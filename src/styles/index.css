@@ -1,0 +1,49 @@
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+}
+
+@layer base {
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply min-h-screen bg-[#f4f0e6] text-black antialiased;
+    font-family: "Instrument Sans", "Segoe UI", sans-serif;
+  }
+
+  #root {
+    @apply min-h-screen;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply rounded-[2rem] border-2 border-black bg-[#f8f3ea];
+  }
+
+  .field-input {
+    @apply w-full rounded-[1.35rem] border-2 border-black bg-[#fffdf8] px-4 py-3.5 text-base font-medium text-black outline-none transition placeholder:text-black/35 focus:-translate-y-px focus:shadow-[6px_6px_0_#000];
+    box-shadow: 4px 4px 0 #000;
+  }
+
+  .tag {
+    @apply inline-flex items-center rounded-full border-2 border-black bg-[#fffdf8] px-3 py-1 text-sm font-medium text-black;
+  }
+
+  .pill {
+    @apply inline-flex items-center rounded-full border-2 border-black bg-[#c5ff6f] px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-black;
+  }
+
+  .note-card {
+    @apply rounded-[1.75rem] border-2 border-black p-5 sm:p-6;
+  }
+
+  .board-card {
+    @apply block rounded-[1.9rem] border-2 border-black p-5 text-left transition hover:-translate-y-1 hover:shadow-[8px_8px_0_#000] sm:p-6;
+    box-shadow: 6px 6px 0 #000;
+  }
+}
