@@ -30,16 +30,8 @@
     box-shadow: 4px 4px 0 #000;
   }
 
-  .tag {
-    @apply inline-flex items-center rounded-full border-2 border-black bg-[#fffdf8] px-3 py-1 text-sm font-medium text-black;
-  }
-
   .pill {
     @apply inline-flex items-center rounded-full border-2 border-black bg-[#c5ff6f] px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-black;
-  }
-
-  .note-card {
-    @apply rounded-[1.75rem] border-2 border-black p-5 sm:p-6;
   }
 
   .board-card {
@@ -48,7 +40,7 @@
   }
 
   .brand-badge {
-    @apply inline-flex w-fit items-center gap-2.5 rounded-[1.5rem] border-2 border-black bg-[#f8f3ea] px-2.5 py-2 pr-4 no-underline transition hover:-translate-y-1 hover:shadow-[8px_8px_0_#000];
+    @apply inline-flex w-fit items-center gap-2.5 rounded-[1.5rem] border-2 border-black bg-[#fffdf8] px-2.5 py-2 pr-4 no-underline transition hover:-translate-y-1 hover:shadow-[8px_8px_0_#000];
     box-shadow: 6px 6px 0 #000;
   }
 }

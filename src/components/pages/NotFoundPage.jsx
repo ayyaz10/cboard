@@ -6,7 +6,7 @@ export function NotFoundPage() {
       <section className="panel p-6 sm:p-8 lg:p-10">
         <span className="pill">Page not found</span>
         <h1 className="mt-6 text-4xl font-bold tracking-[-0.05em] text-black sm:text-5xl">
-          This calculator does not exist yet
+          This page could not be found
         </h1>
         <p className="mt-3 max-w-xl text-base font-medium leading-7 text-black/70">
           Head back to the board and open an available calculator.
