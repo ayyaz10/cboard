@@ -46,4 +46,9 @@
     @apply block rounded-[1.9rem] border-2 border-black p-5 text-left transition hover:-translate-y-1 hover:shadow-[8px_8px_0_#000] sm:p-6;
     box-shadow: 6px 6px 0 #000;
   }
+
+  .brand-badge {
+    @apply inline-flex w-fit items-center gap-2.5 rounded-[1.5rem] border-2 border-black bg-[#f8f3ea] px-2.5 py-2 pr-4 no-underline transition hover:-translate-y-1 hover:shadow-[8px_8px_0_#000];
+    box-shadow: 6px 6px 0 #000;
+  }
 }
