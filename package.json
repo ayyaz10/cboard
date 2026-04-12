@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "copy-docs": "node scripts/copy-dist-to-docs.js",
+    "deploy": "npm run build && npm run copy-docs",
     "preview": "vite preview"
   },
   "dependencies": {
