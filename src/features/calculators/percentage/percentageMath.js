@@ -66,10 +66,18 @@ export function formatResult(value) {
 }
 
 export function buildPercentageResult(values) {
+  const number = Number(values.number);
+  const percentage = Number(values.percentage);
   const result = calculatePercentageResult(values);
+  const formattedNumber = formatResult(number);
+  const formattedPercentage = formatResult(percentage);
+  const formattedValue = formatResult(result);
 
   return {
     value: result,
-    formattedValue: formatResult(result),
+    formattedValue,
+    formulaText: `${formattedNumber} x (${formattedPercentage} / 100) = ${formattedValue}`,
+    historySummary: `${formattedPercentage}% of ${formattedNumber} = ${formattedValue}`,
+    historyDetail: `Formula: ${formattedNumber} x (${formattedPercentage} / 100)`,
   };
 }

@@ -79,6 +79,7 @@ export function calculateCalories(values) {
 
   return {
     totalQuantity,
+    totalCalories,
     desiredQuantity,
     caloriesPerUnit,
     calculatedCalories,
@@ -91,14 +92,21 @@ export function formatNumber(value) {
 
 export function buildResultSummary(values) {
   const result = calculateCalories(values);
+  const formattedTotalQuantity = formatNumber(result.totalQuantity);
+  const formattedTotalCalories = formatNumber(result.totalCalories);
+  const formattedDesiredQuantity = formatNumber(result.desiredQuantity);
+  const formattedCaloriesPerUnit = formatNumber(result.caloriesPerUnit);
+  const formattedCalculatedCalories = formatNumber(result.calculatedCalories);
 
   return {
     ...result,
-    formattedCaloriesPerUnit: formatNumber(result.caloriesPerUnit),
-    formattedDesiredQuantity: formatNumber(result.desiredQuantity),
-    formattedCalculatedCalories: formatNumber(result.calculatedCalories),
-    formulaText: `${formatNumber(result.caloriesPerUnit)} x ${formatNumber(
-      result.desiredQuantity,
-    )} = ${formatNumber(result.calculatedCalories)}`,
+    formattedTotalQuantity,
+    formattedTotalCalories,
+    formattedCaloriesPerUnit,
+    formattedDesiredQuantity,
+    formattedCalculatedCalories,
+    formulaText: `${formattedCaloriesPerUnit} x ${formattedDesiredQuantity} = ${formattedCalculatedCalories}`,
+    historySummary: `${formattedDesiredQuantity} quantity = ${formattedCalculatedCalories} calories`,
+    historyDetail: `${formattedTotalCalories} / ${formattedTotalQuantity} = ${formattedCaloriesPerUnit} calories per unit`,
   };
 }

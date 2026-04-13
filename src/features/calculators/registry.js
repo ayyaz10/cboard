@@ -1,4 +1,5 @@
 import { CalorieCalculator } from './calorie/CalorieCalculator';
+import { MassCalculator } from './mass/MassCalculator';
 import { PercentageCalculator } from './percentage/PercentageCalculator';
 
 export const calculators = [
@@ -38,6 +39,26 @@ export const calculators = [
     },
     showReferenceCards: true,
     component: CalorieCalculator,
+  },
+  {
+    id: 'mass',
+    path: '/calculators/mass',
+    name: 'Mass Unit Converter',
+    boardLabel: 'Calculator 03',
+    boardColor: '#9fe3ff',
+    boardDescription: 'Convert between metric and imperial mass units.',
+    description:
+      'Switch between mass units and see the formula used for the exact conversion you selected.',
+    formula: [
+      'result = value x (from unit in kilograms / to unit in kilograms)',
+      'example: grams = kilograms x 1000',
+    ],
+    example: {
+      total: '2 kilograms -> grams',
+      desired: '2 x 1000 = 2,000 grams',
+    },
+    showReferenceCards: true,
+    component: MassCalculator,
   },
 ];
 
