@@ -2,7 +2,7 @@ import { BrandBadge } from './BrandBadge';
 import { useAuth } from '../../contexts/AuthContext';
 
 export function PageShell({ children }) {
-  const { user, signOut } = useAuth();
+  const { displayName, user, signOut } = useAuth();
 
   return (
     <main className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">
@@ -13,7 +13,7 @@ export function PageShell({ children }) {
           {user ? (
             <div className="flex flex-wrap items-center gap-3">
               <span className="max-w-[16rem] truncate rounded-full border-2 border-black bg-[#fffdf8] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-black">
-                {user.email}
+                {displayName}
               </span>
               <button
                 type="button"

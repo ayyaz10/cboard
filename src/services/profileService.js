@@ -30,3 +30,17 @@ export async function resolveLoginEmail(identifier) {
 
   return data;
 }
+
+export async function getCurrentProfile() {
+  const client = requireSupabase();
+  const { data, error } = await client
+    .from('profiles')
+    .select('username')
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}

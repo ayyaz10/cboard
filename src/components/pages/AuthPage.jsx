@@ -20,7 +20,7 @@ export function AuthPage() {
     setSuccessMessage('');
 
     if (!isConfigured) {
-      setFormError('Supabase is not configured yet.');
+      setFormError('App configuration is missing.');
       return;
     }
 
@@ -76,17 +76,11 @@ export function AuthPage() {
         <section className="panel mx-auto w-full max-w-xl p-6 sm:p-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span className="pill">Account</span>
-            <span className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
-              Supabase
-            </span>
           </div>
 
           <h1 className="mt-6 text-4xl font-bold tracking-[-0.05em] text-black sm:text-5xl">
             {mode === 'signup' ? 'Create your C Board account' : 'Sign in to C Board'}
           </h1>
-          <p className="mt-3 text-base font-medium leading-7 text-black/70">
-            Your goals, entries, and saved calculations are private to your account.
-          </p>
 
           <form onSubmit={handleSubmit} className="mt-6 grid gap-4">
             {mode === 'signup' ? (

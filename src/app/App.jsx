@@ -65,7 +65,7 @@ export default function App() {
     return (
       <main className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">
         <section className="panel mx-auto mt-12 max-w-xl p-6 text-center text-lg font-bold text-black">
-          Moving your local data into Supabase...
+          Setting up your workspace...
         </section>
       </main>
     );

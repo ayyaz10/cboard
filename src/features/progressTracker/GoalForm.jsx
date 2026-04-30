@@ -142,7 +142,7 @@ export function GoalForm({ onCreateGoal, isSaving = false }) {
           </h2>
         </div>
         <span className="rounded-full border-2 border-black bg-[#ffd166] px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-black">
-          Cloud
+          Ready
         </span>
       </div>
 

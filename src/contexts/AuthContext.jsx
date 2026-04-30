@@ -1,25 +1,49 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { isSupabaseConfigured, requireSupabase, supabase } from '../lib/supabaseClient';
-import { normalizeUsername, resolveLoginEmail } from '../services/profileService';
+import { getCurrentProfile, normalizeUsername, resolveLoginEmail } from '../services/profileService';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [authError, setAuthError] = useState('');
+
+  async function syncProfile(nextSession) {
+    const nextUser = nextSession?.user ?? null;
+
+    setSession(nextSession);
+    setUser(nextUser);
+
+    if (!nextUser) {
+      setProfile(null);
+      return;
+    }
+
+    try {
+      const nextProfile = await getCurrentProfile();
+      setProfile(nextProfile ?? {
+        username: nextUser.user_metadata?.username ?? nextUser.email,
+      });
+    } catch {
+      setProfile({
+        username: nextUser.user_metadata?.username ?? nextUser.email,
+      });
+    }
+  }
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
       setIsLoading(false);
-      setAuthError('Supabase environment variables are missing.');
+      setAuthError('App configuration is missing.');
       return undefined;
     }
 
     let isMounted = true;
 
-    supabase.auth.getSession().then(({ data, error }) => {
+    supabase.auth.getSession().then(async ({ data, error }) => {
       if (!isMounted) {
         return;
       }
@@ -28,15 +52,13 @@ export function AuthProvider({ children }) {
         setAuthError(error.message);
       }
 
-      setSession(data.session);
-      setUser(data.session?.user ?? null);
+      await syncProfile(data.session);
       setIsLoading(false);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, nextSession) => {
-        setSession(nextSession);
-        setUser(nextSession?.user ?? null);
+      async (_event, nextSession) => {
+        await syncProfile(nextSession);
         setIsLoading(false);
         setAuthError('');
       },
@@ -52,6 +74,8 @@ export function AuthProvider({ children }) {
     () => ({
       session,
       user,
+      profile,
+      displayName: profile?.username ?? user?.user_metadata?.username ?? user?.email ?? '',
       isAuthenticated: Boolean(user),
       isLoading,
       authError,
@@ -105,7 +129,7 @@ export function AuthProvider({ children }) {
         }
       },
     }),
-    [authError, isLoading, session, user],
+    [authError, isLoading, profile, session, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
