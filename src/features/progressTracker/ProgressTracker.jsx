@@ -248,9 +248,8 @@ export function ProgressTracker() {
 
     try {
       await deleteEntry(entryId);
-      setEntries((current) =>
-        current.filter((entry) => entry.id !== entryId),
-      );
+      const refreshedEntries = await getEntries();
+      setEntries(refreshedEntries);
       if (editingEntry?.id === entryId) {
         setEditingEntry(null);
       }

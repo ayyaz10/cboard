@@ -151,8 +151,14 @@ export async function updateEntry(entryId, entry) {
 
 export async function deleteEntry(entryId) {
   const { client } = await getUserScopedClient();
-  const result = await client.from('entries').delete().eq('id', entryId);
-  assertSupabaseResult(result);
+  const valuesResult = await client
+    .from('entry_values')
+    .delete()
+    .eq('entry_id', entryId);
+  assertSupabaseResult(valuesResult);
+
+  const entryResult = await client.from('entries').delete().eq('id', entryId);
+  assertSupabaseResult(entryResult);
 }
 
 export function subscribeToEntries(userId, onChange) {

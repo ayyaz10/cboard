@@ -1,20 +1,20 @@
-import calLogo from '../../assets/cal-logo.png';
+import calLogo from "../../assets/cal-logo.png";
 
 const featureTiles = [
   {
-    title: 'Progress Tracker',
-    text: 'Create goals, log daily metrics, and see current progress against the target.',
-    color: '#c5ff6f',
+    title: "Progress Tracker",
+    text: "Create goals, log daily metrics, and see current progress against the target.",
+    color: "#c5ff6f",
   },
   {
-    title: 'Calculator Tools',
-    text: 'Save calculation history for percentages, calories, and mass conversions.',
-    color: '#9fe3ff',
+    title: "Calculator Tools",
+    text: "Save calculation history for percentages, calories, and mass conversions.",
+    color: "#9fe3ff",
   },
   {
-    title: 'Personal Workspace',
-    text: 'Keep your tools, entries, and saved results organized behind your account.',
-    color: '#ff90e8',
+    title: "Personal Workspace",
+    text: "Keep your tools, entries, and saved results organized behind your account.",
+    color: "#ff90e8",
   },
 ];
 
@@ -52,16 +52,16 @@ export function LandingPage({ isAuthenticated }) {
             </a>
 
             <a
-              href={isAuthenticated ? '#/board' : '#/login'}
+              href={isAuthenticated ? "#/board" : "#/login"}
               className="rounded-full border-2 border-black bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[4px_4px_0_#000]"
             >
-              {isAuthenticated ? 'Open board' : 'Login'}
+              {isAuthenticated ? "Open board" : "Login"}
             </a>
           </header>
 
           <div className="grid flex-1 items-center gap-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,1.05fr)]">
             <div className="max-w-3xl">
-              <span className="pill">Progress, tools, history</span>
+              {/* <span className="pill">Progress, tools</span> */}
               <h1 className="mt-6 text-5xl font-bold leading-none tracking-[-0.06em] text-black sm:text-6xl lg:text-7xl">
                 One board for goals and quick calculations.
               </h1>
@@ -71,10 +71,10 @@ export function LandingPage({ isAuthenticated }) {
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <a
-                  href={isAuthenticated ? '#/board' : '#/login'}
+                  href={isAuthenticated ? "#/board" : "#/login"}
                   className="inline-flex items-center justify-center rounded-full border-2 border-black bg-[#c5ff6f] px-6 py-3.5 text-sm font-bold uppercase tracking-[0.12em] text-black shadow-[4px_4px_0_#000]"
                 >
-                  {isAuthenticated ? 'Open C Board' : 'Get started'}
+                  {isAuthenticated ? "Open C Board" : "Get started"}
                 </a>
                 <a
                   href="#/progress-tracker"
@@ -104,19 +104,19 @@ export function LandingPage({ isAuthenticated }) {
               </div>
 
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                {['Latest', 'Best', 'Streak'].map((label, index) => (
+                {["Latest", "Best", "Streak"].map((label, index) => (
                   <article
                     key={label}
                     className="rounded-[1.25rem] border-2 border-black p-4"
                     style={{
-                      backgroundColor: ['#c5ff6f', '#9fe3ff', '#ff90e8'][index],
+                      backgroundColor: ["#c5ff6f", "#9fe3ff", "#ff90e8"][index],
                     }}
                   >
                     <p className="text-xs font-bold uppercase tracking-[0.14em] text-black/55">
                       {label}
                     </p>
                     <p className="mt-2 text-3xl font-bold tracking-[-0.05em]">
-                      {['80', '92', '5'][index]}
+                      {["80", "92", "5"][index]}
                     </p>
                   </article>
                 ))}
