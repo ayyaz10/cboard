@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
+import { getPreference, setPreference } from '../../../services/preferenceService';
 import { massUnitOptions } from './massMath';
 
-const STORAGE_KEY = 'calculators:mass-unit-usage';
+const PREFERENCE_KEY = 'mass-unit-usage';
 const FALLBACK_FROM_UNIT = 'kilogram';
 const FALLBACK_TO_UNIT = 'gram';
 const validMassUnitValues = new Set(massUnitOptions.map((unit) => unit.value));
@@ -26,36 +27,11 @@ function normalizeCountMap(value) {
   );
 }
 
-function readUnitUsage() {
-  if (typeof window === 'undefined') {
-    return {
-      fromCounts: {},
-      toCounts: {},
-    };
-  }
-
-  try {
-    const storedValue = window.localStorage.getItem(STORAGE_KEY);
-
-    if (!storedValue) {
-      return {
-        fromCounts: {},
-        toCounts: {},
-      };
-    }
-
-    const parsedValue = JSON.parse(storedValue);
-
-    return {
-      fromCounts: normalizeCountMap(parsedValue?.fromCounts),
-      toCounts: normalizeCountMap(parsedValue?.toCounts),
-    };
-  } catch {
-    return {
-      fromCounts: {},
-      toCounts: {},
-    };
-  }
+function emptyUnitUsage() {
+  return {
+    fromCounts: {},
+    toCounts: {},
+  };
 }
 
 function getMostUsedUnit(counts, fallbackUnit, excludedUnit) {
@@ -99,39 +75,63 @@ function buildPreferredUnits(unitUsage) {
 }
 
 export function useMassUnitPreferences() {
-  const [unitUsage, setUnitUsage] = useState(readUnitUsage);
+  const [unitUsage, setUnitUsage] = useState(emptyUnitUsage);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
+    let isActive = true;
 
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(unitUsage));
-    } catch {
-      // Ignore storage issues so conversions still work even if persistence fails.
-    }
-  }, [unitUsage]);
+    getPreference(PREFERENCE_KEY, emptyUnitUsage())
+      .then((savedUsage) => {
+        if (!isActive) {
+          return;
+        }
 
-  const rememberUnits = ({ fromUnit, toUnit }) => {
+        setUnitUsage({
+          fromCounts: normalizeCountMap(savedUsage?.fromCounts),
+          toCounts: normalizeCountMap(savedUsage?.toCounts),
+        });
+      })
+      .catch((loadError) => {
+        if (isActive) {
+          setError(loadError.message);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, []);
+
+  const rememberUnits = async ({ fromUnit, toUnit }) => {
     if (!validMassUnitValues.has(fromUnit) || !validMassUnitValues.has(toUnit)) {
       return;
     }
 
-    setUnitUsage((currentUsage) => ({
+    const nextUsage = {
       fromCounts: {
-        ...currentUsage.fromCounts,
-        [fromUnit]: (currentUsage.fromCounts[fromUnit] ?? 0) + 1,
+        ...unitUsage.fromCounts,
+        [fromUnit]: (unitUsage.fromCounts[fromUnit] ?? 0) + 1,
       },
       toCounts: {
-        ...currentUsage.toCounts,
-        [toUnit]: (currentUsage.toCounts[toUnit] ?? 0) + 1,
+        ...unitUsage.toCounts,
+        [toUnit]: (unitUsage.toCounts[toUnit] ?? 0) + 1,
       },
-    }));
+    };
+
+    setUnitUsage(nextUsage);
+
+    try {
+      await setPreference(PREFERENCE_KEY, nextUsage);
+      setError('');
+    } catch (saveError) {
+      setError(saveError.message);
+    }
   };
 
   return {
     preferredUnits: buildPreferredUnits(unitUsage),
     rememberUnits,
+    error,
   };
 }

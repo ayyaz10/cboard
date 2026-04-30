@@ -17,6 +17,8 @@ export function RecentResultsPanel({
   entries,
   emptyMessage = 'Your last 5 successful calculations will appear here.',
   onRemoveEntry,
+  isLoading = false,
+  error = '',
 }) {
   return (
     <section className="rounded-[1.75rem] border-2 border-black bg-[#fff0b8] p-5 sm:p-6">
@@ -35,7 +37,15 @@ export function RecentResultsPanel({
         </span>
       </div>
 
-      {entries.length === 0 ? (
+      {error ? (
+        <p className="mt-4 rounded-[1rem] border-2 border-black bg-[#ffe0de] px-4 py-3 text-sm font-bold text-black">
+          {error}
+        </p>
+      ) : isLoading ? (
+        <p className="mt-4 max-w-2xl text-sm font-bold leading-7 text-black/70 sm:text-base">
+          Loading saved calculations...
+        </p>
+      ) : entries.length === 0 ? (
         <p className="mt-4 max-w-2xl text-sm font-medium leading-7 text-black/70 sm:text-base">
           {emptyMessage}
         </p>

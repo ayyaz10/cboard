@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { InputField } from '../../../components/ui/InputField';
 import { PrimaryButton } from '../../../components/ui/PrimaryButton';
 import { RecentResultsPanel } from '../../../components/ui/RecentResultsPanel';
@@ -80,12 +80,34 @@ function MassResultPanel({ result }) {
 }
 
 export function MassCalculator() {
-  const { preferredUnits, rememberUnits } = useMassUnitPreferences();
+  const {
+    preferredUnits,
+    rememberUnits,
+    error: preferenceError,
+  } = useMassUnitPreferences();
   const [formValues, setFormValues] = useState(() => createEmptyMassForm(preferredUnits));
   const [errors, setErrors] = useState({});
   const [result, setResult] = useState(null);
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
-  const { recentResults, saveResult, removeResult } = useRecentResults('mass');
+  const {
+    recentResults,
+    isLoading: isLoadingResults,
+    error: resultsError,
+    saveResult,
+    removeResult,
+  } = useRecentResults('mass');
+
+  useEffect(() => {
+    if (hasAttemptedSubmit) {
+      return;
+    }
+
+    setFormValues((currentValues) => ({
+      ...currentValues,
+      fromUnit: preferredUnits.fromUnit,
+      toUnit: preferredUnits.toUnit,
+    }));
+  }, [hasAttemptedSubmit, preferredUnits.fromUnit, preferredUnits.toUnit]);
 
   const runCalculation = (nextValues) => {
     const validationErrors = validateMassForm(nextValues);
@@ -206,6 +228,8 @@ export function MassCalculator() {
         entries={recentResults}
         emptyMessage="Your last 5 mass conversions will appear here after you save a result with Calculate."
         onRemoveEntry={removeResult}
+        isLoading={isLoadingResults}
+        error={resultsError || preferenceError}
       />
     </div>
   );

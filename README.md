@@ -1,30 +1,48 @@
-# Calculators
+# C Board
 
-A simple, clean, responsive calculator built with React, Vite, and Tailwind CSS.
+C Board is a clean, responsive control board built with React/Vite. It collects calculator tools and a Supabase-backed Progress Tracker in one place, using Tailwind CSS with the existing bold card style: cream background, thick black borders, rounded panels, colorful cards, and compact dashboard controls.
 
-## Feature Log
+## Apps
 
-- `2026-04-13` Added `Mass Unit Converter` with metric and imperial units plus the exact formula for each selected conversion.
-- `2026-04-13` Added `Recent results` for each calculator, storing the last 5 successful saved calculations in the browser.
-- `2026-04-13` Added `Remove saved result` action so any recent record can be deleted with the `x` button.
-- `2026-04-13` Added `Most-used unit preselection` for the mass converter so the `From` and `To` units default to the units used most often.
+- `Calculator Tools`
+  - Percentage Calculator
+  - Calorie Calculator
+  - Mass Unit Converter
+- `Progress Tracker`
+  - Create custom goals
+  - Add/remove goal metrics dynamically
+  - Save daily metric entries
+  - Edit/delete past entries
+  - View target, latest, best, average, progress percentage, and streak
+  - View multi-line progress charts powered by Recharts
 
-## What it does
+## Supabase storage
 
-- Enter a total quantity
-- Enter the total calories for that quantity
-- Enter a desired quantity
-- Get the calories for that desired quantity
+All app data is stored in Supabase and scoped to the signed-in user with Row Level Security.
 
-Formula used:
+1. Create a Supabase project.
+2. Run [supabase/schema.sql](./supabase/schema.sql) in the Supabase SQL editor.
+3. Copy `.env.example` to `.env.local`.
+4. Fill in `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
 
-- `calories per unit = total calories / total quantity`
-- `result = calories per unit x desired quantity`
+Only the anon key belongs in the frontend. Never expose a service role key.
 
-Future Calculators:
-Converters
-Trade return calculator
-https://insider-week.com/en/trade-return-calculator/
+Main tables:
+
+- `profiles`
+- `goals`
+- `metrics`
+- `entries`
+- `entry_values`
+- `calculator_results`
+- `user_tool_preferences`
+- `data_migrations`
+
+Legacy data migration:
+
+On first login, C Board checks for the old localStorage keys, migrates any goals, entries, calculator history, and mass-unit preferences into Supabase, then clears those legacy keys.
+
+Auth supports email/password signup with a unique username. Users can log in with either their email address or username.
 
 ## Run locally
 
@@ -45,21 +63,52 @@ npm run build
 src/
   app/
     App.jsx
+    useHashRoute.js
   components/
     layout/
+    pages/
+      AppBoard.jsx
+      NotFoundPage.jsx
     ui/
   features/
     calculators/
+      CalculatorBoard.jsx
       calorie/
+      mass/
+      percentage/
       registry.js
+    progressTracker/
+      EntryForm.jsx
+      GoalChart.jsx
+      GoalForm.jsx
+      GoalList.jsx
+      GoalStats.jsx
+      ProgressTracker.jsx
+      progressTrackerStorage.js
   styles/
+    index.css
 ```
+
+## Routes
+
+- `#/` Main app board
+- `#/calculators` Calculator Tools
+- `#/calculators/percentage` Percentage Calculator
+- `#/calculators/calorie` Calorie Calculator
+- `#/calculators/mass` Mass Unit Converter
+- `#/progress-tracker` Progress Tracker
 
 ## How to add more calculators later
 
-1. Create a new feature folder inside `src/features/calculators/`
-2. Add its UI component and calculation logic in that folder
-3. Register it in `src/features/calculators/registry.js`
-4. Reuse the shared UI components from `src/components/ui/`
+1. Create a new feature folder inside `src/features/calculators/`.
+2. Add its UI component and calculation logic in that folder.
+3. Register it in `src/features/calculators/registry.js`.
+4. Reuse shared UI components from `src/components/ui/`.
 
-This keeps calculator-specific logic isolated while sharing layout, form inputs, and result display patterns across the app.
+## How to add more app sections later
+
+1. Add the route in `src/app/App.jsx`.
+2. Add the app card metadata in `src/components/pages/AppBoard.jsx`.
+3. Keep feature-specific state and components inside `src/features/<featureName>/`.
+
+This keeps each app isolated while sharing the same board, layout, and visual system.

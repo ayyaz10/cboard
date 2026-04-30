@@ -1,94 +1,76 @@
 import { useEffect, useState } from 'react';
-
-const MAX_RECENT_RESULTS = 5;
-
-function normalizeEntry(entry, index) {
-  if (!entry || typeof entry !== 'object') {
-    return null;
-  }
-
-  if (typeof entry.summary !== 'string' || typeof entry.detail !== 'string') {
-    return null;
-  }
-
-  return {
-    id:
-      typeof entry.id === 'string'
-        ? entry.id
-        : `stored-result-${index}-${entry.savedAt ?? 'unknown'}`,
-    summary: entry.summary,
-    detail: entry.detail,
-    savedAt: typeof entry.savedAt === 'string' ? entry.savedAt : new Date().toISOString(),
-  };
-}
-
-function readRecentResults(storageKey) {
-  if (typeof window === 'undefined') {
-    return [];
-  }
-
-  try {
-    const storedValue = window.localStorage.getItem(storageKey);
-
-    if (!storedValue) {
-      return [];
-    }
-
-    const parsedValue = JSON.parse(storedValue);
-
-    if (!Array.isArray(parsedValue)) {
-      return [];
-    }
-
-    return parsedValue
-      .map(normalizeEntry)
-      .filter(Boolean)
-      .slice(0, MAX_RECENT_RESULTS);
-  } catch {
-    return [];
-  }
-}
+import {
+  createCalculatorResult,
+  deleteCalculatorResult,
+  getCalculatorResults,
+} from '../../services/calculatorResultService';
 
 export function useRecentResults(calculatorId) {
-  const storageKey = `calculators:recent-results:${calculatorId}`;
-  const [recentResults, setRecentResults] = useState(() => readRecentResults(storageKey));
+  const [recentResults, setRecentResults] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
+    let isActive = true;
+    setIsLoading(true);
+    setError('');
+
+    getCalculatorResults(calculatorId)
+      .then((results) => {
+        if (isActive) {
+          setRecentResults(results);
+        }
+      })
+      .catch((loadError) => {
+        if (isActive) {
+          setError(loadError.message);
+        }
+      })
+      .finally(() => {
+        if (isActive) {
+          setIsLoading(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [calculatorId]);
+
+  const saveResult = async ({ summary, detail }) => {
+    setError('');
 
     try {
-      window.localStorage.setItem(storageKey, JSON.stringify(recentResults));
-    } catch {
-      // Ignore storage issues so calculations still work even if persistence fails.
+      const results = await createCalculatorResult(calculatorId, {
+        summary,
+        detail,
+        savedAt: new Date().toISOString(),
+      });
+      setRecentResults(results);
+    } catch (saveError) {
+      setError(saveError.message);
     }
-  }, [recentResults, storageKey]);
-
-  const saveResult = ({ summary, detail }) => {
-    const nextEntry = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      summary,
-      detail,
-      savedAt: new Date().toISOString(),
-    };
-
-    setRecentResults((currentResults) => [
-      nextEntry,
-      ...currentResults.filter(
-        (entry) => entry.summary !== nextEntry.summary || entry.detail !== nextEntry.detail,
-      ),
-    ].slice(0, MAX_RECENT_RESULTS));
   };
 
-  const removeResult = (entryId) => {
+  const removeResult = async (entryId) => {
+    setError('');
     setRecentResults((currentResults) =>
       currentResults.filter((entry) => entry.id !== entryId),
     );
+
+    try {
+      await deleteCalculatorResult(entryId);
+    } catch (deleteError) {
+      setError(deleteError.message);
+      const results = await getCalculatorResults(calculatorId);
+      setRecentResults(results);
+    }
   };
 
   return {
     recentResults,
+    isLoading,
+    error,
     saveResult,
     removeResult,
   };

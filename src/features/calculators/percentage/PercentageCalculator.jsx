@@ -14,7 +14,13 @@ export function PercentageCalculator() {
   const [formValues, setFormValues] = useState(createEmptyPercentageForm);
   const [errors, setErrors] = useState({});
   const [result, setResult] = useState(null);
-  const { recentResults, saveResult, removeResult } = useRecentResults('percentage');
+  const {
+    recentResults,
+    isLoading: isLoadingResults,
+    error: resultsError,
+    saveResult,
+    removeResult,
+  } = useRecentResults('percentage');
 
   const runCalculation = (nextValues) => {
     const validationErrors = validatePercentageForm(nextValues);
@@ -103,6 +109,8 @@ export function PercentageCalculator() {
         entries={recentResults}
         emptyMessage="Your last 5 percentage calculations will appear here after you save a result with Calculate."
         onRemoveEntry={removeResult}
+        isLoading={isLoadingResults}
+        error={resultsError}
       />
     </div>
   );

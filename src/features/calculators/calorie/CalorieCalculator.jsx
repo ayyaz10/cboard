@@ -16,7 +16,13 @@ export function CalorieCalculator() {
   const [errors, setErrors] = useState({});
   const [result, setResult] = useState(null);
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
-  const { recentResults, saveResult, removeResult } = useRecentResults('calorie');
+  const {
+    recentResults,
+    isLoading: isLoadingResults,
+    error: resultsError,
+    saveResult,
+    removeResult,
+  } = useRecentResults('calorie');
 
   const runCalculation = (nextValues) => {
     const validationErrors = validateCalorieForm(nextValues);
@@ -113,6 +119,8 @@ export function CalorieCalculator() {
         entries={recentResults}
         emptyMessage="Your last 5 calorie calculations will appear here after you save a result with Calculate."
         onRemoveEntry={removeResult}
+        isLoading={isLoadingResults}
+        error={resultsError}
       />
     </div>
   );
