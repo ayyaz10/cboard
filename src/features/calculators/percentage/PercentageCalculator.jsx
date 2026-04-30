@@ -107,7 +107,7 @@ export function PercentageCalculator() {
 
       <RecentResultsPanel
         entries={recentResults}
-        emptyMessage="Your last 5 percentage calculations will appear here after you save a result with Calculate."
+        emptyMessage="Your percentage calculations will appear here after you save a result with Calculate."
         onRemoveEntry={removeResult}
         isLoading={isLoadingResults}
         error={resultsError}

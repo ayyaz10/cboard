@@ -226,7 +226,7 @@ export function MassCalculator() {
 
       <RecentResultsPanel
         entries={recentResults}
-        emptyMessage="Your last 5 mass conversions will appear here after you save a result with Calculate."
+        emptyMessage="Your mass conversions will appear here after you save a result with Calculate."
         onRemoveEntry={removeResult}
         isLoading={isLoadingResults}
         error={resultsError || preferenceError}

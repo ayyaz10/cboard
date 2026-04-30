@@ -15,7 +15,7 @@ function formatSavedAt(savedAt) {
 
 export function RecentResultsPanel({
   entries,
-  emptyMessage = 'Your last 5 successful calculations will appear here.',
+  emptyMessage = 'Your saved calculations will appear here.',
   onRemoveEntry,
   isLoading = false,
   error = '',
@@ -28,12 +28,12 @@ export function RecentResultsPanel({
             Recent results
           </p>
           <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-black">
-            Last 5 saved calculations
+            Saved calculations
           </h2>
         </div>
 
         <span className="rounded-full border-2 border-black bg-[#fffdf8] px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-black">
-          {entries.length}/5
+          {entries.length}
         </span>
       </div>
 

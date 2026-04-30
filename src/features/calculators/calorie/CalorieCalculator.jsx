@@ -117,7 +117,7 @@ export function CalorieCalculator() {
 
       <RecentResultsPanel
         entries={recentResults}
-        emptyMessage="Your last 5 calorie calculations will appear here after you save a result with Calculate."
+        emptyMessage="Your calorie calculations will appear here after you save a result with Calculate."
         onRemoveEntry={removeResult}
         isLoading={isLoadingResults}
         error={resultsError}

@@ -1,7 +1,5 @@
 import { assertSupabaseResult, getUserScopedClient, normalizeLegacyUuid } from './supabaseCrud';
 
-const MAX_RECENT_RESULTS = 5;
-
 function toCalculatorResult(row) {
   return {
     id: row.id,
@@ -18,8 +16,7 @@ export async function getCalculatorResults(calculatorId) {
     .from('calculator_results')
     .select('id, tool_id, summary, detail, created_at')
     .eq('tool_id', calculatorId)
-    .order('created_at', { ascending: false })
-    .limit(MAX_RECENT_RESULTS);
+    .order('created_at', { ascending: false });
 
   assertSupabaseResult({ error });
   return (data ?? []).map(toCalculatorResult);
@@ -48,23 +45,6 @@ export async function createCalculatorResult(calculatorId, result) {
       created_at: result.savedAt ?? result.created_at ?? new Date().toISOString(),
     });
   assertSupabaseResult(insertResult);
-
-  const { data: allResults, error: allResultsError } = await client
-    .from('calculator_results')
-    .select('id')
-    .eq('tool_id', calculatorId)
-    .order('created_at', { ascending: false });
-
-  assertSupabaseResult({ error: allResultsError });
-  const staleResults = (allResults ?? []).slice(MAX_RECENT_RESULTS);
-
-  if (staleResults.length > 0) {
-    const staleDeleteResult = await client
-      .from('calculator_results')
-      .delete()
-      .in('id', staleResults.map((savedResult) => savedResult.id));
-    assertSupabaseResult(staleDeleteResult);
-  }
 
   return getCalculatorResults(calculatorId);
 }
