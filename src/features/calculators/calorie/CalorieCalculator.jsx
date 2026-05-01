@@ -138,6 +138,50 @@ export function CalorieCalculator() {
         isLoading={isLoadingResults}
         error={resultsError}
       />
+
+      <section className="rounded-[1.75rem] border-2 border-black bg-[#fffdf8] p-5 text-black sm:p-6">
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
+          How it helps
+        </p>
+        <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-black">
+          Find calories for the portion you actually eat
+        </h2>
+        <p className="mt-3 max-w-3xl text-sm font-medium leading-7 text-black/70 sm:text-base">
+          Food labels often show calories for a fixed weight, like 100g. This
+          calculator converts that label value into the calories for your real
+          portion, so you do not have to guess or do the ratio manually.
+        </p>
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-3">
+          <article className="rounded-[1.35rem] border-2 border-black bg-[#fff0b8] p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-black/55">
+              Example
+            </p>
+            <p className="mt-2 text-lg font-bold leading-7 text-black">
+              If the packet says 400 calories per 100g, then 30g has 120
+              calories.
+            </p>
+          </article>
+
+          <article className="rounded-[1.35rem] border-2 border-black bg-[#c5ff6f] p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-black/55">
+              What to enter
+            </p>
+            <p className="mt-2 text-sm font-semibold leading-7 text-black/75">
+              Total quantity: 100g. Total calories: 400. Desired quantity: 30g.
+            </p>
+          </article>
+
+          <article className="rounded-[1.35rem] border-2 border-black bg-[#9fe3ff] p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-black/55">
+              Formula
+            </p>
+            <p className="mt-2 text-sm font-semibold leading-7 text-black/75">
+              Calories per gram = 400 / 100. Then multiply by 30.
+            </p>
+          </article>
+        </div>
+      </section>
       <ConfirmDialog isOpen={Boolean(dialog)} {...dialog} />
     </div>
   );
