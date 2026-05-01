@@ -1,8 +1,9 @@
+import { getAppHref } from '../../app/useRoute';
 import calLogo from '../../assets/cal-logo.png';
 
 export function BrandBadge() {
   return (
-    <a href="#/" className="brand-badge" aria-label="Open C Board home">
+    <a href={getAppHref('/')} className="brand-badge" aria-label="Open C Board home">
       <img
         src={calLogo}
         alt=""

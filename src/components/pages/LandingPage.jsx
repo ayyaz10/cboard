@@ -1,3 +1,4 @@
+import { getAppHref } from "../../app/useRoute";
 import calLogo from "../../assets/cal-logo.png";
 
 const featureTiles = [
@@ -32,7 +33,7 @@ export function LandingPage({ isAuthenticated }) {
         <div className="relative mx-auto flex max-w-6xl flex-col gap-10 lg:min-h-[84vh]">
           <header className="flex flex-wrap items-center justify-between gap-4">
             <a
-              href="#/"
+              href={getAppHref("/")}
               className="inline-flex w-fit items-center gap-2.5 rounded-[1.5rem] border-2 border-black bg-[#fffdf8] px-2.5 py-2 pr-4 no-underline shadow-[6px_6px_0_#000]"
               aria-label="C Board intro"
             >
@@ -52,7 +53,7 @@ export function LandingPage({ isAuthenticated }) {
             </a>
 
             <a
-              href={isAuthenticated ? "#/board" : "#/login"}
+              href={getAppHref(isAuthenticated ? "/board" : "/login")}
               className="rounded-full border-2 border-black bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[4px_4px_0_#000]"
             >
               {isAuthenticated ? "Open board" : "Login"}
@@ -71,13 +72,13 @@ export function LandingPage({ isAuthenticated }) {
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <a
-                  href={isAuthenticated ? "#/board" : "#/login"}
+                  href={getAppHref(isAuthenticated ? "/board" : "/login")}
                   className="inline-flex items-center justify-center rounded-full border-2 border-black bg-[#c5ff6f] px-6 py-3.5 text-sm font-bold uppercase tracking-[0.12em] text-black shadow-[4px_4px_0_#000]"
                 >
                   {isAuthenticated ? "Open C Board" : "Get started"}
                 </a>
                 <a
-                  href="#/progress-tracker"
+                  href={getAppHref("/progress-tracker")}
                   className="inline-flex items-center justify-center rounded-full border-2 border-black bg-white px-6 py-3.5 text-sm font-bold uppercase tracking-[0.12em] text-black shadow-[4px_4px_0_#000]"
                 >
                   View tracker

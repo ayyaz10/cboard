@@ -6,7 +6,7 @@ import { NotFoundPage } from '../components/pages/NotFoundPage';
 import { ToolLayout } from '../components/layout/ToolLayout';
 import { useAuth } from '../contexts/AuthContext';
 import { migrateLocalStorageData } from '../services/dataMigrationService';
-import { useHashRoute } from './useHashRoute';
+import { navigateTo, useRoute } from './useRoute';
 import { CalculatorBoard } from '../features/calculators/CalculatorBoard';
 import {
   calculators,
@@ -16,7 +16,7 @@ import { ProgressTracker } from '../features/progressTracker/ProgressTracker';
 
 export default function App() {
   const { isAuthenticated, isLoading, user } = useAuth();
-  const route = useHashRoute();
+  const route = useRoute();
   const [isMigrating, setIsMigrating] = useState(false);
   const [migrationError, setMigrationError] = useState('');
   const migratedUserRef = useRef(null);
@@ -56,7 +56,7 @@ export default function App() {
       && !isMigrating
       && !migrationError
     ) {
-      window.location.hash = '/board';
+      navigateTo('/board', { replace: true });
     }
   }, [isAuthenticated, isLoading, isMigrating, migrationError, route]);
 

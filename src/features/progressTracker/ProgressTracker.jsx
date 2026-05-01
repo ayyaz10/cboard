@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { getAppHref } from '../../app/useRoute';
 import { PageShell } from '../../components/layout/PageShell';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useAuth } from '../../contexts/AuthContext';
@@ -335,19 +336,19 @@ export function ProgressTracker() {
         <nav className="overflow-x-auto">
           <div className="flex min-w-max gap-2">
             <a
-              href="#/board"
+              href={getAppHref('/board')}
               className="inline-flex items-center rounded-full border border-black/85 bg-[#fffdf8] px-3.5 py-1.5 text-sm font-semibold tracking-[-0.02em] text-black transition hover:bg-white"
             >
               C Board
             </a>
             <a
-              href="#/calculators"
+              href={getAppHref('/calculators')}
               className="inline-flex items-center rounded-full border border-black/85 bg-[#fffdf8] px-3.5 py-1.5 text-sm font-semibold tracking-[-0.02em] text-black transition hover:bg-white"
             >
               Calculator Tools
             </a>
             <a
-              href="#/progress-tracker"
+              href={getAppHref('/progress-tracker')}
               className="inline-flex items-center rounded-full border border-black/85 bg-[#c5ff6f] px-3.5 py-1.5 text-sm font-semibold tracking-[-0.02em] text-black transition"
             >
               Progress Tracker

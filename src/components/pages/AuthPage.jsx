@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { navigateTo } from "../../app/useRoute";
 import { useAuth } from "../../contexts/AuthContext";
 import {
   isValidUsername,
@@ -64,11 +65,11 @@ export function AuthPage() {
           setUsername("");
           setPassword("");
         } else {
-          window.location.hash = "/board";
+          navigateTo("/board", { replace: true });
         }
       } else {
         await signIn(loginValue, password);
-        window.location.hash = "/board";
+        navigateTo("/board", { replace: true });
       }
     } catch (error) {
       setFormError(error.message);

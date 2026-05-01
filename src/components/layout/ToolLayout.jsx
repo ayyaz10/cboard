@@ -1,3 +1,4 @@
+import { getAppHref } from '../../app/useRoute';
 import { PageShell } from './PageShell';
 
 export function ToolLayout({ activeCalculator, calculators, children }) {
@@ -7,21 +8,21 @@ export function ToolLayout({ activeCalculator, calculators, children }) {
         <nav className="overflow-x-auto">
           <div className="flex min-w-max gap-2">
             <a
-              href="#/board"
+              href={getAppHref('/board')}
               className="inline-flex items-center rounded-full border border-black/85 bg-[#fffdf8] px-3.5 py-1.5 text-sm font-semibold tracking-[-0.02em] text-black transition hover:bg-white"
             >
               C Board
             </a>
 
             <a
-              href="#/calculators"
+              href={getAppHref('/calculators')}
               className="inline-flex items-center rounded-full border border-black/85 bg-[#c5ff6f] px-3.5 py-1.5 text-sm font-semibold tracking-[-0.02em] text-black transition"
             >
               Calculator Tools
             </a>
 
             <a
-              href="#/progress-tracker"
+              href={getAppHref('/progress-tracker')}
               className="inline-flex items-center rounded-full border border-black/85 bg-[#fffdf8] px-3.5 py-1.5 text-sm font-semibold tracking-[-0.02em] text-black transition hover:bg-white"
             >
               Progress Tracker
@@ -33,7 +34,7 @@ export function ToolLayout({ activeCalculator, calculators, children }) {
               return (
                 <a
                   key={calculator.id}
-                  href={`#${calculator.path}`}
+                  href={getAppHref(calculator.path)}
                   className={`inline-flex items-center rounded-full border border-black/85 px-3.5 py-1.5 text-sm font-semibold tracking-[-0.02em] text-black transition ${
                     isActive
                       ? 'bg-[#c5ff6f]'

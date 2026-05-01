@@ -1,5 +1,8 @@
 import { formatGoalTarget, goalTypePresets } from './progressTrackerStorage';
-import { getProgressFromStart } from './progressCalculations';
+import {
+  getProgressFromStart,
+  getSortedMetricEntries,
+} from './progressCalculations';
 
 function formatNumber(value) {
   if (!Number.isFinite(value)) {
@@ -33,9 +36,12 @@ function getCurrentProgress(goal, entries) {
   const value = latestEntry.values[mainMetric.id];
   const unit = mainMetric.unit || goal.unit;
   const goalEntries = entries.filter((entry) => entry.goalId === goal.id);
+  const startEntry = getSortedMetricEntries(goalEntries, mainMetric.id)[0];
+  const startValue = startEntry?.values?.[mainMetric.id];
 
   return {
     value,
+    startValue,
     unit,
     percentage: getProgressFromStart(goal, goalEntries, mainMetric.id),
   };
@@ -126,6 +132,12 @@ export function GoalList({
                   <span className="rounded-full border-2 border-black bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-black">
                     {formatGoalTarget(goal)}
                   </span>
+                  {currentProgress?.startValue !== null && currentProgress?.startValue !== undefined ? (
+                    <span className="rounded-full border-2 border-black bg-[#ffd166] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-black">
+                      Start{' '}
+                      {`${formatNumber(currentProgress.startValue)} ${currentProgress.unit}`.trim()}
+                    </span>
+                  ) : null}
                   <span className="rounded-full border-2 border-black bg-[#c5ff6f] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-black">
                     Current{' '}
                     {currentProgress

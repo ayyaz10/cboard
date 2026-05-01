@@ -1,3 +1,4 @@
+import { getAppHref } from '../../app/useRoute';
 import { PageShell } from '../layout/PageShell';
 
 const appSections = [
@@ -48,7 +49,7 @@ export function AppBoard({ calculators }) {
           {appSections.map((section, index) => (
             <a
               key={section.id}
-              href={`#${section.path}`}
+              href={getAppHref(section.path)}
               className="board-card"
               style={{ backgroundColor: section.color }}
             >

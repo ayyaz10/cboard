@@ -1,7 +1,9 @@
+import { getAppHref } from '../../app/useRoute';
+
 export function CalculatorBoardCard({ calculator, index }) {
   return (
     <a
-      href={`#${calculator.path}`}
+      href={getAppHref(calculator.path)}
       className="board-card"
       style={{ backgroundColor: calculator.boardColor }}
     >

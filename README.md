@@ -63,7 +63,7 @@ npm run build
 src/
   app/
     App.jsx
-    useHashRoute.js
+    useRoute.js
   components/
     layout/
     pages/
@@ -93,14 +93,14 @@ src/
 
 ## Routes
 
-- `#/` Introduction page
-- `#/login` Login and signup
-- `#/board` Main app board
-- `#/calculators` Calculator Tools
-- `#/calculators/percentage` Percentage Calculator
-- `#/calculators/calorie` Calorie Calculator
-- `#/calculators/mass` Mass Unit Converter
-- `#/progress-tracker` Progress Tracker
+- `/` Introduction page
+- `/login` Login and signup
+- `/board` Main app board
+- `/calculators` Calculator Tools
+- `/calculators/percentage` Percentage Calculator
+- `/calculators/calorie` Calorie Calculator
+- `/calculators/mass` Mass Unit Converter
+- `/progress-tracker` Progress Tracker
 
 ## How to add more calculators later
 
