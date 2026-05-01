@@ -11,11 +11,11 @@ import { GoalForm } from './GoalForm';
 import { GoalList } from './GoalList';
 import { GoalStats } from './GoalStats';
 import { metricColors } from './progressTrackerStorage';
+import { getTrackerErrorMessage } from './trackerErrorMessages';
 
 const trackerViews = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'new-tracker', label: 'New Tracker' },
-  { id: 'daily-log', label: 'Daily Log' },
 ];
 
 function sortEntriesNewestFirst(entries) {
@@ -138,7 +138,12 @@ export function ProgressTracker() {
       setGoals(savedGoals);
       setEntries(savedEntries);
     } catch (loadError) {
-      setError(loadError.message);
+      setError(
+        getTrackerErrorMessage(
+          loadError,
+          'Could not load tracker data. Please refresh and try again.',
+        ),
+      );
     } finally {
       setIsLoading(false);
     }
@@ -157,7 +162,12 @@ export function ProgressTracker() {
     const channel = subscribeToEntries(user.id, () => {
       getEntries()
         .then(setEntries)
-        .catch((entryError) => setError(entryError.message));
+        .catch((entryError) => setError(
+          getTrackerErrorMessage(
+            entryError,
+            'Could not refresh tracker entries. Please try again.',
+          ),
+        ));
     });
 
     return () => {
@@ -196,7 +206,12 @@ export function ProgressTracker() {
       setSelectedGoalId(savedGoal.id);
       setActiveView('daily-log');
     } catch (createError) {
-      setError(createError.message);
+      setError(
+        getTrackerErrorMessage(
+          createError,
+          'Could not create this tracker. Please check the fields and try again.',
+        ),
+      );
       throw createError;
     } finally {
       setIsSaving(false);
@@ -204,6 +219,24 @@ export function ProgressTracker() {
   }
 
   async function handleSaveEntry(entry) {
+    const existingEntry = entries.find((savedEntry) =>
+      savedEntry.goalId === entry.goalId
+      && savedEntry.date === entry.date
+      && savedEntry.id !== editingEntry?.id
+    );
+
+    if (!editingEntry && existingEntry) {
+      const confirmed = await confirm({
+        title: 'Override existing log?',
+        message: `This tracker already has a log for ${entry.date}. Saving now will replace that date's values and note.`,
+        confirmLabel: 'Override',
+      });
+
+      if (!confirmed) {
+        return false;
+      }
+    }
+
     setIsSaving(true);
     setError('');
 
@@ -219,7 +252,12 @@ export function ProgressTracker() {
       setEditingEntry(null);
       setActiveView('dashboard');
     } catch (saveError) {
-      setError(saveError.message);
+      setError(
+        getTrackerErrorMessage(
+          saveError,
+          'Could not save this entry. Please check the date and metric values, then try again.',
+        ),
+      );
       throw saveError;
     } finally {
       setIsSaving(false);
@@ -254,7 +292,12 @@ export function ProgressTracker() {
         setEditingEntry(null);
       }
     } catch (deleteError) {
-      setError(deleteError.message);
+      setError(
+        getTrackerErrorMessage(
+          deleteError,
+          'Could not delete this entry. Please try again.',
+        ),
+      );
     }
   }
 
@@ -277,7 +320,12 @@ export function ProgressTracker() {
       setGoals((current) => current.filter((savedGoal) => savedGoal.id !== goalId));
       setEntries((current) => current.filter((entry) => entry.goalId !== goalId));
     } catch (deleteError) {
-      setError(deleteError.message);
+      setError(
+        getTrackerErrorMessage(
+          deleteError,
+          'Could not delete this tracker. Please try again.',
+        ),
+      );
     }
   }
 
@@ -365,6 +413,11 @@ export function ProgressTracker() {
                 onSelectGoal={(goalId) => {
                   setSelectedGoalId(goalId);
                   setEditingEntry(null);
+                }}
+                onLogGoal={(goalId) => {
+                  setSelectedGoalId(goalId);
+                  setEditingEntry(null);
+                  setActiveView('daily-log');
                 }}
                 onDeleteGoal={handleDeleteGoal}
               />

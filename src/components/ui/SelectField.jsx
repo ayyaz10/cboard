@@ -1,3 +1,5 @@
+import { ThemedSelect } from './ThemedSelect';
+
 export function SelectField({
   id,
   name,
@@ -23,25 +25,20 @@ export function SelectField({
         </label>
       </div>
 
-      <select
+      <ThemedSelect
         id={id}
         name={name}
         value={value}
         onChange={onChange}
-        aria-invalid={Boolean(error)}
-        aria-describedby={describedBy}
-        className={`field-input cursor-pointer pr-10 ${
+        options={options}
+        ariaInvalid={Boolean(error)}
+        ariaDescribedBy={describedBy}
+        className={`${
           error
             ? 'border-[#ff6b6b] bg-[#fff0f0]'
             : ''
         }`}
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+      />
 
       {hint ? (
         <p id={hintId} className="mt-2 text-sm font-medium leading-6 text-black/55">

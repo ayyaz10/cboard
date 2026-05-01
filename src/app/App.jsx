@@ -48,6 +48,18 @@ export default function App() {
     };
   }, [user?.id]);
 
+  useEffect(() => {
+    if (
+      route === '/login'
+      && !isLoading
+      && isAuthenticated
+      && !isMigrating
+      && !migrationError
+    ) {
+      window.location.hash = '/board';
+    }
+  }, [isAuthenticated, isLoading, isMigrating, migrationError, route]);
+
   if (route === '/') {
     return <LandingPage isAuthenticated={!isLoading && isAuthenticated} />;
   }
@@ -60,10 +72,6 @@ export default function App() {
         </section>
       </main>
     );
-  }
-
-  if (route === '/login') {
-    return <AuthPage />;
   }
 
   if (!isAuthenticated) {
@@ -91,6 +99,16 @@ export default function App() {
           <p className="mt-3 text-sm font-semibold leading-6 text-black/70">
             {migrationError}
           </p>
+        </section>
+      </main>
+    );
+  }
+
+  if (route === '/login') {
+    return (
+      <main className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">
+        <section className="panel mx-auto mt-12 max-w-xl p-6 text-center text-lg font-bold text-black">
+          Opening your dashboard...
         </section>
       </main>
     );

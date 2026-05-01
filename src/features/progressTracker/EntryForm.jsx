@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { ThemedDatePicker } from '../../components/ui/ThemedDatePicker';
+import { ThemedSelect } from '../../components/ui/ThemedSelect';
 import { createId, getTodayInputValue } from './progressTrackerStorage';
+import { getTrackerErrorMessage } from './trackerErrorMessages';
 
 function buildValueState(goal, entry) {
   if (!goal) {
@@ -27,6 +30,10 @@ export function EntryForm({
   const selectedGoal = useMemo(
     () => goals.find((goal) => goal.id === selectedGoalId),
     [goals, selectedGoalId],
+  );
+  const goalOptions = useMemo(
+    () => goals.map((goal) => ({ value: goal.id, label: goal.title })),
+    [goals],
   );
   const [date, setDate] = useState(getTodayInputValue());
   const [values, setValues] = useState({});
@@ -82,7 +89,7 @@ export function EntryForm({
     }
 
     try {
-      await onSaveEntry({
+      const saveResult = await onSaveEntry({
         id: editingEntry?.id || createId('entry'),
         goalId: selectedGoal.id,
         date,
@@ -92,12 +99,21 @@ export function EntryForm({
         updatedAt: editingEntry ? new Date().toISOString() : undefined,
       });
 
+      if (saveResult === false) {
+        return;
+      }
+
       setError('');
       setDate(getTodayInputValue());
       setValues(buildValueState(selectedGoal));
       setNote('');
     } catch (saveError) {
-      setError(saveError.message);
+      setError(
+        getTrackerErrorMessage(
+          saveError,
+          'Could not save this entry. Please check the date and metric values, then try again.',
+        ),
+      );
     }
   }
 
@@ -137,27 +153,19 @@ export function EntryForm({
               <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
                 Goal
               </span>
-              <select
-                className="field-input"
+              <ThemedSelect
                 value={selectedGoalId || ''}
                 onChange={handleGoalChange}
+                options={goalOptions}
                 disabled={Boolean(editingEntry)}
-              >
-                {goals.map((goal) => (
-                  <option key={goal.id} value={goal.id}>
-                    {goal.title}
-                  </option>
-                ))}
-              </select>
+              />
             </label>
 
             <label className="block">
               <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
                 Date
               </span>
-              <input
-                className="field-input"
-                type="date"
+              <ThemedDatePicker
                 value={date}
                 onChange={(event) => setDate(event.target.value)}
               />

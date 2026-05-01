@@ -63,6 +63,18 @@ function toEntryValueRows(entryId, values) {
     .filter((entryValue) => Number.isFinite(entryValue.value));
 }
 
+async function getExistingEntryId(client, goalId, date) {
+  const { data, error } = await client
+    .from('entries')
+    .select('id')
+    .eq('goal_id', goalId)
+    .eq('date', date)
+    .maybeSingle();
+
+  assertSupabaseResult({ error });
+  return data?.id ?? null;
+}
+
 async function replaceEntryValues(client, entryId, values) {
   const deleteResult = await client
     .from('entry_values')
@@ -108,11 +120,44 @@ export async function getEntriesByGoal(goalId) {
 export async function createEntry(entry) {
   const { client, userId } = await getUserScopedClient();
   const entryPayload = toEntryPayload(entry, userId);
+  const goalId = entryPayload.goal_id;
+  const existingEntryId = await getExistingEntryId(client, goalId, entryPayload.date);
+
+  if (existingEntryId) {
+    const updateResult = await client
+      .from('entries')
+      .update({ note: entryPayload.note })
+      .eq('id', existingEntryId)
+      .select('id')
+      .single();
+
+    assertSupabaseResult(updateResult);
+    await replaceEntryValues(client, existingEntryId, entry.values);
+    return getEntryById(existingEntryId);
+  }
+
   const { data: entryRow, error: entryError } = await client
     .from('entries')
-    .upsert(entryPayload, { onConflict: 'user_id,goal_id,date' })
+    .insert(entryPayload)
     .select('id')
     .single();
+
+  if (entryError?.code === '23505') {
+    const conflictEntryId = await getExistingEntryId(client, goalId, entryPayload.date);
+
+    if (conflictEntryId) {
+      const updateResult = await client
+        .from('entries')
+        .update({ note: entryPayload.note })
+        .eq('id', conflictEntryId)
+        .select('id')
+        .single();
+
+      assertSupabaseResult(updateResult);
+      await replaceEntryValues(client, conflictEntryId, entry.values);
+      return getEntryById(conflictEntryId);
+    }
+  }
 
   assertSupabaseResult({ error: entryError });
   await replaceEntryValues(client, entryRow.id, entry.values);

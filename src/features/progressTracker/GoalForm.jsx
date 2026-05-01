@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { ThemedDatePicker } from '../../components/ui/ThemedDatePicker';
+import { ThemedSelect } from '../../components/ui/ThemedSelect';
 import {
   buildPresetMetrics,
   createId,
@@ -26,6 +28,13 @@ export function GoalForm({ onCreateGoal, isSaving = false }) {
   const typeOptions = useMemo(
     () => Object.entries(goalTypePresets),
     [],
+  );
+  const themedTypeOptions = useMemo(
+    () => typeOptions.map(([type, preset]) => ({
+      value: type,
+      label: preset.label,
+    })),
+    [typeOptions],
   );
 
   function updateField(field, value) {
@@ -163,17 +172,11 @@ export function GoalForm({ onCreateGoal, isSaving = false }) {
           <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
             Type
           </span>
-          <select
-            className="field-input"
+          <ThemedSelect
             value={form.type}
             onChange={handleTypeChange}
-          >
-            {typeOptions.map(([type, preset]) => (
-              <option key={type} value={type}>
-                {preset.label}
-              </option>
-            ))}
-          </select>
+            options={themedTypeOptions}
+          />
         </label>
 
         <label className="block">
@@ -206,9 +209,7 @@ export function GoalForm({ onCreateGoal, isSaving = false }) {
           <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
             Deadline
           </span>
-          <input
-            className="field-input"
-            type="date"
+          <ThemedDatePicker
             value={form.deadline}
             onChange={(event) => updateField('deadline', event.target.value)}
           />

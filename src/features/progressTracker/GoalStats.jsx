@@ -1,4 +1,5 @@
 import { formatGoalTarget, getTodayInputValue } from './progressTrackerStorage';
+import { getProgressFromStart } from './progressCalculations';
 
 function getMetricValues(entries, metricId) {
   return entries
@@ -73,11 +74,13 @@ export function GoalStats({ goal, entries }) {
     values.length > 0
       ? values.reduce((total, value) => total + value, 0) / values.length
       : null;
-  const hasTarget = Number.isFinite(goal.targetValue) && goal.targetValue > 0;
+  const hasTarget = Number.isFinite(goal.targetValue);
   const fallbackMax = Number.isFinite(bestValue) && bestValue > 0 ? bestValue : 0;
   const progressBase = hasTarget ? goal.targetValue : fallbackMax;
   const progressPercentage =
-    Number.isFinite(latestValue) && progressBase > 0
+    hasTarget
+      ? getProgressFromStart(goal, sortedEntries, mainMetric?.id)
+      : Number.isFinite(latestValue) && progressBase > 0
       ? Math.min(999, Math.round((latestValue / progressBase) * 100))
       : null;
   const streak = getCurrentStreak(sortedEntries);
@@ -104,7 +107,7 @@ export function GoalStats({ goal, entries }) {
     {
       label: hasTarget ? 'Progress' : 'Best match',
       value: progressPercentage === null ? '--' : `${progressPercentage}%`,
-      detail: hasTarget ? 'Against target' : 'Against best value',
+      detail: hasTarget ? 'From first log to target' : 'Against best value',
       color: '#ffd166',
     },
     {
@@ -150,7 +153,7 @@ export function GoalStats({ goal, entries }) {
           <div className="flex flex-wrap gap-2">
             {hasTarget && progressPercentage !== null ? (
               <span className="rounded-full border-2 border-white bg-[#c5ff6f] px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-black">
-                {progressPercentage}% of goal
+                {progressPercentage}% from start
               </span>
             ) : null}
             {goal.deadline ? (
