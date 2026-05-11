@@ -11,12 +11,22 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { useTheme } from '../../contexts/ThemeContext';
 import { getGoalType, metricColors } from './progressTrackerStorage';
 import {
   formatTrackerNumber,
   getPrimaryMetric,
   isBinaryEntryCompleted,
 } from './progressCalculations';
+
+const matrixMetricColors = {
+  lime: '#00ff41',
+  pink: '#ff7ada',
+  blue: '#65d8ff',
+  yellow: '#ffd166',
+  coral: '#ff8a70',
+  violet: '#bda6ff',
+};
 
 function ChartTooltip({ active, label, payload }) {
   if (!active || !payload?.length) {
@@ -64,8 +74,9 @@ function BinaryHeatmap({ goal, entries }) {
             return (
               <div
                 key={entry.id}
-                className="aspect-square rounded-[0.75rem] border-2 border-black p-2"
-                style={{ backgroundColor: completed ? '#c5ff6f' : '#ffe0de' }}
+                className="binary-heatmap-cell aspect-square rounded-[0.75rem] border-2 border-black p-2"
+                data-theme-color={completed ? 'lime' : 'danger'}
+                style={{ '--heatmap-cell-bg': completed ? '#c5ff6f' : '#ffe0de' }}
                 title={`${entry.date}: ${completed ? 'Completed' : 'Missed'}`}
               >
                 <p className="text-[10px] font-bold uppercase leading-none tracking-[0.08em] text-black/55">
@@ -84,9 +95,31 @@ function BinaryHeatmap({ goal, entries }) {
 }
 
 export function GoalChart({ goal, entries }) {
+  const { isMatrixTheme } = useTheme();
+
   if (!goal) {
     return null;
   }
+
+  const chartTheme = isMatrixTheme
+    ? {
+      axis: '#d9ffd9',
+      grid: '#00a812',
+      target: '#00ff41',
+      cumulative: '#d9ffd9',
+      dotFill: '#00ff41',
+      stroke: '#001606',
+      metricColors: matrixMetricColors,
+    }
+    : {
+      axis: '#000',
+      grid: '#000',
+      target: '#000',
+      cumulative: '#000',
+      dotFill: '#c5ff6f',
+      stroke: '#000',
+      metricColors,
+    };
 
   const goalType = getGoalType(goal);
   const mainMetric = getPrimaryMetric(goal);
@@ -158,20 +191,20 @@ export function GoalChart({ goal, entries }) {
                 margin={{ top: 14, right: 18, bottom: 4, left: 0 }}
               >
                 <CartesianGrid
-                  stroke="#000"
+                  stroke={chartTheme.grid}
                   strokeDasharray="4 6"
-                  strokeOpacity={0.15}
+                  strokeOpacity={isMatrixTheme ? 0.35 : 0.15}
                 />
                 <XAxis
                   dataKey="date"
-                  tick={{ fill: '#000', fontSize: 12, fontWeight: 700 }}
+                  tick={{ fill: chartTheme.axis, fontSize: 12, fontWeight: 700 }}
                   tickLine={false}
-                  axisLine={{ stroke: '#000', strokeWidth: 2 }}
+                  axisLine={{ stroke: chartTheme.axis, strokeWidth: 2 }}
                 />
                 <YAxis
-                  tick={{ fill: '#000', fontSize: 12, fontWeight: 700 }}
+                  tick={{ fill: chartTheme.axis, fontSize: 12, fontWeight: 700 }}
                   tickLine={false}
-                  axisLine={{ stroke: '#000', strokeWidth: 2 }}
+                  axisLine={{ stroke: chartTheme.axis, strokeWidth: 2 }}
                   width={48}
                 />
                 <Tooltip content={<ChartTooltip />} />
@@ -185,12 +218,12 @@ export function GoalChart({ goal, entries }) {
                 {Number.isFinite(goal.targetValue) && goal.targetValue > 0 ? (
                   <ReferenceLine
                     y={goal.targetValue}
-                    stroke="#000"
+                    stroke={chartTheme.target}
                     strokeDasharray="8 6"
                     strokeWidth={2}
                     label={{
                       value: `Target ${goal.targetValue}`,
-                      fill: '#000',
+                      fill: chartTheme.axis,
                       fontSize: 12,
                       fontWeight: 800,
                       position: 'insideTopRight',
@@ -200,8 +233,8 @@ export function GoalChart({ goal, entries }) {
                 <Bar
                   dataKey="dailyActivity"
                   name="Daily activity"
-                  fill={metricColors[mainMetric?.colorKey] || '#38bdf8'}
-                  stroke="#000"
+                  fill={chartTheme.metricColors[mainMetric?.colorKey] || '#38bdf8'}
+                  stroke={chartTheme.stroke}
                   strokeWidth={2}
                   radius={[8, 8, 0, 0]}
                 />
@@ -209,19 +242,19 @@ export function GoalChart({ goal, entries }) {
                   type="monotone"
                   dataKey="cumulativeTotal"
                   name="Cumulative total"
-                  stroke="#000"
+                  stroke={chartTheme.cumulative}
                   strokeWidth={4}
                   dot={{
                     r: 4,
-                    stroke: '#000',
+                    stroke: chartTheme.stroke,
                     strokeWidth: 2,
-                    fill: '#c5ff6f',
+                    fill: chartTheme.dotFill,
                   }}
                   activeDot={{
                     r: 7,
-                    stroke: '#000',
+                    stroke: chartTheme.stroke,
                     strokeWidth: 2,
-                    fill: '#c5ff6f',
+                    fill: chartTheme.dotFill,
                   }}
                   connectNulls
                 />
@@ -232,20 +265,20 @@ export function GoalChart({ goal, entries }) {
                 margin={{ top: 14, right: 18, bottom: 4, left: 0 }}
               >
                 <CartesianGrid
-                  stroke="#000"
+                  stroke={chartTheme.grid}
                   strokeDasharray="4 6"
-                  strokeOpacity={0.15}
+                  strokeOpacity={isMatrixTheme ? 0.35 : 0.15}
                 />
                 <XAxis
                   dataKey="date"
-                  tick={{ fill: '#000', fontSize: 12, fontWeight: 700 }}
+                  tick={{ fill: chartTheme.axis, fontSize: 12, fontWeight: 700 }}
                   tickLine={false}
-                  axisLine={{ stroke: '#000', strokeWidth: 2 }}
+                  axisLine={{ stroke: chartTheme.axis, strokeWidth: 2 }}
                 />
                 <YAxis
-                  tick={{ fill: '#000', fontSize: 12, fontWeight: 700 }}
+                  tick={{ fill: chartTheme.axis, fontSize: 12, fontWeight: 700 }}
                   tickLine={false}
-                  axisLine={{ stroke: '#000', strokeWidth: 2 }}
+                  axisLine={{ stroke: chartTheme.axis, strokeWidth: 2 }}
                   width={48}
                 />
                 <Tooltip content={<ChartTooltip />} />
@@ -259,12 +292,12 @@ export function GoalChart({ goal, entries }) {
                 {Number.isFinite(goal.targetValue) && goal.targetValue > 0 ? (
                   <ReferenceLine
                     y={goal.targetValue}
-                    stroke="#000"
+                    stroke={chartTheme.target}
                     strokeDasharray="8 6"
                     strokeWidth={2}
                     label={{
                       value: `Target ${goal.targetValue}`,
-                      fill: '#000',
+                      fill: chartTheme.axis,
                       fontSize: 12,
                       fontWeight: 800,
                       position: 'insideTopRight',
@@ -277,19 +310,19 @@ export function GoalChart({ goal, entries }) {
                     type="monotone"
                     dataKey={`metric_${metric.id}`}
                     name={metric.name}
-                    stroke={metricColors[metric.colorKey] || '#000'}
+                    stroke={chartTheme.metricColors[metric.colorKey] || chartTheme.axis}
                     strokeWidth={3}
                     dot={{
                       r: 4,
-                      stroke: '#000',
+                      stroke: chartTheme.stroke,
                       strokeWidth: 2,
-                      fill: metricColors[metric.colorKey] || '#fff',
+                      fill: chartTheme.metricColors[metric.colorKey] || chartTheme.axis,
                     }}
                     activeDot={{
                       r: 7,
-                      stroke: '#000',
+                      stroke: chartTheme.stroke,
                       strokeWidth: 2,
-                      fill: metricColors[metric.colorKey] || '#fff',
+                      fill: chartTheme.metricColors[metric.colorKey] || chartTheme.axis,
                     }}
                     connectNulls
                   />

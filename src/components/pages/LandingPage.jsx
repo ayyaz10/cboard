@@ -7,16 +7,19 @@ const featureTiles = [
     title: "Progress Tracker",
     text: "Create goals, log daily metrics, and see current progress against the target.",
     color: "#c5ff6f",
+    colorKey: "lime",
   },
   {
     title: "Calculator Tools",
     text: "Save calculation history for percentages, calories, and mass conversions.",
     color: "#9fe3ff",
+    colorKey: "cyan",
   },
   {
     title: "Personal Workspace",
     text: "Keep your tools, entries, and saved results organized behind your account.",
     color: "#ff90e8",
+    colorKey: "pink",
   },
 ];
 
@@ -112,9 +115,10 @@ export function LandingPage({ isAuthenticated }) {
                 {["Latest", "Best", "Streak"].map((label, index) => (
                   <article
                     key={label}
-                    className="rounded-[1.25rem] border-2 border-black p-4"
+                    className="theme-color-card rounded-[1.25rem] border-2 border-black p-4"
+                    data-theme-color={["lime", "cyan", "pink"][index]}
                     style={{
-                      backgroundColor: ["#c5ff6f", "#9fe3ff", "#ff90e8"][index],
+                      '--theme-card-bg': ["#c5ff6f", "#9fe3ff", "#ff90e8"][index],
                     }}
                   >
                     <p className="text-xs font-bold uppercase tracking-[0.14em] text-black/55">
@@ -149,8 +153,9 @@ export function LandingPage({ isAuthenticated }) {
           {featureTiles.map((feature) => (
             <article
               key={feature.title}
-              className="rounded-[1.75rem] border-2 border-black p-5 shadow-[5px_5px_0_#000]"
-              style={{ backgroundColor: feature.color }}
+              className="theme-color-card rounded-[1.75rem] border-2 border-black p-5 shadow-[5px_5px_0_#000]"
+              data-theme-color={feature.colorKey}
+              style={{ '--theme-card-bg': feature.color }}
             >
               <h2 className="text-2xl font-bold tracking-[-0.04em]">
                 {feature.title}

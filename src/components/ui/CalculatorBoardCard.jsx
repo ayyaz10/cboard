@@ -1,11 +1,20 @@
 import { getAppHref } from '../../app/useRoute';
 
+const boardColorKeys = {
+  '#c5ff6f': 'lime',
+  '#ff90e8': 'pink',
+  '#9fe3ff': 'cyan',
+};
+
 export function CalculatorBoardCard({ calculator, index }) {
+  const colorKey = boardColorKeys[calculator.boardColor] || 'paper';
+
   return (
     <a
       href={getAppHref(calculator.path)}
-      className="board-card"
-      style={{ backgroundColor: calculator.boardColor }}
+      className="board-card theme-color-card"
+      data-theme-color={colorKey}
+      style={{ '--theme-card-bg': calculator.boardColor }}
     >
       <div className="flex items-start justify-between gap-4">
         <div>

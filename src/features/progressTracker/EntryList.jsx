@@ -58,9 +58,10 @@ export function EntryList({ goal, entries, onEditEntry, onDeleteEntry }) {
                   <div className="mt-3 flex flex-wrap gap-2">
                     {isBinaryGoal(goal) ? (
                       <span
-                        className="rounded-full border-2 border-black px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-black"
+                        className="metric-color-pill rounded-full border-2 border-black px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-black"
+                        data-theme-color={isBinaryEntryCompleted(entry, goal) ? 'lime' : 'danger'}
                         style={{
-                          backgroundColor: isBinaryEntryCompleted(entry, goal)
+                          '--metric-pill-bg': isBinaryEntryCompleted(entry, goal)
                             ? '#c5ff6f'
                             : '#ffe0de',
                         }}
@@ -74,9 +75,10 @@ export function EntryList({ goal, entries, onEditEntry, onDeleteEntry }) {
                       .map((metric) => (
                         <span
                           key={metric.id}
-                          className="rounded-full border-2 border-black px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-black"
+                          className="metric-color-pill rounded-full border-2 border-black px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-black"
+                          data-theme-color={metric.colorKey}
                           style={{
-                            backgroundColor:
+                            '--metric-pill-bg':
                               metricColors[metric.colorKey] || '#fff',
                           }}
                         >

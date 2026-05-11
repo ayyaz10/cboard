@@ -207,10 +207,11 @@ export function EntryForm({
                         key={option.label}
                         type="button"
                         onClick={() => setCompleted(option.value)}
-                        className={`rounded-[1.35rem] border-2 border-black px-4 py-4 text-left text-sm font-bold uppercase tracking-[0.12em] text-black transition hover:-translate-y-1 hover:shadow-[4px_4px_0_#000] ${
+                        className={`entry-choice-card rounded-[1.35rem] border-2 border-black px-4 py-4 text-left text-sm font-bold uppercase tracking-[0.12em] text-black transition hover:-translate-y-1 hover:shadow-[4px_4px_0_#000] ${
                           selected ? 'shadow-[4px_4px_0_#000]' : ''
                         }`}
-                        style={{ backgroundColor: selected ? '#9fe3ff' : option.color }}
+                        data-theme-color={selected ? 'cyan' : option.value ? 'paper' : 'danger'}
+                        style={{ '--entry-choice-bg': selected ? '#9fe3ff' : option.color }}
                       >
                         {option.label}
                       </button>

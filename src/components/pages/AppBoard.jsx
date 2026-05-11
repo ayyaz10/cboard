@@ -10,6 +10,7 @@ const appSections = [
     description:
       'Percentage, calories, and unit tools collected in one quick board.',
     color: '#c5ff6f',
+    colorKey: 'lime',
     countLabel: '3 live tools',
   },
   {
@@ -20,6 +21,7 @@ const appSections = [
     description:
       'Create goals, log daily metrics, and watch your numbers move over time.',
     color: '#9fe3ff',
+    colorKey: 'cyan',
     countLabel: 'Goal dashboard',
   },
 ];
@@ -50,8 +52,9 @@ export function AppBoard({ calculators }) {
             <a
               key={section.id}
               href={getAppHref(section.path)}
-              className="board-card"
-              style={{ backgroundColor: section.color }}
+              className="board-card theme-color-card"
+              data-theme-color={section.colorKey}
+              style={{ '--theme-card-bg': section.color }}
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
