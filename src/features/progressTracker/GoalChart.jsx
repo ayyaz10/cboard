@@ -33,10 +33,12 @@ function ChartTooltip({ active, label, payload }) {
     return null;
   }
 
+  const tooltipLabel = payload[0]?.payload?.tooltipLabel || label;
+
   return (
     <div className="rounded-[1rem] border-2 border-black bg-[#fffdf8] px-4 py-3 shadow-[4px_4px_0_#000]">
       <p className="text-xs font-bold uppercase tracking-[0.16em] text-black/55">
-        {label}
+        {tooltipLabel}
       </p>
       <div className="mt-2 space-y-1">
         {payload.map((item) => (
@@ -53,10 +55,38 @@ function ChartTooltip({ active, label, payload }) {
   );
 }
 
+function compareEntriesChronologically(a, b) {
+  const dateCompare = a.date.localeCompare(b.date);
+  const createdAtCompare = (a.createdAt || '').localeCompare(b.createdAt || '');
+
+  return dateCompare || createdAtCompare || (a.id || '').localeCompare(b.id || '');
+}
+
+function formatEntryTime(entry) {
+  if (!entry.createdAt) {
+    return '';
+  }
+
+  const date = new Date(entry.createdAt);
+
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  return date.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function getChartLabel(entry, showEntryTime) {
+  const entryTime = showEntryTime ? formatEntryTime(entry) : '';
+
+  return entryTime ? `${entry.date} ${entryTime}` : entry.date;
+}
+
 function BinaryHeatmap({ goal, entries }) {
-  const sortedEntries = [...entries].sort((a, b) =>
-    a.date.localeCompare(b.date),
-  );
+  const sortedEntries = [...entries].sort(compareEntriesChronologically);
 
   return (
     <div className="mt-5 rounded-[1.5rem] border-2 border-black bg-[#fffdf8] p-4">
@@ -123,13 +153,13 @@ export function GoalChart({ goal, entries }) {
 
   const goalType = getGoalType(goal);
   const mainMetric = getPrimaryMetric(goal);
-  const sortedEntries = [...entries].sort((a, b) =>
-    a.date.localeCompare(b.date),
-  );
+  const sortedEntries = [...entries].sort(compareEntriesChronologically);
   let cumulativeTotal = Number.isFinite(goal.startValue) ? goal.startValue : 0;
   const chartData = sortedEntries.map((entry) => {
     const point = {
       date: entry.date,
+      chartLabel: getChartLabel(entry, goal.allowMultipleEntriesPerDay),
+      tooltipLabel: getChartLabel(entry, goal.allowMultipleEntriesPerDay),
     };
 
     if (goalType === 'accumulative') {
@@ -157,6 +187,12 @@ export function GoalChart({ goal, entries }) {
       : goalType === 'binary'
       ? 'Calendar'
       : `${goal.metrics.length} line${goal.metrics.length === 1 ? '' : 's'}`;
+  const activityLabel = goal.allowMultipleEntriesPerDay
+    ? 'Entry activity'
+    : 'Daily activity';
+  const emptyChartMessage = goal.allowMultipleEntriesPerDay
+    ? 'Save your first entry to draw the chart.'
+    : 'Save your first daily entry to draw the chart.';
 
   return (
     <section className="rounded-[1.75rem] border-2 border-black bg-[#f8f3ea] p-5 sm:p-6">
@@ -179,7 +215,7 @@ export function GoalChart({ goal, entries }) {
       ) : chartData.length === 0 ? (
         <div className="mt-5 flex min-h-72 items-center justify-center rounded-[1.5rem] border-2 border-dashed border-black bg-[#fffdf8] p-6 text-center">
           <p className="max-w-sm text-lg font-bold leading-7 tracking-[-0.03em] text-black/65">
-            Save your first daily entry to draw the chart.
+            {emptyChartMessage}
           </p>
         </div>
       ) : (
@@ -196,7 +232,7 @@ export function GoalChart({ goal, entries }) {
                   strokeOpacity={isMatrixTheme ? 0.35 : 0.15}
                 />
                 <XAxis
-                  dataKey="date"
+                  dataKey="chartLabel"
                   tick={{ fill: chartTheme.axis, fontSize: 12, fontWeight: 700 }}
                   tickLine={false}
                   axisLine={{ stroke: chartTheme.axis, strokeWidth: 2 }}
@@ -215,7 +251,13 @@ export function GoalChart({ goal, entries }) {
                     textTransform: 'uppercase',
                   }}
                 />
-                {Number.isFinite(goal.targetValue) && goal.targetValue > 0 ? (
+                <ReferenceLine
+                  y={0}
+                  stroke={chartTheme.axis}
+                  strokeOpacity={isMatrixTheme ? 0.7 : 0.35}
+                  strokeWidth={2}
+                />
+                {Number.isFinite(goal.targetValue) ? (
                   <ReferenceLine
                     y={goal.targetValue}
                     stroke={chartTheme.target}
@@ -232,7 +274,7 @@ export function GoalChart({ goal, entries }) {
                 ) : null}
                 <Bar
                   dataKey="dailyActivity"
-                  name="Daily activity"
+                  name={activityLabel}
                   fill={chartTheme.metricColors[mainMetric?.colorKey] || '#38bdf8'}
                   stroke={chartTheme.stroke}
                   strokeWidth={2}
@@ -270,7 +312,7 @@ export function GoalChart({ goal, entries }) {
                   strokeOpacity={isMatrixTheme ? 0.35 : 0.15}
                 />
                 <XAxis
-                  dataKey="date"
+                  dataKey="chartLabel"
                   tick={{ fill: chartTheme.axis, fontSize: 12, fontWeight: 700 }}
                   tickLine={false}
                   axisLine={{ stroke: chartTheme.axis, strokeWidth: 2 }}
