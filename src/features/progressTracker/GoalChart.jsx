@@ -85,6 +85,15 @@ function getChartLabel(entry, showEntryTime) {
   return entryTime ? `${entry.date} ${entryTime}` : entry.date;
 }
 
+function getChartKey(entry, showEntryTime, index) {
+  const chartLabel = getChartLabel(entry, showEntryTime);
+  return `${chartLabel}|${entry.createdAt || ''}|${entry.id || ''}|${index}`;
+}
+
+function getChartKeyLabel(value) {
+  return String(value).split('|')[0];
+}
+
 function BinaryHeatmap({ goal, entries }) {
   const sortedEntries = [...entries].sort(compareEntriesChronologically);
 
@@ -155,9 +164,10 @@ export function GoalChart({ goal, entries }) {
   const mainMetric = getPrimaryMetric(goal);
   const sortedEntries = [...entries].sort(compareEntriesChronologically);
   let cumulativeTotal = Number.isFinite(goal.startValue) ? goal.startValue : 0;
-  const chartData = sortedEntries.map((entry) => {
+  const chartData = sortedEntries.map((entry, index) => {
     const point = {
       date: entry.date,
+      chartKey: getChartKey(entry, goal.allowMultipleEntriesPerDay, index),
       chartLabel: getChartLabel(entry, goal.allowMultipleEntriesPerDay),
       tooltipLabel: getChartLabel(entry, goal.allowMultipleEntriesPerDay),
     };
@@ -232,7 +242,8 @@ export function GoalChart({ goal, entries }) {
                   strokeOpacity={isMatrixTheme ? 0.35 : 0.15}
                 />
                 <XAxis
-                  dataKey="chartLabel"
+                  dataKey="chartKey"
+                  tickFormatter={getChartKeyLabel}
                   tick={{ fill: chartTheme.axis, fontSize: 12, fontWeight: 700 }}
                   tickLine={false}
                   axisLine={{ stroke: chartTheme.axis, strokeWidth: 2 }}
@@ -312,7 +323,8 @@ export function GoalChart({ goal, entries }) {
                   strokeOpacity={isMatrixTheme ? 0.35 : 0.15}
                 />
                 <XAxis
-                  dataKey="chartLabel"
+                  dataKey="chartKey"
+                  tickFormatter={getChartKeyLabel}
                   tick={{ fill: chartTheme.axis, fontSize: 12, fontWeight: 700 }}
                   tickLine={false}
                   axisLine={{ stroke: chartTheme.axis, strokeWidth: 2 }}
