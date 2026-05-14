@@ -1,4 +1,5 @@
 import { CalorieCalculator } from './calorie/CalorieCalculator';
+import { CryptoFuturesCalculator } from './cryptoFutures/CryptoFuturesCalculator';
 import { MassCalculator } from './mass/MassCalculator';
 import { PercentageCalculator } from './percentage/PercentageCalculator';
 
@@ -59,6 +60,18 @@ export const calculators = [
     },
     showReferenceCards: true,
     component: MassCalculator,
+  },
+  {
+    id: 'crypto-futures',
+    path: '/calculators/crypto-futures',
+    name: 'Crypto Futures Trade Calculator',
+    boardLabel: 'Calculator 04',
+    boardColor: '#ffd166',
+    boardDescription: 'Plan futures profit, loss, ROI, position size, and risk/reward before entering a trade.',
+    description:
+      'Enter entry, take profit, stop loss, margin, leverage, and trade side to preview the trade outcome.',
+    showReferenceCards: false,
+    component: CryptoFuturesCalculator,
   },
 ];
 

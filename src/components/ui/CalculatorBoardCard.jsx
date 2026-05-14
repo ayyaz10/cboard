@@ -4,6 +4,7 @@ const boardColorKeys = {
   '#c5ff6f': 'lime',
   '#ff90e8': 'pink',
   '#9fe3ff': 'cyan',
+  '#ffd166': 'amber',
 };
 
 export function CalculatorBoardCard({ calculator, index }) {

@@ -109,6 +109,41 @@ create table if not exists public.calculator_results (
   unique (user_id, tool_id, summary, detail)
 );
 
+create table if not exists public.crypto_futures_trades (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  entry_type text not null default 'normal',
+  asset_symbol text not null default 'MARKET',
+  side text not null,
+  entry_price numeric not null,
+  take_profit_price numeric not null,
+  stop_loss_price numeric not null,
+  margin_used numeric not null,
+  leverage numeric not null,
+  position_size numeric not null,
+  quantity numeric not null,
+  partial_take_profits jsonb not null default '[]'::jsonb,
+  partial_close_total numeric not null default 0,
+  remaining_close_percent numeric not null default 100,
+  partial_profit_total numeric not null default 0,
+  final_take_profit_profit numeric not null default 0,
+  profit_at_take_profit numeric not null,
+  loss_at_stop_loss numeric not null,
+  profit_roi numeric not null,
+  loss_roi numeric not null,
+  take_profit_move numeric not null,
+  stop_loss_move numeric not null,
+  risk_reward_ratio numeric not null,
+  created_at timestamptz not null default now(),
+  constraint crypto_futures_trades_entry_type_check
+    check (entry_type in ('normal', 'journal')),
+  constraint crypto_futures_trades_side_check
+    check (side in ('long', 'short'))
+);
+
+alter table public.crypto_futures_trades
+  add column if not exists asset_symbol text not null default 'MARKET';
+
 create table if not exists public.user_tool_preferences (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
@@ -133,6 +168,8 @@ create index if not exists metrics_goal_created_idx on public.metrics (goal_id, 
 create index if not exists entries_user_goal_date_idx on public.entries (user_id, goal_id, date desc);
 create index if not exists entry_values_entry_idx on public.entry_values (entry_id);
 create index if not exists calculator_results_user_tool_created_idx on public.calculator_results (user_id, tool_id, created_at desc);
+create index if not exists crypto_futures_trades_user_type_created_idx on public.crypto_futures_trades (user_id, entry_type, created_at desc);
+create index if not exists crypto_futures_trades_user_symbol_created_idx on public.crypto_futures_trades (user_id, entry_type, asset_symbol, created_at desc);
 create index if not exists user_tool_preferences_user_key_idx on public.user_tool_preferences (user_id, key);
 create index if not exists profiles_username_idx on public.profiles (username);
 
@@ -142,6 +179,7 @@ alter table public.metrics enable row level security;
 alter table public.entries enable row level security;
 alter table public.entry_values enable row level security;
 alter table public.calculator_results enable row level security;
+alter table public.crypto_futures_trades enable row level security;
 alter table public.user_tool_preferences enable row level security;
 alter table public.data_migrations enable row level security;
 
@@ -362,6 +400,22 @@ create policy "calculator_results_update_own" on public.calculator_results
 
 drop policy if exists "calculator_results_delete_own" on public.calculator_results;
 create policy "calculator_results_delete_own" on public.calculator_results
+  for delete using (user_id = auth.uid());
+
+drop policy if exists "crypto_futures_trades_select_own" on public.crypto_futures_trades;
+create policy "crypto_futures_trades_select_own" on public.crypto_futures_trades
+  for select using (user_id = auth.uid());
+
+drop policy if exists "crypto_futures_trades_insert_own" on public.crypto_futures_trades;
+create policy "crypto_futures_trades_insert_own" on public.crypto_futures_trades
+  for insert with check (user_id = auth.uid());
+
+drop policy if exists "crypto_futures_trades_update_own" on public.crypto_futures_trades;
+create policy "crypto_futures_trades_update_own" on public.crypto_futures_trades
+  for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+drop policy if exists "crypto_futures_trades_delete_own" on public.crypto_futures_trades;
+create policy "crypto_futures_trades_delete_own" on public.crypto_futures_trades
   for delete using (user_id = auth.uid());
 
 drop policy if exists "user_tool_preferences_select_own" on public.user_tool_preferences;
