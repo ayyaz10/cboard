@@ -1,7 +1,5 @@
 import {
-  Bar,
   CartesianGrid,
-  ComposedChart,
   Legend,
   Line,
   LineChart,
@@ -15,7 +13,6 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { getGoalType, metricColors } from './progressTrackerStorage';
 import {
   formatTrackerNumber,
-  getPrimaryMetric,
   isBinaryEntryCompleted,
 } from './progressCalculations';
 
@@ -109,6 +106,7 @@ function BinaryHeatmap({ goal, entries }) {
         <div className="grid grid-cols-4 gap-2 sm:grid-cols-7 md:grid-cols-10 lg:grid-cols-12">
           {sortedEntries.map((entry) => {
             const completed = isBinaryEntryCompleted(entry, goal);
+            const entryLabel = getChartLabel(entry, goal.allowMultipleEntriesPerDay);
 
             return (
               <div
@@ -116,10 +114,10 @@ function BinaryHeatmap({ goal, entries }) {
                 className="binary-heatmap-cell aspect-square rounded-[0.75rem] border-2 border-black p-2"
                 data-theme-color={completed ? 'lime' : 'danger'}
                 style={{ '--heatmap-cell-bg': completed ? '#c5ff6f' : '#ffe0de' }}
-                title={`${entry.date}: ${completed ? 'Completed' : 'Missed'}`}
+                title={`${entryLabel}: ${completed ? 'Completed' : 'Missed'}`}
               >
                 <p className="text-[10px] font-bold uppercase leading-none tracking-[0.08em] text-black/55">
-                  {entry.date.slice(5)}
+                  {entryLabel.slice(5)}
                 </p>
                 <p className="mt-1 text-xs font-bold uppercase tracking-[0.08em] text-black">
                   {completed ? 'Done' : 'Miss'}
@@ -161,9 +159,13 @@ export function GoalChart({ goal, entries }) {
     };
 
   const goalType = getGoalType(goal);
-  const mainMetric = getPrimaryMetric(goal);
   const sortedEntries = [...entries].sort(compareEntriesChronologically);
-  let cumulativeTotal = Number.isFinite(goal.startValue) ? goal.startValue : 0;
+  const cumulativeMetricTotals = new Map(
+    goal.metrics.map((metric, index) => [
+      metric.id,
+      index === 0 && Number.isFinite(goal.startValue) ? goal.startValue : 0,
+    ]),
+  );
   const chartData = sortedEntries.map((entry, index) => {
     const point = {
       date: entry.date,
@@ -173,10 +175,16 @@ export function GoalChart({ goal, entries }) {
     };
 
     if (goalType === 'accumulative') {
-      const dailyActivity = entry.values?.[mainMetric?.id];
-      cumulativeTotal += Number.isFinite(dailyActivity) ? dailyActivity : 0;
-      point.dailyActivity = dailyActivity;
-      point.cumulativeTotal = cumulativeTotal;
+      goal.metrics.forEach((metric) => {
+        const currentTotal = cumulativeMetricTotals.get(metric.id) ?? 0;
+        const entryValue = entry.values?.[metric.id];
+        const nextTotal = currentTotal + (Number.isFinite(entryValue) ? entryValue : 0);
+
+        cumulativeMetricTotals.set(metric.id, nextTotal);
+        point[`metric_${metric.id}`] = nextTotal;
+      });
+    } else if (goalType === 'binary') {
+      point.binaryCompleted = isBinaryEntryCompleted(entry, goal) ? 1 : 0;
     } else {
       goal.metrics.forEach((metric) => {
         point[`metric_${metric.id}`] = entry.values?.[metric.id];
@@ -189,17 +197,16 @@ export function GoalChart({ goal, entries }) {
     goalType === 'accumulative'
       ? 'Completion progress'
       : goalType === 'binary'
-      ? 'Consistency calendar'
+      ? 'Consistency movement'
       : 'Metric movement';
   const badge =
     goalType === 'accumulative'
-      ? 'Cumulative'
+      ? `${goal.metrics.length} cumulative line${goal.metrics.length === 1 ? '' : 's'}`
+      : goalType === 'performance'
+      ? `${goal.metrics.length} line${goal.metrics.length === 1 ? '' : 's'}`
       : goalType === 'binary'
-      ? 'Calendar'
-      : `${goal.metrics.length} line${goal.metrics.length === 1 ? '' : 's'}`;
-  const activityLabel = goal.allowMultipleEntriesPerDay
-    ? 'Entry activity'
-    : 'Daily activity';
+      ? '1 line'
+      : '';
   const emptyChartMessage = goal.allowMultipleEntriesPerDay
     ? 'Save your first entry to draw the chart.'
     : 'Save your first daily entry to draw the chart.';
@@ -221,7 +228,69 @@ export function GoalChart({ goal, entries }) {
       </div>
 
       {goalType === 'binary' ? (
-        <BinaryHeatmap goal={goal} entries={entries} />
+        <>
+          <BinaryHeatmap goal={goal} entries={entries} />
+          {chartData.length > 0 ? (
+            <div className="mt-5 h-72 rounded-[1.5rem] border-2 border-black bg-[#fffdf8] p-3 sm:p-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={chartData}
+                  margin={{ top: 14, right: 18, bottom: 4, left: 0 }}
+                >
+                  <CartesianGrid
+                    stroke={chartTheme.grid}
+                    strokeDasharray="4 6"
+                    strokeOpacity={isMatrixTheme ? 0.35 : 0.15}
+                  />
+                  <XAxis
+                    dataKey="chartKey"
+                    tickFormatter={getChartKeyLabel}
+                    tick={{ fill: chartTheme.axis, fontSize: 12, fontWeight: 700 }}
+                    tickLine={false}
+                    axisLine={{ stroke: chartTheme.axis, strokeWidth: 2 }}
+                  />
+                  <YAxis
+                    domain={[0, 1]}
+                    ticks={[0, 1]}
+                    tickFormatter={(value) => (value === 1 ? 'Done' : 'Miss')}
+                    tick={{ fill: chartTheme.axis, fontSize: 12, fontWeight: 700 }}
+                    tickLine={false}
+                    axisLine={{ stroke: chartTheme.axis, strokeWidth: 2 }}
+                    width={58}
+                  />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Legend
+                    wrapperStyle={{
+                      fontSize: 12,
+                      fontWeight: 800,
+                      textTransform: 'uppercase',
+                    }}
+                  />
+                  <Line
+                    type="stepAfter"
+                    dataKey="binaryCompleted"
+                    name="Completed"
+                    stroke={chartTheme.metricColors.blue}
+                    strokeWidth={3}
+                    dot={{
+                      r: 4,
+                      stroke: chartTheme.stroke,
+                      strokeWidth: 2,
+                      fill: chartTheme.metricColors.blue,
+                    }}
+                    activeDot={{
+                      r: 7,
+                      stroke: chartTheme.stroke,
+                      strokeWidth: 2,
+                      fill: chartTheme.metricColors.blue,
+                    }}
+                    connectNulls
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          ) : null}
+        </>
       ) : chartData.length === 0 ? (
         <div className="mt-5 flex min-h-72 items-center justify-center rounded-[1.5rem] border-2 border-dashed border-black bg-[#fffdf8] p-6 text-center">
           <p className="max-w-sm text-lg font-bold leading-7 tracking-[-0.03em] text-black/65">
@@ -232,7 +301,7 @@ export function GoalChart({ goal, entries }) {
         <div className="mt-5 h-80 rounded-[1.5rem] border-2 border-black bg-[#fffdf8] p-3 sm:h-96 sm:p-4">
           <ResponsiveContainer width="100%" height="100%">
             {goalType === 'accumulative' ? (
-              <ComposedChart
+              <LineChart
                 data={chartData}
                 margin={{ top: 14, right: 18, bottom: 4, left: 0 }}
               >
@@ -283,35 +352,30 @@ export function GoalChart({ goal, entries }) {
                     }}
                   />
                 ) : null}
-                <Bar
-                  dataKey="dailyActivity"
-                  name={activityLabel}
-                  fill={chartTheme.metricColors[mainMetric?.colorKey] || '#38bdf8'}
-                  stroke={chartTheme.stroke}
-                  strokeWidth={2}
-                  radius={[8, 8, 0, 0]}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="cumulativeTotal"
-                  name="Cumulative total"
-                  stroke={chartTheme.cumulative}
-                  strokeWidth={4}
-                  dot={{
-                    r: 4,
-                    stroke: chartTheme.stroke,
-                    strokeWidth: 2,
-                    fill: chartTheme.dotFill,
-                  }}
-                  activeDot={{
-                    r: 7,
-                    stroke: chartTheme.stroke,
-                    strokeWidth: 2,
-                    fill: chartTheme.dotFill,
-                  }}
-                  connectNulls
-                />
-              </ComposedChart>
+                {goal.metrics.map((metric) => (
+                  <Line
+                    key={metric.id}
+                    type="linear"
+                    dataKey={`metric_${metric.id}`}
+                    name={metric.name}
+                    stroke={chartTheme.metricColors[metric.colorKey] || chartTheme.axis}
+                    strokeWidth={3}
+                    dot={{
+                      r: 4,
+                      stroke: chartTheme.stroke,
+                      strokeWidth: 2,
+                      fill: chartTheme.metricColors[metric.colorKey] || chartTheme.axis,
+                    }}
+                    activeDot={{
+                      r: 7,
+                      stroke: chartTheme.stroke,
+                      strokeWidth: 2,
+                      fill: chartTheme.metricColors[metric.colorKey] || chartTheme.axis,
+                    }}
+                    connectNulls
+                  />
+                ))}
+              </LineChart>
             ) : (
               <LineChart
                 data={chartData}
