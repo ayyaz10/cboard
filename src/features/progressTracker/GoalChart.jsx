@@ -13,6 +13,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { getGoalType, metricColors } from './progressTrackerStorage';
 import {
   formatTrackerNumber,
+  getBinaryEntryDelta,
   isBinaryEntryCompleted,
 } from './progressCalculations';
 
@@ -160,6 +161,7 @@ export function GoalChart({ goal, entries }) {
 
   const goalType = getGoalType(goal);
   const sortedEntries = [...entries].sort(compareEntriesChronologically);
+  let binaryScore = Number.isFinite(goal.startValue) ? goal.startValue : 0;
   const cumulativeMetricTotals = new Map(
     goal.metrics.map((metric, index) => [
       metric.id,
@@ -184,7 +186,8 @@ export function GoalChart({ goal, entries }) {
         point[`metric_${metric.id}`] = nextTotal;
       });
     } else if (goalType === 'binary') {
-      point.binaryCompleted = isBinaryEntryCompleted(entry, goal) ? 1 : 0;
+      binaryScore += getBinaryEntryDelta(entry, goal);
+      point.binaryScore = binaryScore;
     } else {
       goal.metrics.forEach((metric) => {
         point[`metric_${metric.id}`] = entry.values?.[metric.id];
@@ -205,7 +208,7 @@ export function GoalChart({ goal, entries }) {
       : goalType === 'performance'
       ? `${goal.metrics.length} line${goal.metrics.length === 1 ? '' : 's'}`
       : goalType === 'binary'
-      ? '1 line'
+      ? 'Cumulative'
       : '';
   const emptyChartMessage = goal.allowMultipleEntriesPerDay
     ? 'Save your first entry to draw the chart.'
@@ -250,9 +253,6 @@ export function GoalChart({ goal, entries }) {
                     axisLine={{ stroke: chartTheme.axis, strokeWidth: 2 }}
                   />
                   <YAxis
-                    domain={[0, 1]}
-                    ticks={[0, 1]}
-                    tickFormatter={(value) => (value === 1 ? 'Done' : 'Miss')}
                     tick={{ fill: chartTheme.axis, fontSize: 12, fontWeight: 700 }}
                     tickLine={false}
                     axisLine={{ stroke: chartTheme.axis, strokeWidth: 2 }}
@@ -266,10 +266,31 @@ export function GoalChart({ goal, entries }) {
                       textTransform: 'uppercase',
                     }}
                   />
+                  <ReferenceLine
+                    y={0}
+                    stroke={chartTheme.axis}
+                    strokeOpacity={isMatrixTheme ? 0.7 : 0.35}
+                    strokeWidth={2}
+                  />
+                  {Number.isFinite(goal.targetValue) ? (
+                    <ReferenceLine
+                      y={goal.targetValue}
+                      stroke={chartTheme.target}
+                      strokeDasharray="8 6"
+                      strokeWidth={2}
+                      label={{
+                        value: `Target ${goal.targetValue}`,
+                        fill: chartTheme.axis,
+                        fontSize: 12,
+                        fontWeight: 800,
+                        position: 'insideTopRight',
+                      }}
+                    />
+                  ) : null}
                   <Line
-                    type="stepAfter"
-                    dataKey="binaryCompleted"
-                    name="Completed"
+                    type="linear"
+                    dataKey="binaryScore"
+                    name="Score"
                     stroke={chartTheme.metricColors.blue}
                     strokeWidth={3}
                     dot={{

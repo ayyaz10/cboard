@@ -122,8 +122,8 @@ export function buildBinaryMetrics() {
   return [
     {
       id: createId('metric'),
-      name: 'Completed',
-      unit: 'day',
+      name: 'Score',
+      unit: 'points',
       colorKey: 'lime',
     },
   ];

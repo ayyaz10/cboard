@@ -18,11 +18,14 @@ function getCurrentSummary(goal, entries) {
 
   if (goalType === 'binary') {
     const stats = calculateBinaryStats(goal, goalEntries);
+    const unit = goal.unit || 'points';
 
     return {
-      current: `${stats.streak} day${stats.streak === 1 ? '' : 's'} streak`,
-      target: stats.completionRate === null ? '' : `${stats.completionRate}% completion`,
-      percentage: stats.completionRate,
+      current: `Current: ${formatTrackerNumber(stats.totalScore)} ${unit}`.trim(),
+      target: Number.isFinite(goal.targetValue)
+        ? `Goal: ${formatTrackerNumber(goal.targetValue)} ${unit}`.trim()
+        : '',
+      percentage: stats.progressPercentage,
     };
   }
 

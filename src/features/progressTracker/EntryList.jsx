@@ -1,5 +1,5 @@
 import { isBinaryGoal, metricColors } from './progressTrackerStorage';
-import { isBinaryEntryCompleted } from './progressCalculations';
+import { getBinaryEntryDelta, isBinaryEntryCompleted } from './progressCalculations';
 
 function sortEntriesNewestFirst(entries) {
   return [...entries].sort((a, b) => {
@@ -42,11 +42,14 @@ export function EntryList({ goal, entries, onEditEntry, onDeleteEntry }) {
         </div>
       ) : (
         <div className="mt-5 grid gap-3">
-          {sortEntriesNewestFirst(entries).map((entry) => (
-            <article
-              key={entry.id}
-              className="rounded-[1.35rem] border-2 border-black bg-[#fffdf8] p-4"
-            >
+          {sortEntriesNewestFirst(entries).map((entry) => {
+            const binaryDelta = getBinaryEntryDelta(entry, goal);
+
+            return (
+              <article
+                key={entry.id}
+                className="rounded-[1.35rem] border-2 border-black bg-[#fffdf8] p-4"
+              >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.16em] text-black/55">
@@ -66,7 +69,7 @@ export function EntryList({ goal, entries, onEditEntry, onDeleteEntry }) {
                             : '#ffe0de',
                         }}
                       >
-                        {isBinaryEntryCompleted(entry, goal) ? 'Completed' : 'Missed'}
+                        {isBinaryEntryCompleted(entry, goal) ? 'Completed' : 'Missed'} {binaryDelta > 0 ? '+' : ''}{binaryDelta}
                       </span>
                     ) : goal.metrics
                       .filter((metric) =>
@@ -112,8 +115,9 @@ export function EntryList({ goal, entries, onEditEntry, onDeleteEntry }) {
                   {entry.note}
                 </p>
               ) : null}
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       )}
     </section>

@@ -242,38 +242,60 @@ function buildAccumulativeDashboard(goal, entries) {
 
 function buildBinaryDashboard(goal, entries) {
   const stats = calculateBinaryStats(goal, entries);
+  const unit = goal.unit || 'points';
+  const targetLabel = Number.isFinite(goal.targetValue)
+    ? `${formatTrackerNumber(stats.totalScore)} / ${formatTrackerNumber(goal.targetValue)} ${unit}`.trim()
+    : `${formatTrackerNumber(stats.totalScore)} ${unit}`.trim();
 
   return {
     target: (
       <TargetSummary
-        label="Consistency progress"
-        heading={`${stats.streak} day${stats.streak === 1 ? '' : 's'}`}
-        detail="Current completed streak"
-        percentage={stats.completionRate}
+        label="Binary score"
+        heading={targetLabel}
+        detail={
+          Number.isFinite(stats.progressPercentage)
+            ? `${stats.progressPercentage}% of target completed`
+            : 'Set a target to show score progress'
+        }
+        percentage={stats.progressPercentage}
         deadline={goal.deadline}
       />
     ),
     cards: [
       {
+        label: 'Score',
+        value: formatTrackerNumber(stats.totalScore),
+        unit,
+        detail: `net ${formatSignedNumber(stats.scoreDelta)} from entries`,
+        color: '#c5ff6f',
+      },
+      {
+        label: 'Target',
+        value: formatTrackerNumber(goal.targetValue),
+        unit,
+        detail: unit || 'Binary target',
+        color: '#9fe3ff',
+      },
+      {
+        label: 'Remaining',
+        value: formatTrackerNumber(stats.remainingValue),
+        unit,
+        detail: unit || 'Left to complete',
+        color: '#ff90e8',
+      },
+      {
         label: 'Streak',
         value: `${stats.streak}`,
         unit: 'days',
         detail: `completed day${stats.streak === 1 ? '' : 's'} in a row`,
-        color: '#c5ff6f',
+        color: '#ffd166',
       },
       {
         label: 'Completion',
         value: stats.completionRate === null ? '--' : `${stats.completionRate}%`,
         unit: 'rate',
         detail: `${stats.totalEntries} logged day${stats.totalEntries === 1 ? '' : 's'}`,
-        color: '#9fe3ff',
-      },
-      {
-        label: 'Completed',
-        value: `${stats.totalCompletedDays}`,
-        unit: 'days',
-        detail: `total completed day${stats.totalCompletedDays === 1 ? '' : 's'}`,
-        color: '#ff90e8',
+        color: '#fffdf8',
       },
     ],
   };

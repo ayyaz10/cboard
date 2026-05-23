@@ -195,6 +195,25 @@ export function isBinaryEntryCompleted(entry, goal) {
   return Number(entry?.values?.[mainMetric?.id]) > 0;
 }
 
+export function getBinaryEntryDelta(entry, goal) {
+  const mainMetric = getPrimaryMetric(goal);
+  const savedValue = entry?.values?.[mainMetric?.id];
+
+  if (Number.isFinite(savedValue)) {
+    if (savedValue === 0 && entry?.completed === false) {
+      return -1;
+    }
+
+    return savedValue;
+  }
+
+  if (typeof entry?.completed === 'boolean') {
+    return entry.completed ? 1 : -1;
+  }
+
+  return 0;
+}
+
 export function calculateBinaryStats(goal, entries) {
   const sortedEntries = [...entries].sort((a, b) => {
     const dateCompare = a.date.localeCompare(b.date);
@@ -203,6 +222,22 @@ export function calculateBinaryStats(goal, entries) {
   const completedEntries = sortedEntries.filter((entry) =>
     isBinaryEntryCompleted(entry, goal),
   );
+  const startingScore = Number.isFinite(goal?.startValue) ? goal.startValue : 0;
+  const scoreDelta = sortedEntries.reduce(
+    (total, entry) => total + getBinaryEntryDelta(entry, goal),
+    0,
+  );
+  const totalScore = startingScore + scoreDelta;
+  const remainingValue = Number.isFinite(goal?.targetValue)
+    ? Math.max(0, goal.targetValue - totalScore)
+    : null;
+  const targetDistance = Number.isFinite(goal?.targetValue)
+    ? goal.targetValue - startingScore
+    : null;
+  const progressPercentage =
+    Number.isFinite(targetDistance) && targetDistance !== 0
+      ? Math.min(999, Math.max(0, Math.round(((totalScore - startingScore) / targetDistance) * 100)))
+      : null;
   const completionRate =
     sortedEntries.length > 0
       ? Math.round((completedEntries.length / sortedEntries.length) * 100)
@@ -212,6 +247,11 @@ export function calculateBinaryStats(goal, entries) {
     completedEntries,
     totalEntries: sortedEntries.length,
     totalCompletedDays: completedEntries.length,
+    startingScore,
+    scoreDelta,
+    totalScore,
+    remainingValue,
+    progressPercentage,
     completionRate,
     streak: calculateStreak(sortedEntries, (entry) =>
       isBinaryEntryCompleted(entry, goal),

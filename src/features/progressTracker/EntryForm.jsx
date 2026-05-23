@@ -84,7 +84,7 @@ export function EntryForm({
     }
 
     const parsedValues = isBinaryGoal(selectedGoal)
-      ? { [mainMetric.id]: completed ? 1 : 0 }
+      ? { [mainMetric.id]: completed ? 1 : -1 }
       : Object.fromEntries(
         selectedGoal.metrics
           .map((metric) => [

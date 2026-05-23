@@ -86,9 +86,9 @@ export function GoalForm({
     setForm((current) => ({
       ...current,
       goalType,
-      startValue: binary ? '' : current.startValue,
-      targetValue: binary ? '' : current.targetValue,
-      unit: binary ? '' : current.unit || goalTypePresets[current.type].targetUnit,
+      startValue: binary && current.startValue === '' ? '0' : current.startValue,
+      targetValue: current.targetValue,
+      unit: binary ? current.unit || 'points' : current.unit || goalTypePresets[current.type].targetUnit,
       metrics: binary ? buildBinaryMetrics() : buildPresetMetrics(current.type),
     }));
   }
@@ -100,7 +100,7 @@ export function GoalForm({
     setForm((current) => ({
       ...current,
       type,
-      unit: preset.targetUnit,
+      unit: isBinaryGoal(current) ? current.unit || 'points' : preset.targetUnit,
       metrics: isBinaryGoal(current) ? current.metrics : buildPresetMetrics(type),
     }));
   }
@@ -163,10 +163,10 @@ export function GoalForm({
 
     const parsedTarget = Number.parseFloat(form.targetValue);
     const parsedStart = Number.parseFloat(form.startValue);
-    const startValue = isBinaryGoal(form)
-      ? null
-      : form.startValue === '' || !Number.isFinite(parsedStart)
+    const startValue = form.startValue === '' || !Number.isFinite(parsedStart)
       ? form.goalType === 'accumulative'
+        ? 0
+        : isBinaryGoal(form)
         ? 0
         : null
       : parsedStart;
@@ -179,10 +179,10 @@ export function GoalForm({
         type: form.type,
         startValue,
         targetValue:
-          isBinaryGoal(form) || form.targetValue === '' || !Number.isFinite(parsedTarget)
+          form.targetValue === '' || !Number.isFinite(parsedTarget)
             ? null
             : parsedTarget,
-        unit: isBinaryGoal(form) ? '' : form.unit.trim(),
+        unit: isBinaryGoal(form) ? form.unit.trim() || 'points' : form.unit.trim(),
         deadline: form.deadline,
         allowMultipleEntriesPerDay: form.allowMultipleEntriesPerDay,
         sortOrder: initialGoal?.sortOrder ?? 0,
@@ -294,11 +294,14 @@ export function GoalForm({
         </div>
       </div>
 
-      {!isBinaryGoal(form) ? (
-        <div className="mt-5 grid gap-4 md:grid-cols-2">
+      <div className="mt-5 grid gap-4 md:grid-cols-2">
         <label className="block">
           <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
-            {form.goalType === 'accumulative' ? 'Already completed' : 'Starting value'}
+            {isBinaryGoal(form)
+              ? 'Starting score'
+              : form.goalType === 'accumulative'
+              ? 'Already completed'
+              : 'Starting value'}
           </span>
           <input
             className="field-input"
@@ -306,13 +309,13 @@ export function GoalForm({
             inputMode="decimal"
             value={form.startValue}
             onChange={(event) => updateField('startValue', event.target.value)}
-            placeholder={form.goalType === 'accumulative' ? '0' : 'Optional'}
+            placeholder={form.goalType === 'accumulative' || isBinaryGoal(form) ? '0' : 'Optional'}
           />
         </label>
 
         <label className="block">
           <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
-            Target value
+            {isBinaryGoal(form) ? 'Target score' : 'Target value'}
           </span>
           <input
             className="field-input"
@@ -320,19 +323,19 @@ export function GoalForm({
             inputMode="decimal"
             value={form.targetValue}
             onChange={(event) => updateField('targetValue', event.target.value)}
-            placeholder="150"
+            placeholder={isBinaryGoal(form) ? '50' : '150'}
           />
         </label>
 
         <label className="block md:col-span-2">
           <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
-            Target unit
+            {isBinaryGoal(form) ? 'Score unit' : 'Target unit'}
           </span>
           <input
             className="field-input"
             value={form.unit}
             onChange={(event) => updateField('unit', event.target.value)}
-            placeholder="WPM, steps, sessions..."
+            placeholder={isBinaryGoal(form) ? 'points' : 'WPM, steps, sessions...'}
           />
         </label>
 
@@ -346,17 +349,6 @@ export function GoalForm({
           />
         </label>
       </div>
-      ) : (
-        <label className="mt-5 block">
-          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
-            Deadline
-          </span>
-          <ThemedDatePicker
-            value={form.deadline}
-            onChange={(event) => updateField('deadline', event.target.value)}
-          />
-        </label>
-      )}
 
       <label className="mt-5 flex items-center justify-between gap-4 rounded-[1.35rem] border-2 border-black bg-[#f8f3ea] p-4">
         <span>
