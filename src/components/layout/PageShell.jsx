@@ -1,3 +1,4 @@
+import { getAppHref } from '../../app/useRoute';
 import { BrandBadge } from './BrandBadge';
 import { ThemeToggle } from './ThemeToggle';
 import { useAuth } from '../../contexts/AuthContext';
@@ -12,6 +13,14 @@ export function PageShell({ children }) {
           <BrandBadge />
 
           <div className="flex flex-wrap items-center justify-end gap-3">
+            {user ? (
+              <a
+                href={getAppHref('/focus-timer')}
+                className="rounded-full border-2 border-black bg-[#c5ff6f] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[3px_3px_0_#000] transition hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_#000]"
+              >
+                Start Focus
+              </a>
+            ) : null}
             <ThemeToggle />
 
             {user ? (

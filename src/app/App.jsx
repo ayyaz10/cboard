@@ -13,6 +13,7 @@ import {
   findCalculatorByPath,
 } from '../features/calculators/registry';
 import { ProgressTracker } from '../features/progressTracker/ProgressTracker';
+import { FocusTimerPage } from '../features/focusTimer/FocusTimerPage';
 
 export default function App() {
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -124,6 +125,10 @@ export default function App() {
 
   if (route === '/progress-tracker') {
     return <ProgressTracker />;
+  }
+
+  if (route === '/focus-timer') {
+    return <FocusTimerPage />;
   }
 
   const activeCalculator = findCalculatorByPath(route);

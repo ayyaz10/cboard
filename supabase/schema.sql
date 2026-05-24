@@ -183,6 +183,67 @@ create table if not exists public.crypto_futures_trades (
 alter table public.crypto_futures_trades
   add column if not exists asset_symbol text not null default 'MARKET';
 
+create table if not exists public.focus_sessions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  title text not null,
+  focus_minutes integer not null,
+  break_minutes integer not null default 0,
+  task_details text not null default '',
+  intention text not null default '',
+  status text not null default 'active_focus',
+  started_at timestamptz,
+  focus_ended_at timestamptz,
+  break_started_at timestamptz,
+  break_ended_at timestamptz,
+  completed_at timestamptz,
+  cancelled_at timestamptz,
+  reflection_result text,
+  distraction_level integer,
+  energy_level integer,
+  reflection_note text not null default '',
+  focus_score numeric,
+  timer_phase text not null default 'focus',
+  phase_started_at timestamptz,
+  focus_remaining_seconds integer,
+  break_remaining_seconds integer,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint focus_sessions_status_check
+    check (status in (
+      'active_focus',
+      'paused_focus',
+      'focus_complete',
+      'active_break',
+      'paused_break',
+      'completed',
+      'cancelled',
+      'skipped_break',
+      'missed'
+    )),
+  constraint focus_sessions_reflection_result_check
+    check (
+      reflection_result is null
+      or reflection_result in ('yes', 'partially', 'no')
+    ),
+  constraint focus_sessions_distraction_level_check
+    check (distraction_level is null or distraction_level between 1 and 5),
+  constraint focus_sessions_energy_level_check
+    check (energy_level is null or energy_level between 1 and 5),
+  constraint focus_sessions_duration_check
+    check (focus_minutes > 0 and break_minutes >= 0)
+);
+
+create table if not exists public.focus_break_tasks (
+  id uuid primary key default gen_random_uuid(),
+  session_id uuid not null references public.focus_sessions(id) on delete cascade,
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  task_text text not null,
+  is_completed boolean not null default false,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.user_tool_preferences (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
@@ -212,6 +273,10 @@ create unique index if not exists goal_quotes_single_pinned_idx on public.goal_q
 create index if not exists calculator_results_user_tool_created_idx on public.calculator_results (user_id, tool_id, created_at desc);
 create index if not exists crypto_futures_trades_user_type_created_idx on public.crypto_futures_trades (user_id, entry_type, created_at desc);
 create index if not exists crypto_futures_trades_user_symbol_created_idx on public.crypto_futures_trades (user_id, entry_type, asset_symbol, created_at desc);
+create index if not exists focus_sessions_user_created_idx on public.focus_sessions (user_id, created_at desc);
+create index if not exists focus_sessions_user_status_idx on public.focus_sessions (user_id, status, created_at desc);
+create index if not exists focus_break_tasks_session_sort_idx on public.focus_break_tasks (session_id, sort_order asc, created_at asc);
+create index if not exists focus_break_tasks_user_session_idx on public.focus_break_tasks (user_id, session_id);
 create index if not exists user_tool_preferences_user_key_idx on public.user_tool_preferences (user_id, key);
 create index if not exists profiles_username_idx on public.profiles (username);
 
@@ -224,6 +289,8 @@ alter table public.goal_journal_entries enable row level security;
 alter table public.goal_quotes enable row level security;
 alter table public.calculator_results enable row level security;
 alter table public.crypto_futures_trades enable row level security;
+alter table public.focus_sessions enable row level security;
+alter table public.focus_break_tasks enable row level security;
 alter table public.user_tool_preferences enable row level security;
 alter table public.data_migrations enable row level security;
 
@@ -520,6 +587,52 @@ create policy "crypto_futures_trades_update_own" on public.crypto_futures_trades
 
 drop policy if exists "crypto_futures_trades_delete_own" on public.crypto_futures_trades;
 create policy "crypto_futures_trades_delete_own" on public.crypto_futures_trades
+  for delete using (user_id = auth.uid());
+
+drop policy if exists "focus_sessions_select_own" on public.focus_sessions;
+create policy "focus_sessions_select_own" on public.focus_sessions
+  for select using (user_id = auth.uid());
+
+drop policy if exists "focus_sessions_insert_own" on public.focus_sessions;
+create policy "focus_sessions_insert_own" on public.focus_sessions
+  for insert with check (user_id = auth.uid());
+
+drop policy if exists "focus_sessions_update_own" on public.focus_sessions;
+create policy "focus_sessions_update_own" on public.focus_sessions
+  for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+drop policy if exists "focus_sessions_delete_own" on public.focus_sessions;
+create policy "focus_sessions_delete_own" on public.focus_sessions
+  for delete using (user_id = auth.uid());
+
+drop policy if exists "focus_break_tasks_select_own" on public.focus_break_tasks;
+create policy "focus_break_tasks_select_own" on public.focus_break_tasks
+  for select using (user_id = auth.uid());
+
+drop policy if exists "focus_break_tasks_insert_own" on public.focus_break_tasks;
+create policy "focus_break_tasks_insert_own" on public.focus_break_tasks
+  for insert with check (
+    user_id = auth.uid()
+    and exists (
+      select 1 from public.focus_sessions
+      where focus_sessions.id = focus_break_tasks.session_id
+        and focus_sessions.user_id = auth.uid()
+    )
+  );
+
+drop policy if exists "focus_break_tasks_update_own" on public.focus_break_tasks;
+create policy "focus_break_tasks_update_own" on public.focus_break_tasks
+  for update using (user_id = auth.uid()) with check (
+    user_id = auth.uid()
+    and exists (
+      select 1 from public.focus_sessions
+      where focus_sessions.id = focus_break_tasks.session_id
+        and focus_sessions.user_id = auth.uid()
+    )
+  );
+
+drop policy if exists "focus_break_tasks_delete_own" on public.focus_break_tasks;
+create policy "focus_break_tasks_delete_own" on public.focus_break_tasks
   for delete using (user_id = auth.uid());
 
 drop policy if exists "user_tool_preferences_select_own" on public.user_tool_preferences;

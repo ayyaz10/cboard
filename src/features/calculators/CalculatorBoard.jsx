@@ -26,6 +26,12 @@ export function CalculatorBoard({ calculators }) {
             >
               Progress Tracker
             </a>
+            <a
+              href={getAppHref('/focus-timer')}
+              className="inline-flex items-center rounded-full border border-black/85 bg-[#fffdf8] px-3.5 py-1.5 text-sm font-semibold tracking-[-0.02em] text-black transition hover:bg-white"
+            >
+              Focus Timer
+            </a>
           </div>
         </nav>
 

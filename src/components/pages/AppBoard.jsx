@@ -24,6 +24,17 @@ const appSections = [
     colorKey: 'cyan',
     countLabel: 'Goal dashboard',
   },
+  {
+    id: 'focus-timer',
+    path: '/focus-timer',
+    label: 'App 03',
+    name: 'Focus Timer',
+    description:
+      'Run focus sessions, breaks, reflections, and review saved history.',
+    color: '#ffd166',
+    colorKey: 'amber',
+    countLabel: 'Focus sessions',
+  },
 ];
 
 const futureAppSections = [];
