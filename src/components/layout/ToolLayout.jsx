@@ -1,59 +1,17 @@
-import { getAppHref } from '../../app/useRoute';
+import { AppNavigation } from './AppNavigation';
 import { PageShell } from './PageShell';
 
 export function ToolLayout({ activeCalculator, calculators, children }) {
   return (
     <PageShell>
       <section className="panel p-6 sm:p-8 lg:p-10">
-        <nav className="overflow-x-auto">
-          <div className="flex min-w-max gap-2">
-            <a
-              href={getAppHref('/board')}
-              className="inline-flex items-center rounded-full border border-black/85 bg-[#fffdf8] px-3.5 py-1.5 text-sm font-semibold tracking-[-0.02em] text-black transition hover:bg-white"
-            >
-              C Board
-            </a>
-
-            <a
-              href={getAppHref('/calculators')}
-              className="inline-flex items-center rounded-full border border-black/85 bg-[#c5ff6f] px-3.5 py-1.5 text-sm font-semibold tracking-[-0.02em] text-black transition"
-            >
-              Calculator Tools
-            </a>
-
-            <a
-              href={getAppHref('/progress-tracker')}
-              className="inline-flex items-center rounded-full border border-black/85 bg-[#fffdf8] px-3.5 py-1.5 text-sm font-semibold tracking-[-0.02em] text-black transition hover:bg-white"
-            >
-              Progress Tracker
-            </a>
-
-            <a
-              href={getAppHref('/focus-timer')}
-              className="inline-flex items-center rounded-full border border-black/85 bg-[#fffdf8] px-3.5 py-1.5 text-sm font-semibold tracking-[-0.02em] text-black transition hover:bg-white"
-            >
-              Focus Timer
-            </a>
-
-            {calculators.map((calculator) => {
-              const isActive = calculator.id === activeCalculator.id;
-
-              return (
-                <a
-                  key={calculator.id}
-                  href={getAppHref(calculator.path)}
-                  className={`inline-flex items-center rounded-full border border-black/85 px-3.5 py-1.5 text-sm font-semibold tracking-[-0.02em] text-black transition ${
-                    isActive
-                      ? 'bg-[#c5ff6f]'
-                      : 'bg-[#fffdf8] hover:bg-white'
-                  }`}
-                >
-                  {calculator.name}
-                </a>
-              );
-            })}
-          </div>
-        </nav>
+        <AppNavigation
+          activePath={activeCalculator.path}
+          extraItems={calculators.map((calculator) => ({
+            path: calculator.path,
+            label: calculator.name,
+          }))}
+        />
 
         <h1 className="mt-7 max-w-3xl text-4xl font-bold tracking-[-0.05em] text-black sm:text-5xl lg:text-6xl">
           {activeCalculator.name}

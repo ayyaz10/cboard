@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getAppHref } from '../../app/useRoute';
+import { AppNavigation } from '../../components/layout/AppNavigation';
 import { PageShell } from '../../components/layout/PageShell';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useAuth } from '../../contexts/AuthContext';
@@ -28,6 +28,14 @@ import {
   updateGoalDetails,
   updateGoalSortOrder,
 } from '../../services/goalService';
+import {
+  createNote,
+  deleteNote,
+  getNotes,
+  subscribeToNotes,
+  updateNote,
+} from '../../services/noteService';
+import { NotesPanel } from '../notebook/NotesPanel';
 import { EntryForm } from './EntryForm';
 import { EntryList } from './EntryList';
 import { GoalChart } from './GoalChart';
@@ -47,6 +55,7 @@ const goalDetailViews = [
   { id: 'progress', label: 'Progress' },
   { id: 'vision', label: 'Vision' },
   { id: 'journal', label: 'Journal' },
+  { id: 'notes', label: 'Notes' },
 ];
 
 function readLocalGoalOrder() {
@@ -106,6 +115,7 @@ export function ProgressTracker() {
   const [entries, setEntries] = useState([]);
   const [goalJournalEntries, setGoalJournalEntries] = useState([]);
   const [goalQuotes, setGoalQuotes] = useState([]);
+  const [notes, setNotes] = useState([]);
   const [selectedGoalId, setSelectedGoalId] = useState('');
   const [editingEntry, setEditingEntry] = useState(null);
   const [editingGoal, setEditingGoal] = useState(null);
@@ -117,23 +127,26 @@ export function ProgressTracker() {
   const [isReflectionSaving, setIsReflectionSaving] = useState(false);
   const [isJournalSaving, setIsJournalSaving] = useState(false);
   const [isQuoteSaving, setIsQuoteSaving] = useState(false);
+  const [isNoteSaving, setIsNoteSaving] = useState(false);
   const [error, setError] = useState('');
 
   async function loadTrackerData() {
     setError('');
 
     try {
-      const [savedGoals, savedEntries, savedGoalJournalEntries, savedGoalQuotes] = await Promise.all([
+      const [savedGoals, savedEntries, savedGoalJournalEntries, savedGoalQuotes, savedNotes] = await Promise.all([
         getGoals(),
         getEntries(),
         getGoalJournalEntries(),
         getGoalQuotes(),
+        getNotes(),
       ]);
 
       setGoals(applyLocalGoalOrder(savedGoals));
       setEntries(savedEntries);
       setGoalJournalEntries(savedGoalJournalEntries);
       setGoalQuotes(savedGoalQuotes);
+      setNotes(savedNotes);
     } catch (loadError) {
       setError(
         getTrackerErrorMessage(
@@ -186,11 +199,22 @@ export function ProgressTracker() {
           ),
         ));
     });
+    const notesChannel = subscribeToNotes(user.id, () => {
+      getNotes()
+        .then(setNotes)
+        .catch((noteError) => setError(
+          getTrackerErrorMessage(
+            noteError,
+            'Could not refresh notes. Please try again.',
+          ),
+        ));
+    });
 
     return () => {
       entriesChannel.unsubscribe();
       goalJournalChannel.unsubscribe();
       goalQuotesChannel.unsubscribe();
+      notesChannel.unsubscribe();
     };
   }, [user?.id]);
 
@@ -223,6 +247,10 @@ export function ProgressTracker() {
   const selectedGoalQuotes = useMemo(
     () => goalQuotes.filter((quote) => quote.goalId === selectedGoalId),
     [goalQuotes, selectedGoalId],
+  );
+  const selectedGoalNotes = useMemo(
+    () => notes.filter((note) => note.linkedGoalId === selectedGoalId),
+    [notes, selectedGoalId],
   );
 
   async function handleCreateGoal(goal) {
@@ -326,7 +354,7 @@ export function ProgressTracker() {
     });
 
     if (!confirmed) {
-      return;
+      return false;
     }
 
     setError('');
@@ -594,6 +622,61 @@ export function ProgressTracker() {
     }
   }
 
+  async function handleSaveNote(note) {
+    setIsNoteSaving(true);
+    setError('');
+
+    try {
+      const savedNote = notes.some((currentNote) => currentNote.id === note.id)
+        ? await updateNote(note.id, note)
+        : await createNote(note);
+
+      setNotes((current) => [
+        savedNote,
+        ...current.filter((currentNote) => currentNote.id !== savedNote.id),
+      ]);
+      return savedNote;
+    } catch (noteError) {
+      setError(
+        getTrackerErrorMessage(
+          noteError,
+          'Could not save this note. Please try again.',
+        ),
+      );
+      throw noteError;
+    } finally {
+      setIsNoteSaving(false);
+    }
+  }
+
+  async function handleDeleteNote(note) {
+    const confirmed = await confirm({
+      title: 'Delete note?',
+      message: `This removes "${note.title || 'this note'}" from your notebook.`,
+      confirmLabel: 'Delete',
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    setError('');
+
+    try {
+      await deleteNote(note.id);
+      setNotes((current) => current.filter((currentNote) => currentNote.id !== note.id));
+      return true;
+    } catch (noteError) {
+      setError(
+        getTrackerErrorMessage(
+          noteError,
+          'Could not delete this note. Please try again.',
+        ),
+      );
+      throw noteError;
+    }
+  }
+
   async function handleReorderGoals(nextGoals) {
     const orderedGoals = nextGoals.map((goal, index) => ({
       ...goal,
@@ -624,34 +707,7 @@ export function ProgressTracker() {
   return (
     <PageShell>
       <section className="panel p-6 sm:p-8 lg:p-10">
-        <nav className="overflow-x-auto">
-          <div className="flex min-w-max gap-2">
-            <a
-              href={getAppHref('/board')}
-              className="inline-flex items-center rounded-full border border-black/85 bg-[#fffdf8] px-3.5 py-1.5 text-sm font-semibold tracking-[-0.02em] text-black transition hover:bg-white"
-            >
-              C Board
-            </a>
-            <a
-              href={getAppHref('/calculators')}
-              className="inline-flex items-center rounded-full border border-black/85 bg-[#fffdf8] px-3.5 py-1.5 text-sm font-semibold tracking-[-0.02em] text-black transition hover:bg-white"
-            >
-              Calculator Tools
-            </a>
-            <a
-              href={getAppHref('/progress-tracker')}
-              className="inline-flex items-center rounded-full border border-black/85 bg-[#c5ff6f] px-3.5 py-1.5 text-sm font-semibold tracking-[-0.02em] text-black transition"
-            >
-              Progress Tracker
-            </a>
-            <a
-              href={getAppHref('/focus-timer')}
-              className="inline-flex items-center rounded-full border border-black/85 bg-[#fffdf8] px-3.5 py-1.5 text-sm font-semibold tracking-[-0.02em] text-black transition hover:bg-white"
-            >
-              Focus Timer
-            </a>
-          </div>
-        </nav>
+        <AppNavigation activePath="/progress-tracker" />
 
         <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
           <span className="pill">Progress tracker</span>
@@ -850,6 +906,17 @@ export function ProgressTracker() {
                     onSaveJournalEntry={handleSaveGoalJournalEntry}
                     onDeleteJournalEntry={handleDeleteGoalJournalEntry}
                     isSaving={isJournalSaving}
+                  />
+                ) : null}
+
+                {activeGoalDetailView === 'notes' ? (
+                  <NotesPanel
+                    notes={selectedGoalNotes}
+                    goals={goals}
+                    activeGoal={selectedGoal}
+                    onSaveNote={handleSaveNote}
+                    onDeleteNote={handleDeleteNote}
+                    isSaving={isNoteSaving}
                   />
                 ) : null}
               </div>

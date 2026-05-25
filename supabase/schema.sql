@@ -128,6 +128,19 @@ create table if not exists public.goal_quotes (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.notes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  title text not null default 'Untitled note',
+  content_html text not null default '',
+  content_text text not null default '',
+  linked_goal_id uuid references public.goals(id) on delete set null,
+  tags jsonb not null default '[]'::jsonb,
+  media jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 insert into public.goal_quotes (user_id, goal_id, content, is_pinned, created_at, updated_at)
 select goals.user_id, goals.id, goals.quote, true, goals.created_at, now()
 from public.goals
@@ -270,6 +283,8 @@ create index if not exists entry_values_entry_idx on public.entry_values (entry_
 create index if not exists goal_journal_entries_user_goal_date_idx on public.goal_journal_entries (user_id, goal_id, entry_date desc, created_at desc);
 create index if not exists goal_quotes_user_goal_created_idx on public.goal_quotes (user_id, goal_id, created_at desc);
 create unique index if not exists goal_quotes_single_pinned_idx on public.goal_quotes (goal_id) where is_pinned;
+create index if not exists notes_user_updated_idx on public.notes (user_id, updated_at desc, created_at desc);
+create index if not exists notes_user_goal_updated_idx on public.notes (user_id, linked_goal_id, updated_at desc);
 create index if not exists calculator_results_user_tool_created_idx on public.calculator_results (user_id, tool_id, created_at desc);
 create index if not exists crypto_futures_trades_user_type_created_idx on public.crypto_futures_trades (user_id, entry_type, created_at desc);
 create index if not exists crypto_futures_trades_user_symbol_created_idx on public.crypto_futures_trades (user_id, entry_type, asset_symbol, created_at desc);
@@ -287,6 +302,7 @@ alter table public.entries enable row level security;
 alter table public.entry_values enable row level security;
 alter table public.goal_journal_entries enable row level security;
 alter table public.goal_quotes enable row level security;
+alter table public.notes enable row level security;
 alter table public.calculator_results enable row level security;
 alter table public.crypto_futures_trades enable row level security;
 alter table public.focus_sessions enable row level security;
@@ -555,6 +571,42 @@ create policy "goal_quotes_update_own" on public.goal_quotes
 
 drop policy if exists "goal_quotes_delete_own" on public.goal_quotes;
 create policy "goal_quotes_delete_own" on public.goal_quotes
+  for delete using (user_id = auth.uid());
+
+drop policy if exists "notes_select_own" on public.notes;
+create policy "notes_select_own" on public.notes
+  for select using (user_id = auth.uid());
+
+drop policy if exists "notes_insert_own" on public.notes;
+create policy "notes_insert_own" on public.notes
+  for insert with check (
+    user_id = auth.uid()
+    and (
+      linked_goal_id is null
+      or exists (
+        select 1 from public.goals
+        where goals.id = notes.linked_goal_id
+          and goals.user_id = auth.uid()
+      )
+    )
+  );
+
+drop policy if exists "notes_update_own" on public.notes;
+create policy "notes_update_own" on public.notes
+  for update using (user_id = auth.uid()) with check (
+    user_id = auth.uid()
+    and (
+      linked_goal_id is null
+      or exists (
+        select 1 from public.goals
+        where goals.id = notes.linked_goal_id
+          and goals.user_id = auth.uid()
+      )
+    )
+  );
+
+drop policy if exists "notes_delete_own" on public.notes;
+create policy "notes_delete_own" on public.notes
   for delete using (user_id = auth.uid());
 
 drop policy if exists "calculator_results_select_own" on public.calculator_results;

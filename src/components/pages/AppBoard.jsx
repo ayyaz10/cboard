@@ -35,6 +35,17 @@ const appSections = [
     colorKey: 'amber',
     countLabel: 'Focus sessions',
   },
+  {
+    id: 'notebook',
+    path: '/notes',
+    label: 'App 04',
+    name: 'Notes',
+    description:
+      'Write rich notebook pages, attach media, and link notes to trackers.',
+    color: '#ff90e8',
+    colorKey: 'pink',
+    countLabel: 'Rich notebook',
+  },
 ];
 
 const futureAppSections = [];

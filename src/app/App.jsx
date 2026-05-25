@@ -14,6 +14,7 @@ import {
 } from '../features/calculators/registry';
 import { ProgressTracker } from '../features/progressTracker/ProgressTracker';
 import { FocusTimerPage } from '../features/focusTimer/FocusTimerPage';
+import { NotebookPage } from '../features/notebook/NotebookPage';
 
 export default function App() {
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -125,6 +126,10 @@ export default function App() {
 
   if (route === '/progress-tracker') {
     return <ProgressTracker />;
+  }
+
+  if (route === '/notes') {
+    return <NotebookPage />;
   }
 
   if (route === '/focus-timer') {

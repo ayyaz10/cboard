@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getAppHref } from '../../app/useRoute';
+import { AppNavigation } from '../../components/layout/AppNavigation';
 import { PageShell } from '../../components/layout/PageShell';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
@@ -65,39 +65,6 @@ function notifyUser(title, body) {
       }
     });
   }
-}
-
-function NavTabs() {
-  return (
-    <nav className="overflow-x-auto">
-      <div className="flex min-w-max gap-2">
-        <a
-          href={getAppHref('/board')}
-          className="inline-flex items-center rounded-full border border-black/85 bg-[#fffdf8] px-3.5 py-1.5 text-sm font-semibold tracking-[-0.02em] text-black transition hover:bg-white"
-        >
-          C Board
-        </a>
-        <a
-          href={getAppHref('/calculators')}
-          className="inline-flex items-center rounded-full border border-black/85 bg-[#fffdf8] px-3.5 py-1.5 text-sm font-semibold tracking-[-0.02em] text-black transition hover:bg-white"
-        >
-          Calculator Tools
-        </a>
-        <a
-          href={getAppHref('/progress-tracker')}
-          className="inline-flex items-center rounded-full border border-black/85 bg-[#fffdf8] px-3.5 py-1.5 text-sm font-semibold tracking-[-0.02em] text-black transition hover:bg-white"
-        >
-          Progress Tracker
-        </a>
-        <a
-          href={getAppHref('/focus-timer')}
-          className="inline-flex items-center rounded-full border border-black/85 bg-[#c5ff6f] px-3.5 py-1.5 text-sm font-semibold tracking-[-0.02em] text-black transition"
-        >
-          Focus Timer
-        </a>
-      </div>
-    </nav>
-  );
 }
 
 function FocusCompleteModal({ isOpen, session, onStartBreak, onSkipBreak, onFinishSession }) {
@@ -641,7 +608,7 @@ export function FocusTimerPage() {
   return (
     <PageShell>
       <section className="panel p-6 sm:p-8 lg:p-10">
-        <NavTabs />
+        <AppNavigation activePath="/focus-timer" />
 
         <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
           <span className="pill">Focus sessions</span>
