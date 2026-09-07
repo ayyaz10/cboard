@@ -2,8 +2,20 @@ import { CalorieCalculator } from './calorie/CalorieCalculator';
 import { CryptoFuturesCalculator } from './cryptoFutures/CryptoFuturesCalculator';
 import { MassCalculator } from './mass/MassCalculator';
 import { PercentageCalculator } from './percentage/PercentageCalculator';
+import { PositionSizeCalculator } from './positionSize/PositionSizeCalculator';
 
 export const calculators = [
+  {
+    id: 'position-size',
+    path: '/calculators/position-size',
+    name: 'Crypto Position Size Calculator',
+    boardLabel: 'Risk & Allocation',
+    boardColor: '#c5ff6f',
+    boardDescription: 'Size futures positions and spot allocations around your wallet, leverage, and stop-loss.',
+    description: 'Plan your margin, protect your wallet, and estimate the risk and reward of your next trade.',
+    showReferenceCards: false,
+    component: PositionSizeCalculator,
+  },
   {
     id: 'percentage',
     path: '/calculators/percentage',

@@ -1,0 +1,15 @@
+.position-calculator .position-eyebrow { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .12em; opacity: .75; }
+.position-calculator .position-result { border: 2px solid #000; border-radius: 1.25rem; padding: 1rem; background: #fffdf8; box-shadow: 3px 3px 0 #000; min-width: 0; }
+.position-calculator .position-result.profit { background: #e4f8de; color: #176333; }
+.position-calculator .position-result.loss { background: #ffe9e6; color: #a52119; }
+.position-button, .position-copy { border: 2px solid currentColor; border-radius: 999px; padding: .5rem 1rem; font-size: .75rem; font-weight: 700; }
+.position-copy { padding: .25rem .65rem; }
+.position-copy:disabled { opacity: .4; cursor: not-allowed; }
+.position-calculator button:focus-visible { outline: 3px solid #558825; outline-offset: 4px; }
+.position-calculator .position-warning { border: 2px solid #bd810c; background: #fff3ce; color: #704600; border-radius: 1rem; padding: .85rem 1rem; font-size: .875rem; line-height: 1.6; }
+.position-calculator .position-error { display: block; color: #b42318; font-size: .875rem; font-weight: 600; }
+html[data-theme="matrix"] .position-calculator .position-result { border-color: var(--matrix-border); background: var(--matrix-surface); box-shadow: none; }
+html[data-theme="matrix"] .position-calculator .position-result.profit { background: #071d12; color: #6ee7a8; }
+html[data-theme="matrix"] .position-calculator .position-result.loss { background: #220b0b; color: #ff9b9b; }
+html[data-theme="matrix"] .position-calculator .position-warning { background: #211a08; color: #ffd166; border-color: #8f671f; }
+html[data-theme="matrix"] .position-calculator .position-error { color: #ff9b9b; }
