@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "title": "Greek Yogurt Oats",
+  "slug": "greek-yogurt-oats",
+  "mealType": "Breakfast",
+  "description": "Creamy oats with Greek yogurt, fruit and peanut butter.",
+  "nutrition": {},
+  "prepTime": null,
+  "cookTime": null,
+  "servings": null,
+  "ingredients": [
+    {
+      "name": "Oats",
+      "amount": 60,
+      "unit": "g"
+    },
+    {
+      "name": "Fat-Free Greek Yogurt",
+      "amount": 250,
+      "unit": "g"
+    },
+    {
+      "name": "Banana",
+      "amount": 1,
+      "unit": "medium",
+      "alternativeGroup": "banana"
+    },
+    {
+      "name": "Peanut Butter",
+      "amount": 15,
+      "unit": "g",
+      "alternativeGroup": "peanut-butter"
+    }
+  ],
+  "steps": [
+    "Mix the oats and Greek yogurt, adding water to your preferred consistency.",
+    "Add sliced banana.",
+    "Top with peanut butter.",
+    "Add cinnamon and optional sugar-free syrup if desired."
+  ],
+  "sauces": [],
+  "alternatives": {
+    "banana": {
+      "title": "Banana Alternatives",
+      "options": [
+        {
+          "name": "Apple",
+          "amount": 1,
+          "unit": "whole"
+        },
+        {
+          "name": "Peach",
+          "amount": 1,
+          "unit": "whole"
+        },
+        {
+          "name": "Mixed Berries",
+          "amount": 175,
+          "unit": "g"
+        }
+      ]
+    },
+    "peanut-butter": {
+      "title": "Peanut Butter Alternatives",
+      "options": [
+        {
+          "name": "Dark Chocolate Chips",
+          "amount": 15,
+          "unit": "g"
+        },
+        {
+          "name": "Walnuts",
+          "amount": 15,
+          "unit": "g"
+        },
+        {
+          "name": "Almonds",
+          "amount": 15,
+          "unit": "g"
+        },
+        {
+          "name": "Cashews",
+          "amount": 15,
+          "unit": "g"
+        }
+      ]
+    }
+  },
+  "tags": [
+    "breakfast",
+    "meal-prep"
+  ]
+}

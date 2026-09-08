@@ -5,6 +5,7 @@ const primaryNavItems = [
   { path: '/calculators', label: 'Calculator Tools' },
   { path: '/progress-tracker', label: 'Progress Tracker' },
   { path: '/notes', label: 'Notes' },
+  { path: '/recipes', label: 'Recipes' },
   { path: '/focus-timer', label: 'Focus Timer' },
 ];
 

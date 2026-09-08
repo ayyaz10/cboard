@@ -15,6 +15,7 @@ import {
 import { ProgressTracker } from '../features/progressTracker/ProgressTracker';
 import { FocusTimerPage } from '../features/focusTimer/FocusTimerPage';
 import { NotebookPage } from '../features/notebook/NotebookPage';
+import { Recipes } from '../features/recipes/Recipes';
 
 export default function App() {
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -130,6 +131,10 @@ export default function App() {
 
   if (route === '/notes') {
     return <NotebookPage />;
+  }
+
+  if (route === '/recipes' || route.startsWith('/recipes/')) {
+    return <Recipes key={user.id} route={route} />;
   }
 
   if (route === '/focus-timer') {

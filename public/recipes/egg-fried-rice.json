@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "title": "Egg Fried Rice",
+  "slug": "egg-fried-rice",
+  "mealType": "Dinner",
+  "description": "Eggs and cooked rice with peas, carrots, bell pepper and a side of lettuce. Preparation steps are a suggested method; review before saving.",
+  "nutrition": {},
+  "prepTime": null,
+  "cookTime": null,
+  "servings": null,
+  "ingredients": [
+    {
+      "name": "Eggs",
+      "amount": 3,
+      "unit": "whole",
+      "alternativeGroup": "eggs"
+    },
+    {
+      "name": "Cooked white rice",
+      "amount": 160,
+      "unit": "g"
+    },
+    {
+      "name": "Green peas",
+      "amount": 0.5,
+      "unit": "cup"
+    },
+    {
+      "name": "Carrots",
+      "amount": 2,
+      "unit": ""
+    },
+    {
+      "name": "Bell pepper",
+      "amount": 0.5,
+      "unit": ""
+    },
+    {
+      "name": "Lettuce",
+      "amount": 1,
+      "unit": "portion",
+      "alternativeGroup": "lettuce"
+    }
+  ],
+  "steps": [
+    "Chop the carrots and bell pepper. Wash and prepare the lettuce.",
+    "Cook the carrots, pepper and peas in a non-stick pan until tender.",
+    "Add the eggs and scramble until set.",
+    "Stir in the cooked rice and heat thoroughly.",
+    "Serve with lettuce and your choice of sauce."
+  ],
+  "sauces": [
+    "Soy sauce",
+    "Sweet chilli sauce",
+    "Sriracha sauce"
+  ],
+  "alternatives": {
+    "eggs": {
+      "title": "Egg Alternatives",
+      "options": [
+        {
+          "name": "Raw extra-lean ground turkey",
+          "amount": 110,
+          "unit": "g",
+          "note": "Cook raw meat fully before combining with the rice; drain canned salmon before adding."
+        },
+        {
+          "name": "Raw extra-lean ground beef",
+          "amount": 110,
+          "unit": "g",
+          "note": "Cook raw meat fully before combining with the rice; drain canned salmon before adding."
+        },
+        {
+          "name": "Canned salmon",
+          "amount": 110,
+          "unit": "g",
+          "note": "Cook raw meat fully before combining with the rice; drain canned salmon before adding."
+        }
+      ]
+    },
+    "lettuce": {
+      "title": "Lettuce Alternatives",
+      "options": [
+        {
+          "name": "Cabbage",
+          "amount": 1,
+          "unit": "portion",
+          "note": "Prepare or cook to suit the vegetable."
+        },
+        {
+          "name": "Mushrooms",
+          "amount": 1,
+          "unit": "portion",
+          "note": "Prepare or cook to suit the vegetable."
+        },
+        {
+          "name": "Cucumber",
+          "amount": 1,
+          "unit": "portion",
+          "note": "Prepare or cook to suit the vegetable."
+        },
+        {
+          "name": "Spinach",
+          "amount": 1,
+          "unit": "portion",
+          "note": "Prepare or cook to suit the vegetable."
+        },
+        {
+          "name": "Asparagus",
+          "amount": 1,
+          "unit": "portion",
+          "note": "Prepare or cook to suit the vegetable."
+        }
+      ]
+    }
+  },
+  "tags": [
+    "dinner"
+  ]
+}

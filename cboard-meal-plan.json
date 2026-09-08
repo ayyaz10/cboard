@@ -1,0 +1,518 @@
+[
+  {
+    "title": "Greek Yogurt Oats",
+    "slug": "greek-yogurt-oats",
+    "mealType": "Breakfast",
+    "description": "Creamy high-protein oats with Greek yogurt, fruit, peanut butter, cinnamon and optional sugar-free syrup. Nutrition values, where provided, are estimates.",
+    "nutrition": {
+      "calories": 560,
+      "protein": 40,
+      "carbs": 77,
+      "fat": 12
+    },
+    "prepTime": "5-10 min",
+    "cookTime": null,
+    "servings": 1,
+    "ingredients": [
+      {
+        "name": "Oats",
+        "amount": 60,
+        "unit": "g"
+      },
+      {
+        "name": "Plain Fat-Free Greek Yogurt",
+        "amount": 250,
+        "unit": "g"
+      },
+      {
+        "name": "Water",
+        "amount": 125,
+        "unit": "ml"
+      },
+      {
+        "name": "Banana",
+        "amount": 1,
+        "unit": "medium",
+        "alternativeGroup": "fruit"
+      },
+      {
+        "name": "Peanut Butter",
+        "amount": 15,
+        "unit": "g",
+        "alternativeGroup": "peanut-butter"
+      },
+      {
+        "name": "Cinnamon Powder",
+        "amount": null,
+        "unit": "to taste"
+      },
+      {
+        "name": "Sugar-Free Syrup",
+        "amount": null,
+        "unit": "optional drizzle"
+      }
+    ],
+    "steps": [
+      "Add the oats, Greek yogurt and water to a bowl.",
+      "Mix until evenly combined.",
+      "Let it sit for 10-15 minutes, or refrigerate overnight for softer oats.",
+      "Add sliced banana or another fruit alternative.",
+      "Top with peanut butter, cinnamon powder and optional sugar-free syrup."
+    ],
+    "sauces": [],
+    "alternatives": {
+      "fruit": {
+        "title": "Fruit Alternatives",
+        "options": [
+          {
+            "name": "Apple",
+            "amount": 1,
+            "unit": "whole",
+            "note": "Works especially well with cinnamon."
+          },
+          {
+            "name": "Peach",
+            "amount": 1,
+            "unit": "whole"
+          },
+          {
+            "name": "Mixed Berries",
+            "amount": 175,
+            "unit": "g"
+          }
+        ]
+      },
+      "peanut-butter": {
+        "title": "Peanut Butter Alternatives",
+        "options": [
+          {
+            "name": "Dark Chocolate Chips",
+            "amount": 15,
+            "unit": "g"
+          },
+          {
+            "name": "Walnuts",
+            "amount": 15,
+            "unit": "g"
+          },
+          {
+            "name": "Cashews",
+            "amount": 15,
+            "unit": "g"
+          },
+          {
+            "name": "Almonds",
+            "amount": 15,
+            "unit": "g"
+          }
+        ]
+      }
+    },
+    "tags": [
+      "high-protein",
+      "breakfast",
+      "oats",
+      "calisthenics"
+    ],
+    "schemaVersion": 1
+  },
+  {
+    "title": "Chicken Burrito",
+    "slug": "chicken-burrito",
+    "mealType": "Lunch",
+    "description": "A high-protein burrito with chicken, beans, vegetables, cheddar and a protein tortilla wrap. Nutrition values, where provided, are estimates.",
+    "nutrition": {
+      "calories": 605,
+      "protein": 58,
+      "carbs": null,
+      "fat": null
+    },
+    "prepTime": "10 min",
+    "cookTime": "10-15 min",
+    "servings": 1,
+    "ingredients": [
+      {
+        "name": "Chicken Breast",
+        "amount": 110,
+        "unit": "g",
+        "alternativeGroup": "chicken"
+      },
+      {
+        "name": "Cheddar Cheese",
+        "amount": 28,
+        "unit": "g",
+        "alternativeGroup": "cheddar"
+      },
+      {
+        "name": "Bell Pepper",
+        "amount": 0.5,
+        "unit": "medium"
+      },
+      {
+        "name": "Onion",
+        "amount": 0.5,
+        "unit": "medium"
+      },
+      {
+        "name": "Canned Pinto Beans",
+        "amount": 60,
+        "unit": "g drained",
+        "alternativeGroup": "beans"
+      },
+      {
+        "name": "Protein Tortilla Wrap",
+        "amount": 1,
+        "unit": "wrap"
+      },
+      {
+        "name": "Seasoning",
+        "amount": null,
+        "unit": "to taste",
+        "alternativeGroup": "seasoning"
+      }
+    ],
+    "steps": [
+      "Season the chicken breast and cook until fully cooked.",
+      "Add onion and bell pepper and cook until softened.",
+      "Stir in the drained pinto beans and heat through.",
+      "Place the filling onto the protein tortilla wrap.",
+      "Add cheddar cheese, roll tightly and optionally toast in a dry pan."
+    ],
+    "sauces": [],
+    "alternatives": {
+      "chicken": {
+        "title": "Chicken Breast Alternatives",
+        "options": [
+          {
+            "name": "Extra-Lean Ground Beef",
+            "amount": 142,
+            "unit": "g raw",
+            "note": "Use half the usual cheddar cheese with this swap."
+          },
+          {
+            "name": "Steak",
+            "amount": 142,
+            "unit": "g raw",
+            "note": "Slice thinly and use half the usual cheddar cheese."
+          }
+        ]
+      },
+      "cheddar": {
+        "title": "Cheddar Alternatives",
+        "options": [
+          {
+            "name": "Another Cheese",
+            "amount": null,
+            "unit": "similar serving"
+          },
+          {
+            "name": "Tahini",
+            "amount": 15,
+            "unit": "g",
+            "note": "About 1 tablespoon."
+          }
+        ]
+      },
+      "beans": {
+        "title": "Pinto Bean Alternatives",
+        "options": [
+          {
+            "name": "Black Beans",
+            "amount": 60,
+            "unit": "g drained"
+          },
+          {
+            "name": "Chickpeas",
+            "amount": 60,
+            "unit": "g drained"
+          },
+          {
+            "name": "Kidney Beans",
+            "amount": 60,
+            "unit": "g drained"
+          }
+        ]
+      },
+      "seasoning": {
+        "title": "Seasoning Alternatives",
+        "options": [
+          {
+            "name": "Fajita Seasoning",
+            "amount": null,
+            "unit": "to taste"
+          },
+          {
+            "name": "Taco Seasoning",
+            "amount": null,
+            "unit": "to taste"
+          }
+        ]
+      }
+    },
+    "tags": [
+      "high-protein",
+      "lunch",
+      "burrito",
+      "calisthenics"
+    ],
+    "schemaVersion": 1
+  },
+  {
+    "title": "Egg Fried Rice",
+    "slug": "egg-fried-rice",
+    "mealType": "Dinner",
+    "description": "Egg fried rice with peas, carrots, bell pepper, lettuce and your choice of sauce. Nutrition values, where provided, are estimates.",
+    "nutrition": {
+      "calories": 590,
+      "protein": 32,
+      "carbs": null,
+      "fat": null
+    },
+    "prepTime": "10 min",
+    "cookTime": "10-15 min",
+    "servings": 1,
+    "ingredients": [
+      {
+        "name": "Whole Eggs",
+        "amount": 3,
+        "unit": "eggs",
+        "alternativeGroup": "eggs"
+      },
+      {
+        "name": "Cooked White Rice",
+        "amount": 160,
+        "unit": "g"
+      },
+      {
+        "name": "Green Peas",
+        "amount": 0.5,
+        "unit": "cup"
+      },
+      {
+        "name": "Carrots",
+        "amount": 2,
+        "unit": "medium"
+      },
+      {
+        "name": "Bell Pepper",
+        "amount": 0.5,
+        "unit": "medium"
+      },
+      {
+        "name": "Lettuce",
+        "amount": 1,
+        "unit": "portion",
+        "alternativeGroup": "vegetable"
+      }
+    ],
+    "steps": [
+      "Chop the carrots and bell pepper.",
+      "Cook carrots, peas and bell pepper in a non-stick pan until just tender.",
+      "Push the vegetables to one side and scramble the eggs.",
+      "Add the cooked rice and mix everything together.",
+      "Add a small amount of soy sauce, sweet chilli sauce or sriracha sauce to taste.",
+      "Serve lettuce on the side or fold it in right at the end."
+    ],
+    "sauces": [
+      {
+        "name": "Soy Sauce",
+        "amount": null,
+        "unit": "to taste"
+      },
+      {
+        "name": "Sweet Chilli Sauce",
+        "amount": null,
+        "unit": "to taste"
+      },
+      {
+        "name": "Sriracha Sauce",
+        "amount": null,
+        "unit": "to taste"
+      }
+    ],
+    "alternatives": {
+      "eggs": {
+        "title": "Egg Alternatives",
+        "options": [
+          {
+            "name": "Extra-Lean Ground Turkey",
+            "amount": 110,
+            "unit": "g raw"
+          },
+          {
+            "name": "Extra-Lean Ground Beef",
+            "amount": 110,
+            "unit": "g raw"
+          },
+          {
+            "name": "Canned Salmon",
+            "amount": 110,
+            "unit": "g",
+            "note": "Drain before adding."
+          }
+        ]
+      },
+      "vegetable": {
+        "title": "Lettuce / Vegetable Alternatives",
+        "options": [
+          {
+            "name": "Cabbage",
+            "amount": 1,
+            "unit": "portion"
+          },
+          {
+            "name": "Mushrooms",
+            "amount": 1,
+            "unit": "portion"
+          },
+          {
+            "name": "Cucumber",
+            "amount": 1,
+            "unit": "portion",
+            "note": "Best served cold on the side."
+          },
+          {
+            "name": "Spinach",
+            "amount": 1,
+            "unit": "portion",
+            "note": "Add near the end."
+          },
+          {
+            "name": "Asparagus",
+            "amount": 1,
+            "unit": "portion"
+          }
+        ]
+      }
+    },
+    "tags": [
+      "high-protein",
+      "dinner",
+      "rice",
+      "calisthenics"
+    ],
+    "schemaVersion": 1
+  },
+  {
+    "title": "Banana Peanut Butter Smoothie",
+    "slug": "banana-peanut-butter-smoothie",
+    "mealType": "Snack",
+    "description": "A cold banana and peanut butter smoothie using either Greek yogurt or protein powder as the protein base. Nutrition values, where provided, are estimates. Varies by protein-base choice and brand.",
+    "nutrition": {
+      "calories": null,
+      "protein": null,
+      "carbs": null,
+      "fat": null
+    },
+    "prepTime": "5 min",
+    "cookTime": null,
+    "servings": 1,
+    "ingredients": [
+      {
+        "name": "Banana",
+        "amount": 1,
+        "unit": "medium",
+        "alternativeGroup": "fruit"
+      },
+      {
+        "name": "Peanut Butter",
+        "amount": 15,
+        "unit": "g",
+        "alternativeGroup": "peanut-butter"
+      },
+      {
+        "name": "Water",
+        "amount": 175,
+        "unit": "ml"
+      },
+      {
+        "name": "Ice Cubes",
+        "amount": "5-10",
+        "unit": "cubes"
+      },
+      {
+        "name": "Protein Base",
+        "amount": 1,
+        "unit": "choice",
+        "alternativeGroup": "protein-base"
+      }
+    ],
+    "steps": [
+      "Add banana, peanut butter, water and ice cubes to a blender.",
+      "Choose one protein base: 200g plain 0% Greek yogurt OR your normal serving of protein powder.",
+      "Blend until smooth.",
+      "Add more water for a thinner smoothie or more ice for a thicker smoothie."
+    ],
+    "sauces": [],
+    "alternatives": {
+      "fruit": {
+        "title": "Fruit Alternatives",
+        "options": [
+          {
+            "name": "Apple",
+            "amount": 1,
+            "unit": "whole"
+          },
+          {
+            "name": "Peach",
+            "amount": 1,
+            "unit": "whole"
+          },
+          {
+            "name": "Mixed Berries",
+            "amount": 175,
+            "unit": "g"
+          }
+        ]
+      },
+      "peanut-butter": {
+        "title": "Peanut Butter Alternatives",
+        "options": [
+          {
+            "name": "Dark Chocolate Chips",
+            "amount": 15,
+            "unit": "g"
+          },
+          {
+            "name": "Walnuts",
+            "amount": 15,
+            "unit": "g"
+          },
+          {
+            "name": "Cashews",
+            "amount": 15,
+            "unit": "g"
+          },
+          {
+            "name": "Almonds",
+            "amount": 15,
+            "unit": "g"
+          }
+        ]
+      },
+      "protein-base": {
+        "title": "Smoothie Protein Base",
+        "options": [
+          {
+            "name": "Plain 0% Greek Yogurt",
+            "amount": 200,
+            "unit": "g"
+          },
+          {
+            "name": "Protein Powder",
+            "amount": 1,
+            "unit": "normal serving",
+            "note": "Use the serving size shown on your product label."
+          }
+        ]
+      }
+    },
+    "tags": [
+      "snack",
+      "smoothie",
+      "high-protein",
+      "calisthenics"
+    ],
+    "schemaVersion": 1
+  }
+]

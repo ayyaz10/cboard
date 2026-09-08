@@ -1,0 +1,260 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CBoard Recipe v1",
+  "type": "object",
+  "required": [
+    "title",
+    "mealType",
+    "ingredients",
+    "steps"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "maxLength": 100,
+      "not": {
+        "enum": [
+          "manage",
+          "import"
+        ]
+      }
+    },
+    "mealType": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 4000
+    },
+    "nutrition": {
+      "$ref": "#/$defs/nutrition"
+    },
+    "prepTime": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 100
+    },
+    "cookTime": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 100
+    },
+    "servings": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "exclusiveMinimum": 0
+    },
+    "ingredients": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ingredient"
+      },
+      "minItems": 1,
+      "maxItems": 100
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4000
+      },
+      "minItems": 1,
+      "maxItems": 100
+    },
+    "sauces": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          {
+            "$ref": "#/$defs/ingredient"
+          }
+        ]
+      },
+      "minItems": 0,
+      "maxItems": 100
+    },
+    "alternatives": {
+      "type": "object",
+      "maxProperties": 100,
+      "propertyNames": {
+        "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        "not": {
+          "enum": [
+            "constructor",
+            "prototype",
+            "__proto__"
+          ]
+        }
+      },
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "title",
+          "options"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/ingredient"
+            },
+            "minItems": 1,
+            "maxItems": 100
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100
+      },
+      "minItems": 0,
+      "maxItems": 100
+    },
+    "source": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "url"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "description": "Absolute HTTP(S) URL. Import also accepts a Markdown link and normalizes it to its URL."
+        },
+        "showOnRecipeCard": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    }
+  },
+  "$defs": {
+    "nutrition": {
+      "type": "object",
+      "properties": {
+        "calories": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "protein": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "carbs": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "fat": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "ingredient": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "amount": {
+          "anyOf": [
+            {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            }
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "nutrition": {
+          "$ref": "#/$defs/nutrition"
+        },
+        "alternativeGroup": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "maxLength": 100
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

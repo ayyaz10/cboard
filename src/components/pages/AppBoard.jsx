@@ -3,6 +3,11 @@ import { PageShell } from '../layout/PageShell';
 
 const appSections = [
   {
+    id: 'recipes', path: '/recipes', label: 'Meal library', name: 'Recipes',
+    description: 'Keep your meal plans, ingredients, alternatives, and recipe photos together.',
+    color: '#c5ff6f', colorKey: 'lime', countLabel: 'Import your recipes',
+  },
+  {
     id: 'calculator-board',
     path: '/calculators',
     label: 'App 01',

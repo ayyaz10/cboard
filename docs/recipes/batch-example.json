@@ -1,0 +1,215 @@
+[
+  {
+    "schemaVersion": 1,
+    "title": "Greek Yogurt Oats",
+    "slug": "greek-yogurt-oats",
+    "mealType": "Breakfast",
+    "description": "Creamy oats with Greek yogurt, fruit and peanut butter.",
+    "nutrition": {},
+    "prepTime": null,
+    "cookTime": null,
+    "servings": null,
+    "ingredients": [
+      {
+        "name": "Oats",
+        "amount": 60,
+        "unit": "g"
+      },
+      {
+        "name": "Fat-Free Greek Yogurt",
+        "amount": 250,
+        "unit": "g"
+      },
+      {
+        "name": "Banana",
+        "amount": 1,
+        "unit": "medium",
+        "alternativeGroup": "banana"
+      },
+      {
+        "name": "Peanut Butter",
+        "amount": 15,
+        "unit": "g",
+        "alternativeGroup": "peanut-butter"
+      }
+    ],
+    "steps": [
+      "Mix the oats and Greek yogurt, adding water to your preferred consistency.",
+      "Add sliced banana.",
+      "Top with peanut butter.",
+      "Add cinnamon and optional sugar-free syrup if desired."
+    ],
+    "sauces": [],
+    "alternatives": {
+      "banana": {
+        "title": "Banana Alternatives",
+        "options": [
+          {
+            "name": "Apple",
+            "amount": 1,
+            "unit": "whole"
+          },
+          {
+            "name": "Peach",
+            "amount": 1,
+            "unit": "whole"
+          },
+          {
+            "name": "Mixed Berries",
+            "amount": 175,
+            "unit": "g"
+          }
+        ]
+      },
+      "peanut-butter": {
+        "title": "Peanut Butter Alternatives",
+        "options": [
+          {
+            "name": "Dark Chocolate Chips",
+            "amount": 15,
+            "unit": "g"
+          },
+          {
+            "name": "Walnuts",
+            "amount": 15,
+            "unit": "g"
+          },
+          {
+            "name": "Almonds",
+            "amount": 15,
+            "unit": "g"
+          },
+          {
+            "name": "Cashews",
+            "amount": 15,
+            "unit": "g"
+          }
+        ]
+      }
+    },
+    "tags": [
+      "breakfast",
+      "meal-prep"
+    ]
+  },
+  {
+    "schemaVersion": 1,
+    "title": "Egg Fried Rice",
+    "slug": "egg-fried-rice",
+    "mealType": "Dinner",
+    "description": "Eggs and cooked rice with peas, carrots, bell pepper and a side of lettuce. Preparation steps are a suggested method; review before saving.",
+    "nutrition": {},
+    "prepTime": null,
+    "cookTime": null,
+    "servings": null,
+    "ingredients": [
+      {
+        "name": "Eggs",
+        "amount": 3,
+        "unit": "whole",
+        "alternativeGroup": "eggs"
+      },
+      {
+        "name": "Cooked white rice",
+        "amount": 160,
+        "unit": "g"
+      },
+      {
+        "name": "Green peas",
+        "amount": 0.5,
+        "unit": "cup"
+      },
+      {
+        "name": "Carrots",
+        "amount": 2,
+        "unit": ""
+      },
+      {
+        "name": "Bell pepper",
+        "amount": 0.5,
+        "unit": ""
+      },
+      {
+        "name": "Lettuce",
+        "amount": 1,
+        "unit": "portion",
+        "alternativeGroup": "lettuce"
+      }
+    ],
+    "steps": [
+      "Chop the carrots and bell pepper. Wash and prepare the lettuce.",
+      "Cook the carrots, pepper and peas in a non-stick pan until tender.",
+      "Add the eggs and scramble until set.",
+      "Stir in the cooked rice and heat thoroughly.",
+      "Serve with lettuce and your choice of sauce."
+    ],
+    "sauces": [
+      "Soy sauce",
+      "Sweet chilli sauce",
+      "Sriracha sauce"
+    ],
+    "alternatives": {
+      "eggs": {
+        "title": "Egg Alternatives",
+        "options": [
+          {
+            "name": "Raw extra-lean ground turkey",
+            "amount": 110,
+            "unit": "g",
+            "note": "Cook raw meat fully before combining with the rice; drain canned salmon before adding."
+          },
+          {
+            "name": "Raw extra-lean ground beef",
+            "amount": 110,
+            "unit": "g",
+            "note": "Cook raw meat fully before combining with the rice; drain canned salmon before adding."
+          },
+          {
+            "name": "Canned salmon",
+            "amount": 110,
+            "unit": "g",
+            "note": "Cook raw meat fully before combining with the rice; drain canned salmon before adding."
+          }
+        ]
+      },
+      "lettuce": {
+        "title": "Lettuce Alternatives",
+        "options": [
+          {
+            "name": "Cabbage",
+            "amount": 1,
+            "unit": "portion",
+            "note": "Prepare or cook to suit the vegetable."
+          },
+          {
+            "name": "Mushrooms",
+            "amount": 1,
+            "unit": "portion",
+            "note": "Prepare or cook to suit the vegetable."
+          },
+          {
+            "name": "Cucumber",
+            "amount": 1,
+            "unit": "portion",
+            "note": "Prepare or cook to suit the vegetable."
+          },
+          {
+            "name": "Spinach",
+            "amount": 1,
+            "unit": "portion",
+            "note": "Prepare or cook to suit the vegetable."
+          },
+          {
+            "name": "Asparagus",
+            "amount": 1,
+            "unit": "portion",
+            "note": "Prepare or cook to suit the vegetable."
+          }
+        ]
+      }
+    },
+    "tags": [
+      "dinner"
+    ]
+  }
+]
