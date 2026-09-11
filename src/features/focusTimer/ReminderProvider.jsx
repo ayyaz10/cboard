@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useReducer, useRef, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { navigateTo } from '../../app/useRoute';
 import { formatReminderInterval } from './reminderHelpers';
-import { readReminderState, reminderReducer } from './reminderHistoryState.js';
+import { mostUsedReminder, readReminderState, reminderReducer } from './reminderHistoryState.js';
 
 const ReminderContext = createContext(null);
 export const useReminders = () => useContext(ReminderContext);
@@ -114,6 +115,10 @@ function ReminderStore({ userId, children }) {
   }
 
   const ringing = reminders.filter((item) => item.status === 'ringing');
+  const quickReminders = [mostUsedReminder(history, false), mostUsedReminder(history, true)].filter(Boolean);
+  const isActive = (quick) => reminders.some((item) => item.title === quick.title
+    && item.durationMs === quick.duration && Boolean(item.repeatMs) === quick.repeats);
+  const openReminder = (repeats) => navigateTo(`/focus-timer#reminders-${repeats ? 'repeat' : 'once'}`);
   return (
     <ReminderContext.Provider value={{ reminders, history, now, addReminder, dismiss, cancel, snooze, prepareSound, playSound, storageError }}>
       {children}
@@ -128,9 +133,25 @@ function ReminderStore({ userId, children }) {
                 <button type="button" onClick={() => snooze(item.id)} aria-label={`Snooze ${item.title} for 5 minutes`} className="rounded-full border-2 border-black bg-white px-4 py-2 text-sm font-bold">Snooze 5 min</button>
                 <button type="button" onClick={() => dismiss(item.id)} aria-label={`Dismiss ${item.title}`} className="rounded-full border-2 border-black bg-black px-4 py-2 text-sm font-bold text-white">Dismiss</button>
                 {item.repeatMs > 0 && <button type="button" onClick={() => cancel(item.id)} aria-label={`Stop repeating ${item.title}`} className="rounded-full border-2 border-black bg-white px-4 py-2 text-sm font-bold">Stop repeating</button>}
+                <button type="button" onClick={() => openReminder(item.repeatMs > 0)} className="rounded-full border-2 border-black bg-white px-4 py-2 text-sm font-bold">Open {item.repeatMs > 0 ? 'Repeat' : 'Just once'}</button>
               </div>
             </div>
           ))}
+          {quickReminders.length > 0 && (
+            <section aria-label="Quick start favorite reminders" className="mt-4 border-t-2 border-black pt-4">
+              <p className="text-sm font-bold">Your most-used reminders</p>
+              <div className="mt-2 grid gap-2">
+                {quickReminders.map((quick) => {
+                  const active = isActive(quick);
+                  return <div key={`${quick.repeats}:${quick.title}:${quick.duration}`} className="rounded-xl border-2 border-black bg-white p-3">
+                    <p className="break-words text-sm font-bold">{quick.title}</p>
+                    <p className="mt-1 text-xs font-semibold text-black/65">{quick.repeats ? 'Repeat every' : 'Just once after'} {formatReminderInterval(quick.duration)}</p>
+                    <button type="button" disabled={active} onClick={() => addReminder(quick.title, quick.duration, quick.repeats)} className="mt-2 rounded-full border-2 border-black bg-[#c5ff6f] px-3 py-1.5 text-xs font-bold disabled:cursor-default disabled:bg-black/10 disabled:text-black/55">{active ? 'Already active' : 'Turn on'}</button>
+                  </div>;
+                })}
+              </div>
+            </section>
+          )}
         </aside>
       )}
     </ReminderContext.Provider>

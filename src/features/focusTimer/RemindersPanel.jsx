@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useReminders } from './ReminderProvider';
 import { ReminderHistory } from './ReminderHistory.jsx';
 import { ReminderPresets } from './ReminderPresets.jsx';
@@ -20,6 +20,13 @@ export function RemindersPanel() {
   const titleInput = useRef(null);
   const duration = durationMilliseconds(hours, minutes);
   const upcoming = reminders.filter((item) => item.status === 'waiting' || item.repeatMs > 0).sort((a, b) => a.dueAt - b.dueAt);
+
+  useEffect(() => {
+    const mode = window.location.hash;
+    if (mode !== '#reminders-once' && mode !== '#reminders-repeat') return;
+    setRepeats(mode === '#reminders-repeat');
+    window.requestAnimationFrame(() => document.getElementById('reminders-heading')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }, []);
 
   function submit(event) {
     event.preventDefault();

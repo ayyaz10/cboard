@@ -13,6 +13,24 @@ function eventFor(item, type, at) {
   };
 }
 
+export function mostUsedReminder(history, repeats) {
+  const matching = history.filter((event) => event?.type === 'created'
+    && Boolean(event.repeatMs) === repeats && Number.isFinite(event.durationMs)
+    && event.durationMs >= 60_000 && typeof event.title === 'string' && event.title.trim());
+  const usage = new Map();
+  for (const event of matching) {
+    const key = `${event.title.trim()}\0${event.durationMs}`;
+    const current = usage.get(key);
+    usage.set(key, {
+      title: event.title.trim(), duration: event.durationMs, repeats,
+      count: (current?.count || 0) + 1,
+      lastUsedAt: Math.max(current?.lastUsedAt || 0, event.at || 0),
+    });
+  }
+  return [...usage.values()].sort((left, right) => right.count - left.count
+    || right.lastUsedAt - left.lastUsedAt)[0] || null;
+}
+
 export function readReminderState(raw, now) {
   try {
     const saved = JSON.parse(raw || '[]');
