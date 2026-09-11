@@ -6,7 +6,9 @@ const primaryNavItems = [
   { path: '/progress-tracker', label: 'Progress Tracker' },
   { path: '/notes', label: 'Notes' },
   { path: '/recipes', label: 'Recipes' },
+  { path: '/groceries', label: 'Groceries' },
   { path: '/focus-timer', label: 'Focus Timer' },
+  { path: '/finance', label: 'Finance' },
 ];
 
 export function AppNavigation({ activePath, extraItems = [] }) {

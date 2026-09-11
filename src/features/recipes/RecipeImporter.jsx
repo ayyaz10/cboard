@@ -10,6 +10,7 @@ import {
 import { RecipePage, secondaryButton } from './RecipeComponents';
 import { RecipeImageUploader } from './RecipeImageUploader';
 import { RecipeFormEditor, emptyRecipe } from './RecipeFormEditor';
+import { parseRecipeText } from '../../services/recipeService';
 
 export function RecipeImporter({
   initial,
@@ -18,6 +19,7 @@ export function RecipeImporter({
   onSaveBatch,
   onCancel,
   getSlugs,
+  onAiCreated,
 }) {
   const [text, setText] = useState(() => {
     if (!initial) return '';
@@ -33,7 +35,25 @@ export function RecipeImporter({
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const [imageBusy, setImageBusy] = useState(false);
+  const [aiText, setAiText] = useState('');
   const lock = useRef(false);
+  async function createWithAi() {
+    if (lock.current || !aiText.trim()) return;
+    lock.current = true;
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const recipe = await parseRecipeText(aiText);
+      setNotice('Recipe created securely. Opening it now…');
+      onAiCreated(recipe);
+    } catch (error) {
+      setError(error.message || 'Unable to parse recipe. Please try again.');
+    } finally {
+      lock.current = false;
+      setBusy(false);
+    }
+  }
   async function showPreview(event) {
     event.preventDefault();
     if (lock.current || imageBusy) return;
@@ -266,8 +286,48 @@ export function RecipeImporter({
               >
                 JSON editor
               </button>
+              {!editing && (
+                <button
+                  type="button"
+                  className={secondaryButton}
+                  aria-pressed={mode === 'ai'}
+                  onClick={() => {
+                    setMode('ai');
+                    setError('');
+                    setPreview(null);
+                  }}
+                >
+                  AI text import
+                </button>
+              )}
             </div>
-            {mode === 'form' ? (
+            {mode === 'ai' ? (
+              <section className="space-y-4 rounded-2xl border-2 border-black bg-[#e9f8ff] p-5">
+                <div>
+                  <h2 className="text-2xl font-bold">Paste a recipe in your own words</h2>
+                  <p className="mt-2 text-sm leading-6 text-black/70">
+                    Include a title, cooking time, ingredients, and steps. The server securely parses and saves it to your account.
+                  </p>
+                </div>
+                <label className="block font-bold" htmlFor="ai-recipe-text">Recipe text</label>
+                <textarea
+                  id="ai-recipe-text"
+                  className="field-input min-h-64"
+                  maxLength={2000}
+                  required
+                  value={aiText}
+                  onChange={(event) => setAiText(event.target.value)}
+                  placeholder="Chicken fried rice. Use 120g chicken, 160g cooked rice…"
+                />
+                <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-black/65">
+                  <span>{aiText.length}/2000 characters</span>
+                  <span>AI can make mistakes. Review the saved recipe before cooking.</span>
+                </div>
+                <PrimaryButton type="button" disabled={busy || !aiText.trim()} onClick={createWithAi}>
+                  {busy ? 'Creating recipe…' : 'Create recipe with AI'}
+                </PrimaryButton>
+              </section>
+            ) : mode === 'form' ? (
               <RecipeFormEditor
                 recipe={formData}
                 onChange={setFormData}
@@ -330,20 +390,20 @@ export function RecipeImporter({
               </>
             )}
           </fieldset>
-          <RecipeImageUploader
+          {mode !== 'ai' && <RecipeImageUploader
             image={image}
             onChange={setImage}
             onBusy={setImageBusy}
             disabled={busy}
-          />
-          <p className="text-sm text-black/70">
+          />}
+          {mode !== 'ai' && <p className="text-sm text-black/70">
             The image above is for a single-recipe import. Batch imports have a
             separate image uploader for each recipe in the preview.
-          </p>
+          </p>}
           <div className="flex flex-wrap gap-3">
-            <PrimaryButton type="submit" disabled={busy || imageBusy}>
+            {mode !== 'ai' && <PrimaryButton type="submit" disabled={busy || imageBusy}>
               {busy ? 'Checking…' : 'Preview Recipe'}
-            </PrimaryButton>
+            </PrimaryButton>}
             <button
               type="button"
               className={secondaryButton}

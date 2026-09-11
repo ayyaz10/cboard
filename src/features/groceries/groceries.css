@@ -1,0 +1,461 @@
+.groceries {
+  color: #17251b;
+  --g-green: #c5ff6f;
+  --g-border: #d9dfd2;
+}
+.groceries h1 {
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  font-weight: 800;
+  letter-spacing: -0.055em;
+  line-height: 1.1;
+  margin: 10px 0;
+}
+.groceries h2 {
+  font-weight: 750;
+  font-size: 1.15rem;
+}
+.groceries p {
+  color: #576050;
+  line-height: 1.6;
+}
+.groceries button,
+.groceries input,
+.groceries select,
+.groceries textarea {
+  font: inherit;
+}
+.groceries button {
+  border: 1px solid var(--g-border);
+  border-radius: 12px;
+  min-height: 42px;
+  padding: 8px 13px;
+  background: #fffdf8;
+  cursor: pointer;
+  font-weight: 650;
+}
+.groceries button:hover {
+  background: #ecf5df;
+}
+.groceries button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.groceries :focus-visible {
+  outline: 3px solid #4f7a2c;
+  outline-offset: 3px;
+}
+.groceries input:not([type="checkbox"]):not([type="file"]),
+.groceries select,
+.groceries textarea {
+  border: 1px solid #bac4b2;
+  border-radius: 10px;
+  background: white;
+  padding: 10px;
+  min-height: 44px;
+  max-width: 100%;
+}
+.groceries input[type="checkbox"] {
+  width: 19px;
+  height: 19px;
+  accent-color: #365a20;
+  flex-shrink: 0;
+}
+.groceries .g-primary {
+  background: var(--g-green);
+  border-color: #17251b;
+  padding: 12px 20px;
+}
+.g-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.g-header {
+  margin: 32px 0 25px;
+}
+.g-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  font-weight: 800;
+}
+.g-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 26px;
+}
+.groceries .g-stats button {
+  text-align: left;
+  padding: 17px;
+  background: #f3f6ec;
+}
+.g-stats strong {
+  display: block;
+  font-size: 28px;
+  line-height: 1.2;
+}
+.g-stats span {
+  font-size: 13px;
+  color: #58624f;
+}
+.g-tabs {
+  display: flex;
+  gap: 5px;
+}
+.groceries .g-tabs button[aria-pressed="true"] {
+  background: #17251b;
+  color: white;
+}
+.g-tools {
+  display: flex;
+  gap: 10px;
+  align-items: end;
+  flex-wrap: wrap;
+  margin: 16px 0;
+}
+.g-tools > input {
+  flex: 1;
+  min-width: 180px;
+}
+.g-check {
+  display: flex !important;
+  align-items: center;
+  gap: 9px;
+  font-size: 14px;
+}
+.g-actions,
+.g-row-actions {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.g-hint {
+  background: #f4f5ec;
+  padding: 12px 15px;
+  border-radius: 12px;
+  margin-top: 15px;
+  font-size: 13px;
+}
+.g-list {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.g-group {
+  margin-top: 25px;
+}
+.g-group h2 {
+  padding: 10px 0;
+}
+.g-group h2 small {
+  font-size: 12px;
+  margin-left: 8px;
+  color: #6c7661;
+}
+.g-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 13px 0;
+  border-bottom: 1px solid #e3e7de;
+}
+.g-thumb {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: #f1f4ea;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  font-size: 25px;
+}
+.g-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.g-item-name {
+  flex: 1;
+  min-width: 120px;
+}
+.groceries .g-name {
+  display: block;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 0;
+  min-height: 28px;
+  font-weight: 700;
+}
+.g-item-name small {
+  display: block;
+  font-size: 12px;
+  color: #627057;
+}
+.g-quantity {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.g-quantity span {
+  font-size: 13px;
+  min-width: 25px;
+}
+.groceries .g-number {
+  width: 85px;
+  text-align: center;
+}
+.g-bulk {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  background: #eafad6;
+  padding: 12px;
+  border-radius: 12px;
+  margin-top: 15px;
+}
+.g-footer {
+  position: sticky;
+  bottom: 12px;
+  background: #17251b;
+  color: #fff;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  margin-top: 24px;
+  box-shadow: 0 4px 15px #0002;
+}
+.g-footer small {
+  margin-left: auto;
+  color: #c4d0ba;
+}
+.g-footer > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.groceries .g-footer button {
+  color: #17251b;
+}
+.g-name:hover {
+  text-decoration: underline;
+}
+html[data-theme="matrix"] .groceries {
+  color: var(--matrix-text);
+  --g-border: var(--matrix-border);
+}
+html[data-theme="matrix"]
+  .groceries
+  :is(button, input, select, textarea, .g-hint, .g-bulk, .g-thumb),
+html[data-theme="matrix"] .g-dialog,
+html[data-theme="matrix"] .g-recipe {
+  background: var(--matrix-surface-raised);
+  color: var(--matrix-text);
+  border-color: var(--matrix-border);
+}
+html[data-theme="matrix"] .groceries :is(p, small, .g-stats span) {
+  color: var(--matrix-muted);
+}
+html[data-theme="matrix"] .groceries .g-primary,
+html[data-theme="matrix"] .groceries .g-tabs button[aria-pressed="true"] {
+  background: var(--matrix-accent);
+  color: var(--matrix-accent-text);
+}
+html[data-theme="matrix"] .groceries .g-stats button {
+  background: var(--matrix-surface-soft);
+}
+.g-empty {
+  text-align: center;
+  padding: 45px 12px;
+}
+.g-empty > span {
+  font-size: 40px;
+}
+.g-empty p {
+  margin: 10px 0 20px;
+}
+.g-alert {
+  padding: 15px;
+  background: #fff0e8;
+  border-radius: 12px;
+  margin-bottom: 15px;
+}
+.g-dialog {
+  padding: 25px;
+  border: 1px solid #17251b;
+  border-radius: 22px;
+  width: min(620px, calc(100% - 24px));
+  max-height: 88dvh;
+  overflow: auto;
+  background: #fffdf8;
+  margin: auto;
+  box-shadow: 0 20px 90px #0004;
+}
+.g-dialog::backdrop {
+  background: #14210b70;
+  backdrop-filter: blur(3px);
+}
+.g-dialog form {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+}
+.g-dialog label {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+  font-weight: 600;
+  font-size: 14px;
+}
+.g-dialog details {
+  border-top: 1px solid var(--g-border);
+  padding-top: 16px;
+}
+.g-dialog summary {
+  cursor: pointer;
+  min-height: 40px;
+}
+.g-dialog textarea {
+  width: 100%;
+}
+.g-preview {
+  display: grid;
+  grid-template-columns: 1fr 90px 95px;
+  gap: 8px;
+  border-bottom: 1px solid var(--g-border);
+  padding-bottom: 13px;
+}
+.g-preview select:last-of-type,
+.g-preview small {
+  grid-column: 1/-1;
+}
+.g-photo {
+  width: 110px;
+  height: 110px;
+  object-fit: cover;
+  border-radius: 15px;
+}
+.g-suggestions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.g-modal-error {
+  position: fixed;
+  bottom: 15px;
+  left: 5%;
+  right: 5%;
+  z-index: 100;
+  background: #ffe7dd;
+  padding: 15px;
+  border: 1px solid #a83413;
+  border-radius: 12px;
+  pointer-events: none;
+}
+.g-item-name .g-expiry {
+  color: #ac451b;
+}
+.g-recipe {
+  border: 1px solid #d9dfd2;
+  border-radius: 18px;
+  padding: 20px;
+  background: #f8faf3;
+}
+.g-recipe ul {
+  margin: 15px 0;
+}
+.g-recipe li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #e3e7de;
+}
+.g-recipe-ingredient { display: flex; align-items: center; gap: 10px; }
+.g-recipe-ingredient > img { width: 38px; height: 38px; border-radius: 10px; object-fit: cover; flex: 0 0 auto; }
+.g-recipe .g-tools {
+  align-items: center;
+}
+.g-recipe .g-tools input {
+  max-width: 95px;
+}
+kbd {
+  font-size: 11px;
+  border: 1px solid #17251b55;
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 8px;
+}
+@media (max-width: 700px) {
+  .g-header {
+    margin: 20px 0 16px;
+  }
+  .g-header p {
+    font-size: 14px;
+  }
+  .g-tools > input {
+    flex-basis: 100%;
+  }
+  .g-tools > select {
+    flex: 1;
+    min-width: 0;
+    width: calc(50% - 5px);
+  }
+  .g-footer {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+  .groceries .g-number {
+    width: 65px;
+  }
+  .g-quantity button {
+    padding: 8px;
+  }
+  .g-row-actions button[aria-label^="Edit"] {
+    display: none;
+  }
+  .g-stats {
+    gap: 7px;
+  }
+  .groceries .g-stats button {
+    padding: 12px 9px;
+  }
+  .g-stats span {
+    font-size: 11px;
+  }
+  .g-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .g-item-name {
+    flex-basis: calc(100% - 95px);
+  }
+  .g-quantity {
+    margin-left: 27px;
+  }
+  .g-row-actions {
+    margin-left: auto;
+  }
+  .g-footer small {
+    display: none;
+  }
+  .g-preview {
+    grid-template-columns: 1fr 75px;
+  }
+  .g-preview select {
+    grid-column: auto;
+  }
+  .g-preview input:first-child {
+    grid-column: 1/-1;
+  }
+}

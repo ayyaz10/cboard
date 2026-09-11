@@ -23,6 +23,7 @@ import { FocusHistory } from './FocusHistory';
 import { FocusSessionForm } from './FocusSessionForm';
 import { FocusStats } from './FocusStats';
 import { ReflectionModal } from './ReflectionModal';
+import { RemindersPanel } from './RemindersPanel';
 import {
   calculateFocusScore,
   focusSessionStatuses,
@@ -619,8 +620,10 @@ export function FocusTimerPage() {
         </h1>
 
         <p className="mt-3 max-w-2xl text-base font-medium leading-7 text-black/70 sm:text-lg">
-          Run timestamped focus sessions, close the loop with reflection, and keep the history in Supabase.
+          Make time to focus, take a break, and set reminders for the things you don’t want to forget.
         </p>
+
+        <RemindersPanel />
 
         {error ? (
           <p className="mt-5 rounded-[1rem] border-2 border-black bg-[#ffe0de] px-4 py-3 text-sm font-bold text-black">

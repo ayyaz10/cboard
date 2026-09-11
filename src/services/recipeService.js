@@ -4,8 +4,36 @@ import {
   MAX_BATCH_RECIPES,
 } from '../features/recipes/recipeData';
 import { isRecipeImage } from '../features/recipes/recipeImage';
+import { requireSupabase } from '../lib/supabaseClient';
 
 const PREFIX = 'recipe:v1:';
+
+export async function parseRecipeText(recipeText) {
+  if (typeof recipeText !== 'string' || !recipeText.trim())
+    throw new Error('Paste some recipe text first.');
+  if (recipeText.trim().length > 2000)
+    throw new Error('Recipe text must be 2000 characters or fewer.');
+  const { data, error } = await requireSupabase().functions.invoke('parse-recipe', {
+    body: { recipeText: recipeText.trim() },
+  });
+  let message = typeof data?.error === 'string' ? data.error : '';
+  const context = error?.context;
+  if (!message && context && typeof context.json === 'function') {
+    try {
+      const response = typeof context.clone === 'function' ? context.clone() : context;
+      const body = await response.json();
+      if (typeof body?.error === 'string') message = body.error;
+    } catch { /* Use the status-based safe fallback below. */ }
+  }
+  if (!message && context?.status === 401) message = 'Your session expired. Please sign in again.';
+  if (!message && context?.status === 422)
+    message = 'Add a cooking time, ingredients, and at least one cooking step.';
+  if (!message && context?.status === 429)
+    message = 'Daily AI recipe limit reached. Try again tomorrow.';
+  if (error || !data?.success || !data?.recipe)
+    throw new Error(message || 'Unable to parse recipe. Please check the text and try again.');
+  return { ...validateRecipe(data.recipe), image: null, updatedAt: data.recipe.updatedAt };
+}
 
 // One row per recipe reuses CBoard's existing user-scoped JSONB persistence.
 // The existing (user_id, key) unique constraint also protects concurrent imports.

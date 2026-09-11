@@ -1,6 +1,7 @@
 import { getAppHref, navigateTo } from '../../app/useRoute';
 import { formatIngredient } from './recipeData';
 import { RecipeSource } from './RecipeSource';
+import { RecipeGroceries } from '../groceries/RecipeGroceries';
 import { useRecipeCardGrid } from './RecipeCardView';
 
 export const secondaryButton =
@@ -191,6 +192,7 @@ export function RecipePage({ recipe, preview = false }) {
           ))}
       </dl>
       <IngredientList recipe={recipe} preview={preview} />
+      {!preview && <RecipeGroceries key={recipe.slug} recipe={recipe} />}
       <RecipeSteps steps={recipe.steps} />
       {recipe.sauces.length > 0 && (
         <section>

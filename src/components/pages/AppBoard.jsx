@@ -3,6 +3,16 @@ import { PageShell } from '../layout/PageShell';
 
 const appSections = [
   {
+    id: 'finance', path: '/finance', label: 'Money workspace', name: 'Finance Manager',
+    description: 'Plan your month, track spending, manage repayments, and grow savings goals.',
+    color: '#9fe3ff', colorKey: 'cyan', countLabel: 'Budget & goals',
+  },
+  {
+    id: 'groceries', path: '/groceries', label: 'Your kitchen', name: 'Groceries',
+    description: 'Track what is left, restock in a tap, and take your shopping list with you.',
+    color: '#c5ff6f', colorKey: 'lime', countLabel: 'Stock & shopping list',
+  },
+  {
     id: 'recipes', path: '/recipes', label: 'Meal library', name: 'Recipes',
     description: 'Keep your meal plans, ingredients, alternatives, and recipe photos together.',
     color: '#c5ff6f', colorKey: 'lime', countLabel: 'Import your recipes',

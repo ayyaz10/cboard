@@ -175,6 +175,14 @@ function RecipesContent({ route }) {
                 getSlugs={async () =>
                   (await getRecipes()).map((item) => item.slug)
                 }
+                onAiCreated={(created) => {
+                  setRecipes((current) => [
+                    ...current.filter((item) => item.slug !== created.slug),
+                    created,
+                  ]);
+                  setDraft(null);
+                  navigateTo(`/recipes/${created.slug}`);
+                }}
               />
             ) : null}
             {!error && planning && <DailyMealPlanner recipes={recipes} />}

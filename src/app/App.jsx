@@ -7,6 +7,7 @@ import { ToolLayout } from '../components/layout/ToolLayout';
 import { useAuth } from '../contexts/AuthContext';
 import { migrateLocalStorageData } from '../services/dataMigrationService';
 import { navigateTo, useRoute } from './useRoute';
+import { observeWorkspaceSetup } from './workspaceSetup';
 import { CalculatorBoard } from '../features/calculators/CalculatorBoard';
 import {
   calculators,
@@ -16,39 +17,37 @@ import { ProgressTracker } from '../features/progressTracker/ProgressTracker';
 import { FocusTimerPage } from '../features/focusTimer/FocusTimerPage';
 import { NotebookPage } from '../features/notebook/NotebookPage';
 import { Recipes } from '../features/recipes/Recipes';
+import { Groceries } from '../features/groceries/Groceries';
+import { FinancePage } from '../features/finance/FinancePage.jsx';
 
 export default function App() {
   const { isAuthenticated, isLoading, user } = useAuth();
   const route = useRoute();
   const [isMigrating, setIsMigrating] = useState(false);
   const [migrationError, setMigrationError] = useState('');
-  const migratedUserRef = useRef(null);
+  const workspaceSetupRef = useRef(null);
 
   useEffect(() => {
-    if (!user?.id || migratedUserRef.current === user.id) {
+    if (!user?.id) {
+      workspaceSetupRef.current = null;
+      setIsMigrating(false);
+      setMigrationError('');
       return undefined;
     }
 
-    let isActive = true;
-    migratedUserRef.current = user.id;
     setIsMigrating(true);
     setMigrationError('');
 
-    migrateLocalStorageData()
-      .catch((error) => {
-        if (isActive) {
-          setMigrationError(error.message);
-        }
-      })
-      .finally(() => {
-        if (isActive) {
-          setIsMigrating(false);
-        }
-      });
-
-    return () => {
-      isActive = false;
-    };
+    return observeWorkspaceSetup(
+      workspaceSetupRef,
+      user.id,
+      migrateLocalStorageData,
+      () => setIsMigrating(false),
+      (error) => {
+        setMigrationError(error?.message || 'Could not set up your workspace. Please refresh to try again.');
+        setIsMigrating(false);
+      },
+    );
   }, [user?.id]);
 
   useEffect(() => {
@@ -132,6 +131,10 @@ export default function App() {
   if (route === '/notes') {
     return <NotebookPage />;
   }
+
+  if (route === '/groceries') return <Groceries key={user.id} />;
+
+  if (route === '/finance') return <FinancePage key={user.id} />;
 
   if (route === '/recipes' || route.startsWith('/recipes/')) {
     return <Recipes key={user.id} route={route} />;
