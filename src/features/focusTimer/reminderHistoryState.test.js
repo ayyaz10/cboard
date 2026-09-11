@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mostUsedReminder, readReminderState, reminderReducer } from './reminderHistoryState.js';
+import { readReminderState, reminderReducer } from './reminderHistoryState.js';
 
 const empty = () => ({ reminders: [], history: [] });
 const reminder = (repeatMs = 0) => ({ id: 'r1', title: 'Stretch', dueAt: 60_000, repeatMs, durationMs: 60_000, status: 'waiting' });
@@ -59,18 +59,4 @@ test('delayed ticks record one actual alert with its original scheduled time', (
   assert.equal(state.history[0].at, 635_000);
   assert.equal(state.history[0].dueAt, 60_000);
   assert.equal(state.reminders[0].dueAt, 660_000);
-});
-
-test('most-used quick reminders are selected separately for once and repeat', () => {
-  const history = [
-    { type: 'created', title: 'Tea', durationMs: 300_000, repeatMs: 0, at: 1 },
-    { type: 'created', title: 'Stretch', durationMs: 2_700_000, repeatMs: 2_700_000, at: 2 },
-    { type: 'created', title: 'Tea', durationMs: 300_000, repeatMs: 0, at: 3 },
-    { type: 'created', title: 'Water', durationMs: 3_600_000, repeatMs: 3_600_000, at: 4 },
-    { type: 'created', title: 'Stretch', durationMs: 2_700_000, repeatMs: 2_700_000, at: 5 },
-  ];
-  assert.deepEqual(mostUsedReminder(history, false), {
-    title: 'Tea', duration: 300_000, repeats: false, count: 2, lastUsedAt: 3,
-  });
-  assert.equal(mostUsedReminder(history, true).title, 'Stretch');
 });

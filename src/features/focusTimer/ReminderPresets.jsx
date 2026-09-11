@@ -2,17 +2,9 @@ import { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useReminders } from './ReminderProvider.jsx';
 import { formatReminderInterval } from './reminderHelpers.js';
+import { readReminderPresets } from './reminderPresetData.js';
 
 const buttonClass = 'rounded-full border-2 border-black bg-white px-4 py-2 text-sm font-bold text-black hover:bg-[#c5ff6f]';
-
-function readPresets(key) {
-  const saved = JSON.parse(localStorage.getItem(key) || '[]');
-  return Array.isArray(saved) ? saved.filter((item) => item && typeof item.id === 'string'
-    && typeof item.title === 'string' && item.title.trim() && item.title.length <= 120
-    && typeof item.repeats === 'boolean' && Number.isSafeInteger(item.duration)
-    && item.duration >= 60_000 && item.duration <= (168 * 60 + 59) * 60_000
-    && item.duration % 60_000 === 0) : [];
-}
 
 export function ReminderPresets(props) {
   const { user } = useAuth();
@@ -23,7 +15,7 @@ function PresetList({ userId, title, duration, repeats, onEdit }) {
   const storageKey = `cboard:reminder-presets:${userId}`;
   const { addReminder } = useReminders();
   const [presets, setPresets] = useState(() => {
-    try { return userId ? readPresets(storageKey) : []; } catch { return []; }
+    try { return userId ? readReminderPresets(localStorage.getItem(storageKey)) : []; } catch { return []; }
   });
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState('');
@@ -34,6 +26,7 @@ function PresetList({ userId, title, duration, repeats, onEdit }) {
     try {
       localStorage.setItem(storageKey, JSON.stringify(items));
       setPresets(items);
+      window.dispatchEvent(new CustomEvent('cboard:reminder-presets-changed', { detail: { userId, presets: items } }));
       setError('');
       return true;
     } catch {
