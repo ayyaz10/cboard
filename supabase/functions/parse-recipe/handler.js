@@ -78,6 +78,8 @@ export function createParseRecipeHandler({ createClient, env, generateRecipe }) 
           return json({ error: "Gemini has reached its current quota. Try again later or check the Gemini quota." }, 502, cors.headers);
         if (providerStatus === 400)
           return json({ error: "Gemini rejected the recipe request configuration. Please try again after updating the app." }, 502, cors.headers);
+        if (providerStatus === 404)
+          return json({ error: "No compatible Gemini Flash model is available for this API key." }, 502, cors.headers);
         return json({ error: "The AI recipe service is unavailable right now. Please try again." }, 502, cors.headers);
       }
       let extracted;

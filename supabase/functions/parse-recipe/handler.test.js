@@ -69,6 +69,9 @@ test("invalid AI output and provider failures return safe errors without inserts
   const rejectedResponse = await rejectedKey.handler(request());
   assert.equal(rejectedResponse.status, 502);
   assert.deepEqual(await rejectedResponse.json(), { error: "Gemini rejected the API key. Check the key and its API restrictions." });
+
+  const missingModel = setup({ generate: async () => { const error = new Error("model detail"); error.status = 404; throw error; } });
+  assert.deepEqual(await (await missingModel.handler(request())).json(), { error: "No compatible Gemini Flash model is available for this API key." });
 });
 
 test("OPTIONS returns scoped CORS headers", async () => {

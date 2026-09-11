@@ -12,7 +12,22 @@ class GeminiHttpError extends Error {
 }
 
 async function generateRecipe(recipeText: string, apiKey: string): Promise<unknown> {
-  const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", {
+  const modelsResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/models", {
+    headers: { "x-goog-api-key": apiKey },
+  });
+  if (!modelsResponse.ok) throw new GeminiHttpError(modelsResponse.status);
+  const modelsPayload = await modelsResponse.json();
+  const availableModels = (Array.isArray(modelsPayload?.models) ? modelsPayload.models : [])
+    .filter((model: { name?: unknown; supportedGenerationMethods?: unknown }) => typeof model?.name === "string"
+      && Array.isArray(model.supportedGenerationMethods)
+      && model.supportedGenerationMethods.includes("generateContent"))
+    .map((model: { name: string }) => model.name.replace(/^models\//, ""));
+  const preferredModels = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-flash-latest"];
+  const model = preferredModels.find((name) => availableModels.includes(name))
+    || availableModels.find((name: string) => /^gemini-.*flash/i.test(name));
+  if (!model) throw new GeminiHttpError(404);
+
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
     body: JSON.stringify({
