@@ -4,11 +4,17 @@ import {
   GOAL_KEY,
   GOAL_FIELDS,
   emptyGoals,
-  validateGoals,
+  hydrateCalculatedGoals,
+  prepareGoalsForSave,
   formatMacro,
   maintenanceDifference,
 } from './nutritionGoals';
+import { MacroTargetCard } from './MacroTargetCard';
 import './nutritionGoals.css';
+
+const BASIC_FIELDS = GOAL_FIELDS.filter(([key]) =>
+  ['calories', 'maintenanceCalories', 'fiber'].includes(key),
+);
 
 export function useNutritionGoals() {
   const [goals, setGoals] = useState(emptyGoals);
@@ -21,7 +27,7 @@ export function useNutritionGoals() {
     setError('');
     try {
       const stored = await getPreference(GOAL_KEY);
-      if (id === generation.current) setGoals(stored == null ? emptyGoals() : validateGoals(stored));
+      if (id === generation.current) setGoals(stored == null ? emptyGoals() : hydrateCalculatedGoals(stored));
     } catch {
       if (id === generation.current) setError('Could not load your daily targets. Please retry.');
     } finally {
@@ -33,7 +39,7 @@ export function useNutritionGoals() {
     return () => { generation.current++; };
   }, [load]);
   async function save(draft) {
-    const next = validateGoals(draft);
+    const next = prepareGoalsForSave(draft);
     const id = generation.current;
     await setPreference(GOAL_KEY, next);
     if (id === generation.current) setGoals(next);
@@ -81,29 +87,33 @@ export function DailyNutritionTargets({ controller }) {
     {loading ? <p role="status">Loading targets…</p> : error ? <p role="alert">{error} <button type="button" onClick={load}>Retry targets</button></p> : <>
       {editing ? <form onSubmit={submit}>
         <fieldset disabled={busy}>
-          <div className="nutrition-targets-grid">
-            {GOAL_FIELDS.map(([key, label, unit]) => <label key={key}>
+          <div className="nutrition-basics-grid">
+            {BASIC_FIELDS.map(([key, label, unit]) => <label key={key}>
               <span>{label} ({unit}/day)</span>
-              <input type="number" min="0" max="100000" step="any" placeholder="Not set" value={draft[key] ?? ''}
+              <input type="number" min={key === 'calories' ? '0.01' : '0'} max="100000" step="any" placeholder="Not set" value={draft[key] ?? ''}
                 onChange={(event) => {
                   const value = event.target.value;
                   setDraft((current) => ({ ...current, [key]: value }));
                 }} />
             </label>)}
           </div>
+          <MacroTargetCard goals={draft} editing onChange={setDraft} />
           <p>Maintenance calories are your estimated weight-maintaining intake. The meal planner compares meals with your calorie target.</p>
-          <p>Leave a field blank if you don’t want a target for it.</p>
+          <p>Maintenance calories and fibre can be left blank. A calorie target is required to calculate macros.</p>
           <div className="nutrition-targets-actions">
             <button type="submit">{busy ? 'Saving…' : 'Save targets'}</button>
             <button type="button" onClick={() => { setEditing(false); setSaveError(''); }}>Cancel</button>
           </div>
         </fieldset>
         {saveError && <p role="alert">{saveError}</p>}
-      </form> : <dl className="nutrition-targets-grid">
-        {GOAL_FIELDS.map(([key, label, unit]) => <div key={key}>
-          <dt>{label}</dt><dd>{goals[key] == null ? 'Not set' : <>{formatMacro(goals[key])} <small>{unit}/day</small></>}</dd>
-        </div>)}
-      </dl>}
+      </form> : <>
+        <dl className="nutrition-basics-grid">
+          {BASIC_FIELDS.map(([key, label, unit]) => <div key={key}>
+            <dt>{label}</dt><dd>{goals[key] == null ? 'Not set' : <>{formatMacro(goals[key])} <small>{unit}/day</small></>}</dd>
+          </div>)}
+        </dl>
+        {goals.calories != null && <MacroTargetCard goals={goals} />}
+      </>}
       {!editing && calorieDifference != null && (
         <p className="nutrition-targets-balance">
           {calorieDifference > 0

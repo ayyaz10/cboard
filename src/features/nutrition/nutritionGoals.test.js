@@ -1,11 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateGoals, emptyGoals, compareGoal, comparisonText, maintenanceDifference } from './nutritionGoals.js';
+import {
+  validateGoals,
+  emptyGoals,
+  compareGoal,
+  comparisonText,
+  maintenanceDifference,
+  prepareGoalsForSave,
+} from './nutritionGoals.js';
 import { calculateMealPlan } from '../recipes/mealPlanData.js';
 
 test('daily targets preserve zero and optional values through a save round trip', () => {
   const goals = validateGoals({ calories: '2000', protein: '150.5', carbs: '', fat: 0 });
-  assert.deepEqual(goals, { calories: 2000, maintenanceCalories: null, protein: 150.5, carbs: null, fat: 0, fiber: null });
+  assert.deepEqual(
+    { calories: goals.calories, maintenanceCalories: goals.maintenanceCalories, protein: goals.protein, carbs: goals.carbs, fat: goals.fat, fiber: goals.fiber },
+    { calories: 2000, maintenanceCalories: null, protein: 150.5, carbs: null, fat: 0, fiber: null },
+  );
+  assert.deepEqual(goals.macroLocked, { protein: true, carbs: false, fat: true });
+  assert.equal(goals.macroPreset, 'balanced');
   assert.deepEqual(validateGoals(JSON.parse(JSON.stringify(goals))), goals);
   assert.deepEqual(validateGoals({}), emptyGoals());
   for (const value of [-1, Infinity, NaN, true, [], {}, 'oops', 100001])
@@ -37,6 +49,23 @@ test('zero targets and decimal arithmetic give meaningful comparisons', () => {
   assert.equal(compareGoal({ value: 1, known: 1, missing: 0 }, 0).status, 'over');
   assert.equal(compareGoal({ value: 0.1 + 0.2, known: 2, missing: 0 }, 0.3).status, 'met');
   assert.equal(comparisonText(compareGoal({ value: 100.01, known: 1, missing: 0 }, 100), 'g'), '<0.1 g over target');
+});
+
+test('automatic macro settings survive validation and save their calculated targets', () => {
+  const goals = prepareGoalsForSave({
+    calories: 2000,
+    fiber: 30,
+    macroPreset: 'higherProtein',
+    customMacroPercentages: { protein: 30, carbs: 40, fat: 30 },
+    macroLocked: { protein: true, carbs: false, fat: false },
+    protein: 130,
+  });
+  assert.equal(goals.protein, 130);
+  assert.equal(goals.carbs, 1480 * 45 / 75 / 4);
+  assert.equal(goals.fat, 1480 * 30 / 75 / 9);
+  assert.deepEqual(goals.macroLocked, { protein: true, carbs: false, fat: false });
+  assert.throws(() => prepareGoalsForSave({ ...goals, calories: 0 }), /greater than 0/);
+  assert.throws(() => validateGoals({ ...goals, macroPreset: 'custom', customMacroPercentages: { protein: 10, carbs: 10, fat: 10 } }), /total 100/);
 });
 
 test('maintenance calories are optional and calculate the planned calorie difference', () => {

@@ -1,18 +1,63 @@
 .nutrition-targets { margin: 20px 0; padding: 20px; border: 2px solid #17251b; border-radius: 20px; background: #f4f9e9; color: #17251b; }
-.nutrition-targets-heading { display: flex; justify-content: space-between; align-items: start; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.nutrition-targets-heading, .macro-target-heading, .macro-custom-heading { display: flex; justify-content: space-between; align-items: start; gap: 16px; flex-wrap: wrap; }
+.nutrition-targets-heading { margin-bottom: 16px; }
 .nutrition-targets h2 { font-size: 1.25rem; font-weight: 800; }
 .nutrition-targets p { font-size: .875rem; line-height: 1.6; margin-top: 8px; }
-.nutrition-targets-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(125px, 1fr)); gap: 16px; }
-.nutrition-targets-grid dt, .nutrition-targets-grid label span { display: block; font-size: .875rem; font-weight: 650; margin-bottom: 6px; }
-.nutrition-targets-grid dd { font-size: 1.5rem; font-weight: 750; overflow-wrap: anywhere; }
-.nutrition-targets-grid small { font-size: .8rem; font-weight: 500; }
-.nutrition-targets input { width: 100%; min-width: 0; border: 1px solid #879577; border-radius: 10px; padding: 10px; background: white; }
-.nutrition-targets button { border: 1px solid #17251b; border-radius: 12px; padding: 10px 14px; background: white; font-weight: 700; cursor: pointer; }
+.nutrition-basics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; }
+.nutrition-basics-grid dt, .nutrition-basics-grid label > span { display: block; font-size: .875rem; font-weight: 650; margin-bottom: 6px; }
+.nutrition-basics-grid dd { font-size: 1.5rem; font-weight: 750; overflow-wrap: anywhere; }
+.nutrition-basics-grid small { font-size: .8rem; font-weight: 500; }
+.nutrition-targets input, .nutrition-targets select { width: 100%; min-width: 0; border: 2px solid #17251b; border-radius: 12px; padding: 10px; background: #fff; color: #17251b; }
+.nutrition-targets button { border: 2px solid #17251b; border-radius: 12px; padding: 10px 14px; background: #fff; color: #17251b; font-weight: 700; cursor: pointer; }
 .nutrition-targets button[type=submit] { background: #c5ff6f; }
 .nutrition-targets button:disabled { opacity: .5; cursor: wait; }
 .nutrition-targets :focus-visible { outline: 3px solid #4f7a2c; outline-offset: 3px; }
 .nutrition-targets-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
 .nutrition-targets-balance { font-weight: 750; }
+
+.macro-target-card { margin-top: 18px; padding: 16px; border: 2px solid #17251b; border-radius: 18px; background: #fffdf8; }
+.macro-target-heading { align-items: end; }
+.macro-target-kicker { display: block; font-size: .7rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.macro-target-card h3 { margin-top: 2px; font-size: 1.25rem; font-weight: 800; }
+.macro-preset-field { min-width: min(100%, 310px); font-size: .78rem; font-weight: 750; }
+.macro-preset-field > span { display: block; margin-bottom: 6px; }
+.macro-custom-panel { margin-top: 14px; padding: 13px; border: 2px dashed #17251b; border-radius: 14px; background: #f4f9e9; }
+.macro-custom-heading { align-items: center; font-size: .82rem; }
+.macro-total-invalid { color: #a52b16; font-weight: 800; }
+.macro-custom-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 10px; }
+.macro-custom-grid label span { display: block; margin-bottom: 5px; font-size: .76rem; font-weight: 700; }
+.macro-target-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+.macro-target-item { min-width: 0; padding: 13px; border: 2px solid #17251b; border-radius: 15px; }
+.macro-target-item[data-macro=protein] { background: #c5ff6f; }
+.macro-target-item[data-macro=carbs] { background: #9fe3ff; }
+.macro-target-item[data-macro=fat] { background: #ffd166; }
+.macro-target-item[data-mode=manual] { box-shadow: 4px 4px 0 #17251b; }
+.macro-target-item-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.macro-target-item-heading > strong { font-size: .95rem; }
+.macro-target-item-heading button, .macro-mode-label { border: 2px solid #17251b; border-radius: 999px; padding: 4px 8px; background: #fff; font-size: .65rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.macro-target-item-heading button[aria-pressed=true] { background: #17251b; color: #fff; }
+.macro-grams-field { position: relative; display: block; margin-top: 12px; }
+.macro-grams-field input { padding-right: 34px; font-size: 1.2rem; font-weight: 800; }
+.macro-grams-field input[readonly] { background: rgba(255,255,255,.62); cursor: default; }
+.macro-grams-field > span:last-child { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); font-weight: 800; }
+.macro-grams-value { margin-top: 10px !important; font-size: 1.65rem !important; font-weight: 800; line-height: 1.1 !important; }
+.macro-target-item dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.macro-target-item dt { font-size: .65rem; font-weight: 650; opacity: .65; }
+.macro-target-item dd { font-size: .78rem; font-weight: 800; }
+.macro-distribution { display: flex; height: 14px; margin-top: 16px; overflow: hidden; border: 2px solid #17251b; border-radius: 999px; background: #fff; }
+.macro-distribution span { min-width: 0; }
+.macro-distribution [data-macro=protein] { background: #77b92f; }
+.macro-distribution [data-macro=carbs] { background: #42a7cc; }
+.macro-distribution [data-macro=fat] { background: #d99412; }
+.macro-distribution-legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; font-size: .72rem; font-weight: 750; }
+.macro-distribution-legend span::before { display: inline-block; width: 8px; height: 8px; margin-right: 5px; border: 1px solid #17251b; border-radius: 999px; content: ''; }
+.macro-distribution-legend [data-macro=protein]::before { background: #77b92f; }
+.macro-distribution-legend [data-macro=carbs]::before { background: #42a7cc; }
+.macro-distribution-legend [data-macro=fat]::before { background: #d99412; }
+.macro-target-result { margin-top: 12px !important; padding: 10px 12px; border: 2px solid #17251b; border-radius: 12px; background: #f4f9e9; font-weight: 800; }
+.macro-target-result[data-valid=false] { border-color: #a52b16; background: #ffe0de; color: #8b2010; }
+.macro-target-help { color: rgba(23,37,27,.7); }
+
 .macro-comparison { margin-top: 10px; font-size: .875rem; }
 .macro-comparison strong { display: block; margin-top: 5px; }
 .macro-comparison[data-status=over] strong { color: #a52b16; }
@@ -20,4 +65,26 @@
 .macro-comparison[data-status=incomplete] strong { color: #775100; }
 .macro-comparison progress { width: 100%; height: 8px; accent-color: #54822b; }
 .macro-comparison[data-status=over] progress { accent-color: #b63c22; }
-@media (max-width: 640px) { .nutrition-targets-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .nutrition-targets { padding: 16px; } }
+
+html[data-theme=matrix] .nutrition-targets { border-color: var(--matrix-border); background: var(--matrix-surface); color: var(--matrix-text); box-shadow: 0 0 18px rgba(0,255,65,.13); }
+html[data-theme=matrix] .macro-target-card { border-color: var(--matrix-border); background: #020d04; box-shadow: inset 0 0 0 1px rgba(0,255,65,.1); }
+html[data-theme=matrix] .macro-custom-panel, html[data-theme=matrix] .macro-target-result { border-color: var(--matrix-border); background: var(--matrix-surface-raised); color: var(--matrix-text); }
+html[data-theme=matrix] .macro-target-item { border-color: var(--matrix-border-strong); color: var(--matrix-text); box-shadow: inset 0 0 12px rgba(0,255,65,.1); }
+html[data-theme=matrix] .macro-target-item[data-macro=protein] { background: #063714; }
+html[data-theme=matrix] .macro-target-item[data-macro=carbs] { background: #082b31; }
+html[data-theme=matrix] .macro-target-item[data-macro=fat] { background: #342707; }
+html[data-theme=matrix] .macro-target-item[data-mode=manual] { box-shadow: 0 0 14px rgba(0,255,65,.28); }
+html[data-theme=matrix] .macro-target-item-heading button, html[data-theme=matrix] .macro-mode-label { border-color: var(--matrix-border-strong); background: #020d04; color: var(--matrix-text); }
+html[data-theme=matrix] .macro-target-item-heading button[aria-pressed=true] { background: var(--matrix-accent); color: var(--matrix-accent-text); box-shadow: 0 0 10px rgba(0,255,65,.35); }
+html[data-theme=matrix] .macro-distribution { border-color: var(--matrix-border); background: #020d04; box-shadow: 0 0 10px rgba(0,255,65,.18); }
+html[data-theme=matrix] .macro-distribution [data-macro=protein] { background: #00ff41; }
+html[data-theme=matrix] .macro-distribution [data-macro=carbs] { background: #20b8c7; }
+html[data-theme=matrix] .macro-distribution [data-macro=fat] { background: #d8a820; }
+html[data-theme=matrix] .macro-target-result[data-valid=false] { border-color: #b73333; background: var(--matrix-danger-bg); color: var(--matrix-danger-text); }
+html[data-theme=matrix] .macro-target-help { color: var(--matrix-muted); }
+
+@media (max-width: 720px) {
+  .macro-target-grid, .macro-custom-grid { grid-template-columns: 1fr; }
+  .nutrition-targets { padding: 16px; }
+  .macro-preset-field { width: 100%; }
+}
