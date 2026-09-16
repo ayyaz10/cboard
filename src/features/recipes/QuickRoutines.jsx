@@ -10,6 +10,7 @@ const units = {
   protein: 'g protein',
   carbs: 'g carbs',
   fat: 'g fat',
+  fiber: 'g fibre',
 };
 
 export function QuickRoutines({

@@ -1,16 +1,17 @@
+import { geminiErrorMessage } from "../_shared/gemini.js";
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json", "Cache-Control": "no-store" } });
 export function validateLabel(value) {
   if (!value || !Number.isFinite(value.quantity) || value.quantity <= 0 || !["g", "ml", "pieces"].includes(value.unit))
     throw new Error("The label's serving size could not be read. Upload a clearer photo including the column headings.");
   const nutrition = { quantity: value.quantity, unit: value.unit };
-  for (const key of ["calories", "protein", "carbs", "fat"]) {
+  for (const key of ["calories", "protein", "carbs", "fat", "fiber"]) {
     const n = value[key];
     if (n != null && (typeof n !== "number" || !Number.isFinite(n) || n < 0))
       throw new Error("Some label values could not be read. Please try a clearer photo.");
     nutrition[key] = n ?? null;
   }
-  if ([nutrition.calories, nutrition.protein, nutrition.carbs, nutrition.fat].every((v) => v == null))
+  if ([nutrition.calories, nutrition.protein, nutrition.carbs, nutrition.fat, nutrition.fiber].every((v) => v == null))
     throw new Error("No readable nutrition values found. Upload a close-up of the nutrition table.");
   return nutrition;
 }
@@ -41,8 +42,8 @@ export function createLabelHandler({ createClient, env, extract }) {
       const result = await extract({ mimeType: `image/${match[1]}`, data: match[2] }, env("GEMINI_API_KEY"));
       try { return json({ nutrition: validateLabel(result) }); }
       catch (error) { return json({ error: error.message }, 422); }
-    } catch {
-      return json({ error: "The label could not be read right now. Try again with a clear photo." }, 502);
+    } catch (error) {
+      return json({ error: geminiErrorMessage(error, "The label could not be read right now. Try again with a clear photo.") }, 502);
     }
   };
 }

@@ -27,9 +27,9 @@ export function nutritionProduct(product) {
     // OFF uses *_100g for both weight and volume.
     unit: nutritionUnit(product),
     calories: kcal ?? (kj == null ? null : Math.round(kj / 4.184 * 100) / 100),
-    protein: value(n.proteins_100g), carbs: value(n.carbohydrates_100g), fat: value(n.fat_100g),
+    protein: value(n.proteins_100g), carbs: value(n.carbohydrates_100g), fat: value(n.fat_100g), fiber: value(n.fiber_100g),
   };
-  if ([nutrition.calories, nutrition.protein, nutrition.carbs, nutrition.fat].every((v) => v == null)) return null;
+  if ([nutrition.calories, nutrition.protein, nutrition.carbs, nutrition.fat, nutrition.fiber].every((v) => v == null)) return null;
   return {
     code: String(product.code), name: name.trim(),
     brand: Array.isArray(product.brands) ? product.brands.filter((v) => typeof v === "string").join(", ") : typeof product.brands === "string" ? product.brands : "",

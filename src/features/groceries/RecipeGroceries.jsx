@@ -1,9 +1,10 @@
+import { RecipeFibre } from '../recipes/RecipeFibre.jsx';
 import { useState } from "react";
 import { getAppHref } from "../../app/useRoute";
 import { useGroceries } from "./useGroceries";
 import { addShopping, cookRecipe, recipeNeeds, recipeNutrition, nutrients } from "./groceryData";
 import "./groceries.css";
-export function RecipeGroceries({ recipe }) {
+export function RecipeGroceries({ recipe, onRecipeUpdated }) {
   const { data, busy, error, reload, change, notice, undo } = useGroceries();
   const [multiplier, setMultiplier] = useState(1),
     [review, setReview] = useState(false);
@@ -65,6 +66,7 @@ export function RecipeGroceries({ recipe }) {
           })}
         </div>
       </details>
+      {onRecipeUpdated && <RecipeFibre key={recipe.updatedAt} recipe={recipe} groceries={data} onSaved={onRecipeUpdated} />}
       <ul>
         {needs.map((need, index) => (
           <li key={index}>

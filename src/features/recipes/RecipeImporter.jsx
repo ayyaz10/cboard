@@ -321,7 +321,7 @@ export function RecipeImporter({
                 />
                 <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-black/65">
                   <span>{aiText.length}/2000 characters</span>
-                  <span>AI can make mistakes. Review the saved recipe before cooking.</span>
+                  <span>Includes a short ingredient review with green positives, red points to watch and suggested improvements. AI can make mistakes; check the saved recipe and report.</span>
                 </div>
                 <PrimaryButton type="button" disabled={busy || !aiText.trim()} onClick={createWithAi}>
                   {busy ? 'Creating recipe…' : 'Create recipe with AI'}

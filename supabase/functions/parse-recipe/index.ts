@@ -1,22 +1,15 @@
+import { geminiJson, geminiResult, GeminiError } from "../_shared/gemini.js";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { createParseRecipeHandler } from "./handler.js";
 import { recipeSystemInstruction } from "./recipeParser.js";
 
-class GeminiHttpError extends Error {
-  status: number;
-  constructor(status: number) {
-    super(`Gemini request failed with status ${status}`);
-    this.name = "GeminiHttpError";
-    this.status = status;
-  }
-}
 
 async function generateRecipe(recipeText: string, apiKey: string): Promise<unknown> {
-  const modelsResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/models", {
+  const modelsResponse = await geminiJson("https://generativelanguage.googleapis.com/v1beta/models", {
     headers: { "x-goog-api-key": apiKey },
-  });
-  if (!modelsResponse.ok) throw new GeminiHttpError(modelsResponse.status);
-  const modelsPayload = await modelsResponse.json();
+  }, { timeoutMs: 5000 });
+
+  const modelsPayload = modelsResponse;
   const availableModels = (Array.isArray(modelsPayload?.models) ? modelsPayload.models : [])
     .filter((model: { name?: unknown; supportedGenerationMethods?: unknown }) => typeof model?.name === "string"
       && Array.isArray(model.supportedGenerationMethods)
@@ -25,9 +18,9 @@ async function generateRecipe(recipeText: string, apiKey: string): Promise<unkno
   const preferredModels = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash", "gemini-flash-latest"];
   const model = preferredModels.find((name) => availableModels.includes(name))
     || availableModels.find((name: string) => /^gemini-.*flash/i.test(name));
-  if (!model) throw new GeminiHttpError(404);
+  if (!model) throw new GeminiError(404);
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+  const response = await geminiJson(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
     body: JSON.stringify({
@@ -39,11 +32,7 @@ async function generateRecipe(recipeText: string, apiKey: string): Promise<unkno
       },
     }),
   });
-  if (!response.ok) throw new GeminiHttpError(response.status);
-  const payload = await response.json();
-  const text = payload?.candidates?.[0]?.content?.parts?.[0]?.text;
-  if (typeof text !== "string" || !text.trim()) throw new Error("Empty model response");
-  return JSON.parse(text);
+  return geminiResult(response);
 }
 
 Deno.serve(createParseRecipeHandler({

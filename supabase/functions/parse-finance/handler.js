@@ -1,3 +1,4 @@
+import { geminiErrorMessage } from "../_shared/gemini.js";
 import { validateFinanceRequest, validateFinanceDraft } from "./financeParser.js";
 const cors = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type", "Access-Control-Allow-Methods": "POST, OPTIONS" };
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json", "Cache-Control": "no-store" } });
@@ -26,8 +27,8 @@ export function createFinanceHandler({ createClient, env, generate }) {
       const result = await generate(context, env("GEMINI_API_KEY"));
       try { return json(validateFinanceDraft(result, context)); }
       catch (error) { return json({ error: error.message }, 422); }
-    } catch {
-      return json({ error: "Gemini could not prepare this transaction. Try again later or use Add transaction." }, 502);
+    } catch (error) {
+      return json({ error: geminiErrorMessage(error, "Gemini could not prepare this transaction. Try again later or use Add transaction.") }, 502);
     }
   };
 }

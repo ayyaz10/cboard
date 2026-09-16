@@ -12,6 +12,13 @@ import { isRecipeImage, readRecipeImage } from './recipeImage.js';
 import { validateRecipeSource } from './recipeData.js';
 import { recipeEditorData } from './recipeData.js';
 
+test('recipe fibre survives editing and missing fibre remains unknown', () => {
+  const recipe = validateRecipe({ ...example, nutrition: { fiber: 8 } });
+  assert.equal(validateRecipe(recipeEditorData(recipe)).nutrition.fiber, 8);
+  assert.equal(validateRecipe({ ...example, nutrition: {} }).nutrition.fiber, null);
+  assert.throws(() => validateRecipe({ ...example, nutrition: { fiber: -1 } }));
+});
+
 test('editing a recipe with a large saved photo excludes image bytes from JSON limits', () => {
   const stored = { ...example, image: `data:image/webp;base64,${'A'.repeat(900000)}`, updatedAt: '2026-09-08', tags: [' breakfast ', ''] };
   const editable = recipeEditorData(stored);

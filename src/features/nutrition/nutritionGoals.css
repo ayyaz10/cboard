@@ -1,0 +1,22 @@
+.nutrition-targets { margin: 20px 0; padding: 20px; border: 2px solid #17251b; border-radius: 20px; background: #f4f9e9; color: #17251b; }
+.nutrition-targets-heading { display: flex; justify-content: space-between; align-items: start; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.nutrition-targets h2 { font-size: 1.25rem; font-weight: 800; }
+.nutrition-targets p { font-size: .875rem; line-height: 1.6; margin-top: 8px; }
+.nutrition-targets-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; }
+.nutrition-targets-grid dt, .nutrition-targets-grid label span { display: block; font-size: .875rem; font-weight: 650; margin-bottom: 6px; }
+.nutrition-targets-grid dd { font-size: 1.5rem; font-weight: 750; overflow-wrap: anywhere; }
+.nutrition-targets-grid small { font-size: .8rem; font-weight: 500; }
+.nutrition-targets input { width: 100%; min-width: 0; border: 1px solid #879577; border-radius: 10px; padding: 10px; background: white; }
+.nutrition-targets button { border: 1px solid #17251b; border-radius: 12px; padding: 10px 14px; background: white; font-weight: 700; cursor: pointer; }
+.nutrition-targets button[type=submit] { background: #c5ff6f; }
+.nutrition-targets button:disabled { opacity: .5; cursor: wait; }
+.nutrition-targets :focus-visible { outline: 3px solid #4f7a2c; outline-offset: 3px; }
+.nutrition-targets-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.macro-comparison { margin-top: 10px; font-size: .875rem; }
+.macro-comparison strong { display: block; margin-top: 5px; }
+.macro-comparison[data-status=over] strong { color: #a52b16; }
+.macro-comparison[data-status=reached] strong, .macro-comparison[data-status=met] strong { color: #326016; }
+.macro-comparison[data-status=incomplete] strong { color: #775100; }
+.macro-comparison progress { width: 100%; height: 8px; accent-color: #54822b; }
+.macro-comparison[data-status=over] progress { accent-color: #b63c22; }
+@media (max-width: 640px) { .nutrition-targets-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .nutrition-targets { padding: 16px; } }

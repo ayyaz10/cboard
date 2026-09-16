@@ -1,3 +1,4 @@
+import { compareGoal, comparisonText, formatMacro } from '../nutrition/nutritionGoals';
 import { useEffect, useRef, useState } from 'react';
 import { getPreference, setPreference } from '../../services/preferenceService';
 import { PrimaryButton } from '../../components/ui/PrimaryButton';
@@ -18,11 +19,12 @@ const units = {
   protein: 'g protein',
   carbs: 'g carbs',
   fat: 'g fat',
+  fiber: 'g fibre',
 };
 const format = (value) =>
   new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(value);
 
-export function DailyMealPlanner({ recipes }) {
+export function DailyMealPlanner({ recipes, nutritionGoals }) {
   const [entries, setEntries] = useState(emptyMealPlan);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -105,7 +107,7 @@ export function DailyMealPlanner({ recipes }) {
         <h1 className="text-4xl font-bold">Daily Meal Planner</h1>
         <p className="leading-7 text-black/70">
           Choose your meals to see what you’ll eat and the combined calories,
-          protein, carbs and fat.
+          protein, carbs, fat and fibre.
         </p>
       </header>
       {loading ? (
@@ -149,14 +151,18 @@ export function DailyMealPlanner({ recipes }) {
             className="space-y-4 rounded-2xl border-2 border-black bg-white p-5"
           >
             <h2 className="text-2xl font-bold">Daily totals</h2>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {MACROS.map((key) => (
-                <div key={key}>
-                  <p className="text-sm capitalize text-black/70">{key}</p>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+              {MACROS.map((key) => {
+                const target = nutritionGoals.goals[key];
+                const comparison = compareGoal(totals[key], target, key);
+                const unit = key === 'calories' ? 'kcal' : 'g';
+                return <div key={key}>
+                  <p className="text-sm capitalize text-black/70">{key === 'fiber' ? 'fibre' : key}</p>
                   <p className="text-2xl font-bold">
                     {totals[key].known ? format(totals[key].value) : '—'}{' '}
                     {units[key]}
                   </p>
+                  {key === 'fiber' && meals.some((meal) => meal.recipe?.fibreSource) && <p className="text-sm text-black/70">Includes saved estimates</p>}
                   {totals[key].missing > 0 && (
                     <p className="text-sm text-black/70">
                       {totals[key].known ? 'Known subtotal' : 'Not provided'} ·
@@ -164,9 +170,19 @@ export function DailyMealPlanner({ recipes }) {
                       {totals[key].missing === 1 ? '' : 's'}
                     </p>
                   )}
-                </div>
-              ))}
+                  {!nutritionGoals.loading && !nutritionGoals.error && (
+                    <div className="macro-comparison" data-status={comparison.status}>
+                      {target != null && <p>Target: {formatMacro(target)} {unit}</p>}
+                      {target > 0 && totals[key].known > 0 && <progress
+                        aria-label={`${key} towards daily target${totals[key].missing ? ' (known subtotal)' : ''}`}
+                        max={target} value={Math.min(totals[key].value, target)} />}
+                      <strong>{comparisonText(comparison, unit)}</strong>
+                    </div>
+                  )}
+                </div>;
+              })}
             </div>
+            {nutritionGoals.error && <p role="status">Target comparison unavailable until your targets load.</p>}
             <p role="status" className="text-sm text-black/70">
               {meals.length
                 ? `${meals.length} selected meal${meals.length === 1 ? '' : 's'}. Totals update as you change selections.`

@@ -173,6 +173,104 @@
           "default": false
         }
       }
+    },
+    "healthReview": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "basis",
+        "summary",
+        "positives",
+        "watchOuts",
+        "suggestions",
+        "limitations"
+      ],
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "basis": {
+          "type": "string",
+          "maxLength": 100000
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "positives": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "watchOuts": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "suggestions": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "type": "string",
+            "maxLength": 300
+          }
+        }
+      }
+    },
+    "fibreSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "basis",
+        "servings",
+        "value",
+        "ingredients"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "groceries",
+            "ai"
+          ]
+        },
+        "basis": {
+          "enum": [
+            "recipe",
+            "serving"
+          ]
+        },
+        "servings": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 100
+        },
+        "value": {
+          "type": "number",
+          "minimum": 0
+        },
+        "ingredients": {
+          "type": "string"
+        }
+      }
     }
   },
   "$defs": {
@@ -201,6 +299,13 @@
           "minimum": 0
         },
         "fat": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "fiber": {
           "type": [
             "number",
             "null"

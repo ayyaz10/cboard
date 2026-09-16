@@ -40,6 +40,7 @@ function Macros({ value = {}, onChange }) {
         ['protein', 'Protein (g)'],
         ['carbs', 'Carbs (g)'],
         ['fat', 'Fat (g)'],
+        ['fiber', 'Fibre (g)'],
       ].map(([key, label]) => (
         <Field
           key={key}

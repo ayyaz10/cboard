@@ -1,3 +1,5 @@
+import { normaliseFibreSource, fibreBasis } from './recipeFibre.js';
+import { storedHealthReview } from "../../../supabase/functions/_shared/recipeHealthReview.js";
 export const MAX_JSON_BYTES = 256 * 1024;
 
 // Photos remain in the uploader state, never in the editable JSON document.
@@ -48,7 +50,7 @@ function nutrition(value, label = 'Nutrition') {
   if (value == null) value = {};
   if (!object(value)) throw new Error(`${label} must be an object.`);
   return Object.fromEntries(
-    ['calories', 'protein', 'carbs', 'fat'].map((key) => [
+    ['calories', 'protein', 'carbs', 'fat', 'fiber'].map((key) => [
       key,
       number(value[key], `${label}: ${key}`),
     ]),
@@ -170,8 +172,9 @@ export function validateRecipe(data) {
         `“${item.name}” refers to missing alternatives “${item.alternativeGroup}”.`,
       );
   }
-  return {
+  const clean = {
     schemaVersion: 1,
+    ...(storedHealthReview(data.healthReview) ? { healthReview: storedHealthReview(data.healthReview) } : {}),
     source: validateRecipeSource(data.source),
     title,
     slug,
@@ -196,6 +199,10 @@ export function validateRecipe(data) {
       string(tag, `Tag #${index + 1}`, true, 100),
     ),
   };
+  const source = normaliseFibreSource(data.fibreSource, clean);
+  if (source && source.ingredients !== fibreBasis(clean)) clean.nutrition.fiber = null;
+  else if (source) clean.fibreSource = source;
+  return clean;
 }
 
 export function validateRecipeSource(value) {

@@ -1,3 +1,4 @@
+import { DailyNutritionTargets, useNutritionGoals } from '../nutrition/DailyNutritionTargets';
 import { useEffect, useRef, useState } from "react";
 import { PageShell } from "../../components/layout/PageShell";
 import { AppNavigation } from "../../components/layout/AppNavigation";
@@ -140,6 +141,7 @@ function Modal({ title, close, children, error }) {
   );
 }
 export function Groceries() {
+  const nutritionGoals = useNutritionGoals();
   const {
     data,
     busy,
@@ -353,6 +355,7 @@ export function Groceries() {
             ＋ Quick add <kbd>N</kbd>
           </button>
         </header>
+        <DailyNutritionTargets controller={nutritionGoals} />
         {error && (
           <div role="alert" className="g-alert">
             {error}{" "}

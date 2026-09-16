@@ -1,5 +1,5 @@
 export const MEAL_SLOTS = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
-export const MACROS = ['calories', 'protein', 'carbs', 'fat'];
+export const MACROS = ['calories', 'protein', 'carbs', 'fat', 'fiber'];
 export const emptyMealPlan = () =>
   MEAL_SLOTS.map((meal, index) => ({
     id: `meal-${index}`,

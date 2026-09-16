@@ -1,0 +1,16 @@
+.recipe-health-review { border: 2px solid #17251b; border-radius: 20px; padding: 20px; background: white; display: grid; gap: 14px; }
+.recipe-review-heading { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
+.recipe-health-review h2 { font-size: 1.25rem; font-weight: 800; }
+.recipe-health-review h3 { font-weight: 750; margin-bottom: 6px; }
+.recipe-health-review p, .recipe-health-review li { line-height: 1.6; }
+.recipe-health-review ul { list-style: disc; padding-left: 20px; }
+.recipe-health-review li + li { margin-top: 5px; }
+.recipe-review-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.recipe-review-note { padding: 14px; border-radius: 12px; border: 1px solid #ddd; }
+.recipe-review-badge { display: inline-block; width: fit-content; padding: 5px 10px; border-radius: 10px; font-size: .8rem; font-weight: 750; background: #f1f1ef; color: #444; }
+.recipe-review-note[data-status=positive], .recipe-review-badge[data-status=positive] { background: #edf7e5; color: #245315; border-color: #9bc782; }
+.recipe-review-note[data-status=watch], .recipe-review-badge[data-status=watch] { background: #fff0ed; color: #942b1b; border-color: #e7a89c; }
+.recipe-review-note[data-status=limited], .recipe-review-badge[data-status=limited], .recipe-review-badge[data-status=outdated] { background: #fff8e2; color: #715208; border-color: #dfc777; }
+.recipe-review-context, .recipe-health-review a { font-size: .8rem; color: #555; }
+.recipe-health-review a { text-decoration: underline; }
+@media(max-width: 640px) { .recipe-review-grid { grid-template-columns: 1fr; } .recipe-health-review { padding: 16px; } }

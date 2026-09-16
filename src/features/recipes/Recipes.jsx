@@ -1,3 +1,4 @@
+import { DailyNutritionTargets, useNutritionGoals } from '../nutrition/DailyNutritionTargets';
 import { useEffect, useRef, useState } from 'react';
 import { navigateTo, getAppHref } from '../../app/useRoute';
 import { PageShell } from '../../components/layout/PageShell';
@@ -35,6 +36,7 @@ export function Recipes({ route }) {
 
 function RecipesContent({ route }) {
   const cardGrid = useRecipeCardGrid();
+  const nutritionGoals = useNutritionGoals();
   const [recipes, setRecipes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -143,6 +145,7 @@ function RecipesContent({ route }) {
     <PageShell>
       <section className="panel space-y-7 border-black p-5 text-black sm:p-8 lg:p-10">
         <AppNavigation activePath="/recipes" />
+        <DailyNutritionTargets controller={nutritionGoals} />
         <RecipeCardViewControl />
         {!home && !importing && (
           <RecipeLink to="/recipes">← Recipes</RecipeLink>
@@ -185,7 +188,7 @@ function RecipesContent({ route }) {
                 }}
               />
             ) : null}
-            {!error && planning && <DailyMealPlanner recipes={recipes} />}
+            {!error && planning && <DailyMealPlanner recipes={recipes} nutritionGoals={nutritionGoals} />}
             {!error && (home || manage) && (
               <>
                 <header className="flex flex-wrap items-start justify-between gap-4">
@@ -339,7 +342,7 @@ function RecipesContent({ route }) {
             )}
             {!error && recipe && parts.length === 2 && (
               <>
-                <RecipePage recipe={recipe} />
+                <RecipePage recipe={recipe} onRecipeUpdated={(updated) => setRecipes((current) => current.map((item) => item.slug === updated.slug ? updated : item))} />
                 <button
                   className={secondaryButton}
                   onClick={() => startImport(recipe, true)}

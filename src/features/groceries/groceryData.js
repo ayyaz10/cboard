@@ -206,6 +206,7 @@ export const nutrients = [
   ["protein", "Protein", "g"],
   ["carbs", "Carbs", "g"],
   ["fat", "Fat", "g"],
+  ["fiber", "Fibre", "g"],
 ];
 export function validateNutrition(nutrition) {
   if (nutrition == null) return;

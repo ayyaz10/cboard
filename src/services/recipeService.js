@@ -8,6 +8,26 @@ import { requireSupabase } from '../lib/supabaseClient';
 
 const PREFIX = 'recipe:v1:';
 
+export async function saveRecipeFibre(recipe, fibreSource) {
+  const { client, userId } = await getUserScopedClient();
+  const key = `${PREFIX}${recipe.slug}`;
+  const found = await client.from('user_tool_preferences').select('value,updated_at')
+    .eq('user_id', userId).eq('key', key).single();
+  assertSupabaseResult(found);
+  if (!recipe.updatedAt || found.data.updated_at !== recipe.updatedAt)
+    throw new Error('This recipe changed in another tab. Reload it before saving fibre.');
+  const clean = validateRecipe({ ...found.data.value.recipe,
+    nutrition: { ...found.data.value.recipe.nutrition, fiber: fibreSource.value }, fibreSource });
+  if (!clean.fibreSource || clean.nutrition.fiber == null) throw new Error('The ingredients changed. Calculate fibre again.');
+  const updatedAt = new Date().toISOString();
+  const result = await client.from('user_tool_preferences').update({
+    value: { ...found.data.value, recipe: clean }, updated_at: updatedAt,
+  }).eq('user_id', userId).eq('key', key).eq('updated_at', found.data.updated_at).select('updated_at').maybeSingle();
+  assertSupabaseResult(result);
+  if (!result.data) throw new Error('This recipe changed while saving. Reload it before trying again.');
+  return { ...clean, image: found.data.value.image || null, updatedAt: result.data.updated_at };
+}
+
 export async function parseRecipeText(recipeText) {
   if (typeof recipeText !== 'string' || !recipeText.trim())
     throw new Error('Paste some recipe text first.');

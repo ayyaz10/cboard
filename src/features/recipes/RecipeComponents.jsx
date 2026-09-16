@@ -1,3 +1,4 @@
+import { RecipeHealthReview } from './RecipeHealthReview';
 import { getAppHref, navigateTo } from '../../app/useRoute';
 import { formatIngredient } from './recipeData';
 import { RecipeSource } from './RecipeSource';
@@ -48,12 +49,13 @@ export function RecipeImage({ image, title, large = false }) {
   );
 }
 
-export function RecipeNutrition({ nutrition = {} }) {
+export function RecipeNutrition({ nutrition = {}, fibreSource }) {
   const values = [
     ['calories', 'kcal'],
     ['protein', 'g protein'],
     ['carbs', 'g carbs'],
     ['fat', 'g fat'],
+    ['fiber', 'g fibre'],
   ].filter(([key]) => nutrition[key] != null);
   return values.length ? (
     <dl className="flex flex-wrap gap-3">
@@ -62,9 +64,10 @@ export function RecipeNutrition({ nutrition = {} }) {
           key={key}
           className="rounded-2xl border-2 border-black bg-white px-4 py-3 text-black"
         >
-          <dt className="text-xs capitalize text-black/70">{key}</dt>
+          <dt className="text-xs capitalize text-black/70">{key === 'fiber' ? 'fibre' : key}</dt>
           <dd className="font-bold">
             {nutrition[key]} {unit}
+            {key === 'fiber' && fibreSource && <small className="block font-normal">Estimated ? {fibreSource.type === 'ai' ? 'AI assisted' : 'grocery labels'} ? {fibreSource.basis === 'serving' ? 'per serving' : 'whole recipe'}</small>}
           </dd>
         </div>
       ))}
@@ -160,7 +163,7 @@ export function RecipeSteps({ steps }) {
   );
 }
 
-export function RecipePage({ recipe, preview = false }) {
+export function RecipePage({ recipe, preview = false, onRecipeUpdated }) {
   return (
     <article className="space-y-7 break-words text-black">
       <RecipeImage image={recipe.image} title={recipe.title} large />
@@ -176,7 +179,8 @@ export function RecipePage({ recipe, preview = false }) {
         )}
       </header>
       <RecipeSource source={recipe.source} linkClassName={secondaryButton} />
-      <RecipeNutrition nutrition={recipe.nutrition} />
+      <RecipeNutrition nutrition={recipe.nutrition} fibreSource={recipe.fibreSource} />
+      <RecipeHealthReview recipe={recipe} />
       <dl className="flex flex-wrap gap-6">
         {[
           ['Prep time', recipe.prepTime],
@@ -192,7 +196,7 @@ export function RecipePage({ recipe, preview = false }) {
           ))}
       </dl>
       <IngredientList recipe={recipe} preview={preview} />
-      {!preview && <RecipeGroceries key={recipe.slug} recipe={recipe} />}
+      {!preview && <RecipeGroceries key={recipe.slug} recipe={recipe} onRecipeUpdated={onRecipeUpdated} />}
       <RecipeSteps steps={recipe.steps} />
       {recipe.sauces.length > 0 && (
         <section>
@@ -241,7 +245,8 @@ export function RecipeCard({ recipe }) {
           {recipe.description}
         </p>
       )}
-      <RecipeNutrition nutrition={recipe.nutrition} />
+      <RecipeNutrition nutrition={recipe.nutrition} fibreSource={recipe.fibreSource} />
+      <RecipeHealthReview recipe={recipe} compact />
       <p className="text-sm text-black/70">
         {[
           recipe.prepTime && `Prep: ${recipe.prepTime}`,

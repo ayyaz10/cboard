@@ -300,3 +300,8 @@ entrypoint = "./functions/nutrition-label/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/parse-finance/index.ts"
+
+[functions.estimate-recipe-fibre]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/estimate-recipe-fibre/index.ts"

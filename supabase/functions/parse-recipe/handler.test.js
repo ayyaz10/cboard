@@ -1,17 +1,18 @@
+import { geminiJson } from "../_shared/gemini.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createParseRecipeHandler } from "./handler.js";
 
 const generated = { is_recipe: true, title: "Soup", cooking_time_minutes: 20, ingredients: ["1 cup water"], steps: ["Boil water"] };
 function setup({ auth = true, allowance = true, generate = async () => generated, insertError = null } = {}) {
-  const calls = { generated: 0, inserted: null, clientOptions: null };
+  const calls = { generated: 0, reserved: 0, inserts: 0, inserted: null, clientOptions: null };
   const chain = {
     select() { return this; }, eq() { return this; }, like() { return this; }, limit: async () => ({ data: [], error: null }),
-    insert(value) { calls.inserted = value; return { select: () => ({ single: async () => ({ data: { updated_at: "2026-09-11T00:00:00Z" }, error: insertError }) }) }; },
+    insert(value) { calls.inserts++; calls.inserted = value; return { select: () => ({ single: async () => ({ data: { updated_at: "2026-09-11T00:00:00Z" }, error: insertError }) }) }; },
   };
   const db = {
     auth: { getUser: async () => auth ? { data: { user: { id: "user-1" } }, error: null } : { data: {}, error: new Error("bad") } },
-    rpc: async () => ({ data: allowance, error: null }),
+    rpc: async () => { calls.reserved++; return { data: allowance, error: null }; },
     from: () => chain,
   };
   const handler = createParseRecipeHandler({
@@ -79,4 +80,17 @@ test("OPTIONS returns scoped CORS headers", async () => {
   const response = await handler(new Request("https://fn.example.com", { method: "OPTIONS", headers: { Origin: "https://app.example.com" } }));
   assert.equal(response.status, 204);
   assert.equal(response.headers.get("Access-Control-Allow-Origin"), "https://app.example.com");
+});
+
+
+test("provider retry reserves allowance and saves the recipe only once", async () => {
+  let attempts = 0;
+  const { handler, calls } = setup({ generate: () => geminiJson("https://example.invalid", {}, {
+    wait: async () => {},
+    fetchImpl: async () => ++attempts === 1 ? new Response(null, { status: 503 }) : Response.json(generated),
+  }) });
+  assert.equal((await handler(request())).status, 201);
+  assert.equal(attempts, 2);
+  assert.equal(calls.reserved, 1);
+  assert.equal(calls.inserts, 1);
 });

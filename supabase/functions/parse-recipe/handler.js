@@ -1,3 +1,4 @@
+import { geminiErrorMessage } from "../_shared/gemini.js";
 import { MAX_RECIPE_TEXT_LENGTH, toStoredRecipe, uniqueRecipeSlug, validateGeminiRecipe, validateRequestBody } from "./recipeParser.js";
 
 const localOrigins = new Set(["http://localhost:5173", "http://127.0.0.1:5173", "https://ayyaz10.github.io"]);
@@ -80,7 +81,7 @@ export function createParseRecipeHandler({ createClient, env, generateRecipe }) 
           return json({ error: "Gemini rejected the recipe request configuration. Please try again after updating the app." }, 502, cors.headers);
         if (providerStatus === 404)
           return json({ error: "No compatible Gemini Flash model is available for this API key." }, 502, cors.headers);
-        return json({ error: "The AI recipe service is unavailable right now. Please try again." }, 502, cors.headers);
+        return json({ error: geminiErrorMessage(error, "The AI recipe service is unavailable right now. Please try again.") }, 502, cors.headers);
       }
       let extracted;
       try {

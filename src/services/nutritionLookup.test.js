@@ -14,6 +14,13 @@ test("maps only standard per-100 values, preserves zero and missing nutrition", 
   assert.equal(partial.nutrition.calories, null);
   assert.equal(nutritionProduct({ ...product, nutriments: {} }), null);
 });
+
+test("fibre lookup preserves label values without guessing missing fibre", () => {
+  assert.equal(nutritionProduct(product).nutrition.fiber, null);
+  assert.equal(nutritionProduct({ ...product, nutriments: { fiber_100g: 8.5 } }).nutrition.fiber, 8.5);
+  assert.equal(nutritionProduct({ ...product, nutriments: { fiber_100g: 0 } }).nutrition.fiber, 0);
+  assert.equal(nutritionProduct({ ...product, nutriments: { fiber_100g: -1 } }), null);
+});
 test("uses package units first and defaults solid foods to grams", () => {
   assert.equal(nutritionProduct({ ...product, quantity: "1 L", nutrition_data_per: "100g" }).nutrition.unit, "ml");
   assert.equal(nutritionProduct({ ...product, quantity: "", nutrition_data_per: "100g" }).nutrition.unit, "g");
