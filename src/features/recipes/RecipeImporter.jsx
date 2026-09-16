@@ -11,6 +11,7 @@ import { RecipePage, secondaryButton } from './RecipeComponents';
 import { RecipeImageUploader } from './RecipeImageUploader';
 import { RecipeFormEditor, emptyRecipe } from './RecipeFormEditor';
 import { parseRecipeText } from '../../services/recipeService';
+import { RecipeJsonGuide } from './RecipeJsonGuide';
 
 export function RecipeImporter({
   initial,
@@ -335,6 +336,7 @@ export function RecipeImporter({
               />
             ) : (
               <>
+                {!editing && <RecipeJsonGuide />}
                 <p className="leading-7 text-black/70">
                   Paste or upload one recipe object or an array of up to 20
                   recipes. For batches, add each recipe’s image in the preview.

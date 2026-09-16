@@ -38,11 +38,11 @@ export function RecipeImage({ image, title, large = false }) {
       src={image}
       alt={title}
       loading={large ? 'eager' : 'lazy'}
-      className={`w-full rounded-[1.35rem] object-cover ${large ? 'max-h-[30rem] aspect-[16/9]' : 'aspect-[4/3]'}`}
+      className={`w-full rounded-[1.35rem] object-cover ${large ? 'max-h-[22rem] aspect-[4/3]' : 'aspect-[4/3]'}`}
     />
   ) : (
     <div
-      className={`recipe-image-placeholder flex items-center justify-center rounded-[1.35rem] border-2 border-black bg-white text-sm font-semibold text-black/55 ${large ? 'h-48' : 'aspect-[4/3]'}`}
+      className={`recipe-image-placeholder flex items-center justify-center rounded-[1.35rem] border-2 border-black bg-white text-sm font-semibold text-black/55 ${large ? 'min-h-28 h-full' : 'aspect-[4/3]'}`}
     >
       No recipe image yet
     </div>
@@ -107,23 +107,26 @@ export function RecipeAlternatives({ group }) {
 export function IngredientList({ recipe, preview = false }) {
   return (
     <section>
-      <h2 className="text-2xl font-bold">Ingredients</h2>
-      <ul className="mt-4 space-y-3">
+      <div className="flex items-end justify-between gap-3">
+        <h2 className="text-2xl font-bold">Ingredients</h2>
+        <span className="text-sm text-black/60">{recipe.ingredients.length} items</span>
+      </div>
+      <ul className="mt-3 grid gap-2 md:grid-cols-2">
         {recipe.ingredients.map((item, index) => (
           <li
             key={index}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-black bg-white p-4"
+            className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-xl border-2 border-black bg-white px-3 py-2.5"
           >
             <div>
               <p className="font-semibold">{formatIngredient(item)}</p>
               {item.note && (
-                <p className="mt-1 text-sm text-black/70">{item.note}</p>
+                <p className="mt-0.5 text-xs leading-5 text-black/65">{item.note}</p>
               )}
             </div>
             {item.alternativeGroup &&
               (preview ? (
                 <a
-                  className="font-bold underline underline-offset-4"
+                  className="text-sm font-bold underline underline-offset-4"
                   href={`#preview-${item.alternativeGroup}`}
                 >
                   View Alternatives →
@@ -146,9 +149,9 @@ export function RecipeSteps({ steps }) {
   return (
     <section>
       <h2 className="text-2xl font-bold">How to make it</h2>
-      <ol className="mt-4 space-y-4">
+      <ol className="mt-3 grid gap-x-6 gap-y-3 lg:grid-cols-2">
         {steps.map((step, index) => (
-          <li key={index} className="flex gap-4 leading-7">
+          <li key={index} className="flex gap-3 text-sm leading-6">
             <span className="pill h-fit shrink-0" aria-hidden="true">
               {index + 1}
             </span>
@@ -165,39 +168,47 @@ export function RecipeSteps({ steps }) {
 
 export function RecipePage({ recipe, preview = false, onRecipeUpdated }) {
   return (
-    <article className="space-y-7 break-words text-black">
-      <RecipeImage image={recipe.image} title={recipe.title} large />
-      <header className="space-y-3">
-        <span className="pill">{recipe.mealType}</span>
-        <h1 className="text-3xl font-bold tracking-[-0.04em] sm:text-5xl">
-          {recipe.title}
-        </h1>
-        {recipe.description && (
-          <p className="max-w-3xl leading-7 text-black/70">
-            {recipe.description}
-          </p>
-        )}
-      </header>
-      <RecipeSource source={recipe.source} linkClassName={secondaryButton} />
-      <RecipeNutrition nutrition={recipe.nutrition} fibreSource={recipe.fibreSource} />
-      <RecipeHealthReview recipe={recipe} />
-      <dl className="flex flex-wrap gap-6">
-        {[
-          ['Prep time', recipe.prepTime],
-          ['Cooking time', recipe.cookTime],
-          ['Servings', recipe.servings],
-        ]
-          .filter(([, value]) => value != null && value !== '')
-          .map(([label, value]) => (
-            <div key={label}>
-              <dt className="text-sm text-black/70">{label}</dt>
-              <dd className="font-bold">{value}</dd>
-            </div>
-          ))}
-      </dl>
+    <article className="space-y-5 break-words text-black">
+      <section className="grid gap-5 lg:grid-cols-[minmax(15rem,0.75fr)_minmax(0,1.25fr)] lg:items-stretch">
+        <RecipeImage image={recipe.image} title={recipe.title} large />
+        <div className="space-y-4 rounded-[1.35rem] border-2 border-black bg-white p-5">
+          <header className="space-y-2">
+            <span className="pill">{recipe.mealType}</span>
+            <h1 className="text-3xl font-bold tracking-[-0.04em] sm:text-4xl">
+              {recipe.title}
+            </h1>
+            {recipe.description && <p className="text-sm leading-6 text-black/70">{recipe.description}</p>}
+          </header>
+          <RecipeNutrition nutrition={recipe.nutrition} fibreSource={recipe.fibreSource} />
+          <dl className="flex flex-wrap gap-x-6 gap-y-2">
+            {[
+              ['Prep time', recipe.prepTime],
+              ['Cooking time', recipe.cookTime],
+              ['Servings', recipe.servings],
+            ].filter(([, value]) => value != null && value !== '').map(([label, value]) => (
+              <div key={label}>
+                <dt className="text-xs text-black/60">{label}</dt>
+                <dd className="text-sm font-bold">{value}</dd>
+              </div>
+            ))}
+          </dl>
+          <RecipeSource source={recipe.source} linkClassName={secondaryButton} />
+        </div>
+      </section>
+      {(recipe.healthReview || recipe.tags?.includes('AI imported')) && (
+        <details className="rounded-2xl border-2 border-black bg-white p-4">
+          <summary className="cursor-pointer font-bold">Ingredient health report</summary>
+          <div className="mt-4"><RecipeHealthReview recipe={recipe} /></div>
+        </details>
+      )}
       <IngredientList recipe={recipe} preview={preview} />
-      {!preview && <RecipeGroceries key={recipe.slug} recipe={recipe} onRecipeUpdated={onRecipeUpdated} />}
       <RecipeSteps steps={recipe.steps} />
+      {!preview && (
+        <details className="rounded-2xl border-2 border-black bg-white p-4">
+          <summary className="cursor-pointer font-bold">Kitchen stock, shopping and fibre tools</summary>
+          <div className="mt-4"><RecipeGroceries key={recipe.slug} recipe={recipe} onRecipeUpdated={onRecipeUpdated} /></div>
+        </details>
+      )}
       {recipe.sauces.length > 0 && (
         <section>
           <h2 className="text-2xl font-bold">Sauces</h2>

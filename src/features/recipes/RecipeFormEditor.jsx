@@ -1,5 +1,5 @@
 import { secondaryButton } from './RecipeComponents';
-import { useId } from 'react';
+import { useId, useState } from 'react';
 
 export const emptyRecipe = () => ({
   title: '',
@@ -34,7 +34,7 @@ function Field({ label, value, onChange, multiline = false, ...props }) {
 
 function Macros({ value = {}, onChange }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
       {[
         ['calories', 'Calories (kcal)'],
         ['protein', 'Protein (g)'],
@@ -61,8 +61,8 @@ function Macros({ value = {}, onChange }) {
 function ItemEditor({ item, onChange, groups }) {
   const set = (key, value) => onChange({ ...item, [key]: value });
   return (
-    <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-3">
+    <div className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-[minmax(12rem,2fr)_minmax(7rem,1fr)_minmax(7rem,1fr)]">
         <Field
           label="Name"
           value={item.name}
@@ -132,36 +132,64 @@ function ItemEditor({ item, onChange, groups }) {
   );
 }
 
+function ItemRow({ title, item, index, items, onChange, groups }) {
+  const normalizedItem = typeof item === 'string' ? { name: item } : item;
+  const [open, setOpen] = useState(!normalizedItem?.name);
+
+  return (
+    <details
+      className="rounded-xl border-2 border-black bg-white p-3"
+      open={open}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <summary className="cursor-pointer font-bold">
+        <span className="text-black/55">{index + 1}.</span>{' '}
+        {normalizedItem.name || `New ${title.toLowerCase()}`}
+        {(normalizedItem.amount != null || normalizedItem.unit) && (
+          <span className="ml-2 text-sm font-normal text-black/60">
+            {[normalizedItem.amount, normalizedItem.unit]
+              .filter((value) => value != null && value !== '')
+              .join(' ')}
+          </span>
+        )}
+      </summary>
+      <div className="mt-3 space-y-3">
+        <ItemEditor
+          item={normalizedItem}
+          groups={groups}
+          onChange={(next) =>
+            onChange(items.map((current, i) => (i === index ? next : current)))
+          }
+        />
+        <button
+          type="button"
+          className={secondaryButton}
+          onClick={() => onChange(items.filter((_, i) => i !== index))}
+        >
+          Remove {title.toLowerCase()} #{index + 1}
+        </button>
+      </div>
+    </details>
+  );
+}
+
 function Items({ title, items, onChange, groups }) {
   return (
     <section className="space-y-4">
       <h2 className="text-2xl font-bold">{title}</h2>
-      {items.map((item, index) => (
-        <fieldset
+      <div className="grid gap-2 lg:grid-cols-2">
+        {items.map((item, index) => (
+          <ItemRow
           key={index}
-          className="space-y-4 rounded-2xl border-2 border-black p-4"
-        >
-          <legend className="px-2 font-bold">
-            {title} #{index + 1}
-          </legend>
-          <ItemEditor
-            item={typeof item === 'string' ? { name: item } : item}
-            groups={groups}
-            onChange={(next) =>
-              onChange(
-                items.map((current, i) => (i === index ? next : current)),
-              )
-            }
+          title={title}
+          item={item}
+          index={index}
+          items={items}
+          onChange={onChange}
+          groups={groups}
           />
-          <button
-            type="button"
-            className={secondaryButton}
-            onClick={() => onChange(items.filter((_, i) => i !== index))}
-          >
-            Remove {title.toLowerCase()} #{index + 1}
-          </button>
-        </fieldset>
-      ))}
+        ))}
+      </div>
       <button
         type="button"
         className={secondaryButton}
@@ -179,22 +207,13 @@ export function RecipeFormEditor({ recipe, onChange, editing }) {
   const set = (key, value) => onChange({ ...recipe, [key]: value });
   const groups = recipe.alternatives ?? {};
   return (
-    <div className="space-y-7">
-      <section className="space-y-4">
+    <div className="space-y-5">
+      <section className="space-y-3 rounded-2xl border-2 border-black bg-white p-4">
         <h2 className="text-2xl font-bold">Recipe details</h2>
-        <Field
-          label="Recipe title"
-          required
-          value={recipe.title}
-          onChange={(value) => set('title', value)}
-        />
-        <Field
-          label="Meal type"
-          required
-          value={recipe.mealType}
-          placeholder="Breakfast, Lunch, Dinner, Snack or custom"
-          onChange={(value) => set('mealType', value)}
-        />
+        <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
+          <Field label="Recipe title" required value={recipe.title} onChange={(value) => set('title', value)} />
+          <Field label="Meal type" required value={recipe.mealType} placeholder="Breakfast, Lunch…" onChange={(value) => set('mealType', value)} />
+        </div>
         <Field
           label="Description"
           multiline
@@ -202,7 +221,7 @@ export function RecipeFormEditor({ recipe, onChange, editing }) {
           value={recipe.description}
           onChange={(value) => set('description', value)}
         />
-        <div className="grid gap-4 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-3">
           <Field
             label="Prep time"
             value={recipe.prepTime}
@@ -235,27 +254,25 @@ export function RecipeFormEditor({ recipe, onChange, editing }) {
           onChange={(value) => set('tags', value.split(','))}
         />
       </section>
-      <section className="space-y-4">
-        <h2 className="text-2xl font-bold">Recipe nutrition</h2>
+      <details className="rounded-2xl border-2 border-black bg-white p-4" open>
+        <summary className="cursor-pointer text-xl font-bold">Recipe nutrition</summary>
         <p className="text-sm text-black/70">
           Enter macros manually; changing ingredients does not recalculate them.
           Leave unknown values blank.
         </p>
-        <Macros
-          value={recipe.nutrition}
-          onChange={(value) => set('nutrition', value)}
-        />
-      </section>
+        <div className="mt-3"><Macros value={recipe.nutrition} onChange={(value) => set('nutrition', value)} /></div>
+      </details>
       <Items
         title="Ingredients"
         items={recipe.ingredients ?? []}
         groups={groups}
         onChange={(value) => set('ingredients', value)}
       />
-      <section className="space-y-4">
+      <section className="space-y-3">
         <h2 className="text-2xl font-bold">Instructions</h2>
+        <div className="grid gap-3 lg:grid-cols-2">
         {(recipe.steps ?? []).map((step, index) => (
-          <div key={index} className="space-y-2">
+          <div key={index} className="space-y-2 rounded-xl border-2 border-black bg-white p-3">
             <Field
               label={`Step ${index + 1}`}
               multiline
@@ -284,6 +301,7 @@ export function RecipeFormEditor({ recipe, onChange, editing }) {
             </button>
           </div>
         ))}
+        </div>
         <button
           type="button"
           className={secondaryButton}
@@ -292,14 +310,14 @@ export function RecipeFormEditor({ recipe, onChange, editing }) {
           Add step
         </button>
       </section>
-      <Items
-        title="Sauces"
-        items={recipe.sauces ?? []}
-        onChange={(value) => set('sauces', value)}
-      />
+      <details className="rounded-2xl border-2 border-black bg-white p-4">
+        <summary className="cursor-pointer text-xl font-bold">Sauces ({recipe.sauces?.length ?? 0})</summary>
+        <div className="mt-4"><Items title="Sauces" items={recipe.sauces ?? []} onChange={(value) => set('sauces', value)} /></div>
+      </details>
       {Object.keys(groups).length > 0 && (
-        <section className="space-y-4">
-          <h2 className="text-2xl font-bold">Ingredient alternatives</h2>
+        <details className="rounded-2xl border-2 border-black bg-white p-4">
+          <summary className="cursor-pointer text-xl font-bold">Ingredient alternatives ({Object.keys(groups).length})</summary>
+          <div className="mt-4 space-y-3">
           {Object.entries(groups).map(([key, group]) => (
             <details
               key={key}
@@ -331,10 +349,12 @@ export function RecipeFormEditor({ recipe, onChange, editing }) {
               </div>
             </details>
           ))}
-        </section>
+          </div>
+        </details>
       )}
-      <section className="space-y-4">
-        <h2 className="text-2xl font-bold">Recipe source</h2>
+      <details className="rounded-2xl border-2 border-black bg-white p-4" open={Boolean(recipe.source)}>
+        <summary className="cursor-pointer text-xl font-bold">Recipe source</summary>
+        <div className="mt-4 space-y-3">
         <label className="flex items-center gap-3 font-semibold">
           <input
             type="checkbox"
@@ -396,7 +416,8 @@ export function RecipeFormEditor({ recipe, onChange, editing }) {
             </label>
           </>
         )}
-      </section>
+        </div>
+      </details>
     </div>
   );
 }
