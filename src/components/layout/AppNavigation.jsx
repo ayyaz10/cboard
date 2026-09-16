@@ -8,6 +8,7 @@ const primaryNavItems = [
   { path: '/recipes', label: 'Recipes' },
   { path: '/groceries', label: 'Groceries' },
   { path: '/focus-timer', label: 'Focus Timer' },
+  { path: '/weight-progress', label: 'Weight Progress' },
   { path: '/finance', label: 'Finance' },
 ];
 

@@ -18,6 +18,7 @@ import { FocusTimerPage } from '../features/focusTimer/FocusTimerPage';
 import { NotebookPage } from '../features/notebook/NotebookPage';
 import { Recipes } from '../features/recipes/Recipes';
 import { Groceries } from '../features/groceries/Groceries';
+import { WeightProgress } from '../features/weightProgress/WeightProgress.jsx';
 import { FinancePage } from '../features/finance/FinancePage.jsx';
 
 export default function App() {
@@ -133,6 +134,8 @@ export default function App() {
   }
 
   if (route === '/groceries') return <Groceries key={user.id} />;
+
+  if (route === '/weight-progress') return <WeightProgress key={user.id} />;
 
   if (route === '/finance') return <FinancePage key={user.id} />;
 

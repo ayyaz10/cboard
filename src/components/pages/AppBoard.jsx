@@ -3,6 +3,11 @@ import { PageShell } from '../layout/PageShell';
 
 const appSections = [
   {
+    id: 'weight-progress', path: '/weight-progress', label: 'Your personal progress', name: 'Weight Progress',
+    description: 'Log weigh-ins, follow your weight trend, and compare private progress photos.',
+    color: '#ff90e8', colorKey: 'pink', countLabel: 'Weight & photos',
+  },
+  {
     id: 'finance', path: '/finance', label: 'Money workspace', name: 'Finance Manager',
     description: 'Plan your month, track spending, manage repayments, and grow savings goals.',
     color: '#9fe3ff', colorKey: 'cyan', countLabel: 'Budget & goals',

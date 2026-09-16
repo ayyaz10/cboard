@@ -1,0 +1,29 @@
+.weight-page { color: #17251b; }
+.weight-header { display:flex; justify-content:space-between; align-items:center; gap:20px; flex-wrap:wrap; margin:28px 0; }
+.weight-header h1 { font-size:clamp(2rem,5vw,3rem); font-weight:800; margin:12px 0; letter-spacing:-.04em; }
+.weight-page h2 { font-size:1.3rem; font-weight:750; margin-bottom:14px; }
+.weight-page label { display:grid; gap:6px; font-weight:600; }
+.weight-page input,.weight-page select,.weight-page textarea { width:100%; min-width:0; background:#fffdf8; border:1px solid #8a9486; border-radius:10px; padding:10px; color:#17251b; }
+.weight-page button { border:1px solid #17251b; border-radius:10px; padding:9px 13px; background:#fffdf8; font-weight:600; }
+.weight-page button:disabled { opacity:.5; cursor:wait; }
+.weight-page .weight-primary { background:#c5ff6f; }
+.weight-card { border:1px solid #b4bfae; border-radius:18px; padding:20px; background:#fffdf8; margin:20px 0; min-width:0; }
+.weight-columns { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.5fr); gap:20px; }
+.weight-form fieldset { display:grid; gap:14px; min-width:0; }
+.weight-help { font-size:.85rem; color:#53604d; }
+.weight-stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+.weight-stats>div { padding:18px; border:1px solid #17251b; border-radius:14px; background:#e9f3dd; }
+.weight-stats small,.weight-stats strong { display:block; }
+.weight-stats strong { font-size:1.6rem; margin-top:8px; }
+.weight-chart { height:300px; min-width:0; }
+.weight-actions { display:flex; gap:8px; flex-wrap:wrap; }
+.weight-page img { width:100%; max-height:420px; object-fit:contain; border-radius:12px; background:#f1f1eb; margin:12px 0; }
+.weight-compare { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; }
+.weight-compare img { height:380px; }
+.weight-history article { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:14px; padding:16px 0; border-bottom:1px solid #d3dbcd; }
+.weight-history article>div:first-child { flex:1; min-width:150px; }
+.weight-note { white-space:pre-wrap; overflow-wrap:anywhere; }
+.weight-alert { background:#fff0d5; border-radius:10px; padding:12px; margin:12px 0; }
+.weight-history .weight-alert { flex-basis:100%; }
+@media(max-width:760px) { .weight-columns { grid-template-columns:1fr; gap:0; } .weight-stats { grid-template-columns:repeat(2,minmax(0,1fr)); } .weight-card { padding:15px; } .weight-compare { gap:10px; } .weight-compare img { height:240px; } }
+@media(max-width:400px) { .weight-compare { grid-template-columns:1fr; } }
