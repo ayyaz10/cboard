@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { getAppHref } from "../../app/useRoute";
 import { useGroceries } from "./useGroceries";
-import { addShopping, cookRecipe, recipeNeeds } from "./groceryData";
+import { addShopping, cookRecipe, recipeNeeds, recipeNutrition, nutrients } from "./groceryData";
 import "./groceries.css";
 export function RecipeGroceries({ recipe }) {
   const { data, busy, error, reload, change, notice, undo } = useGroceries();
@@ -21,6 +21,9 @@ export function RecipeGroceries({ recipe }) {
       </section>
     );
   const needs = recipeNeeds(recipe, data, multiplier);
+  const nutrition = recipeNutrition(recipe, data, multiplier);
+  const servings = Number(recipe.servings) > 0 ? Number(recipe.servings) * multiplier : null;
+  const format = (value) => new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(value);
   const unresolved = needs.some((i) => i.missing == null);
   return (
     <section className="groceries g-recipe">
@@ -47,6 +50,21 @@ export function RecipeGroceries({ recipe }) {
           }}
         />
       </label>
+      <details className="g-nutrition-fields" open>
+        <summary>Estimated nutrition from groceries</summary>
+        <p className="g-hint">For the selected {servings ? "servings" : "batches"}, using your grocery labels. These estimates are separate from the recipe's manually entered nutrition.</p>
+        <div className="g-nutrition-grid">
+          {nutrients.map(([key, label, unit]) => {
+            const total = nutrition[key];
+            return <div key={key}>
+              <strong>{label}</strong>
+              <p>{total.value == null ? "Not available" : `${format(total.value)} ${unit}${total.missing.length ? " (known subtotal)" : " total"}`}</p>
+              {servings && total.value != null && <small>{format(total.value / servings)} {unit} per serving{total.missing.length ? " (partial)" : ""}</small>}
+              {total.missing.length > 0 && <p className="g-hint">Missing values or compatible amounts: {[...new Set(total.missing)].join(", ")}</p>}
+            </div>;
+          })}
+        </div>
+      </details>
       <ul>
         {needs.map((need, index) => (
           <li key={index}>

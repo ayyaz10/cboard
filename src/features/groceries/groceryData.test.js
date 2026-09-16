@@ -1,6 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  recipeNutrition,
+  validateNutrition,
+  estimatedCost,
+  shoppingEstimate,
+  validatePrice,
   initialState,
   newItem,
   parseEntry,
@@ -164,4 +169,76 @@ test("legacy item images migrate once into the shared library without duplicatio
   );
   assert.equal(Object.hasOwn(state.items[0], "image"), false);
   assert.equal(Object.hasOwn(state.shopping[0], "image"), false);
+});
+
+test("estimates scale to quantities and distinguish missing prices from free items", () => {
+  const item = { ...newItem("Rice", 750, "g"), estimatedPrice: 2.50, priceQuantity: 500 };
+  assert.equal(estimatedCost(item), 3.75);
+  assert.deepEqual(shoppingEstimate([item, newItem("Milk", 1, "L"),
+    { ...newItem("Apple", 1), estimatedPrice: 0 }]), { total: 3.75, missing: 1 });
+  assert.throws(() => validatePrice({ estimatedPrice: -1, priceQuantity: 1 }));
+  assert.throws(() => validatePrice({ estimatedPrice: 1, priceQuantity: 0 }));
+});
+test("prices survive shopping merges and purchases with converted units", () => {
+  const rice = { ...newItem("Rice", 0, "kg"), estimatedPrice: 4, priceQuantity: 1 };
+  const shopping = addShopping([newItem("Rice", 500, "g")], rice, 1);
+  assert.equal(estimatedCost(shopping[0]), 6);
+  const state = { ...initialState(), items: [rice], shopping };
+  const bought = purchase(state, [{ id: shopping[0].id, quantity: 1500 }]);
+  assert.equal(bought.items[0].priceQuantity, 1);
+  assert.equal(estimatedCost(bought.items[0]), 6);
+  const fresh = purchase({ ...state, items: [] }, [{ id: shopping[0].id, quantity: 1500 }]);
+  assert.equal(estimatedCost(fresh.items[0]), 6);
+});
+
+test("recipe nutrition converts label units and scales independently of stock", () => {
+  const item = { ...newItem("Rice", null, "packs"), nutrition: {
+    quantity: 100, unit: "g", calories: 360, protein: 7, carbs: 80, fat: 0,
+  } };
+  const recipe = { ingredients: [{ name: "Rice", amount: 0.25, unit: "kg" }] };
+  const totals = recipeNutrition(recipe, { items: [item] }, 2);
+  assert.equal(totals.calories.value, 1800);
+  assert.equal(totals.protein.value, 35);
+  assert.equal(totals.fat.value, 0);
+  assert.deepEqual(totals.fat.missing, []);
+});
+test("recipe nutrition exposes partial and unknown values instead of zero", () => {
+  const item = { ...newItem("Milk"), nutrition: { quantity: 100, unit: "ml", protein: 3, fat: 0 } };
+  const totals = recipeNutrition({ ingredients: [
+    { name: "Milk", amount: 200, unit: "ml" },
+    { name: "Milk", amount: 1, unit: "bottles" },
+    { name: "Sugar", amount: null, unit: "g" },
+  ] }, { items: [item] });
+  assert.equal(totals.protein.value, 6);
+  assert.deepEqual(totals.protein.missing, ["Milk", "Sugar"]);
+  assert.equal(totals.calories.value, null);
+  assert.equal(totals.calories.missing.length, 3);
+  assert.equal(totals.fat.value, 0);
+});
+test("nutrition is optional, validates basis and preserves unknowns", () => {
+  validateNutrition(null);
+  validateNutrition({ quantity: 1, unit: "pieces", protein: null, fat: 0 });
+  for (const nutrition of [
+    { quantity: 0, unit: "g" }, { quantity: 1, unit: "serving" },
+    { quantity: 100, unit: "g", calories: -1 },
+    { quantity: 100, unit: "g", protein: Infinity },
+  ]) assert.throws(() => validateNutrition(nutrition));
+  const state = normalizeGroceryState({ items: [{ name: "Rice" }], shopping: [] });
+  assert.equal(state.items[0].nutrition, null);
+});
+test("nutrition survives additions, shopping merges, recipes and purchases", () => {
+  const item = { ...newItem("Rice", 1000, "g"), nutrition: { quantity: 100, unit: "g", protein: 7 } };
+  const state = { ...initialState(), items: [], shopping: [] };
+  const added = addItems(state, [item]);
+  const need = recipeNeeds({ ingredients: [{ name: "Rice", amount: 2, unit: "kg" }] }, added)[0];
+  assert.deepEqual(need.nutrition, item.nutrition);
+  const shopping = addShopping([newItem("Rice", 1, "kg")], item, 500);
+  assert.deepEqual(shopping[0].nutrition, item.nutrition);
+  for (const items of [[], [newItem("Rice", 0, "kg")]]) {
+    const bought = purchase({ ...state, items, shopping }, [{ id: shopping[0].id, quantity: 1.5 }]);
+    assert.deepEqual(bought.items[0].nutrition, item.nutrition);
+  }
+  const merged = addItems({ ...state, items: [newItem("Rice", 0, "kg")] }, [item]);
+  assert.deepEqual(merged.items[0].nutrition, item.nutrition);
+  assert.equal(state.items.length, 0);
 });

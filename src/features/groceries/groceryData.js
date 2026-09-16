@@ -83,6 +83,9 @@ export function normalizeGroceryState(value) {
   for (const item of [...state.items, ...state.shopping]) {
     if (typeof item.image === "string" && item.image.startsWith("data:image/"))
       state.imageLibrary[normalizeName(item.name)] = item.image;
+    item.nutrition ??= null;
+    item.estimatedPrice ??= null;
+    item.priceQuantity ??= 1;
     delete item.image;
   }
   return state;
@@ -111,6 +114,9 @@ export function newItem(name, quantity = null, unit = "pieces", category) {
         categories[c].some((n) => normalizeName(n) === normalizeName(name)),
       ) ||
       "Other",
+    nutrition: null,
+    estimatedPrice: null,
+    priceQuantity: 1,
     threshold: 0,
     expiry: "",
     location: "",
@@ -135,7 +141,7 @@ export const initialState = () => ({
   ),
   shopping: [],
   imageLibrary: {},
-  settings: { autoImages: false, expiryReminders: true, imageLimit: 0 },
+  settings: { currency: "GBP", autoImages: false, expiryReminders: true, imageLimit: 0 },
 });
 export const stockStatus = (item) =>
   item.quantity == null
@@ -195,9 +201,70 @@ export function parseEntry(text) {
     canonicalUnit(match[2]?.toLowerCase() || "pieces"),
   );
 }
+export const nutrients = [
+  ["calories", "Calories", "kcal"],
+  ["protein", "Protein", "g"],
+  ["carbs", "Carbs", "g"],
+  ["fat", "Fat", "g"],
+];
+export function validateNutrition(nutrition) {
+  if (nutrition == null) return;
+  if (!Number.isFinite(nutrition.quantity) || nutrition.quantity <= 0 || !units.includes(nutrition.unit))
+    throw new Error("Enter a nutrition basis greater than zero and a supported unit.");
+  for (const [key, label] of nutrients)
+    if (nutrition[key] != null && (!Number.isFinite(nutrition[key]) || nutrition[key] < 0))
+      throw new Error(`${label} must be blank or a non-negative number.`);
+}
+// Calculate directly from ingredients: nutrition units are independent of stock units.
+export function recipeNutrition(recipe, state, multiplier = 1) {
+  const totals = Object.fromEntries(nutrients.map(([key]) => [key, { value: null, missing: [] }]));
+  for (const ingredient of recipe.ingredients) {
+    const item = state.items.find((i) => normalizeName(i.name) === normalizeName(ingredient.name));
+    const nutrition = item?.nutrition;
+    const amount = nutrition && Number.isFinite(ingredient.amount) && ingredient.amount > 0
+      ? convert(ingredient.amount * multiplier, ingredient.unit, nutrition.unit) : null;
+    for (const [key] of nutrients) {
+      const value = nutrition?.[key];
+      if (amount == null || !Number.isFinite(nutrition?.quantity) || nutrition.quantity <= 0 ||
+          !Number.isFinite(value) || value < 0) {
+        totals[key].missing.push(ingredient.name);
+      } else {
+        totals[key].value = (totals[key].value ?? 0) + value * amount / nutrition.quantity;
+      }
+    }
+  }
+  return totals;
+}
+export function validatePrice(item) {
+  if (item.estimatedPrice != null &&
+      (!Number.isFinite(item.estimatedPrice) || item.estimatedPrice < 0 ||
+       !Number.isFinite(item.priceQuantity) || item.priceQuantity <= 0))
+    throw new Error("Enter a non-negative estimated price and a price quantity greater than zero.");
+}
+export function estimatedCost(item) {
+  if (item.estimatedPrice == null || item.quantity == null) return null;
+  validatePrice(item);
+  return Math.round(item.estimatedPrice * item.quantity / item.priceQuantity * 100) / 100;
+}
+export function shoppingEstimate(items) {
+  const costs = items.map(estimatedCost);
+  return {
+    total: Math.round(costs.reduce((sum, cost) => sum + (cost ?? 0), 0) * 100) / 100,
+    missing: costs.filter((cost) => cost == null).length,
+  };
+}
+function copyPrice(target, source) {
+  if (source.estimatedPrice == null) return;
+  const basis = convert(source.priceQuantity, source.unit, target.unit);
+  if (basis == null) return;
+  target.estimatedPrice = source.estimatedPrice;
+  target.priceQuantity = basis;
+}
 export function addItems(state, entries, shopping = false) {
   const next = structuredClone(state);
   for (const entry of entries) {
+    validatePrice(entry);
+    validateNutrition(entry.nutrition);
     if (
       !entry.name.trim() ||
       !units.includes(entry.unit) ||
@@ -213,6 +280,8 @@ export function addItems(state, entries, shopping = false) {
       (i) => normalizeName(i.name) === normalizeName(entry.name),
     );
     if (existing) {
+      copyPrice(existing, entry);
+      if (entry.nutrition != null) existing.nutrition = structuredClone(entry.nutrition);
       if (entry.quantity == null) continue;
       const amount = convert(entry.quantity, entry.unit, existing.unit);
       if (amount == null)
@@ -225,6 +294,8 @@ export function addItems(state, entries, shopping = false) {
   return next;
 }
 export function addShopping(list, item, amount = 1, ensure = false) {
+  validatePrice(item);
+  validateNutrition(item.nutrition);
   const next = structuredClone(list);
   const existing = next.find(
     (i) =>
@@ -232,6 +303,8 @@ export function addShopping(list, item, amount = 1, ensure = false) {
       convert(amount, item.unit, i.unit) != null,
   );
   if (existing) {
+    if (existing.nutrition == null && item.nutrition != null) existing.nutrition = structuredClone(item.nutrition);
+    if (existing.estimatedPrice == null) copyPrice(existing, item);
     const converted = convert(amount, item.unit, existing.unit);
     existing.quantity = round(
       ensure
@@ -269,9 +342,13 @@ export function purchase(state, purchases) {
           `Set ${entry.name}'s stock quantity and compatible unit before purchasing.`,
         );
       existing.quantity = round(existing.quantity + amount);
+      copyPrice(existing, entry);
+      if (entry.nutrition != null) existing.nutrition = structuredClone(entry.nutrition);
     } else
       next.items.push(
-        newItem(entry.name, quantity, entry.unit, entry.category),
+        { ...newItem(entry.name, quantity, entry.unit, entry.category),
+          nutrition: structuredClone(entry.nutrition ?? null),
+          estimatedPrice: entry.estimatedPrice ?? null, priceQuantity: entry.priceQuantity ?? 1 },
       );
     next.shopping = next.shopping.filter((i) => i.id !== id);
   }
@@ -302,6 +379,9 @@ export function recipeNeeds(recipe, state, multiplier = 1) {
       grouped.push({
         name: ingredient.name,
         itemId: item?.id,
+        nutrition: structuredClone(item?.nutrition ?? null),
+        estimatedPrice: item?.estimatedPrice ?? null,
+        priceQuantity: item?.priceQuantity ?? 1,
         unit: targetUnit,
         required,
         available: item ? item.quantity : 0,

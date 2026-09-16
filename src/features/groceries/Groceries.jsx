@@ -5,6 +5,11 @@ import { readGroceryImage, resizeGroceryImage } from "./groceryImage";
 import { groceryImage } from "../../services/groceryService";
 import { useGroceries } from "./useGroceries";
 import {
+  validateNutrition,
+  nutrients,
+  validatePrice,
+  estimatedCost,
+  shoppingEstimate,
   categories,
   categoryIcon,
   units,
@@ -19,6 +24,7 @@ import {
   groceryImageFor,
   setGroceryImage,
 } from "./groceryData";
+import { NutritionLookup } from "./NutritionLookup";
 import "./groceries.css";
 
 function Thumbnail({ item, image }) {
@@ -66,6 +72,50 @@ function NumberEdit({ value, label, onSave }) {
       }}
     />
   );
+}
+function NutritionFields({ item, onChange }) {
+  const [open, setOpen] = useState(false);
+  const nutrition = item.nutrition || { quantity: 100, unit: "g" };
+  const update = (values) => onChange({ ...item, nutrition: { ...nutrition, ...values, ...(nutrition.source ? { source: { ...nutrition.source, modified: true } } : {}) } });
+  const number = (value) => value === "" ? null : Number(value);
+  return <details className="g-nutrition-fields" onToggle={(e) => setOpen(e.currentTarget.open)}>
+    <summary>Nutrition (optional)</summary>
+    <NutritionLookup name={item.name} visible={open} active={open && !item.nutrition} onSelect={(value) => onChange({ ...item, nutrition: value })} />
+    {nutrition.source && <p className="g-hint">{nutrition.source.modified ? "Edited after importing" : "Imported"} from {nutrition.source.provider || "Open Food Facts"}: {nutrition.source.name}. Values fill the fields below; save the item to keep them.</p>}
+    <p className="g-hint">You can also enter or adjust values manually. For a serving, enter its weight, volume or number of pieces. Leave unknown values blank.</p>
+    <div className="g-tools">
+      <label>Per quantity
+        <input type="number" min="0.0001" step="any" required={item.nutrition != null}
+          value={nutrition.quantity ?? ""} onChange={(e) => update({ quantity: number(e.target.value) })} />
+      </label>
+      <label>Nutrition unit
+        <select value={nutrition.unit} onChange={(e) => update({ unit: e.target.value })}>
+          {units.map((unit) => <option key={unit}>{unit}</option>)}
+        </select>
+      </label>
+    </div>
+    <div className="g-nutrition-grid">
+      {nutrients.map(([key, label, unit]) => <label key={key}>{label} ({unit})
+        <input type="number" min="0" step="any" placeholder="Not set"
+          value={nutrition[key] ?? ""} onChange={(e) => update({ [key]: number(e.target.value) })} />
+      </label>)}
+    </div>
+    {item.nutrition != null && <button type="button" onClick={() => onChange({ ...item, nutrition: null })}>Clear nutrition</button>}
+  </details>;
+}
+function PriceFields({ item, currency, onChange }) {
+  return <div className="g-tools g-price-fields">
+    <label>Estimated price ({currency})
+      <input type="number" min="0" step="0.01" placeholder="Not set"
+        value={item.estimatedPrice ?? ""}
+        onChange={(e) => onChange({ ...item, estimatedPrice: e.target.value === "" ? null : Number(e.target.value) })} />
+    </label>
+    <label>Per quantity ({item.unit})
+      <input type="number" min="0.0001" step="any" required={item.estimatedPrice != null}
+        value={item.priceQuantity ?? 1}
+        onChange={(e) => onChange({ ...item, priceQuantity: e.target.value === "" ? "" : Number(e.target.value) })} />
+    </label>
+  </div>;
 }
 function Modal({ title, close, children, error }) {
   const ref = useRef(null);
@@ -239,6 +289,9 @@ export function Groceries() {
       ...(data?.items || []).map((i) => i.category),
     ]),
   ];
+  const currency = data?.settings.currency || "GBP";
+  const money = (amount) => new Intl.NumberFormat(undefined, { style: "currency", currency }).format(amount);
+  const estimate = shoppingEstimate(data?.shopping || []);
   const list = data ? (tab === "stock" ? data.items : data.shopping) : [];
   const filtered = list.filter(
     (i) =>
@@ -529,6 +582,12 @@ export function Groceries() {
                 save. Unknown quantities aren’t counted as out of stock.
               </p>
             )}
+            {tab === "shop" && data.shopping.length > 0 && (
+              <p className="g-alert" role="status">
+                {estimate.missing ? "Estimated subtotal" : "Estimated total"}: <strong>{money(estimate.total)}</strong>
+                {estimate.missing > 0 && ` ? ${estimate.missing} item${estimate.missing === 1 ? "" : "s"} missing prices`}
+              </p>
+            )}
             <fieldset disabled={busy} className="g-list">
               <legend className="sr-only">
                 {tab === "stock" ? "Grocery inventory" : "Shopping items"}
@@ -587,6 +646,10 @@ export function Groceries() {
                                 Best before {item.expiry}
                               </small>
                             )}
+                          <small>
+                            {item.estimatedPrice == null ? "Estimated price not set" :
+                              `${money(item.estimatedPrice)} per ${item.priceQuantity} ${item.unit}${tab === "shop" && estimatedCost(item) != null ? ` ? Est. ${money(estimatedCost(item))}` : ""}`}
+                          </small>
                           {imageJobs[item.id] && (
                             <small>{imageJobs[item.id]}</small>
                           )}
@@ -823,6 +886,10 @@ export function Groceries() {
                       <option key={c}>{c}</option>
                     ))}
                   </select>
+                  <PriceFields item={item} currency={currency}
+                    onChange={(value) => setEntries((rows) => rows.map((row, n) => n === index ? value : row))} />
+                  <NutritionFields item={item}
+                    onChange={(value) => setEntries((rows) => rows.map((row, n) => n === index ? value : row))} />
                   {data.items.some(
                     (i) => normalizeName(i.name) === normalizeName(item.name),
                   ) && (
@@ -854,6 +921,8 @@ export function Groceries() {
                       throw new Error(
                         "Enter a shopping quantity greater than zero.",
                       );
+                    validatePrice(edit);
+                    validateNutrition(edit.nutrition);
                     const key = modal === "edit" ? "items" : "shopping";
                     const previous = s[key].find((i) => i.id === edit.id);
                     if (
@@ -921,7 +990,7 @@ export function Groceries() {
                   <select
                     value={edit.unit}
                     onChange={(e) =>
-                      setEdit({ ...edit, unit: e.target.value, quantity: null })
+                      setEdit({ ...edit, unit: e.target.value, quantity: null, estimatedPrice: null, priceQuantity: 1 })
                     }
                   >
                     {units.map((u) => (
@@ -931,9 +1000,11 @@ export function Groceries() {
                 </label>
               </div>
               <p className="g-hint">
-                Changing the unit clears the quantity so you can enter the
+                Changing the unit clears the quantity and estimated price so you can enter the
                 correct amount.
               </p>
+              <PriceFields item={edit} currency={currency} onChange={setEdit} />
+              <NutritionFields item={edit} onChange={setEdit} />
               <label>
                 Category
                 <input
@@ -1225,6 +1296,14 @@ export function Groceries() {
             title="Kitchen preferences"
             close={() => setModal(null)}
           >
+            <label>Price currency
+              <select disabled={busy} value={currency} onChange={(e) => change((s) => {
+                s.settings.currency = e.target.value; return s;
+              })}>
+                {["GBP", "USD", "EUR", "CAD", "AUD", "INR", "PKR"].map((code) => <option key={code}>{code}</option>)}
+              </select>
+            </label>
+            <p className="g-hint">Changing currency does not convert existing prices.</p>
             <label className="g-check">
               <input
                 disabled={busy}

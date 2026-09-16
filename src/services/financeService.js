@@ -20,3 +20,19 @@ export async function saveFinance(state, version, expectedUserId) {
   assertSupabaseResult(result);
   return result.data.updated_at;
 }
+
+export async function parseFinanceEntry(body) {
+  const { client, userId } = await getUserScopedClient();
+  const { data, error } = await client.functions.invoke('parse-finance', { body });
+  if (error) {
+    let message = 'AI quick add is unavailable. Use Add transaction instead.';
+    if (error.context instanceof Response) {
+      try { message = (await error.context.json()).error || message; } catch { /* non-JSON failure */ }
+    }
+    throw new Error(message);
+  }
+  if (data?.error) throw new Error(data.error);
+  const current = await getUserScopedClient();
+  if (current.userId !== userId) throw new Error('Your account changed. Prepare this transaction again.');
+  return data;
+}
