@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateGoals, emptyGoals, compareGoal, comparisonText } from './nutritionGoals.js';
+import { validateGoals, emptyGoals, compareGoal, comparisonText, maintenanceDifference } from './nutritionGoals.js';
 import { calculateMealPlan } from '../recipes/mealPlanData.js';
 
 test('daily targets preserve zero and optional values through a save round trip', () => {
   const goals = validateGoals({ calories: '2000', protein: '150.5', carbs: '', fat: 0 });
-  assert.deepEqual(goals, { calories: 2000, protein: 150.5, carbs: null, fat: 0, fiber: null });
+  assert.deepEqual(goals, { calories: 2000, maintenanceCalories: null, protein: 150.5, carbs: null, fat: 0, fiber: null });
   assert.deepEqual(validateGoals(JSON.parse(JSON.stringify(goals))), goals);
   assert.deepEqual(validateGoals({}), emptyGoals());
   for (const value of [-1, Infinity, NaN, true, [], {}, 'oops', 100001])
@@ -37,6 +37,15 @@ test('zero targets and decimal arithmetic give meaningful comparisons', () => {
   assert.equal(compareGoal({ value: 1, known: 1, missing: 0 }, 0).status, 'over');
   assert.equal(compareGoal({ value: 0.1 + 0.2, known: 2, missing: 0 }, 0.3).status, 'met');
   assert.equal(comparisonText(compareGoal({ value: 100.01, known: 1, missing: 0 }, 100), 'g'), '<0.1 g over target');
+});
+
+test('maintenance calories are optional and calculate the planned calorie difference', () => {
+  const goals = validateGoals({ calories: '2300', maintenanceCalories: '2850' });
+  assert.equal(goals.maintenanceCalories, 2850);
+  assert.equal(maintenanceDifference(goals), 550);
+  assert.equal(maintenanceDifference({ calories: 3000, maintenanceCalories: 2800 }), -200);
+  assert.equal(maintenanceDifference({ calories: 2300, maintenanceCalories: null }), null);
+  assert.throws(() => validateGoals({ maintenanceCalories: -1 }), /Maintenance calories/);
 });
 
 test('fibre reaches its target without an over-limit warning and unknown fibre stays unknown', () => {

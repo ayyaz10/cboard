@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getPreference, setPreference } from '../../services/preferenceService';
-import { GOAL_KEY, GOAL_FIELDS, emptyGoals, validateGoals, formatMacro } from './nutritionGoals';
+import {
+  GOAL_KEY,
+  GOAL_FIELDS,
+  emptyGoals,
+  validateGoals,
+  formatMacro,
+  maintenanceDifference,
+} from './nutritionGoals';
 import './nutritionGoals.css';
 
 export function useNutritionGoals() {
@@ -43,6 +50,7 @@ export function DailyNutritionTargets({ controller }) {
   const [saved, setSaved] = useState(false);
   const lock = useRef(false);
   const hasGoals = GOAL_FIELDS.some(([key]) => goals[key] != null);
+  const calorieDifference = maintenanceDifference(goals);
   async function submit(event) {
     event.preventDefault();
     if (lock.current) return;
@@ -83,6 +91,7 @@ export function DailyNutritionTargets({ controller }) {
                 }} />
             </label>)}
           </div>
+          <p>Maintenance calories are your estimated weight-maintaining intake. The meal planner compares meals with your calorie target.</p>
           <p>Leave a field blank if you don’t want a target for it.</p>
           <div className="nutrition-targets-actions">
             <button type="submit">{busy ? 'Saving…' : 'Save targets'}</button>
@@ -95,6 +104,15 @@ export function DailyNutritionTargets({ controller }) {
           <dt>{label}</dt><dd>{goals[key] == null ? 'Not set' : <>{formatMacro(goals[key])} <small>{unit}/day</small></>}</dd>
         </div>)}
       </dl>}
+      {!editing && calorieDifference != null && (
+        <p className="nutrition-targets-balance">
+          {calorieDifference > 0
+            ? `Planned deficit: ${formatMacro(calorieDifference)} kcal/day below maintenance.`
+            : calorieDifference < 0
+              ? `Planned surplus: ${formatMacro(Math.abs(calorieDifference))} kcal/day above maintenance.`
+              : 'Your calorie target matches your maintenance calories.'}
+        </p>
+      )}
       <p>Fibre is an amount to aim for, not a strict upper limit. Targets are editable starting points.</p>
       {saved && <p role="status">Daily targets saved.</p>}
     </>}

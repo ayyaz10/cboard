@@ -2,7 +2,7 @@
 .nutrition-targets-heading { display: flex; justify-content: space-between; align-items: start; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
 .nutrition-targets h2 { font-size: 1.25rem; font-weight: 800; }
 .nutrition-targets p { font-size: .875rem; line-height: 1.6; margin-top: 8px; }
-.nutrition-targets-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; }
+.nutrition-targets-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(125px, 1fr)); gap: 16px; }
 .nutrition-targets-grid dt, .nutrition-targets-grid label span { display: block; font-size: .875rem; font-weight: 650; margin-bottom: 6px; }
 .nutrition-targets-grid dd { font-size: 1.5rem; font-weight: 750; overflow-wrap: anywhere; }
 .nutrition-targets-grid small { font-size: .8rem; font-weight: 500; }
@@ -12,6 +12,7 @@
 .nutrition-targets button:disabled { opacity: .5; cursor: wait; }
 .nutrition-targets :focus-visible { outline: 3px solid #4f7a2c; outline-offset: 3px; }
 .nutrition-targets-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.nutrition-targets-balance { font-weight: 750; }
 .macro-comparison { margin-top: 10px; font-size: .875rem; }
 .macro-comparison strong { display: block; margin-top: 5px; }
 .macro-comparison[data-status=over] strong { color: #a52b16; }

@@ -1,6 +1,7 @@
 export const GOAL_KEY = 'nutrition:daily-goals:v1';
 export const GOAL_FIELDS = [
-  ['calories', 'Calories', 'kcal'],
+  ['calories', 'Calorie target', 'kcal'],
+  ['maintenanceCalories', 'Maintenance calories', 'kcal'],
   ['protein', 'Protein', 'g'],
   ['carbs', 'Carbs', 'g'],
   ['fat', 'Fat', 'g'],
@@ -37,6 +38,11 @@ export function compareGoal(total, target, key) {
 }
 
 export const formatMacro = (value) => new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(value);
+
+export function maintenanceDifference(goals) {
+  if (goals.calories == null || goals.maintenanceCalories == null) return null;
+  return goals.maintenanceCalories - goals.calories;
+}
 export function comparisonText(comparison, unit) {
   const amount = comparison.amount > 0 && comparison.amount < 0.1 ? '<0.1' : formatMacro(comparison.amount ?? 0);
   switch (comparison.status) {
