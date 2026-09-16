@@ -15,6 +15,7 @@ import {
 } from './proteinIntakeMath';
 
 const scenarioColours = ['bg-[#fff0b8]', 'bg-[#9fe3ff]', 'bg-[#c5ff6f]'];
+const proteinReferenceVideoUrl = 'https://youtu.be/j1bx0GMofYw?si=M9_h8M_zO2tqoSew';
 
 function ProteinResultPanel({ result }) {
   return (
@@ -154,6 +155,22 @@ export function ProteinIntakeCalculator() {
         <p className="mt-4 text-sm font-medium leading-6 text-black/60">
           These are bodyweight-based estimates. Training, total calories, health, and personal response can change the amount that suits you.
         </p>
+        <div className="mt-5 flex flex-col gap-3 rounded-[1.35rem] border-2 border-black bg-[#fff0b8] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-black/55">Video reference</p>
+            <p className="mt-1 text-base font-bold leading-6 text-black">
+              You&apos;re Wasting Your Money On Protein (NEW RESEARCH)
+            </p>
+          </div>
+          <a
+            href={proteinReferenceVideoUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex shrink-0 items-center justify-center rounded-full border-2 border-black bg-[#c5ff6f] px-4 py-2.5 text-xs font-bold uppercase tracking-[0.1em] text-black shadow-[3px_3px_0_#000] transition hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_#000] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-black/15"
+          >
+            Watch on YouTube
+          </a>
+        </div>
       </section>
 
       <RecentResultsPanel
