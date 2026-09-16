@@ -1,6 +1,8 @@
 .nutrition-targets { margin: 20px 0; padding: 20px; border: 2px solid #17251b; border-radius: 20px; background: #f4f9e9; color: #17251b; }
 .nutrition-targets-heading, .macro-target-heading, .macro-custom-heading { display: flex; justify-content: space-between; align-items: start; gap: 16px; flex-wrap: wrap; }
 .nutrition-targets-heading { margin-bottom: 16px; }
+.nutrition-targets-heading-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.nutrition-targets-heading-actions a { border: 2px solid #17251b; border-radius: 12px; padding: 10px 14px; background: #c5ff6f; color: #17251b; font-weight: 700; text-decoration: none; }
 .nutrition-targets h2 { font-size: 1.25rem; font-weight: 800; }
 .nutrition-targets p { font-size: .875rem; line-height: 1.6; margin-top: 8px; }
 .nutrition-basics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; }
@@ -67,6 +69,7 @@
 .macro-comparison[data-status=over] progress { accent-color: #b63c22; }
 
 html[data-theme=matrix] .nutrition-targets { border-color: var(--matrix-border); background: var(--matrix-surface); color: var(--matrix-text); box-shadow: 0 0 18px rgba(0,255,65,.13); }
+html[data-theme=matrix] .nutrition-targets-heading-actions a { border-color: var(--matrix-border-strong); background: var(--matrix-accent); color: var(--matrix-accent-text); box-shadow: 0 0 10px rgba(0,255,65,.24); }
 html[data-theme=matrix] .macro-target-card { border-color: var(--matrix-border); background: #020d04; box-shadow: inset 0 0 0 1px rgba(0,255,65,.1); }
 html[data-theme=matrix] .macro-custom-panel, html[data-theme=matrix] .macro-target-result { border-color: var(--matrix-border); background: var(--matrix-surface-raised); color: var(--matrix-text); }
 html[data-theme=matrix] .macro-target-item { border-color: var(--matrix-border-strong); color: var(--matrix-text); box-shadow: inset 0 0 12px rgba(0,255,65,.1); }

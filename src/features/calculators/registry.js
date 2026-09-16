@@ -3,6 +3,7 @@ import { CryptoFuturesCalculator } from './cryptoFutures/CryptoFuturesCalculator
 import { MassCalculator } from './mass/MassCalculator';
 import { PercentageCalculator } from './percentage/PercentageCalculator';
 import { PositionSizeCalculator } from './positionSize/PositionSizeCalculator';
+import { ProteinIntakeCalculator } from './proteinIntake/ProteinIntakeCalculator';
 
 export const calculators = [
   {
@@ -72,6 +73,25 @@ export const calculators = [
     },
     showReferenceCards: true,
     component: MassCalculator,
+  },
+  {
+    id: 'protein-intake',
+    path: '/calculators/protein-intake',
+    name: 'Protein Intake Calculator',
+    boardLabel: 'Calculator 05',
+    boardColor: '#c5ff6f',
+    boardDescription: 'Estimate daily protein for three muscle-gain confidence ranges from body weight.',
+    description: 'Enter your weight in kilograms or pounds to compare three daily protein intake ranges.',
+    formula: [
+      'daily protein = body weight in pounds x grams per pound',
+      'ranges: 0.55-0.63, 0.64-0.72, and 0.73-1.00 g/lb',
+    ],
+    example: {
+      total: '160 lb body weight',
+      desired: 'Calculated ranges: 88-101g, 102-115g, and 117-160g per day',
+    },
+    showReferenceCards: true,
+    component: ProteinIntakeCalculator,
   },
   {
     id: 'crypto-futures',

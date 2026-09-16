@@ -10,6 +10,7 @@ import {
   maintenanceDifference,
 } from './nutritionGoals';
 import { MacroTargetCard } from './MacroTargetCard';
+import { getAppHref } from '../../app/useRoute';
 import './nutritionGoals.css';
 
 const BASIC_FIELDS = GOAL_FIELDS.filter(([key]) =>
@@ -80,9 +81,12 @@ export function DailyNutritionTargets({ controller }) {
         <h2>Daily nutrition targets</h2>
         <p>Your daily goals, shared across your meal planner, recipes and groceries.</p>
       </div>
-      {!loading && !error && !editing && <button type="button" onClick={() => {
-        setDraft({ ...goals }); setEditing(true); setSaved(false); setSaveError('');
-      }}>{hasGoals ? 'Edit targets' : 'Set targets'}</button>}
+      <div className="nutrition-targets-heading-actions">
+        <a href={getAppHref('/calculators/protein-intake')}>Protein calculator</a>
+        {!loading && !error && !editing && <button type="button" onClick={() => {
+          setDraft({ ...goals }); setEditing(true); setSaved(false); setSaveError('');
+        }}>{hasGoals ? 'Edit targets' : 'Set targets'}</button>}
+      </div>
     </div>
     {loading ? <p role="status">Loading targets…</p> : error ? <p role="alert">{error} <button type="button" onClick={load}>Retry targets</button></p> : <>
       {editing ? <form onSubmit={submit}>
