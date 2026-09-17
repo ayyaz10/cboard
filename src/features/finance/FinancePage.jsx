@@ -51,7 +51,19 @@ function Overview({data,month,setMonth,setTab,openTransaction}) {
   const recent=[...s.transactions].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);
   return <div className="f-grid"><div className="f-between"><div className="f-actions"><button className={btn} onClick={()=>setMonth(shiftMonth(month,-1))} aria-label="Previous month">←</button><span className="f-month">{new Date(`${month}-15`).toLocaleDateString([],{month:'long',year:'numeric'})}</span><button className={btn} onClick={()=>setMonth(shiftMonth(month,1))} aria-label="Next month">→</button></div><button className={btn} onClick={()=>setMonth(monthKey())}>Current month</button></div>
     <div className="f-grid f-stats"><Stat label="Income" amount={s.income} currency={currency} tone="green"/><Stat label="Spent" amount={s.expenses} currency={currency}/><Stat label="Remaining" amount={s.remaining} currency={currency} tone={s.remaining>=0?'blue':'pink'}/><Stat label="Savings rate" text={`${(s.savingsRate/100).toFixed(1)}%`} tone="amber"/><Stat label="Donations" amount={s.donations} currency={currency}/><Stat label="Invested" amount={s.investments} currency={currency}/><Stat label="Debt outstanding" amount={debts.outstanding} currency={currency}/><Stat label="Budget used" text={`${(s.budgetUsed/100).toFixed(1)}%`}/></div>
-    <p className="f-card text-center font-semibold"><Money amount={s.income} currency={currency}/> income − <Money amount={s.expenses} currency={currency}/> expenses − <Money amount={s.donations} currency={currency}/> donations − <Money amount={s.investments} currency={currency}/> investments − <Money amount={s.debtPayments} currency={currency}/> debt = <Money amount={s.remaining} currency={currency} className={s.remaining<0?'f-negative':'f-positive'}/></p>
+    <section className="f-card f-cashflow" aria-labelledby="finance-breakdown-title">
+      <div className="f-cashflow-detail">
+        <h3 id="finance-breakdown-title">Monthly breakdown</h3>
+        <dl className="f-cashflow-lines">
+          {[['Income',s.income,'+'],['Expenses',s.expenses,'−'],['Donations',s.donations,'−'],['Investments',s.investments,'−'],['Debt payments',s.debtPayments,'−']].map(([label,amount,sign])=><div key={label} className={`f-cashflow-line${amount===0?' f-cashflow-zero':''}`}><dt><span className="f-cashflow-sign" aria-hidden="true">{sign}</span>{label}</dt><dd><Money amount={amount} currency={currency}/></dd></div>)}
+        </dl>
+      </div>
+      <div className={`f-cashflow-result${s.remaining<0?' f-cashflow-shortfall':''}`}>
+        <p className="f-cashflow-label">{s.remaining<0?'Over income':'Money remaining'}</p>
+        <p className="f-cashflow-total"><Money amount={Math.abs(s.remaining)} currency={currency}/></p>
+        <p className="f-cashflow-caption">{s.remaining<0?'Your outgoings exceed this month’s income.':'After all the outgoings shown here.'}</p>
+      </div>
+    </section>
     <div className="f-grid f-section-grid"><section className="f-card"><div className="f-between"><h2>Recent transactions</h2><button className={btn} onClick={()=>setTab('transactions')}>View all</button></div>{recent.length?<div className="f-list mt-4">{recent.map(t=><div className="f-between" key={t.id}><div><p className="f-item-title">{t.title}</p><p className="f-meta">{typeLabels[t.type]} · {t.date}</p></div><Money amount={t.amount} currency={currency}/></div>)}</div>:<Empty>No activity yet. Add your first transaction to see this month clearly.</Empty>}</section>
       <section className="f-card"><div className="f-between"><h2>Savings goals</h2><button className={btn} onClick={()=>setTab('goals')}>Open goals</button></div>{goals.length?<div className="f-list mt-4">{goals.map(g=>{const p=goalProjection(g);return <div key={g.id}><div className="f-between"><strong>{g.title}</strong><span>{(p.percent/100).toFixed(0)}%</span></div><Progress value={p.percent}/></div>})}</div>:<Empty>Create a goal for an emergency fund, holiday, or something important.</Empty>}</section></div>
     <button className="f-primary" onClick={()=>openTransaction()}>＋ Add transaction <kbd className="f-kbd">N</kbd></button>
