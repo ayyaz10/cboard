@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { AppBoard } from '../components/pages/AppBoard';
 import { AuthPage } from '../components/pages/AuthPage';
 import { LandingPage } from '../components/pages/LandingPage';
@@ -20,6 +20,7 @@ import { Recipes } from '../features/recipes/Recipes';
 import { Groceries } from '../features/groceries/Groceries';
 import { WeightProgress } from '../features/weightProgress/WeightProgress.jsx';
 import { FinancePage } from '../features/finance/FinancePage.jsx';
+const Training = lazy(() => import('../features/training/Training.jsx').then(module => ({ default: module.Training })));
 
 export default function App() {
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -138,6 +139,7 @@ export default function App() {
   if (route === '/weight-progress') return <WeightProgress key={user.id} />;
 
   if (route === '/finance') return <FinancePage key={user.id} />;
+  if (route === '/training') return <Suspense fallback={<main className="panel m-6 p-6" role="status">Loading Training…</main>}><Training key={user.id} /></Suspense>;
 
   if (route === '/recipes' || route.startsWith('/recipes/')) {
     return <Recipes key={user.id} route={route} />;

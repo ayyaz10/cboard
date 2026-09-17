@@ -4,6 +4,8 @@ C Board is a clean, responsive control board built with React/Vite. It collects 
 
 ## Apps
 
+- `Training` — calisthenics, strength, skills and recovery tracking. See [setup, storage and verification](./TRAINING.md), including the required Supabase migration.
+
 - `Calculator Tools`
   - Percentage Calculator
   - Calorie Calculator

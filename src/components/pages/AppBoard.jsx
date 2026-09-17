@@ -3,6 +3,11 @@ import { PageShell } from '../layout/PageShell';
 
 const appSections = [
   {
+    id: 'training', path: '/training', label: 'Strength · skill · recovery', name: 'Training',
+    description: 'Start your session, log a set in one tap, and build clean, consistent progress.',
+    color: '#c5ff6f', colorKey: 'lime', countLabel: 'Calisthenics tracker',
+  },
+  {
     id: 'weight-progress', path: '/weight-progress', label: 'Your personal progress', name: 'Weight Progress',
     description: 'Log weigh-ins, follow your weight trend, and compare private progress photos.',
     color: '#ff90e8', colorKey: 'pink', countLabel: 'Weight & photos',
