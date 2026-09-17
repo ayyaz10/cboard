@@ -6,7 +6,7 @@ The four-day, two-week re-entry schedule is seeded on first successful cloud loa
 
 ## Database setup
 
-Apply `supabase/migrations/202609170001_training.sql` to the existing Supabase project before opening Training. Use the Supabase SQL editor, or run `supabase db push` in an authenticated, linked CLI environment after reviewing its migration list. This development session could not authenticate to the linked database, so the migration has **not** been applied remotely.
+Migration `supabase/migrations/202609170001_training.sql` is applied to the linked **ControlBoard** Supabase project (`oslhmrtxyjbjbhhrckky`). The SQL and migration-history entry `202609170001` were committed atomically through the authenticated Management API. Live verification confirmed the table, enabled RLS, all three ownership policies, authenticated read/insert/update privileges, and denied anonymous access. No further database setup is needed for this project. For a new Supabase project, apply this migration after the existing schema.
 
 The new `training_workspaces` table stores a versioned aggregate per authenticated user. Its primary key indexes the user lookup. RLS permits only the owner to read, insert or update; anonymous access is denied. Plans, library, symptoms, settings and session snapshots are updated atomically. Optimistic revisions prevent silently overwriting another device's work. Existing tables and authentication are unchanged.
 
@@ -40,7 +40,7 @@ Video attachments are HTTP(S) links to existing videos; binary video hosting is 
 
 ## Verification
 
-Verified on 2026-09-17: **168/168 Node tests pass**, including 17 focused Training tests; the production build passes; Prettier checks and strict model type-checking pass; browser workflow and isolated PostgreSQL/RLS checks pass. Browser checks also cover next-morning symptom entry, confirmed progression, duplicate-progression prevention, cloud conflicts and cross-tab protection. The existing Vite large-chunk and mixed-import warnings remain; Training itself is lazy-loaded as a separate approximately 21 KB gzip JavaScript bundle. Live Supabase migration deployment was not verified because database authentication was unavailable.
+Verified on 2026-09-17: **168/168 Node tests pass**, including 17 focused Training tests; the production build passes; Prettier checks and strict model type-checking pass; browser workflow and isolated PostgreSQL/RLS checks pass. Browser checks also cover next-morning symptom entry, confirmed progression, duplicate-progression prevention, cloud conflicts and cross-tab protection. The existing Vite large-chunk and mixed-import warnings remain; Training itself is lazy-loaded as a separate approximately 21 KB gzip JavaScript bundle. The migration was subsequently applied to live Supabase and its table, migration history, policies and grants were verified.
 
 No runtime dependencies were added. The existing repository has a build command and Node tests, but no configured formatter, lint or type-check scripts. Prettier and TypeScript were run from temporary QA tooling against the new feature and models.
 
