@@ -23,7 +23,7 @@ export function RecipeJsonGuide() {
         <li>Copy the JSON ChatGPT returns. Paste it into <strong>Paste Recipe JSON</strong> below, without any surrounding explanation or code fences.</li>
         <li>Select <strong>Preview Recipe</strong>, check the ingredients, portions and nutrition, optionally add a photo, then save.</li>
       </ol>
-      <p className="text-sm leading-6">Unknown nutrition stays blank. Check whether the macros are per serving or for the whole recipe: the planner’s 1× uses the listed values. You can fill missing fibre from the recipe page after saving.</p>
+      <p className="text-sm leading-6">The prompt requests calories, protein, carbs, fat and fibre for every ingredient’s listed quantity, plus recipe totals. Estimates must be labeled in the notes; unresolved values stay blank. Check the quantities, sources and per-serving or whole-recipe basis before saving: the planner’s 1× uses the listed recipe values.</p>
       <div className="flex flex-wrap gap-3">
         <button type="button" onClick={copy} className="rounded-full border-2 border-black bg-[#c5ff6f] px-4 py-2 font-bold">Copy ChatGPT prompt</button>
         <a download="cboard-recipe-prompt.txt" href={`data:text/plain;charset=utf-8,${encodeURIComponent(prompt)}`} className="rounded-full border-2 border-black bg-white px-4 py-2 font-bold">Download prompt</a>

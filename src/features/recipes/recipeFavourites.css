@@ -1,0 +1,9 @@
+.recipe-favourite{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:46px;height:46px;border:2px solid #111;border-radius:50%;background:#fffdf8;color:#555;transition:background-color .15s,color .15s}
+.recipe-favourite[aria-pressed=true]{background:#ffe6ef;color:#a81148}
+.recipe-favourite:hover{background:#fff0f5;color:#a81148}
+.recipe-favourite:focus-visible{outline:3px solid #6650ba;outline-offset:4px}
+.recipe-favourite:disabled{opacity:.6;cursor:wait}
+html[data-theme="matrix"] .recipe-favourite{background:var(--matrix-surface);border-color:var(--matrix-border);color:var(--matrix-text)}
+html[data-theme="matrix"] .recipe-favourite[aria-pressed=true],html[data-theme="matrix"] .recipe-favourite:hover{background:var(--matrix-surface-soft);color:var(--matrix-accent)}
+html[data-theme="matrix"] .recipe-favourite:focus-visible{outline-color:var(--matrix-accent)}
+@media(prefers-reduced-motion:reduce){.recipe-favourite{transition:none}}

@@ -4,6 +4,7 @@ import { formatIngredient } from './recipeData';
 import { RecipeSource } from './RecipeSource';
 import { RecipeGroceries } from '../groceries/RecipeGroceries';
 import { useRecipeCardGrid } from './RecipeCardView';
+import { RecipeFavouriteButton } from './RecipeFavouriteButton';
 
 export const secondaryButton =
   'inline-flex items-center justify-center rounded-full border-2 border-black bg-white px-4 py-2 text-sm font-bold text-black transition hover:-translate-y-px focus-visible:outline-offset-4 disabled:opacity-50';
@@ -166,14 +167,14 @@ export function RecipeSteps({ steps }) {
   );
 }
 
-export function RecipePage({ recipe, preview = false, onRecipeUpdated }) {
+export function RecipePage({ recipe, preview = false, onRecipeUpdated, favourite = false, favouritePending = false, onToggleFavourite }) {
   return (
     <article className="space-y-5 break-words text-black">
       <section className="grid gap-5 lg:grid-cols-[minmax(15rem,0.75fr)_minmax(0,1.25fr)] lg:items-stretch">
         <RecipeImage image={recipe.image} title={recipe.title} large />
         <div className="space-y-4 rounded-[1.35rem] border-2 border-black bg-white p-5">
           <header className="space-y-2">
-            <span className="pill">{recipe.mealType}</span>
+            <div className="flex items-center justify-between gap-3"><span className="pill">{recipe.mealType}</span>{!preview && <RecipeFavouriteButton recipe={recipe} favourite={favourite} pending={favouritePending} onToggle={onToggleFavourite}/>}</div>
             <h1 className="text-3xl font-bold tracking-[-0.04em] sm:text-4xl">
               {recipe.title}
             </h1>
@@ -243,12 +244,12 @@ export function RecipePage({ recipe, preview = false, onRecipeUpdated }) {
   );
 }
 
-export function RecipeCard({ recipe }) {
+export function RecipeCard({ recipe, favourite = false, favouritePending = false, onToggleFavourite }) {
   return (
     <article className="recipe-card panel flex min-w-0 flex-col gap-4 border-black p-5 text-black">
       <RecipeImage image={recipe.image} title={recipe.title} />
       <div>
-        <span className="pill">{recipe.mealType}</span>
+        <div className="flex items-center justify-between gap-3"><span className="pill">{recipe.mealType}</span><RecipeFavouriteButton recipe={recipe} favourite={favourite} pending={favouritePending} onToggle={onToggleFavourite}/></div>
         <h2 className="mt-3 break-words text-2xl font-bold">{recipe.title}</h2>
       </div>
       {recipe.description && (

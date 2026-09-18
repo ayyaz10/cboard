@@ -1,5 +1,6 @@
 import { DailyNutritionTargets, useNutritionGoals } from '../nutrition/DailyNutritionTargets';
 import { useEffect, useRef, useState } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 import { navigateTo, getAppHref } from '../../app/useRoute';
 import { PageShell } from '../../components/layout/PageShell';
 import { AppNavigation } from '../../components/layout/AppNavigation';
@@ -9,6 +10,8 @@ import {
   saveRecipe,
   saveRecipeBatch,
   deleteRecipe,
+  getRecipeFavourites,
+  setRecipeFavourite,
 } from '../../services/recipeService';
 import {
   RecipeCard,
@@ -35,6 +38,7 @@ export function Recipes({ route }) {
 }
 
 function RecipesContent({ route }) {
+  const { user } = useAuth();
   const cardGrid = useRecipeCardGrid();
   const nutritionGoals = useNutritionGoals();
   const [recipes, setRecipes] = useState([]);
@@ -42,6 +46,12 @@ function RecipesContent({ route }) {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
+  const [favourites, setFavourites] = useState(new Set());
+  const [favouritesOnly, setFavouritesOnly] = useState(false);
+  const [favouritePending, setFavouritePending] = useState(new Set());
+  const [favouriteError, setFavouriteError] = useState('');
+  const [favouriteNotice, setFavouriteNotice] = useState('');
+  const favouriteLocks = useRef(new Set());
   const [draft, setDraft] = useState(null);
   const [removing, setRemoving] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -51,7 +61,9 @@ function RecipesContent({ route }) {
     setLoading(true);
     setError('');
     try {
-      setRecipes(await getRecipes());
+      const [loadedRecipes, loadedFavourites] = await Promise.all([getRecipes(), getRecipeFavourites()]);
+      setRecipes(loadedRecipes);
+      setFavourites(new Set(loadedFavourites));
     } catch (error) {
       setError(error.message || 'Could not load recipes. Please try again.');
     } finally {
@@ -64,6 +76,26 @@ function RecipesContent({ route }) {
   useEffect(() => {
     if (removing) dialog.current?.showModal();
   }, [removing]);
+  async function toggleFavourite(item) {
+    if (favouriteLocks.current.has(item.slug)) return;
+    favouriteLocks.current.add(item.slug);
+    const next = !favourites.has(item.slug);
+    const update = (values, selected) => { const copy = new Set(values); if (selected) copy.add(item.slug); else copy.delete(item.slug); return copy; };
+    setFavouritePending(values => update(values, true));
+    setFavourites(values => update(values, next));
+    setFavouriteError('');
+    setFavouriteNotice('');
+    try {
+      await setRecipeFavourite(item.slug, next, user.id);
+      setFavouriteNotice(`${item.title} ${next ? 'added to' : 'removed from'} favourites.`);
+    } catch (error) {
+      setFavourites(values => update(values, !next));
+      setFavouriteError(error.message || 'Could not save your favourite. Tap the heart to try again.');
+    } finally {
+      favouriteLocks.current.delete(item.slug);
+      setFavouritePending(values => update(values, false));
+    }
+  }
   const parts = route.replace(/\/$/, '').split('/').filter(Boolean);
   const manage = parts.length === 2 && parts[1] === 'manage';
   const importing = parts.length === 2 && parts[1] === 'import';
@@ -102,6 +134,7 @@ function RecipesContent({ route }) {
         current.filter((item) => item.slug !== removing.slug),
       );
       setRemoving(null);
+      setFavourites(current => { const next = new Set(current); next.delete(removing.slug); return next; });
     } catch (error) {
       setError(error.message || 'Could not delete recipe. Please try again.');
       setRemoving(null);
@@ -116,6 +149,7 @@ function RecipesContent({ route }) {
     setDraft(null);
     setSearch('');
     setCategory('All');
+    setFavouritesOnly(false);
     navigateTo('/recipes');
     window.scrollTo(0, 0);
   }
@@ -132,6 +166,7 @@ function RecipesContent({ route }) {
   const filtered = recipes.filter(
     (item) =>
       (category === 'All' || item.mealType === category) &&
+      (!favouritesOnly || favourites.has(item.slug)) &&
       [
         item.title,
         ...item.ingredients.map((ingredient) => ingredient.name),
@@ -147,6 +182,8 @@ function RecipesContent({ route }) {
         <AppNavigation activePath="/recipes" />
         <DailyNutritionTargets controller={nutritionGoals} />
         <RecipeCardViewControl />
+        {favouriteError && <p role="alert" className="rounded-xl border-2 border-black bg-[#ffe0de] p-3 text-sm font-semibold">{favouriteError}</p>}
+        <p role="status" className="sr-only">{favouriteNotice}</p>
         {!home && !importing && (
           <RecipeLink to="/recipes">← Recipes</RecipeLink>
         )}
@@ -242,6 +279,10 @@ function RecipesContent({ route }) {
                         </select>
                       </label>
                     </div>
+                    <div className="flex flex-wrap gap-3" aria-label="Recipe filters">
+                      <button type="button" className={`${secondaryButton.replace('bg-white', '')} min-h-11 ${!favouritesOnly ? 'bg-[#c5ff6f]' : 'bg-white'}`} aria-pressed={!favouritesOnly} onClick={() => setFavouritesOnly(false)}>All recipes</button>
+                      <button type="button" className={`${secondaryButton.replace('bg-white', '')} min-h-11 ${favouritesOnly ? 'bg-[#c5ff6f]' : 'bg-white'}`} aria-pressed={favouritesOnly} onClick={() => setFavouritesOnly(true)}><span aria-hidden="true" className="mr-2">♥</span>Favourites ({recipes.filter(item => favourites.has(item.slug)).length})</button>
+                    </div>
                     <p role="status" className="text-sm text-black/70">
                       {filtered.length} recipe{filtered.length === 1 ? '' : 's'}
                     </p>
@@ -251,7 +292,7 @@ function RecipesContent({ route }) {
                           key={item.slug}
                           className="flex min-w-0 flex-col gap-3"
                         >
-                          <RecipeCard recipe={item} />
+                          <RecipeCard recipe={item} favourite={favourites.has(item.slug)} favouritePending={favouritePending.has(item.slug)} onToggleFavourite={toggleFavourite} />
                           {manage && (
                             <div className="flex flex-wrap gap-2">
                               <button
@@ -273,6 +314,7 @@ function RecipesContent({ route }) {
                               </button>
                               <button
                                 className={secondaryButton}
+                                disabled={favouritePending.has(item.slug)}
                                 onClick={() => setRemoving(item)}
                               >
                                 Delete
@@ -284,7 +326,7 @@ function RecipesContent({ route }) {
                     </div>
                     {!filtered.length && (
                       <p className="py-8 text-center">
-                        No matching recipes. Try another search or meal type.
+                        {favouritesOnly ? 'No favourites match this view. Tap a recipe’s heart in All recipes to save it here, or clear your search and meal type.' : 'No matching recipes. Try another search or meal type.'}
                       </p>
                     )}
                   </>
@@ -342,7 +384,7 @@ function RecipesContent({ route }) {
             )}
             {!error && recipe && parts.length === 2 && (
               <>
-                <RecipePage recipe={recipe} onRecipeUpdated={(updated) => setRecipes((current) => current.map((item) => item.slug === updated.slug ? updated : item))} />
+                <RecipePage recipe={recipe} favourite={favourites.has(recipe.slug)} favouritePending={favouritePending.has(recipe.slug)} onToggleFavourite={toggleFavourite} onRecipeUpdated={(updated) => setRecipes((current) => current.map((item) => item.slug === updated.slug ? updated : item))} />
                 <button
                   className={secondaryButton}
                   onClick={() => startImport(recipe, true)}

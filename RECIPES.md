@@ -6,6 +6,8 @@ Recipes uses the existing React/JavaScript architecture, base-aware History API 
 
 ## Add a recipe
 
+Tap the **heart** on a saved recipe card or recipe page to add/remove it from your favourites. Choose **Favourites** in the library or management view to filter the list; search and meal-type filters still apply. Hearts have keyboard support and phone-sized touch targets in both themes. Favourites sync to the signed-in account using separate `recipe-favourite:v1:<slug>` rows in the existing RLS-protected `user_tool_preferences` table, so recipe edits do not reset them and no migration is needed. Deleting a recipe removes its favourite marker in the same database operation. Failed saves revert the heart and show an error. Favourite markers are personal preferences and are not part of imported recipe JSON.
+
 1. Open **Recipes → Add Recipe**.
 2. Paste one JSON object or an array of recipe objects from ChatGPT, or upload a `.json` file (up to 2 MB total and 256 KB per recipe).
 3. Optionally upload/drop a JPG, PNG or WebP photo (up to 5 MB).
@@ -84,7 +86,7 @@ Ingredient/option objects contain required `name`, optional `amount` (non-negati
 
 Imported HTML is displayed as plain text through React. Unknown fields are discarded, including imported image URLs, event handlers and account IDs. Upload photos separately. The schema describes the supported document; runtime validation additionally checks whitespace-only values and alternative references. Arrays are limited to 100 entries, general text to 4000 characters, titles/names to 200, and categories/tags/slugs to 100. Error messages identify the relevant field.
 
-Suggested ChatGPT prompt: “Create one CBoard recipe JSON object using schemaVersion 1 with title, mealType, ingredients and steps. Include alternatives as named groups referenced by ingredient.alternativeGroup. Use only known nutrition/quantities; omit unknown values. No Markdown fences, image URLs, or executable content.”
+Use the app's **Copy ChatGPT prompt** or [the complete conversion prompt](./src/features/recipes/recipe-conversion-prompt.txt). It requests a five-key `nutrition` object for every ingredient, scaled to its listed whole-recipe quantity, and separately labeled recipe-level totals. Supplied labels take priority; generic estimates must be identified in ingredient notes with their assumptions. Material ambiguities require clarification, and incomplete nutrient sums must not be presented as complete totals. The prompt uses only fields accepted by the existing importer.
 
 ## Starter content
 

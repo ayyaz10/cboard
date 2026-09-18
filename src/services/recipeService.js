@@ -7,6 +7,31 @@ import { isRecipeImage } from '../features/recipes/recipeImage';
 import { requireSupabase } from '../lib/supabaseClient';
 
 const PREFIX = 'recipe:v1:';
+const FAVOURITE_PREFIX = 'recipe-favourite:v1:';
+
+export async function getRecipeFavourites() {
+  const { client, userId } = await getUserScopedClient();
+  const slugs = [];
+  for (let from = 0; ; from += 100) {
+    const result = await client.from('user_tool_preferences').select('key,value')
+      .eq('user_id', userId).like('key', `${FAVOURITE_PREFIX}%`).order('key').range(from, from + 99);
+    assertSupabaseResult(result);
+    for (const row of result.data) if (row.value === true) slugs.push(row.key.slice(FAVOURITE_PREFIX.length));
+    if (result.data.length < 100) return slugs;
+  }
+}
+
+export async function setRecipeFavourite(slug, favourite, expectedUserId) {
+  if (typeof slug !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug) || typeof favourite !== 'boolean')
+    throw new Error('Invalid recipe favourite.');
+  const { client, userId } = await getUserScopedClient();
+  if (userId !== expectedUserId) throw new Error('Your account changed. Reload Recipes before saving.');
+  const key = `${FAVOURITE_PREFIX}${slug}`;
+  const result = favourite
+    ? await client.from('user_tool_preferences').upsert({ user_id: userId, key, value: true, updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' })
+    : await client.from('user_tool_preferences').delete().eq('user_id', userId).eq('key', key);
+  assertSupabaseResult(result);
+}
 
 export async function saveRecipeFibre(recipe, fibreSource) {
   const { client, userId } = await getUserScopedClient();
@@ -112,7 +137,7 @@ export async function deleteRecipe(slug) {
     .from('user_tool_preferences')
     .delete()
     .eq('user_id', userId)
-    .eq('key', `${PREFIX}${slug}`);
+    .in('key', [`${PREFIX}${slug}`, `${FAVOURITE_PREFIX}${slug}`]);
   assertSupabaseResult(result);
 }
 
