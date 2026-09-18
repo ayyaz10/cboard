@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { getPreference, setPreference } from '../../services/preferenceService';
 import {
   GOAL_KEY,
@@ -16,6 +16,7 @@ import './nutritionGoals.css';
 const BASIC_FIELDS = GOAL_FIELDS.filter(([key]) =>
   ['calories', 'maintenanceCalories', 'fiber'].includes(key),
 );
+const COLLAPSED_KEY = 'cboard-nutrition-targets-collapsed';
 
 export function useNutritionGoals() {
   const [goals, setGoals] = useState(emptyGoals);
@@ -50,6 +51,17 @@ export function useNutritionGoals() {
 
 export function DailyNutritionTargets({ controller }) {
   const { goals, loading, error, load, save } = controller;
+  const contentId = useId();
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return window.localStorage.getItem(COLLAPSED_KEY) === 'true'; }
+    catch { return false; }
+  });
+  function toggleCollapsed() {
+    const next = !collapsed;
+    setCollapsed(next);
+    try { window.localStorage.setItem(COLLAPSED_KEY, String(next)); }
+    catch { /* The control still works when browser storage is unavailable. */ }
+  }
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(emptyGoals);
   const [busy, setBusy] = useState(false);
@@ -75,19 +87,26 @@ export function DailyNutritionTargets({ controller }) {
       setBusy(false);
     }
   }
-  return <section className="nutrition-targets" aria-label="Daily nutrition targets">
+  return <section className="nutrition-targets" data-collapsed={collapsed} aria-label="Daily nutrition targets">
     <div className="nutrition-targets-heading">
       <div>
         <h2>Daily nutrition targets</h2>
-        <p>Your daily goals, shared across your meal planner, recipes and groceries.</p>
+        {!collapsed && <p>Your daily goals, shared across your meal planner, recipes and groceries.</p>}
+        {collapsed && <p>{editing ? 'Your unsaved edits are kept. Maximise to continue.' : loading ? 'Loading targets…' : error ? 'Targets unavailable. Maximise to retry.' : goals.calories != null ? `${formatMacro(goals.calories)} kcal/day · maximise for all targets` : 'Maximise to view or set your daily goals.'}</p>}
       </div>
       <div className="nutrition-targets-heading-actions">
-        <a href={getAppHref('/calculators/protein-intake')}>Protein calculator</a>
-        {!loading && !error && !editing && <button type="button" onClick={() => {
+        {!collapsed && <a href={getAppHref('/calculators/protein-intake')}>Protein calculator</a>}
+        {!collapsed && !loading && !error && !editing && <button type="button" onClick={() => {
           setDraft({ ...goals }); setEditing(true); setSaved(false); setSaveError('');
         }}>{hasGoals ? 'Edit targets' : 'Set targets'}</button>}
+        <button type="button" className="nutrition-targets-toggle" aria-expanded={!collapsed} aria-controls={contentId}
+          aria-label={`${collapsed ? 'Maximise' : 'Minimise'} daily nutrition targets`} onClick={toggleCollapsed}>
+          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={collapsed ? 'm6 9 6 6 6-6' : 'm6 15 6-6 6 6'} /></svg>
+          {collapsed ? 'Maximise' : 'Minimise'}
+        </button>
       </div>
     </div>
+    <div id={contentId} hidden={collapsed}>
     {loading ? <p role="status">Loading targets…</p> : error ? <p role="alert">{error} <button type="button" onClick={load}>Retry targets</button></p> : <>
       {editing ? <form onSubmit={submit}>
         <fieldset disabled={busy}>
@@ -130,5 +149,6 @@ export function DailyNutritionTargets({ controller }) {
       <p>Fibre is an amount to aim for, not a strict upper limit. Targets are editable starting points.</p>
       {saved && <p role="status">Daily targets saved.</p>}
     </>}
+    </div>
   </section>;
 }

@@ -1,6 +1,10 @@
 .nutrition-targets { margin: 20px 0; padding: 20px; border: 2px solid #17251b; border-radius: 20px; background: #f4f9e9; color: #17251b; }
 .nutrition-targets-heading, .macro-target-heading, .macro-custom-heading { display: flex; justify-content: space-between; align-items: start; gap: 16px; flex-wrap: wrap; }
 .nutrition-targets-heading { margin-bottom: 16px; }
+.nutrition-targets[data-collapsed=true] .nutrition-targets-heading { margin-bottom: 0; }
+.nutrition-targets .nutrition-targets-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; white-space: nowrap; }
+.nutrition-targets [hidden] { display: none !important; }
+html[data-theme=matrix] .nutrition-targets .nutrition-targets-toggle { border-color: var(--matrix-border); background: var(--matrix-surface-raised); color: var(--matrix-text); }
 .nutrition-targets-heading-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .nutrition-targets-heading-actions a { border: 2px solid #17251b; border-radius: 12px; padding: 10px 14px; background: #c5ff6f; color: #17251b; font-weight: 700; text-decoration: none; }
 .nutrition-targets h2 { font-size: 1.25rem; font-weight: 800; }
