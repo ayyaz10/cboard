@@ -271,6 +271,111 @@
           "type": "string"
         }
       }
+    },
+    "productNutrition": {
+      "type": "object",
+      "description": "App-managed product label choices; nutrition is recalculated per serving.",
+      "required": [
+        "basis",
+        "items"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "basis": {
+          "type": "string"
+        },
+        "items": {
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "quantity",
+                  "unit",
+                  "nutrition"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "quantity": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "unit": {
+                    "enum": [
+                      "g",
+                      "ml",
+                      "pieces"
+                    ]
+                  },
+                  "nutrition": {
+                    "type": "object",
+                    "required": [
+                      "quantity",
+                      "unit"
+                    ],
+                    "properties": {
+                      "quantity": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      "unit": {
+                        "enum": [
+                          "g",
+                          "ml",
+                          "pieces"
+                        ]
+                      },
+                      "calories": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "protein": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "carbs": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "fat": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "fiber": {
+                        "type": [
+                          "number",
+                          "null"
+                        ],
+                        "minimum": 0
+                      },
+                      "source": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
     }
   },
   "$defs": {

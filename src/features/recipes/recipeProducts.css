@@ -1,0 +1,8 @@
+.recipe-products { min-width: 0; }
+.recipe-products label { display: grid; gap: .35rem; margin-top: .75rem; }
+.recipe-products input, .recipe-products select { width: 100%; min-width: 0; }
+.recipe-product-row { border: 1px solid var(--g-border); padding: 1rem; border-radius: 1rem; min-width: 0; }
+.recipe-product-values { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: .75rem; margin-top: .75rem; }
+.recipe-products .g-tools { flex-wrap: wrap; }
+.recipe-products .g-tools > * { min-width: 0; max-width: 100%; }
+.recipe-products .g-actions { flex-wrap: wrap; }

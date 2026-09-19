@@ -66,7 +66,7 @@ export function RecipeGroceries({ recipe, onRecipeUpdated }) {
           })}
         </div>
       </details>
-      {onRecipeUpdated && <RecipeFibre key={recipe.updatedAt} recipe={recipe} groceries={data} onSaved={onRecipeUpdated} />}
+      {onRecipeUpdated && !recipe.productNutrition && <RecipeFibre key={recipe.updatedAt} recipe={recipe} groceries={data} onSaved={onRecipeUpdated} />}
       <ul>
         {needs.map((need, index) => (
           <li key={index}>

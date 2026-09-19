@@ -1,4 +1,5 @@
 import { normaliseFibreSource, fibreBasis } from './recipeFibre.js';
+import { normalizeProducts, calculateProducts, macroKeys } from './recipeProducts.js';
 import { storedHealthReview } from "../../../supabase/functions/_shared/recipeHealthReview.js";
 export const MAX_JSON_BYTES = 256 * 1024;
 
@@ -202,6 +203,19 @@ export function validateRecipe(data) {
   const source = normaliseFibreSource(data.fibreSource, clean);
   if (source && source.ingredients !== fibreBasis(clean)) clean.nutrition.fiber = null;
   else if (source) clean.fibreSource = source;
+  if (data.productNutrition) {
+    const products = normalizeProducts(data.productNutrition, clean);
+    delete clean.fibreSource;
+    if (products) {
+      clean.productNutrition = products;
+      const calculated = calculateProducts(products.items, clean.servings);
+      clean.nutrition = calculated.perServing;
+      [...clean.ingredients, ...clean.sauces].forEach((item, index) => { item.nutrition = calculated.ingredients[index]; });
+    } else {
+      clean.nutrition = Object.fromEntries(macroKeys.map((key) => [key, null]));
+      [...clean.ingredients, ...clean.sauces].forEach((item) => { item.nutrition = { ...clean.nutrition }; });
+    }
+  }
   return clean;
 }
 

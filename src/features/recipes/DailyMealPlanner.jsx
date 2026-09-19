@@ -105,6 +105,7 @@ export function DailyMealPlanner({ recipes, nutritionGoals }) {
       <header className="space-y-3">
         <span className="pill">Daily meals</span>
         <h1 className="text-4xl font-bold">Daily Meal Planner</h1>
+        <RecipeLink to="/recipes/diary/day">Food diary · log meals & view history</RecipeLink>
         <p className="leading-7 text-black/70">
           Choose your meals to see what you’ll eat and the combined calories,
           protein, carbs, fat and fibre.

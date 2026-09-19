@@ -23,6 +23,7 @@ import {
 import { RecipeImporter } from './RecipeImporter';
 import { formatIngredient } from './recipeData';
 import { DailyMealPlanner } from './DailyMealPlanner';
+import { FoodDiary } from '../diary/FoodDiary';
 import {
   RecipeCardViewProvider,
   RecipeCardViewControl,
@@ -110,6 +111,7 @@ function RecipesContent({ route }) {
   const home = parts.length === 1;
   const planning =
     parts.length === 3 && parts[1] === 'planner' && parts[2] === 'day';
+  const diary = parts.length === 3 && parts[1] === 'diary' && parts[2] === 'day';
   function startImport(initial = null, editing = false) {
     setDraft({ initial, editing, key: crypto.randomUUID() });
     navigateTo('/recipes/import');
@@ -181,7 +183,7 @@ function RecipesContent({ route }) {
       <section className="panel space-y-7 border-black p-5 text-black sm:p-8 lg:p-10">
         <AppNavigation activePath="/recipes" />
         <DailyNutritionTargets controller={nutritionGoals} />
-        <RecipeCardViewControl />
+        {!diary && <RecipeCardViewControl />}
         {favouriteError && <p role="alert" className="rounded-xl border-2 border-black bg-[#ffe0de] p-3 text-sm font-semibold">{favouriteError}</p>}
         <p role="status" className="sr-only">{favouriteNotice}</p>
         {!home && !importing && (
@@ -226,6 +228,7 @@ function RecipesContent({ route }) {
               />
             ) : null}
             {!error && planning && <DailyMealPlanner recipes={recipes} nutritionGoals={nutritionGoals} />}
+            {!error && diary && <FoodDiary recipes={recipes} nutritionGoals={nutritionGoals} />}
             {!error && (home || manage) && (
               <>
                 <header className="flex flex-wrap items-start justify-between gap-4">
@@ -245,6 +248,7 @@ function RecipesContent({ route }) {
                     <RecipeLink to="/recipes/planner/day">
                       Daily Meal Planner
                     </RecipeLink>
+                    <RecipeLink to="/recipes/diary/day">Food diary</RecipeLink>
                     {home && (
                       <RecipeLink to="/recipes/manage">
                         Manage Recipes
@@ -398,6 +402,7 @@ function RecipesContent({ route }) {
               !manage &&
               !importing &&
               !planning &&
+              !diary &&
               !(recipe && parts.length === 2) &&
               !group && (
                 <>

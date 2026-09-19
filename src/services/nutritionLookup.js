@@ -1,3 +1,4 @@
+import { offNutrients } from '../features/nutrition/nutrients.js';
 // Search-a-licious supports broader product-name matching. Browser calls use
 // our authenticated proxy because the upstream search does not allow browser CORS.
 const value = (n) => typeof n === "number" && Number.isFinite(n) && n >= 0 ? n : null;
@@ -23,6 +24,7 @@ export function nutritionProduct(product) {
   const kcal = value(n["energy-kcal_100g"]);
   const kj = value(n["energy-kj_100g"]);
   const nutrition = {
+    ...offNutrients(n),
     quantity: 100,
     // OFF uses *_100g for both weight and volume.
     unit: nutritionUnit(product),

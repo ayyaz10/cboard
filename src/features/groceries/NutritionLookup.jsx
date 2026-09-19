@@ -90,7 +90,7 @@ export function NutritionLookup({ name, active, visible, onSelect }) {
         </label>}
         <div className="g-actions">
           <button type="button" disabled={!unit} onClick={() => {
-            onSelect({ ...product.nutrition, unit, source: { ...product.source, fetchedAt: new Date().toISOString() } });
+            onSelect({ ...product.nutrition, unit, source: { ...product.source, name: [product.name, product.brand].filter(Boolean).join(' · '), fetchedAt: new Date().toISOString() } });
             setResults(null);
           }}>Use these values</button>
           <a href={product.source.url} target="_blank" rel="noreferrer">View product</a>

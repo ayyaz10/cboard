@@ -9,6 +9,24 @@ import { requireSupabase } from '../lib/supabaseClient';
 const PREFIX = 'recipe:v1:';
 const FAVOURITE_PREFIX = 'recipe-favourite:v1:';
 
+export async function saveRecipeProducts(recipe, productNutrition, servings) {
+  const { client, userId } = await getUserScopedClient();
+  const key = `${PREFIX}${recipe.slug}`;
+  const found = await client.from('user_tool_preferences').select('value,updated_at')
+    .eq('user_id', userId).eq('key', key).single();
+  assertSupabaseResult(found);
+  if (!recipe.updatedAt || found.data.updated_at !== recipe.updatedAt)
+    throw new Error('This recipe changed. Reload it before saving nutrition.');
+  const clean = validateRecipe({ ...found.data.value.recipe, productNutrition, servings });
+  if (!clean.productNutrition || !clean.servings) throw new Error('Confirm the ingredients and number of servings before saving.');
+  const result = await client.from('user_tool_preferences').update({
+    value: { ...found.data.value, recipe: clean }, updated_at: new Date().toISOString(),
+  }).eq('user_id', userId).eq('key', key).eq('updated_at', found.data.updated_at).select('updated_at').maybeSingle();
+  assertSupabaseResult(result);
+  if (!result.data) throw new Error('This recipe changed while saving. Reload it and try again.');
+  return { ...clean, image: found.data.value.image || null, updatedAt: result.data.updated_at };
+}
+
 export async function getRecipeFavourites() {
   const { client, userId } = await getUserScopedClient();
   const slugs = [];

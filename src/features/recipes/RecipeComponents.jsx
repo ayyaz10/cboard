@@ -5,6 +5,7 @@ import { RecipeSource } from './RecipeSource';
 import { RecipeGroceries } from '../groceries/RecipeGroceries';
 import { useRecipeCardGrid } from './RecipeCardView';
 import { RecipeFavouriteButton } from './RecipeFavouriteButton';
+import { RecipeProducts } from './RecipeProducts.jsx';
 
 export const secondaryButton =
   'inline-flex items-center justify-center rounded-full border-2 border-black bg-white px-4 py-2 text-sm font-bold text-black transition hover:-translate-y-px focus-visible:outline-offset-4 disabled:opacity-50';
@@ -181,6 +182,7 @@ export function RecipePage({ recipe, preview = false, onRecipeUpdated, favourite
             {recipe.description && <p className="text-sm leading-6 text-black/70">{recipe.description}</p>}
           </header>
           <RecipeNutrition nutrition={recipe.nutrition} fibreSource={recipe.fibreSource} />
+          {recipe.productNutrition && <p className="text-sm">Product label nutrition · per serving</p>}
           <dl className="flex flex-wrap gap-x-6 gap-y-2">
             {[
               ['Prep time', recipe.prepTime],
@@ -203,6 +205,7 @@ export function RecipePage({ recipe, preview = false, onRecipeUpdated, favourite
         </details>
       )}
       <IngredientList recipe={recipe} preview={preview} />
+      {!preview && <RecipeProducts key={recipe.slug} recipe={recipe} onSaved={onRecipeUpdated} />}
       <RecipeSteps steps={recipe.steps} />
       {!preview && (
         <details className="rounded-2xl border-2 border-black bg-white p-4">
@@ -258,6 +261,7 @@ export function RecipeCard({ recipe, favourite = false, favouritePending = false
         </p>
       )}
       <RecipeNutrition nutrition={recipe.nutrition} fibreSource={recipe.fibreSource} />
+      {recipe.productNutrition && <p className="text-sm">Product label nutrition · per serving</p>}
       <RecipeHealthReview recipe={recipe} compact />
       <p className="text-sm text-black/70">
         {[
