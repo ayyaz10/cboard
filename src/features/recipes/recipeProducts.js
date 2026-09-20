@@ -15,7 +15,7 @@ export function normalizeProducts(value, recipe) {
     return { quantity: item.quantity, unit: item.unit, nutrition: {
       quantity: nutrition.quantity, unit: item.unit,
       ...cleanNutrients(nutrition),
-      source: { name: text(source.name), provider: text(source.provider), code: text(source.code), fetchedAt: text(source.fetchedAt), modified: source.modified === true },
+      source: { name: text(source.name), provider: text(source.provider), code: text(source.code), fetchedAt: text(source.fetchedAt), modified: source.modified === true, estimatedPortion: source.estimatedPortion === true, portionDescription: text(source.portionDescription) },
     } };
   });
   return { basis: value.basis, items };
@@ -34,7 +34,18 @@ export function calculateProducts(items, servings) {
 }
 
 export function initialProductAmount(ingredient, unit) {
-  const conversions = { g: ['g', 1], kg: ['g', 1000], ml: ['ml', 1], l: ['ml', 1000], pieces: ['pieces', 1] };
-  const conversion = conversions[String(ingredient.unit).toLowerCase().trim()];
-  return positive(ingredient.amount) && conversion?.[0] === unit ? ingredient.amount * conversion[1] : '';
+  const aliases = { gram: 'g', grams: 'g', kilogram: 'kg', kilograms: 'kg', milligram: 'mg', milligrams: 'mg', millilitre: 'ml', millilitres: 'ml', milliliter: 'ml', milliliters: 'ml', litre: 'l', litres: 'l', liter: 'l', liters: 'l', piece: 'pieces', whole: 'pieces', item: 'pieces', items: 'pieces', each: 'pieces', ounce: 'oz', ounces: 'oz', pound: 'lb', pounds: 'lb', lbs: 'lb' };
+  const conversions = { g: ['g', 1], kg: ['g', 1000], mg: ['g', .001], oz: ['g', 28.349523125], lb: ['g', 453.59237], ml: ['ml', 1], cl: ['ml', 10], dl: ['ml', 100], l: ['ml', 1000], pieces: ['pieces', 1] };
+  const rawUnit = String(ingredient.unit).toLowerCase().trim();
+  const conversion = conversions[aliases[rawUnit] || rawUnit];
+  let amount = ingredient.amount;
+  if (typeof amount === 'string') {
+    const raw = amount.trim();
+    if (/^\d+(?:\.\d+)?$/.test(raw)) amount = Number(raw);
+    else {
+      const fraction = raw.match(/^(?:(\d+)\s+)?(\d+)\/(\d+)$/);
+      amount = fraction && Number(fraction[3]) > 0 ? Number(fraction[1] || 0) + Number(fraction[2]) / Number(fraction[3]) : null;
+    }
+  }
+  return positive(amount) && conversion?.[0] === unit ? Number((amount * conversion[1]).toPrecision(12)) : '';
 }

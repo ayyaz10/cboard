@@ -1,4 +1,5 @@
 import { RecipeHealthReview } from './RecipeHealthReview';
+import { useState } from 'react';
 import { getAppHref, navigateTo } from '../../app/useRoute';
 import { formatIngredient } from './recipeData';
 import { RecipeSource } from './RecipeSource';
@@ -169,6 +170,7 @@ export function RecipeSteps({ steps }) {
 }
 
 export function RecipePage({ recipe, preview = false, onRecipeUpdated, favourite = false, favouritePending = false, onToggleFavourite }) {
+  const [nutritionPreview, setNutritionPreview] = useState(null);
   return (
     <article className="space-y-5 break-words text-black">
       <section className="grid gap-5 lg:grid-cols-[minmax(15rem,0.75fr)_minmax(0,1.25fr)] lg:items-stretch">
@@ -181,8 +183,8 @@ export function RecipePage({ recipe, preview = false, onRecipeUpdated, favourite
             </h1>
             {recipe.description && <p className="text-sm leading-6 text-black/70">{recipe.description}</p>}
           </header>
-          <RecipeNutrition nutrition={recipe.nutrition} fibreSource={recipe.fibreSource} />
-          {recipe.productNutrition && <p className="text-sm">Product label nutrition · per serving</p>}
+          <RecipeNutrition nutrition={nutritionPreview || recipe.nutrition} fibreSource={nutritionPreview ? null : recipe.fibreSource} />
+          {nutritionPreview ? <p className="text-sm" role="status">Unsaved nutrition preview · per serving. Complete the ingredient amounts, then save products & nutrition.</p> : (recipe.productNutrition || recipe.nutritionFromIngredients) && <p className="text-sm">Ingredient nutrition · per serving</p>}
           <dl className="flex flex-wrap gap-x-6 gap-y-2">
             {[
               ['Prep time', recipe.prepTime],
@@ -205,7 +207,7 @@ export function RecipePage({ recipe, preview = false, onRecipeUpdated, favourite
         </details>
       )}
       <IngredientList recipe={recipe} preview={preview} />
-      {!preview && <RecipeProducts key={recipe.slug} recipe={recipe} onSaved={onRecipeUpdated} />}
+      {!preview && <RecipeProducts key={recipe.slug} recipe={recipe} onSaved={onRecipeUpdated} onPreview={setNutritionPreview} />}
       <RecipeSteps steps={recipe.steps} />
       {!preview && (
         <details className="rounded-2xl border-2 border-black bg-white p-4">
@@ -249,11 +251,11 @@ export function RecipePage({ recipe, preview = false, onRecipeUpdated, favourite
 
 export function RecipeCard({ recipe, favourite = false, favouritePending = false, onToggleFavourite }) {
   return (
-    <article className="recipe-card panel flex min-w-0 flex-col gap-4 border-black p-5 text-black">
+    <article className="recipe-card recipe-clickable-card panel flex min-w-0 flex-col gap-4 border-black p-5 text-black">
       <RecipeImage image={recipe.image} title={recipe.title} />
       <div>
         <div className="flex items-center justify-between gap-3"><span className="pill">{recipe.mealType}</span><RecipeFavouriteButton recipe={recipe} favourite={favourite} pending={favouritePending} onToggle={onToggleFavourite}/></div>
-        <h2 className="mt-3 break-words text-2xl font-bold">{recipe.title}</h2>
+        <h2 className="mt-3 break-words text-2xl font-bold"><RecipeLink to={`/recipes/${recipe.slug}`} className="recipe-card-main-link">{recipe.title}</RecipeLink></h2>
       </div>
       {recipe.description && (
         <p className="line-clamp-3 text-sm leading-6 text-black/70">
@@ -261,7 +263,7 @@ export function RecipeCard({ recipe, favourite = false, favouritePending = false
         </p>
       )}
       <RecipeNutrition nutrition={recipe.nutrition} fibreSource={recipe.fibreSource} />
-      {recipe.productNutrition && <p className="text-sm">Product label nutrition · per serving</p>}
+      {(recipe.productNutrition || recipe.nutritionFromIngredients) && <p className="text-sm">Ingredient nutrition · per serving</p>}
       <RecipeHealthReview recipe={recipe} compact />
       <p className="text-sm text-black/70">
         {[

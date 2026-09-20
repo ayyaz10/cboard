@@ -182,11 +182,11 @@ function RecipesContent({ route }) {
     <PageShell>
       <section className="panel space-y-7 border-black p-5 text-black sm:p-8 lg:p-10">
         <AppNavigation activePath="/recipes" />
+        {!error && recipe && parts.length === 2 && <div className="flex flex-wrap items-center justify-between gap-3"><RecipeLink to="/recipes">Back to recipes</RecipeLink><button className={secondaryButton} onClick={() => startImport(recipe, true)}>Edit Recipe</button></div>}
         <DailyNutritionTargets controller={nutritionGoals} />
-        {!diary && <RecipeCardViewControl />}
         {favouriteError && <p role="alert" className="rounded-xl border-2 border-black bg-[#ffe0de] p-3 text-sm font-semibold">{favouriteError}</p>}
         <p role="status" className="sr-only">{favouriteNotice}</p>
-        {!home && !importing && (
+        {!home && !importing && !(recipe && parts.length === 2) && (
           <RecipeLink to="/recipes">← Recipes</RecipeLink>
         )}
         {loading ? (
@@ -287,9 +287,10 @@ function RecipesContent({ route }) {
                       <button type="button" className={`${secondaryButton.replace('bg-white', '')} min-h-11 ${!favouritesOnly ? 'bg-[#c5ff6f]' : 'bg-white'}`} aria-pressed={!favouritesOnly} onClick={() => setFavouritesOnly(false)}>All recipes</button>
                       <button type="button" className={`${secondaryButton.replace('bg-white', '')} min-h-11 ${favouritesOnly ? 'bg-[#c5ff6f]' : 'bg-white'}`} aria-pressed={favouritesOnly} onClick={() => setFavouritesOnly(true)}><span aria-hidden="true" className="mr-2">♥</span>Favourites ({recipes.filter(item => favourites.has(item.slug)).length})</button>
                     </div>
-                    <p role="status" className="text-sm text-black/70">
-                      {filtered.length} recipe{filtered.length === 1 ? '' : 's'}
-                    </p>
+                    <div className="flex items-center justify-between gap-3">
+                      <p role="status" className="text-sm text-black/70">{filtered.length} recipe{filtered.length === 1 ? '' : 's'}</p>
+                      <RecipeCardViewControl />
+                    </div>
                     <div className={cardGrid}>
                       {filtered.map((item) => (
                         <div
@@ -388,13 +389,8 @@ function RecipesContent({ route }) {
             )}
             {!error && recipe && parts.length === 2 && (
               <>
-                <RecipePage recipe={recipe} favourite={favourites.has(recipe.slug)} favouritePending={favouritePending.has(recipe.slug)} onToggleFavourite={toggleFavourite} onRecipeUpdated={(updated) => setRecipes((current) => current.map((item) => item.slug === updated.slug ? updated : item))} />
-                <button
-                  className={secondaryButton}
-                  onClick={() => startImport(recipe, true)}
-                >
-                  Edit Recipe
-                </button>
+                <RecipePage key={recipe.slug} recipe={recipe} favourite={favourites.has(recipe.slug)} favouritePending={favouritePending.has(recipe.slug)} onToggleFavourite={toggleFavourite} onRecipeUpdated={(updated) => setRecipes((current) => current.map((item) => item.slug === updated.slug ? updated : item))} />
+
               </>
             )}
             {!error &&

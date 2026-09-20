@@ -1,4 +1,5 @@
 import { normaliseFibreSource, fibreBasis } from './recipeFibre.js';
+import { cleanIngredientLabel, ingredientLabelNutrition, ingredientRecipeTotals } from './ingredientNutrition.js';
 import { normalizeProducts, calculateProducts, macroKeys } from './recipeProducts.js';
 import { storedHealthReview } from "../../../supabase/functions/_shared/recipeHealthReview.js";
 export const MAX_JSON_BYTES = 256 * 1024;
@@ -65,7 +66,7 @@ function ingredient(value, label) {
     typeof value.amount === 'string'
       ? string(value.amount, `${label} amount`, true, 80)
       : number(value.amount, `${label} amount`);
-  return {
+  const result = {
     name: string(value.name, `${label} name`, true, 200),
     amount,
     unit: string(value.unit, `${label} unit`, false, 80),
@@ -82,6 +83,12 @@ function ingredient(value, label) {
         }
       : {}),
   };
+  const nutritionLabel = cleanIngredientLabel(value.nutritionLabel);
+  if (nutritionLabel) {
+    result.nutritionLabel = nutritionLabel;
+    result.nutrition = ingredientLabelNutrition(result);
+  }
+  return result;
 }
 
 export function slugify(title) {
@@ -215,6 +222,12 @@ export function validateRecipe(data) {
       clean.nutrition = Object.fromEntries(macroKeys.map((key) => [key, null]));
       [...clean.ingredients, ...clean.sauces].forEach((item) => { item.nutrition = { ...clean.nutrition }; });
     }
+  }
+  if (data.nutritionFromIngredients === true) {
+    clean.nutritionFromIngredients = true;
+    delete clean.productNutrition;
+    delete clean.fibreSource;
+    clean.nutrition = ingredientRecipeTotals(clean);
   }
   return clean;
 }

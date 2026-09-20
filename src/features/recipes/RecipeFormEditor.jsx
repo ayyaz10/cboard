@@ -1,5 +1,9 @@
 import { secondaryButton } from './RecipeComponents';
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
+import { NutritionLookup } from '../groceries/NutritionLookup';
+import { initialProductAmount } from './recipeProducts.js';
+import { cleanIngredientLabel, ingredientLabelAmount, ingredientLabelNutrition, ingredientRecipeTotals, prepareIngredientEditor } from './ingredientNutrition.js';
+import '../groceries/groceries.css';
 
 export const emptyRecipe = () => ({
   title: '',
@@ -58,8 +62,28 @@ function Macros({ value = {}, onChange }) {
   );
 }
 
-function ItemEditor({ item, onChange, groups }) {
-  const set = (key, value) => onChange({ ...item, [key]: value });
+function ItemEditor({ item, onChange, groups, visible }) {
+  const [lookup, setLookup] = useState(false);
+  const [nutritionOpen, setNutritionOpen] = useState(Boolean(item.nutritionLabel));
+  const nutritionDetails = useRef(null);
+  const set = (key, value) => {
+    const next = { ...item, [key]: value };
+    if (key === 'name' && value !== item.name && item.nutritionLabel) {
+      delete next.nutritionLabel;
+      next.nutrition = {};
+    } else if (key === 'nutrition') delete next.nutritionLabel;
+    else if (next.nutritionLabel) next.nutrition = ingredientLabelNutrition(next);
+    onChange(next, { calculateNutrition: key === 'nutrition' });
+  };
+  const label = item.nutritionLabel;
+  function useLabel(nutrition) {
+    const needsWeight = initialProductAmount(item, nutrition.unit) === '';
+    const next = { ...item, nutritionLabel: cleanIngredientLabel({ ...nutrition,
+      ...(needsWeight && nutrition.portion ? { amountPerUnit: nutrition.portion.grams, recipeUnit: String(item.unit || '').trim().toLowerCase() } : {}),
+    }) };
+    next.nutrition = ingredientLabelNutrition(next);
+    onChange(next); setLookup(false); setNutritionOpen(true);
+  }
   return (
     <div className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-[minmax(12rem,2fr)_minmax(7rem,1fr)_minmax(7rem,1fr)]">
@@ -119,9 +143,35 @@ function ItemEditor({ item, onChange, groups }) {
           </select>
         </label>
       )}
-      <details>
+      <div className="groceries space-y-3 rounded-xl border border-black/20 p-3">
+        <div className="flex flex-wrap gap-2">
+        <button type="button" className={secondaryButton} aria-expanded={lookup} onClick={() => setLookup(!lookup)}>{lookup ? 'Close food lookup' : label ? 'Change nutrition food' : 'Find nutrition from food API'}</button>
+        <button type="button" className={secondaryButton} onClick={() => {
+          setLookup(false);
+          setNutritionOpen(true);
+          set('nutrition', item.nutrition || {});
+          if (nutritionDetails.current) {
+            nutritionDetails.current.open = true;
+            nutritionDetails.current.querySelector('input')?.focus();
+          }
+        }}>Enter nutrition manually</button>
+        </div>
+        {visible && lookup && <NutritionLookup name={item.name || ''} amountUnit={item.unit} portionMode="weight" active visible onSelect={useLabel} />}
+        {label && <>
+          <p className="text-sm">{label.source.name || item.name} · {label.source.provider}. Label values per {label.quantity} {label.unit}.</p>
+          {label.source.estimatedPortion && <p className="text-sm">Estimated USDA portion: {label.source.portionDescription}. Replace the weight below with your measured edible weight if available.</p>}
+          {initialProductAmount(item, label.unit) === '' && <Field label={`${label.unit} in one ${item.unit || 'recipe unit'} (edible amount)`} type="number" min="0.001" step="any" value={label.recipeUnit === String(item.unit || '').trim().toLowerCase() ? label.amountPerUnit : ''} onChange={(value) => {
+            const next = { ...item, nutritionLabel: { ...label, source: { ...label.source, estimatedPortion: false }, amountPerUnit: value === '' ? null : Number(value), recipeUnit: String(item.unit || '').trim().toLowerCase() } };
+            next.nutrition = ingredientLabelNutrition(next); onChange(next);
+          }} />}
+          <p className="text-sm" role="status">{ingredientLabelAmount(item) == null ? 'Confirm the edible weight or volume of one recipe unit. The API cannot reliably infer the weight of your banana, handful or cup.' : `${ingredientLabelAmount(item)} ${label.unit} used / ${label.quantity} ${label.unit} on the label. The nutrition fields below are calculated for the amount above.`}</p>
+          <p className="text-sm">Changing the amount recalculates automatically. Changing the food name clears the selected label. Editing a nutrition number switches this ingredient to manual values.</p>
+        </>}
+      </div>
+      <details ref={nutritionDetails} open={nutritionOpen} onToggle={(event) => setNutritionOpen(event.currentTarget.open)}>
         <summary className="font-semibold">Item nutrition (optional)</summary>
         <div className="mt-4">
+          {!label && <p className="mb-3 text-sm text-black/60">Manual values for the full amount above. Use food lookup for automatic recalculation when the amount changes.</p>}
           <Macros
             value={item.nutrition}
             onChange={(value) => set('nutrition', value)}
@@ -157,8 +207,9 @@ function ItemRow({ title, item, index, items, onChange, groups }) {
         <ItemEditor
           item={normalizedItem}
           groups={groups}
-          onChange={(next) =>
-            onChange(items.map((current, i) => (i === index ? next : current)))
+          visible={open}
+          onChange={(next, options) =>
+            onChange(items.map((current, i) => (i === index ? next : current)), options)
           }
         />
         <button
@@ -204,7 +255,18 @@ function Items({ title, items, onChange, groups }) {
 }
 
 export function RecipeFormEditor({ recipe, onChange, editing }) {
-  const set = (key, value) => onChange({ ...recipe, [key]: value });
+  recipe = prepareIngredientEditor(recipe);
+  const set = (key, value, options = {}) => {
+    const next = { ...recipe, [key]: value };
+    if (key === 'nutrition') next.nutritionFromIngredients = false;
+    else if (options.calculateNutrition || next.nutritionFromIngredients || [...(next.ingredients || []), ...(next.sauces || [])].some((item) => item.nutritionLabel)) {
+      next.nutritionFromIngredients = true;
+      delete next.productNutrition;
+      delete next.fibreSource;
+      next.nutrition = ingredientRecipeTotals(next);
+    }
+    onChange(next);
+  };
   const groups = recipe.alternatives ?? {};
   return (
     <div className="space-y-5">
@@ -257,8 +319,7 @@ export function RecipeFormEditor({ recipe, onChange, editing }) {
       <details className="rounded-2xl border-2 border-black bg-white p-4" open>
         <summary className="cursor-pointer text-xl font-bold">Recipe nutrition</summary>
         <p className="text-sm text-black/70">
-          Enter macros manually; changing ingredients does not recalculate them.
-          Leave unknown values blank.
+          {recipe.nutritionFromIngredients ? 'Calculated per serving from ingredient and sauce quantities. Missing values stay unknown. Set the serving count above; alternatives are not included.' : 'Enter macros manually or use food lookup inside an ingredient to calculate from ingredients. Item nutrition describes the full amount listed for that ingredient.'}
         </p>
         <div className="mt-3"><Macros value={recipe.nutrition} onChange={(value) => set('nutrition', value)} /></div>
       </details>
@@ -266,7 +327,7 @@ export function RecipeFormEditor({ recipe, onChange, editing }) {
         title="Ingredients"
         items={recipe.ingredients ?? []}
         groups={groups}
-        onChange={(value) => set('ingredients', value)}
+        onChange={(value, options) => set('ingredients', value, options)}
       />
       <section className="space-y-3">
         <h2 className="text-2xl font-bold">Instructions</h2>
@@ -312,7 +373,7 @@ export function RecipeFormEditor({ recipe, onChange, editing }) {
       </section>
       <details className="rounded-2xl border-2 border-black bg-white p-4">
         <summary className="cursor-pointer text-xl font-bold">Sauces ({recipe.sauces?.length ?? 0})</summary>
-        <div className="mt-4"><Items title="Sauces" items={recipe.sauces ?? []} onChange={(value) => set('sauces', value)} /></div>
+        <div className="mt-4"><Items title="Sauces" items={recipe.sauces ?? []} onChange={(value, options) => set('sauces', value, options)} /></div>
       </details>
       {Object.keys(groups).length > 0 && (
         <details className="rounded-2xl border-2 border-black bg-white p-4">

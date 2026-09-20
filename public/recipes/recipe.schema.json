@@ -376,6 +376,10 @@
           }
         }
       }
+    },
+    "nutritionFromIngredients": {
+      "type": "boolean",
+      "description": "App-managed: calculate recipe nutrition per serving from ingredient and sauce quantities."
     }
   },
   "$defs": {
@@ -462,6 +466,75 @@
           "type": "string",
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
           "maxLength": 100
+        },
+        "nutritionLabel": {
+          "type": "object",
+          "required": [
+            "quantity",
+            "unit"
+          ],
+          "properties": {
+            "quantity": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "unit": {
+              "enum": [
+                "g",
+                "ml",
+                "pieces"
+              ]
+            },
+            "calories": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "protein": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "carbs": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "fat": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "fiber": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "source": {
+              "type": "object"
+            },
+            "amountPerUnit": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "exclusiveMinimum": 0
+            },
+            "recipeUnit": {
+              "type": "string",
+              "maxLength": 80
+            }
+          }
         }
       },
       "additionalProperties": false

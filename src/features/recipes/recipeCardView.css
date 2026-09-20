@@ -41,3 +41,23 @@
 .recipe-card {
   overflow-wrap: anywhere;
 }
+.recipe-view-control { display: inline-flex; align-items: center; gap: .5rem; margin-left: auto; order: 1; font-size: .875rem; font-weight: 700; }
+.recipe-view-control select { min-height: 44px; width: auto; max-width: 10rem; border: 2px solid currentColor; border-radius: 999px; padding: .4rem 1.8rem .4rem .8rem; background-color: white; color: black; }
+.recipe-clickable-card { position: relative; }
+.recipe-card-main-link::after { content: ''; position: absolute; inset: 0; border-radius: inherit; z-index: 1; }
+.recipe-view-small .recipe-card a.recipe-card-main-link { padding: 0; font-size: inherit; }
+.recipe-clickable-card :is(button, a:not(.recipe-card-main-link)) { position: relative; z-index: 2; }
+.recipe-clickable-card:has(.recipe-card-main-link:focus-visible) { outline: 3px solid currentColor; outline-offset: 4px; }
+.recipe-clickable-card:hover { border-color: #54851c; }
+.recipe-view-details .recipe-clickable-card { display: grid; grid-template-columns: 6rem minmax(0, 1fr); gap: .75rem 1rem; padding: 1rem; }
+.recipe-view-details .recipe-clickable-card > :is(img, .recipe-image-placeholder) { grid-column: 1; grid-row: 1 / span 2; width: 6rem; height: 6rem; aspect-ratio: 1; min-height: 0; }
+.recipe-view-details .recipe-clickable-card > :not(img):not(.recipe-image-placeholder) { grid-column: 2; }
+.recipe-view-details .recipe-clickable-card h2 { font-size: 1.2rem; }
+.recipe-view-details .recipe-clickable-card dl { gap: .4rem; }
+.recipe-view-details .recipe-clickable-card dl > div { padding: .35rem .6rem; }
+@media (max-width: 480px) {
+  .recipe-view-details .recipe-clickable-card { grid-template-columns: 4rem minmax(0, 1fr); }
+  .recipe-view-details .recipe-clickable-card > :is(img, .recipe-image-placeholder) { width: 4rem; height: 4rem; }
+  .recipe-view-details .recipe-clickable-card > :nth-child(n+3) { grid-column: 1 / -1; }
+}
+html[data-theme="matrix"] .recipe-view-control select { background: var(--matrix-surface-raised); color: var(--matrix-text); border-color: var(--matrix-border); }

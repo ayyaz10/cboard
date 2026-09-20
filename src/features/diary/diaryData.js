@@ -97,6 +97,8 @@ export function validateItem(item) {
       name: text(item.source?.name || "", 500),
       code: /^\d{1,30}$/.test(item.source?.code || "") ? item.source.code : "",
       modified: item.source?.modified === true,
+      estimatedPortion: item.source?.estimatedPortion === true,
+      portionDescription: text(item.source?.portionDescription || '', 200),
     },
   };
 }

@@ -1,7 +1,8 @@
 import { createContext, useContext, useState } from 'react';
 import './recipeCardView.css';
 
-const sizes = ['small', 'medium', 'large'];
+const sizes = ['small', 'medium', 'large', 'details'];
+const viewLabels = { small: 'Tiles', medium: 'Cards', large: 'Gallery', details: 'Details' };
 const storageKey = 'cboard-recipe-card-size';
 const CardViewContext = createContext({ size: 'medium', setSize: () => {} });
 
@@ -33,20 +34,12 @@ export function RecipeCardViewProvider({ children }) {
 export function RecipeCardViewControl() {
   const { size, setSize } = useContext(CardViewContext);
   return (
-    <fieldset className="flex flex-wrap items-center gap-2">
-      <legend className="mb-2 text-sm font-bold text-black">Card size</legend>
-      {sizes.map((value) => (
-        <button
-          type="button"
-          key={value}
-          aria-pressed={size === value}
-          onClick={() => setSize(value)}
-          className={`rounded-full border-2 border-black px-4 py-2 text-sm font-semibold capitalize text-black transition focus-visible:outline-offset-4 ${size === value ? 'bg-[#c5ff6f]' : 'bg-white'}`}
-        >
-          {value[0].toUpperCase() + value.slice(1)}
-        </button>
-      ))}
-    </fieldset>
+    <label className="recipe-view-control">
+      <span>View</span>
+      <select aria-label="Recipe view" value={size} onChange={(event) => setSize(event.target.value)}>
+        {sizes.map((value) => <option key={value} value={value}>{viewLabels[value]}</option>)}
+      </select>
+    </label>
   );
 }
 
@@ -56,5 +49,6 @@ export function useRecipeCardGrid() {
     small: 'grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4',
     medium: 'grid gap-5 md:grid-cols-2 xl:grid-cols-3',
     large: 'grid gap-6 lg:grid-cols-2',
+    details: 'grid gap-3',
   }[size];
 }

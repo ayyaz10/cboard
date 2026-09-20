@@ -17,7 +17,11 @@ export async function saveRecipeProducts(recipe, productNutrition, servings) {
   assertSupabaseResult(found);
   if (!recipe.updatedAt || found.data.updated_at !== recipe.updatedAt)
     throw new Error('This recipe changed. Reload it before saving nutrition.');
-  const clean = validateRecipe({ ...found.data.value.recipe, productNutrition, servings });
+  const withoutLabel = ({ nutritionLabel, ...item }) => item;
+  const clean = validateRecipe({ ...found.data.value.recipe, productNutrition, servings, nutritionFromIngredients: false,
+    ingredients: found.data.value.recipe.ingredients.map(withoutLabel),
+    sauces: (found.data.value.recipe.sauces || []).map((item) => typeof item === 'string' ? item : withoutLabel(item)),
+  });
   if (!clean.productNutrition || !clean.servings) throw new Error('Confirm the ingredients and number of servings before saving.');
   const result = await client.from('user_tool_preferences').update({
     value: { ...found.data.value, recipe: clean }, updated_at: new Date().toISOString(),

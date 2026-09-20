@@ -1,22 +1,28 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NutritionLookup } from '../groceries/NutritionLookup';
 import { saveRecipeProducts } from '../../services/recipeService';
 import { calculateProducts, initialProductAmount, macroKeys, productBasis, productIngredients } from './recipeProducts.js';
+import { ingredientLabelAmount } from './ingredientNutrition.js';
 import '../groceries/groceries.css';
 import './recipeProducts.css';
 
 const labels = { calories: 'Calories (kcal)', protein: 'Protein (g)', carbs: 'Carbs (g)', fat: 'Fat (g)', fiber: 'Fibre (g)' };
-export function RecipeProducts({ recipe, onSaved }) {
+export function RecipeProducts({ recipe, onSaved, onPreview }) {
   const ingredients = productIngredients(recipe);
-  const [items, setItems] = useState(() => recipe.productNutrition?.items || ingredients.map(() => null));
+  const [items, setItems] = useState(() => recipe.productNutrition?.items || ingredients.map((item) => item.nutritionLabel ? { quantity: ingredientLabelAmount(item) ?? '', unit: item.nutritionLabel.unit, nutrition: item.nutritionLabel } : null));
   const [servings, setServings] = useState(recipe.servings || '');
   const [active, setActive] = useState(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [open, setOpen] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const calculated = calculateProducts(items, Number(servings));
+  useEffect(() => {
+    onPreview?.(dirty ? calculateProducts(items, Number(servings)).perServing : null);
+  }, [items, servings, dirty, onPreview]);
   function update(index, item) {
+    setDirty(true);
     setItems((previous) => previous.map((value, i) => i === index ? item : value));
     setMessage(''); setError('');
   }
@@ -26,6 +32,7 @@ export function RecipeProducts({ recipe, onSaved }) {
       if (items.some((item) => item && macroKeys.some((key) => item.nutrition[key] != null && (!Number.isFinite(item.nutrition[key]) || item.nutrition[key] < 0)))) throw new Error('Label values must be zero or greater, or blank when unknown.');
       const saved = await saveRecipeProducts(recipe, { basis: productBasis(recipe), items }, Number(servings));
       onSaved?.(saved);
+      setDirty(false);
       setMessage('Products and nutrition saved. Recipe macros are per serving.');
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
@@ -35,7 +42,7 @@ export function RecipeProducts({ recipe, onSaved }) {
     <div className="mt-4 space-y-4">
       <p>Choose the product you use for each ingredient, including sauces. Match raw or cooked weights to the label. Alternatives are not added unless you replace the ingredient in your recipe.</p>
       <fieldset disabled={busy} className="space-y-4 min-w-0">
-        <label>Number of servings<input type="number" min="0.01" step="any" value={servings} onChange={(event) => { setServings(event.target.value); setMessage(''); }} /></label>
+        <label>Number of servings<input type="number" min="0.01" step="any" value={servings} onChange={(event) => { setServings(event.target.value); setMessage(''); setDirty(true); }} /></label>
         {ingredients.map((ingredient, index) => {
           const item = items[index];
           return <section key={index} className="recipe-product-row">
@@ -43,8 +50,10 @@ export function RecipeProducts({ recipe, onSaved }) {
             <p className="text-sm">Recipe amount: {[ingredient.amount, ingredient.unit].filter((part) => part != null && part !== '').join(' ') || 'Not specified'}</p>
             {item && <>
               <p className="font-semibold">{item.nutrition.source?.name || 'Nutrition label'} <small>({item.nutrition.source?.provider || 'Manual label'}{item.nutrition.source?.modified ? ', edited' : ''})</small></p>
-              {/^\d{8,14}$/.test(item.nutrition.source?.code || '') && <a className="underline" href={`https://world.openfoodfacts.org/product/${item.nutrition.source.code}`} target="_blank" rel="noreferrer">View product label</a>}
+              {item.nutrition.source?.provider === 'USDA FoodData Central' && /^\d+$/.test(item.nutrition.source?.code || '') ? <a className="underline" href={`https://fdc.nal.usda.gov/food-details/${item.nutrition.source.code}/nutrients`} target="_blank" rel="noreferrer">View USDA food</a> : /^\d{8,14}$/.test(item.nutrition.source?.code || '') && <a className="underline" href={`https://world.openfoodfacts.org/product/${item.nutrition.source.code}`} target="_blank" rel="noreferrer">View product label</a>}
+              {item.nutrition.source?.estimatedPortion && <p className="text-sm">Estimated portion: {item.nutrition.source.portionDescription}. Use an actual edible weight if available.</p>}
               <label>Amount used in this recipe ({item.unit})<input type="number" min="0.01" step="any" value={item.quantity} onChange={(event) => update(index, { ...item, quantity: event.target.value === '' ? '' : Number(event.target.value) })} /></label>
+              <p className="text-sm">{item.quantity === '' ? 'Enter the edible amount in the label unit; weights cannot be guessed from cups or pieces.' : `Calculation: ${item.quantity} ${item.unit} used ÷ ${item.nutrition.quantity} ${item.unit} on the label × each nutrient value.`}</p>
               <details><summary>Check or correct label values per {item.nutrition.quantity} {item.unit}</summary>
                 <label>Label values per quantity<input type="number" min="0.01" step="any" value={item.nutrition.quantity} onChange={(event) => update(index, { ...item, nutrition: { ...item.nutrition, quantity: Number(event.target.value), source: { ...item.nutrition.source, modified: true } } })} /></label><div className="recipe-product-values">{macroKeys.map((key) => <label key={key}>{labels[key]}<input type="number" min="0" step="any" value={item.nutrition[key] ?? ''} placeholder="Unknown" onChange={(event) => update(index, { ...item, nutrition: { ...item.nutrition, [key]: event.target.value === '' ? null : Number(event.target.value), source: { ...item.nutrition.source, modified: true } } })} /></label>)}</div>
               </details>
@@ -55,9 +64,11 @@ export function RecipeProducts({ recipe, onSaved }) {
               {!item && <button type="button" onClick={() => update(index, { quantity: initialProductAmount(ingredient, 'g'), unit: 'g', nutrition: { quantity: 100, unit: 'g', source: { name: ingredient.name, provider: 'Manual label' } } })}>Enter label manually</button>}
               {item && <button type="button" onClick={() => update(index, null)}>Remove product</button>}
             </div>
-            {item && <label>Label unit<select value={item.unit} onChange={(event) => update(index, { ...item, unit: event.target.value, quantity: '', nutrition: { ...item.nutrition, unit: event.target.value, source: { ...item.nutrition.source, modified: true } } })}><option value="g">Grams (g)</option><option value="ml">Millilitres (ml)</option><option value="pieces">Pieces (label must give values per piece)</option></select></label>}
-            {open && active === index && <NutritionLookup key={index} name={ingredient.name} active visible onSelect={(nutrition) => {
-              update(index, { quantity: initialProductAmount(ingredient, nutrition.unit), unit: nutrition.unit, nutrition }); setActive(null);
+            {item && <label>Label unit<select value={item.unit} onChange={(event) => update(index, { ...item, unit: event.target.value, quantity: initialProductAmount(ingredient, event.target.value), nutrition: { ...item.nutrition, unit: event.target.value, source: { ...item.nutrition.source, modified: true } } })}><option value="g">Grams (g)</option><option value="ml">Millilitres (ml)</option><option value="pieces">Pieces (label must give values per piece)</option></select></label>}
+            {open && active === index && <NutritionLookup key={index} name={ingredient.name} amountUnit={ingredient.unit} portionMode="weight" active visible onSelect={(nutrition) => {
+              const direct = initialProductAmount(ingredient, nutrition.unit);
+              const count = initialProductAmount({ amount: ingredient.amount, unit: 'pieces' }, 'pieces');
+              update(index, { quantity: direct !== '' ? direct : nutrition.portion && count !== '' ? nutrition.portion.grams * count : '', unit: nutrition.unit, nutrition }); setActive(null);
             }} />}
           </section>;
         })}

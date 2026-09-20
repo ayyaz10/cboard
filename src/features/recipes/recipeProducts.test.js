@@ -19,6 +19,15 @@ test('only compatible mass and volume amounts are prefilled', () => {
   assert.equal(initialProductAmount({ amount: 2, unit: 'cups' }, 'g'), '');
   assert.equal(initialProductAmount({ amount: 150, unit: 'g' }, 'ml'), '');
 });
+test('recipe quantities accept explicit unit names and numeric fractions without guessing weights', () => {
+  assert.equal(initialProductAmount({ amount: '150', unit: 'grams' }, 'g'), 150);
+  assert.equal(initialProductAmount({ amount: '1/2', unit: 'kilograms' }, 'g'), 500);
+  assert.equal(initialProductAmount({ amount: '1 1/2', unit: 'litres' }, 'ml'), 1500);
+  assert.equal(initialProductAmount({ amount: 2, unit: 'whole' }, 'pieces'), 2);
+  assert.equal(initialProductAmount({ amount: '2-3', unit: 'g' }, 'g'), '');
+  assert.equal(initialProductAmount({ amount: '1/0', unit: 'kg' }, 'g'), '');
+  assert.equal(initialProductAmount({ amount: 2, unit: 'whole' }, 'g'), '');
+});
 test('saved product choices survive validation and serving edits recalculate nutrition', () => {
   const clean = validateRecipe(recipe);
   const saved = validateRecipe({ ...clean, productNutrition: { basis: productBasis(clean), items: [item] } });
