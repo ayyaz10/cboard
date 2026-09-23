@@ -28,6 +28,13 @@ export function shiftDate(date, days) {
   value.setUTCDate(value.getUTCDate() + days);
   return value.toISOString().slice(0, 10);
 }
+export function weekDates(date) {
+  if (!validDate(date)) throw new Error("Choose a valid report date.");
+  const value = new Date(`${date}T12:00:00Z`);
+  const weekday = value.getUTCDay();
+  const monday = shiftDate(date, weekday === 0 ? -6 : 1 - weekday);
+  return Array.from({ length: 7 }, (_, index) => shiftDate(monday, index));
+}
 export const emptyDay = (date) => ({
   version: 1,
   date,
@@ -198,6 +205,35 @@ export function diaryTotals(meals) {
       },
     ]),
   );
+}
+export function dailyCalorieReport(day, target) {
+  const calories = diaryTotals(day?.meals || []).calories;
+  const hasTarget = Number.isFinite(target) && target > 0;
+  return {
+    calories: calories.known ? calories.value : null,
+    missing: calories.missing,
+    target: hasTarget ? target : null,
+    balance: calories.known && hasTarget ? target - calories.value : null,
+  };
+}
+export function weeklyCalorieReport(days, date, target) {
+  const byDate = new Map(days.map((day) => [day.date, day]));
+  const entries = weekDates(date).map((entryDate) => ({
+    date: entryDate,
+    complete: byDate.get(entryDate)?.complete === true,
+    ...dailyCalorieReport(byDate.get(entryDate), target),
+  }));
+  const logged = entries.filter((entry) => entry.calories != null);
+  const consumed = logged.reduce((sum, entry) => sum + entry.calories, 0);
+  const hasTarget = Number.isFinite(target) && target > 0;
+  return {
+    start: entries[0].date,
+    end: entries[6].date,
+    entries,
+    logged: logged.length,
+    average: logged.length ? consumed / logged.length : null,
+    balance: logged.length && hasTarget ? target * logged.length - consumed : null,
+  };
 }
 export function foodItem(nutrition, name = "") {
   return {

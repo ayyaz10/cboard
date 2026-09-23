@@ -1,11 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
-import { getFoodDiary, saveFoodDiary } from "../../services/foodDiaryService";
+import {
+  deleteFoodDiaryDay,
+  getFoodDiary,
+  saveFoodDiary,
+} from "../../services/foodDiaryService";
 import { getPreference } from "../../services/preferenceService";
 import { readMealRoutine } from "../recipes/mealPlanData";
 import { RecipeLink } from "../recipes/RecipeComponents";
 import { NutritionTotals } from "./DiaryNutrition";
 import { DiaryMealEditor } from "./DiaryMealEditor";
+import { DiaryReports } from "./DiaryReports";
 import {
   MEALS,
   REQUIRED_MEALS,
@@ -36,15 +41,21 @@ export function FoodDiary({ recipes, nutritionGoals }) {
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState(null);
   const [remove, setRemove] = useState(null);
+  const [removeDay, setRemoveDay] = useState(null);
   const [routine, setRoutine] = useState(null);
   const [selected, setSelected] = useState([]);
   const [month, setMonth] = useState("");
   const lock = useRef(false);
   const generation = useRef(0);
   const editorRef = useRef(null);
+  const diaryTopRef = useRef(null);
   const day = days.find((entry) => entry.date === date) || emptyDay(date);
   const streak = streaks(days, today);
   const disabled = busy || Boolean(draft) || Boolean(routine);
+  const goals =
+    !nutritionGoals.loading && !nutritionGoals.error
+      ? nutritionGoals.goals
+      : null;
   async function load() {
     const id = ++generation.current;
     setLoading(true);
@@ -136,12 +147,38 @@ export function FoodDiary({ recipes, nutritionGoals }) {
       if (id === generation.current) setBusy(false);
     }
   }
-  function selectDate(next) {
+  function selectDate(next, scroll = false) {
     if (validDate(next) && next <= today) {
       setDate(next);
       setError("");
       setNotice("");
       setRemove(null);
+      setRemoveDay(null);
+      if (scroll)
+        window.requestAnimationFrame(() =>
+          diaryTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+        );
+    }
+  }
+  async function deleteDay(entry) {
+    if (lock.current) return;
+    lock.current = true;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    const id = generation.current;
+    try {
+      await deleteFoodDiaryDay(entry, user.id);
+      if (id !== generation.current) return;
+      setDays((previous) => previous.filter((item) => item.date !== entry.date));
+      setRemoveDay(null);
+      setNotice(`${entry.date} was removed from meal history.`);
+    } catch (err) {
+      if (id === generation.current)
+        setError(err.message || "Could not delete this diary day.");
+    } finally {
+      lock.current = false;
+      if (id === generation.current) setBusy(false);
     }
   }
   async function saveMeal(meal) {
@@ -257,7 +294,7 @@ export function FoodDiary({ recipes, nutritionGoals }) {
           including backfilled entries. Today can stay open until you finish.
         </small>
       </section>
-      <div className="diary-datebar">
+      <div className="diary-datebar" ref={diaryTopRef}>
         <button
           type="button"
           disabled={disabled || date <= "2000-01-01"}
@@ -293,6 +330,14 @@ export function FoodDiary({ recipes, nutritionGoals }) {
           Today
         </button>
       </div>
+      <DiaryReports
+        days={days}
+        date={date}
+        today={today}
+        goals={goals}
+        disabled={disabled}
+        onSelectDate={selectDate}
+      />
       <section className="diary-panel" aria-label="Daily nutrition totals">
         <div className="diary-section-heading">
           <h2>{date === today ? "Today’s" : date} nutrition</h2>
@@ -302,11 +347,7 @@ export function FoodDiary({ recipes, nutritionGoals }) {
         </div>
         <NutritionTotals
           meals={day.meals}
-          goals={
-            !nutritionGoals.loading && !nutritionGoals.error
-              ? nutritionGoals.goals
-              : null
-          }
+          goals={goals}
         />
         <p className="diary-hint">
           {day.meals.length} meal entries · totals reflect saved meals. Targets
@@ -580,27 +621,51 @@ export function FoodDiary({ recipes, nutritionGoals }) {
             .map((entry) => {
               const totals = diaryTotals(entry.meals);
               return (
-                <button
+                <article
+                  className="diary-history-item"
                   key={entry.date}
-                  disabled={disabled}
                   aria-current={entry.date === date ? "date" : undefined}
-                  onClick={() => selectDate(entry.date)}
                 >
-                  <strong>
-                    {entry.date}
-                    {entry.complete ? " ✓" : ""}
-                  </strong>
-                  <span>
-                    {entry.meals.length} meals ·{" "}
-                    {totals.calories.known
-                      ? `${format(totals.calories.value)} kcal${totals.calories.missing ? " (partial)" : ""}`
-                      : "Calories unknown"}{" "}
-                    ·{" "}
-                    {totals.protein.known
-                      ? `${format(totals.protein.value)} g protein${totals.protein.missing ? " (partial)" : ""}`
-                      : "Protein unknown"}
-                  </span>
-                </button>
+                  <div className="diary-history-copy">
+                    <strong>
+                      {entry.date}
+                      {entry.complete ? " ✓" : ""}
+                    </strong>
+                    <span>
+                      {entry.meals.length} meals ·{" "}
+                      {totals.calories.known
+                        ? `${format(totals.calories.value)} kcal${totals.calories.missing ? " (partial)" : ""}`
+                        : "Calories unknown"}{" "}
+                      ·{" "}
+                      {totals.protein.known
+                        ? `${format(totals.protein.value)} g protein${totals.protein.missing ? " (partial)" : ""}`
+                        : "Protein unknown"}
+                    </span>
+                  </div>
+                  <div className="diary-actions">
+                    <button type="button" disabled={disabled} onClick={() => selectDate(entry.date, true)}>
+                      Open & edit
+                    </button>
+                    <button type="button" disabled={disabled} onClick={() => {
+                      selectDate(entry.date);
+                      setDraft(newMeal());
+                    }}>
+                      Add meal
+                    </button>
+                    <button type="button" disabled={disabled} onClick={() => setRemoveDay(entry.date)}>
+                      Delete day
+                    </button>
+                  </div>
+                  {removeDay === entry.date && (
+                    <div className="diary-delete" role="group" aria-label={`Confirm deletion of ${entry.date}`}>
+                      <p>Delete every meal saved for {entry.date}? This cannot be undone.</p>
+                      <div className="diary-actions">
+                        <button type="button" disabled={busy} onClick={() => deleteDay(entry)}>Confirm delete day</button>
+                        <button type="button" disabled={busy} onClick={() => setRemoveDay(null)}>Keep this day</button>
+                      </div>
+                    </div>
+                  )}
+                </article>
               );
             })}
         </div>

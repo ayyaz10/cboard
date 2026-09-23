@@ -13,6 +13,9 @@ import {
   validDate,
   shiftDate,
   localDate,
+  weekDates,
+  dailyCalorieReport,
+  weeklyCalorieReport,
 } from "./diaryData.js";
 import { offNutrients } from "../nutrition/nutrients.js";
 
@@ -180,6 +183,30 @@ test("streaks handle yesterday grace, missed dates, reopening, historical correc
   assert.equal(shiftDate("2026-03-29", 1), "2026-03-30");
   assert.equal(shiftDate("2026-10-25", -1), "2026-10-24");
   assert.match(localDate(), /^\d{4}-\d{2}-\d{2}$/);
+});
+test("daily and Monday-to-Sunday weekly calorie reports use logged days without inventing zeroes", () => {
+  const monday = { ...emptyDay("2026-04-27"), meals: [meal()] };
+  const wednesday = {
+    ...emptyDay("2026-04-29"),
+    meals: [{ ...meal(), items: [{ ...egg(), quantity: 200 }] }],
+    complete: true,
+  };
+  assert.deepEqual(weekDates("2026-05-03"), [
+    "2026-04-27", "2026-04-28", "2026-04-29", "2026-04-30",
+    "2026-05-01", "2026-05-02", "2026-05-03",
+  ]);
+  assert.deepEqual(dailyCalorieReport(monday, 1908), {
+    calories: 155,
+    missing: 0,
+    target: 1908,
+    balance: 1753,
+  });
+  const report = weeklyCalorieReport([monday, wednesday], "2026-05-01", 1908);
+  assert.equal(report.logged, 2);
+  assert.equal(report.average, 232.5);
+  assert.equal(report.balance, 3351);
+  assert.equal(report.entries[1].calories, null);
+  assert.equal(report.entries[2].complete, true);
 });
 test("OFF mass units convert to mg and micrograms without treating missing micros as zero", () => {
   const n = offNutrients({

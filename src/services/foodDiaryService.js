@@ -55,3 +55,25 @@ export async function saveFoodDiary(day, expectedUserId) {
   assertSupabaseResult(result);
   return { ...clean, updatedAt: result.data.updated_at };
 }
+export async function deleteFoodDiaryDay(day, expectedUserId) {
+  const clean = validateDay(day);
+  if (!day.updatedAt)
+    throw new Error("This diary day is not saved yet.");
+  const { client, userId } = await getUserScopedClient();
+  if (userId !== expectedUserId)
+    throw new Error("Your account changed. Reload the diary before deleting.");
+  const result = await client
+    .from("user_tool_preferences")
+    .delete()
+    .eq("user_id", userId)
+    .eq("key", `${PREFIX}${clean.date}`)
+    .eq("updated_at", day.updatedAt)
+    .select("key")
+    .maybeSingle();
+  if (!result.error && !result.data)
+    throw new Error(
+      "This day changed in another tab. Reload the diary before deleting it.",
+    );
+  assertSupabaseResult(result);
+  return clean.date;
+}
