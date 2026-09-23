@@ -247,7 +247,7 @@ function RecipesContent({ route }) {
                 </header>
                 {recipes.length > 0 ? (
                   <>
-                    <div className="grid gap-4 sm:grid-cols-[1fr_14rem]">
+                    <div className="space-y-4">
                       <label className="space-y-2 font-bold">
                         <span>Search recipes</span>
                         <input
@@ -258,19 +258,25 @@ function RecipesContent({ route }) {
                           onChange={(event) => setSearch(event.target.value)}
                         />
                       </label>
-                      <label className="space-y-2 font-bold">
-                        <span>Meal type</span>
-                        <select
-                          className="field-input"
-                          value={category}
-                          onChange={(event) => setCategory(event.target.value)}
-                        >
-                          <option>All</option>
-                          {categories.map((value) => (
-                            <option key={value}>{value}</option>
-                          ))}
-                        </select>
-                      </label>
+                      <fieldset className="space-y-2">
+                        <legend className="font-bold">Meal type</legend>
+                        <div className="flex flex-wrap gap-2" aria-label="Filter recipes by meal type">
+                          {['All', ...categories].map((value) => {
+                            const selected = category === value;
+                            return (
+                              <button
+                                key={value}
+                                type="button"
+                                className={`${secondaryButton.replace('bg-white', '')} min-h-11 ${selected ? 'bg-[#c5ff6f]' : 'bg-white'}`}
+                                aria-pressed={selected}
+                                onClick={() => setCategory(value)}
+                              >
+                                {value === 'All' ? 'All meals' : value}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </fieldset>
                     </div>
                     <div className="flex flex-wrap gap-3" aria-label="Recipe filters">
                       <button type="button" className={`${secondaryButton.replace('bg-white', '')} min-h-11 ${!favouritesOnly ? 'bg-[#c5ff6f]' : 'bg-white'}`} aria-pressed={!favouritesOnly} onClick={() => setFavouritesOnly(false)}>All recipes</button>
