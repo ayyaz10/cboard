@@ -61,3 +61,5 @@
   .recipe-view-details .recipe-clickable-card > :nth-child(n+3) { grid-column: 1 / -1; }
 }
 html[data-theme="matrix"] .recipe-view-control select { background: var(--matrix-surface-raised); color: var(--matrix-text); border-color: var(--matrix-border); }
+html[data-theme="matrix"] .recipe-meal-filter { background: var(--matrix-surface-raised); color: var(--matrix-text); border-color: var(--matrix-border); }
+html[data-theme="matrix"] .recipe-meal-filter select { color: var(--matrix-text); }
