@@ -5,10 +5,8 @@ import {
   secondaryButton,
 } from './RecipeComponents';
 import { MEAL_SLOTS } from './mealPlanData';
-import { useRecipeCardGrid } from './RecipeCardView';
 
 export function MealRoutine({ routine, meals, onEdit }) {
-  const cardGrid = useRecipeCardGrid();
   return (
     <section className="space-y-5" aria-label="Current meal routine">
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -29,7 +27,7 @@ export function MealRoutine({ routine, meals, onEdit }) {
         Your saved everyday meal routine. Daily totals above use the latest
         recipe macros.
       </p>
-      <div className={cardGrid}>
+      <div className="grid items-start gap-5 md:grid-cols-2">
         {MEAL_SLOTS.map((slot) => {
           const selected = meals.filter((meal) => meal.meal === slot);
           return (
@@ -40,24 +38,28 @@ export function MealRoutine({ routine, meals, onEdit }) {
                   {selected.map((meal) => (
                     <article
                       key={meal.id}
-                      className="recipe-card min-w-0 space-y-4 rounded-2xl border-2 border-black bg-white p-5"
+                      className="grid min-w-0 gap-3 break-words rounded-2xl border-2 border-black bg-white p-3 sm:grid-cols-[8rem_minmax(0,1fr)]"
                     >
                       {meal.recipe ? (
                         <>
-                          <RecipeImage
-                            image={meal.recipe.image}
-                            title={meal.recipe.title}
-                          />
-                          <h4 className="break-words text-xl font-bold">
+                          <div className="self-start">
+                            <RecipeImage
+                              image={meal.recipe.image}
+                              title={meal.recipe.title}
+                            />
+                          </div>
+                          <div className="min-w-0 space-y-2.5">
+                          <h4 className="break-words text-lg font-bold leading-tight">
                             {meal.recipe.title}
                           </h4>
-                          <p className="font-semibold">
+                          <p className="text-sm font-semibold">
                             {meal.portions}× portion
                           </p>
                           <RecipeNutrition nutrition={meal.nutrition} />
                           <RecipeLink to={`/recipes/${meal.slug}`}>
                             View Recipe →
                           </RecipeLink>
+                          </div>
                         </>
                       ) : (
                         <p role="alert">

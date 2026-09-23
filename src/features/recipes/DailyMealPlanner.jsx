@@ -12,6 +12,8 @@ import {
 } from './mealPlanData';
 import { MealRoutine } from './MealRoutine';
 import { QuickRoutines } from './QuickRoutines';
+import { calculateProducts } from './recipeProducts.js';
+import { ingredientRecipeCalculation } from './ingredientNutrition.js';
 
 const STORAGE_KEY = 'recipes:daily-plan:v1';
 const units = {
@@ -346,6 +348,11 @@ export function DailyMealPlanner({ recipes, nutritionGoals }) {
                               return `${value == null ? '—' : format(value)} ${units[key]}`;
                             }).join(' · ')}
                           </p>
+                          {(recipe.productNutrition || recipe.nutritionFromIngredients) && Object.values(recipe.productNutrition
+                            ? calculateProducts(recipe.productNutrition.items, recipe.servings).missing
+                            : ingredientRecipeCalculation(recipe).missing).some((value) => value > 0) && (
+                            <p className="text-sm font-semibold">Known subtotal · complete the missing ingredient nutrition in the recipe for full totals.</p>
+                          )}
                         </div>
                       )}
                       {entry.slug && !recipe && (

@@ -182,13 +182,16 @@ function RecipesContent({ route }) {
     <PageShell>
       <section className="panel space-y-7 border-black p-5 text-black sm:p-8 lg:p-10">
         <AppNavigation activePath="/recipes" />
-        {!error && recipe && parts.length === 2 && <div className="flex flex-wrap items-center justify-between gap-3"><RecipeLink to="/recipes">Back to recipes</RecipeLink><button className={secondaryButton} onClick={() => startImport(recipe, true)}>Edit Recipe</button></div>}
         <DailyNutritionTargets controller={nutritionGoals} />
+        <nav className="flex flex-wrap gap-2" aria-label="Recipe shortcuts">
+          {!home && !(recipe && parts.length === 2) && <RecipeLink to="/recipes">Back to recipes</RecipeLink>}
+          {!importing && <PrimaryButton onClick={() => startImport()}>Add recipe</PrimaryButton>}
+          {!planning && <RecipeLink to="/recipes/planner/day">Meal planner</RecipeLink>}
+          {!diary && <RecipeLink to="/recipes/diary/day">Food diary</RecipeLink>}
+          {!manage && <RecipeLink to="/recipes/manage">Manage recipes</RecipeLink>}
+        </nav>
         {favouriteError && <p role="alert" className="rounded-xl border-2 border-black bg-[#ffe0de] p-3 text-sm font-semibold">{favouriteError}</p>}
         <p role="status" className="sr-only">{favouriteNotice}</p>
-        {!home && !importing && !(recipe && parts.length === 2) && (
-          <RecipeLink to="/recipes">← Recipes</RecipeLink>
-        )}
         {loading ? (
           <p role="status" className="py-12 text-center font-bold">
             Loading recipes…
@@ -240,20 +243,6 @@ function RecipesContent({ route }) {
                     <p className="mt-3 text-black/70">
                       Your meals, ingredients, and alternatives in one place.
                     </p>
-                  </div>
-                  <div className="flex flex-wrap gap-3">
-                    <PrimaryButton onClick={() => startImport()}>
-                      Add Recipe
-                    </PrimaryButton>
-                    <RecipeLink to="/recipes/planner/day">
-                      Daily Meal Planner
-                    </RecipeLink>
-                    <RecipeLink to="/recipes/diary/day">Food diary</RecipeLink>
-                    {home && (
-                      <RecipeLink to="/recipes/manage">
-                        Manage Recipes
-                      </RecipeLink>
-                    )}
                   </div>
                 </header>
                 {recipes.length > 0 ? (
@@ -388,10 +377,13 @@ function RecipesContent({ route }) {
               </>
             )}
             {!error && recipe && parts.length === 2 && (
-              <>
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <RecipeLink to="/recipes">Back to recipes</RecipeLink>
+                  <button className={secondaryButton} onClick={() => startImport(recipe, true)}>Edit Recipe</button>
+                </div>
                 <RecipePage key={recipe.slug} recipe={recipe} favourite={favourites.has(recipe.slug)} favouritePending={favouritePending.has(recipe.slug)} onToggleFavourite={toggleFavourite} onRecipeUpdated={(updated) => setRecipes((current) => current.map((item) => item.slug === updated.slug ? updated : item))} />
-
-              </>
+              </div>
             )}
             {!error &&
               !home &&

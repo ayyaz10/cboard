@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { findNaturalFoods, createNaturalFoodSearch, naturalPortionNutrition, nutritionForOnePortion } from './naturalFoods.js';
+import { findNaturalFoods, createNaturalFoodSearch, naturalPortionNutrition, nutritionForOnePortion, suggestedNaturalPortion } from './naturalFoods.js';
 import { cleanIngredientLabel, ingredientLabelNutrition } from '../features/recipes/ingredientNutrition.js';
 import { foodItem, itemNutrition, validateDay, emptyDay, newMeal } from '../features/diary/diaryData.js';
 const catalog = JSON.parse(readFileSync(new URL('../../public/nutrition/usda-foods.json', import.meta.url)));
@@ -27,6 +27,16 @@ test('USDA medium banana gives estimated edible weight and scales half portions,
   assert.equal(itemNutrition(diaryItem).salt, null);
   const day = validateDay({ ...emptyDay('2026-09-19'), meals: [{ ...newMeal(), items: [diaryItem] }] });
   assert.equal(day.meals[0].items[0].source.estimatedPortion, true);
+});
+test('plain eggs prefer a whole large egg and default to its edible per-egg portion', () => {
+  const egg = findNaturalFoods(catalog.foods, 'egg')[0];
+  assert.match(egg.name, /grade a.*large.*whole/i);
+  const index = suggestedNaturalPortion(egg, 'Egg', 'eggs');
+  assert.equal(egg.portions[index].label, 'whole without shell');
+  assert.equal(egg.portions[index].grams, 50.3);
+  const selected = naturalPortionNutrition({ ...egg.nutrition, source: egg.source }, egg.portions[index]);
+  assert.equal(Number((selected.calories * selected.portion.grams / selected.quantity).toFixed(2)), 74.44);
+  assert.equal(suggestedNaturalPortion(egg, 'Egg', 'g'), '');
 });
 test('USDA data uses canonical units and missing nutrients are not fabricated', () => {
   const banana = findNaturalFoods(catalog.foods, 'medium banana')[0];

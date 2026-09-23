@@ -160,6 +160,64 @@
   font-weight: 700;
   margin: 0.6rem 0;
 }
+.diary-food-compact {
+  padding: 0;
+  overflow: hidden;
+}
+.food-diary .diary-food-toggle {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.8rem;
+  width: 100%;
+  min-height: 0;
+  padding: 0.85rem 1rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+.food-diary .diary-food-toggle:hover {
+  background: #f4f9e9;
+}
+.diary-food-toggle-copy {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.2rem 0.75rem;
+  align-items: baseline;
+  min-width: 0;
+}
+.diary-food-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 750;
+}
+.diary-food-amount {
+  color: rgb(0 0 0 / 0.62);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+.diary-food-macro-summary {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.7rem;
+  color: rgb(0 0 0 / 0.65);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.diary-food-chevron {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+.diary-food-editor-body {
+  overflow: hidden;
+}
+.diary-food-editor-inner {
+  padding: 1rem;
+  border-top: 1px solid var(--g-border);
+}
 .diary-entry {
   border-top: 1px solid var(--g-border);
   padding-top: 1rem;
@@ -247,4 +305,11 @@
   background: #001500;
   border-color: #00b943;
   color: #bdffba;
+}
+[data-theme="matrix"] .food-diary .diary-food-toggle:hover {
+  background: var(--matrix-surface-raised);
+}
+[data-theme="matrix"] .diary-food-amount,
+[data-theme="matrix"] .diary-food-macro-summary {
+  color: var(--matrix-text-muted);
 }

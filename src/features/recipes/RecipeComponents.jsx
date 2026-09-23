@@ -1,12 +1,14 @@
 import { RecipeHealthReview } from './RecipeHealthReview';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { getAppHref, navigateTo } from '../../app/useRoute';
 import { formatIngredient } from './recipeData';
 import { RecipeSource } from './RecipeSource';
 import { RecipeGroceries } from '../groceries/RecipeGroceries';
 import { useRecipeCardGrid } from './RecipeCardView';
 import { RecipeFavouriteButton } from './RecipeFavouriteButton';
-import { RecipeProducts } from './RecipeProducts.jsx';
+import { calculateProducts } from './recipeProducts.js';
+import { ingredientRecipeCalculation } from './ingredientNutrition.js';
 
 export const secondaryButton =
   'inline-flex items-center justify-center rounded-full border-2 border-black bg-white px-4 py-2 text-sm font-bold text-black transition hover:-translate-y-px focus-visible:outline-offset-4 disabled:opacity-50';
@@ -80,6 +82,22 @@ export function RecipeNutrition({ nutrition = {}, fibreSource }) {
   );
 }
 
+function RecipeNutritionStatus({ recipe, preview = false }) {
+  if (preview)
+    return <p className="text-sm" role="status">Unsaved nutrition preview · per serving. Complete the ingredient amounts, then save products & nutrition.</p>;
+  if (!recipe.productNutrition && !recipe.nutritionFromIngredients) return null;
+  const calculation = recipe.productNutrition
+    ? calculateProducts(recipe.productNutrition.items, recipe.servings)
+    : recipe.nutritionFromIngredients
+      ? ingredientRecipeCalculation(recipe)
+      : null;
+  const missing = calculation ? Math.max(...Object.values(calculation.missing)) : 0;
+  return <p className="text-sm">
+    Ingredient nutrition · per serving
+    {missing > 0 && <> · <strong>known subtotal</strong> ({missing} ingredient{missing === 1 ? '' : 's'} incomplete)</>}
+  </p>;
+}
+
 export function RecipeAlternatives({ group }) {
   const cardGrid = useRecipeCardGrid();
   return (
@@ -107,43 +125,108 @@ export function RecipeAlternatives({ group }) {
   );
 }
 
+const ingredientNutrients = [
+  ['calories', 'Calories', 'kcal'],
+  ['protein', 'Protein', 'g'],
+  ['carbs', 'Carbs', 'g'],
+  ['fat', 'Fat', 'g'],
+  ['fiber', 'Fibre', 'g'],
+];
+
+function ChevronDownIcon({ open, reduceMotion }) {
+  return <motion.svg
+    aria-hidden="true"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.25"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className="h-5 w-5 shrink-0"
+    animate={{ rotate: open ? 180 : 0 }}
+    transition={{ duration: reduceMotion ? 0 : 0.28, ease: [0.22, 1, 0.36, 1] }}
+  >
+    <path d="m6 9 6 6 6-6" />
+  </motion.svg>;
+}
+
+function IngredientNutritionRow({ item, recipe, preview }) {
+  const [open, setOpen] = useState(false);
+  const reduceMotion = useReducedMotion();
+  return <li className="min-w-0 self-start overflow-hidden rounded-xl border-2 border-black bg-white">
+    <div className="flex min-w-0 items-center gap-2">
+      <button type="button" className="flex min-w-0 flex-1 items-center justify-between gap-3 bg-transparent px-3 py-2.5 text-left" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+        <span className="min-w-0">
+          <span className="block font-semibold">{formatIngredient(item)}</span>
+          {item.note && <span className="mt-0.5 block text-xs leading-5 text-black/65">{item.note}</span>}
+        </span>
+        <ChevronDownIcon open={open} reduceMotion={reduceMotion} />
+      </button>
+      {item.alternativeGroup && (preview ? (
+        <a className="mr-3 text-sm font-bold underline underline-offset-4" href={`#preview-${item.alternativeGroup}`}>Alternatives →</a>
+      ) : (
+        <RecipeLink to={`/recipes/${recipe.slug}/alternatives/${item.alternativeGroup}`}>Alternatives →</RecipeLink>
+      ))}
+    </div>
+    <AnimatePresence initial={false}>
+      {open && <motion.div
+        key="ingredient-nutrition"
+        initial={{ height: 0, opacity: 0 }}
+        animate={{ height: 'auto', opacity: 1 }}
+        exit={{ height: 0, opacity: 0 }}
+        transition={{
+          height: { duration: reduceMotion ? 0 : 0.38, ease: [0.22, 1, 0.36, 1] },
+          opacity: { duration: reduceMotion ? 0 : 0.24, ease: 'easeOut' },
+        }}
+        className="overflow-hidden"
+      >
+        <motion.div
+          initial={{ y: reduceMotion ? 0 : -8 }}
+          animate={{ y: 0 }}
+          exit={{ y: reduceMotion ? 0 : -5 }}
+          transition={{ duration: reduceMotion ? 0 : 0.32, ease: [0.22, 1, 0.36, 1] }}
+          className="border-t-2 border-black/15 px-3 py-3"
+        >
+          <p className="mb-2 text-xs font-semibold text-black/60">Nutrition for the listed ingredient amount</p>
+          <dl className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            {ingredientNutrients.map(([key, label, unit]) => <div key={key} className="rounded-lg bg-[#f4f1e8] px-2.5 py-2">
+              <dt className="text-xs text-black/60">{label}</dt>
+              <dd className="font-bold">{item.nutrition?.[key] == null ? '—' : `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(item.nutrition[key])} ${unit}`}</dd>
+            </div>)}
+          </dl>
+          {!ingredientNutrients.some(([key]) => item.nutrition?.[key] != null) && <p className="mt-2 text-xs text-black/60">Nutrition has not been calculated for this ingredient yet.</p>}
+        </motion.div>
+      </motion.div>}
+    </AnimatePresence>
+  </li>;
+}
+
+function useIngredientColumns() {
+  const query = '(min-width: 768px)';
+  const [columns, setColumns] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches);
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const update = () => setColumns(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+  return columns;
+}
+
 export function IngredientList({ recipe, preview = false }) {
+  const columns = useIngredientColumns();
+  const row = (item, index) => <IngredientNutritionRow key={index} item={item} recipe={recipe} preview={preview} />;
   return (
     <section>
       <div className="flex items-end justify-between gap-3">
         <h2 className="text-2xl font-bold">Ingredients</h2>
         <span className="text-sm text-black/60">{recipe.ingredients.length} items</span>
       </div>
-      <ul className="mt-3 grid gap-2 md:grid-cols-2">
-        {recipe.ingredients.map((item, index) => (
-          <li
-            key={index}
-            className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-xl border-2 border-black bg-white px-3 py-2.5"
-          >
-            <div>
-              <p className="font-semibold">{formatIngredient(item)}</p>
-              {item.note && (
-                <p className="mt-0.5 text-xs leading-5 text-black/65">{item.note}</p>
-              )}
-            </div>
-            {item.alternativeGroup &&
-              (preview ? (
-                <a
-                  className="text-sm font-bold underline underline-offset-4"
-                  href={`#preview-${item.alternativeGroup}`}
-                >
-                  View Alternatives →
-                </a>
-              ) : (
-                <RecipeLink
-                  to={`/recipes/${recipe.slug}/alternatives/${item.alternativeGroup}`}
-                >
-                  View Alternatives →
-                </RecipeLink>
-              ))}
-          </li>
-        ))}
-      </ul>
+      {columns ? <div className="mt-3 grid items-start gap-2 md:grid-cols-2">
+        <ul className="min-w-0 space-y-2">{recipe.ingredients.map((item, index) => index % 2 === 0 ? row(item, index) : null)}</ul>
+        <ul className="min-w-0 space-y-2">{recipe.ingredients.map((item, index) => index % 2 === 1 ? row(item, index) : null)}</ul>
+      </div> : <ul className="mt-3 space-y-2">{recipe.ingredients.map(row)}</ul>}
     </section>
   );
 }
@@ -170,7 +253,6 @@ export function RecipeSteps({ steps }) {
 }
 
 export function RecipePage({ recipe, preview = false, onRecipeUpdated, favourite = false, favouritePending = false, onToggleFavourite }) {
-  const [nutritionPreview, setNutritionPreview] = useState(null);
   return (
     <article className="space-y-5 break-words text-black">
       <section className="grid gap-5 lg:grid-cols-[minmax(15rem,0.75fr)_minmax(0,1.25fr)] lg:items-stretch">
@@ -183,8 +265,8 @@ export function RecipePage({ recipe, preview = false, onRecipeUpdated, favourite
             </h1>
             {recipe.description && <p className="text-sm leading-6 text-black/70">{recipe.description}</p>}
           </header>
-          <RecipeNutrition nutrition={nutritionPreview || recipe.nutrition} fibreSource={nutritionPreview ? null : recipe.fibreSource} />
-          {nutritionPreview ? <p className="text-sm" role="status">Unsaved nutrition preview · per serving. Complete the ingredient amounts, then save products & nutrition.</p> : (recipe.productNutrition || recipe.nutritionFromIngredients) && <p className="text-sm">Ingredient nutrition · per serving</p>}
+          <RecipeNutrition nutrition={recipe.nutrition} fibreSource={recipe.fibreSource} />
+          <RecipeNutritionStatus recipe={recipe} />
           <dl className="flex flex-wrap gap-x-6 gap-y-2">
             {[
               ['Prep time', recipe.prepTime],
@@ -207,7 +289,6 @@ export function RecipePage({ recipe, preview = false, onRecipeUpdated, favourite
         </details>
       )}
       <IngredientList recipe={recipe} preview={preview} />
-      {!preview && <RecipeProducts key={recipe.slug} recipe={recipe} onSaved={onRecipeUpdated} onPreview={setNutritionPreview} />}
       <RecipeSteps steps={recipe.steps} />
       {!preview && (
         <details className="rounded-2xl border-2 border-black bg-white p-4">
@@ -263,7 +344,7 @@ export function RecipeCard({ recipe, favourite = false, favouritePending = false
         </p>
       )}
       <RecipeNutrition nutrition={recipe.nutrition} fibreSource={recipe.fibreSource} />
-      {(recipe.productNutrition || recipe.nutritionFromIngredients) && <p className="text-sm">Ingredient nutrition · per serving</p>}
+      <RecipeNutritionStatus recipe={recipe} />
       <RecipeHealthReview recipe={recipe} compact />
       <p className="text-sm text-black/70">
         {[

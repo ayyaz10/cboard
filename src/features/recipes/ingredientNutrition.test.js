@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ingredientLabelNutrition, cleanIngredientLabel, ingredientRecipeTotals, prepareIngredientEditor } from './ingredientNutrition.js';
+import { ingredientLabelNutrition, cleanIngredientLabel, ingredientRecipeCalculation, ingredientRecipeTotals, prepareIngredientEditor } from './ingredientNutrition.js';
 import { validateRecipe } from './recipeData.js';
 const label = cleanIngredientLabel({ quantity: 100, unit: 'g', calories: 90, protein: 1, carbs: 20, fat: 0, fiber: 3, source: { name: 'Banana', provider: 'Open Food Facts' } });
 test('ingredient editor scales fractions by confirmed piece weight and keeps unknown weight unknown', () => {
@@ -18,6 +18,23 @@ test('label metadata and calculated ingredient and overall macros persist throug
   assert.deepEqual(validateRecipe(recipe), recipe);
   assert.equal(validateRecipe({ ...recipe, ingredients: [{ ...recipe.ingredients[0], amount: 100 }] }).nutrition.calories, 45);
   assert.equal(ingredientRecipeTotals({ ...recipe, servings: null }).calories, null);
+});
+test('known ingredient nutrition populates recipe subtotals while missing items remain explicit', () => {
+  const calculation = ingredientRecipeCalculation({ servings: 2, ingredients: [
+    { nutrition: { calories: 180, protein: 2, fiber: 6 } },
+    { nutrition: { calories: null, protein: null, fiber: null } },
+  ] });
+  assert.equal(calculation.perServing.calories, 90);
+  assert.equal(calculation.perServing.fiber, 3);
+  assert.equal(calculation.missing.calories, 1);
+  assert.equal(calculation.known.calories, 1);
+  const saved = validateRecipe({ title: 'Fruit bowl', slug: 'fruit-bowl', mealType: 'Snack', servings: 2, steps: ['Serve'], nutritionFromIngredients: true, ingredients: [
+    { name: 'Banana', amount: 200, unit: 'g', nutrition: { calories: 180, protein: 2, fiber: 6 } },
+    { name: 'Topping', amount: 10, unit: 'g' },
+  ] });
+  assert.equal(saved.nutrition.calories, 90);
+  assert.equal(saved.nutrition.fiber, 3);
+  assert.equal(ingredientRecipeCalculation(saved).missing.calories, 1);
 });
 test('existing saved product choices move into editor labels without losing actual quantities', () => {
   const prepared = prepareIngredientEditor({ ingredients: [{ name: 'Banana', amount: 150, unit: 'g' }], sauces: [], productNutrition: { items: [{ quantity: 200, unit: 'g', nutrition: label }] } });

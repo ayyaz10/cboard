@@ -3,7 +3,7 @@ import { searchNutrition, lookupBarcode } from "../../services/nutritionLookup";
 import { BarcodeScanner } from "./BarcodeScanner";
 import { NutritionLabel } from "./NutritionLabel";
 import { nutrients } from "./groceryData";
-import { searchNaturalFoods, naturalPortionNutrition, nutritionForOnePortion } from '../../services/naturalFoods';
+import { searchNaturalFoods, naturalPortionNutrition, nutritionForOnePortion, suggestedNaturalPortion } from '../../services/naturalFoods';
 
 export function NutritionLookup({ name, active, visible, onSelect, amountUnit, portionMode = 'unit' }) {
   const [mode, setMode] = useState("name");
@@ -81,20 +81,23 @@ export function NutritionLookup({ name, active, visible, onSelect, amountUnit, p
     {results?.map((product) => {
       const unit = basis[product.code] || product.nutrition.unit;
       const natural = product.source.provider === 'USDA FoodData Central';
-      const portion = product.portions?.[portions[product.code]];
+      const suggestedPortion = suggestedNaturalPortion(product, name, amountUnit);
+      const portionIndex = Object.hasOwn(portions, product.code) ? portions[product.code] : suggestedPortion;
+      const portion = product.portions?.[portionIndex];
       const allowPortion = !amountUnit || !/^(g|grams?|kg|kilograms?|mg|ml|millilitres?|milliliters?|l|litres?|liters?|oz|lb)$/i.test(amountUnit.trim());
+      const displayScale = natural && allowPortion && portion ? portion.grams / product.nutrition.quantity : 1;
       return <div className="g-nutrition-result" key={product.code}>
         <strong>{product.name}</strong>
         <p>{[product.brand, product.pack].filter(Boolean).join(" / ")}</p>
-        <small>{nutrients.map(([key, label, suffix]) => `${label}: ${product.nutrition[key] == null ? "unknown" : `${product.nutrition[key]} ${suffix}`}`).join(" / ")}</small>
-        <p>Per 100 {unit || "g or ml (choose below)"}</p>
+        <small>{nutrients.map(([key, label, suffix]) => `${label}: ${product.nutrition[key] == null ? "unknown" : `${Number((product.nutrition[key] * displayScale).toFixed(2))} ${suffix}`}`).join(" / ")}</small>
+        <p>{natural && allowPortion && portion ? `Per 1 ${portion.label} (~${Number(portion.grams.toFixed(2))} g edible portion)` : `Per 100 ${unit || "g or ml (choose below)"}`}</p>
         {!natural && <label>Nutrition basis (auto-selected; change if needed)
           <select value={unit || ""} onChange={(e) => setBasis({ ...basis, [product.code]: e.target.value })}>
             <option value="">Choose g or ml</option><option value="g">100 g</option><option value="ml">100 ml</option>
           </select>
         </label>}
-        {natural && allowPortion && product.portions.length > 0 && <label>{amountUnit ? `Estimated weight of one ${amountUnit}` : 'Portion size (estimated)'}
-          <select value={portions[product.code] ?? ''} onChange={(event) => setPortions({ ...portions, [product.code]: event.target.value })}>
+        {natural && allowPortion && product.portions.length > 0 && <label>{amountUnit ? `Portion used for one ${amountUnit}` : 'Portion size (estimated)'}
+          <select value={portionIndex} onChange={(event) => setPortions({ ...portions, [product.code]: event.target.value })}>
             <option value="">Use weighed grams</option>
             {product.portions.map((value, index) => <option key={index} value={index}>{value.label} (~{Number(value.grams.toFixed(2))} g per unit)</option>)}
           </select>

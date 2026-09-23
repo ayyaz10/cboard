@@ -28,9 +28,13 @@ export function calculateProducts(items, servings) {
       ? value * item.quantity / item.nutrition.quantity : null;
     return [key, amount != null && Number.isFinite(amount) ? amount : null];
   })));
-  const total = Object.fromEntries(macroKeys.map((key) => [key, ingredients.length && ingredients.every((item) => item[key] != null) ? ingredients.reduce((sum, item) => sum + item[key], 0) : null]));
+  const known = Object.fromEntries(macroKeys.map((key) => [key, ingredients.filter((item) => item[key] != null).length]));
+  const missing = Object.fromEntries(macroKeys.map((key) => [key, ingredients.length - known[key]]));
+  // Preserve useful values from matched products. `missing` lets callers label
+  // them as subtotals instead of silently treating absent values as zero.
+  const total = Object.fromEntries(macroKeys.map((key) => [key, known[key] ? ingredients.reduce((sum, item) => sum + (item[key] ?? 0), 0) : null]));
   const perServing = Object.fromEntries(macroKeys.map((key) => [key, total[key] != null && positive(servings) ? Math.round(total[key] / servings * 100) / 100 : null]));
-  return { ingredients, total, perServing };
+  return { ingredients, total, perServing, known, missing };
 }
 
 export function initialProductAmount(ingredient, unit) {

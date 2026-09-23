@@ -1,8 +1,8 @@
 import { secondaryButton } from './RecipeComponents';
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { NutritionLookup } from '../groceries/NutritionLookup';
 import { initialProductAmount } from './recipeProducts.js';
-import { cleanIngredientLabel, ingredientLabelAmount, ingredientLabelNutrition, ingredientRecipeTotals, prepareIngredientEditor } from './ingredientNutrition.js';
+import { cleanIngredientLabel, ingredientLabelAmount, ingredientLabelNutrition, ingredientRecipeCalculation, ingredientRecipeTotals, prepareIngredientEditor } from './ingredientNutrition.js';
 import '../groceries/groceries.css';
 
 export const emptyRecipe = () => ({
@@ -156,7 +156,7 @@ function ItemEditor({ item, onChange, groups, visible }) {
           }
         }}>Enter nutrition manually</button>
         </div>
-        {visible && lookup && <NutritionLookup name={item.name || ''} amountUnit={item.unit} portionMode="weight" active visible onSelect={useLabel} />}
+        {visible && lookup && <div className="max-h-[34rem] min-w-0 overflow-y-auto overscroll-contain pr-1" aria-label="Food nutrition search results"><NutritionLookup name={item.name || ''} amountUnit={item.unit} portionMode="weight" active visible onSelect={useLabel} /></div>}
         {label && <>
           <p className="text-sm">{label.source.name || item.name} · {label.source.provider}. Label values per {label.quantity} {label.unit}.</p>
           {label.source.estimatedPortion && <p className="text-sm">Estimated USDA portion: {label.source.portionDescription}. Replace the weight below with your measured edible weight if available.</p>}
@@ -169,7 +169,7 @@ function ItemEditor({ item, onChange, groups, visible }) {
         </>}
       </div>
       <details ref={nutritionDetails} open={nutritionOpen} onToggle={(event) => setNutritionOpen(event.currentTarget.open)}>
-        <summary className="font-semibold">Item nutrition (optional)</summary>
+        <summary className="font-semibold">{label ? 'Item nutrition (calculated)' : 'Item nutrition (optional)'}</summary>
         <div className="mt-4">
           {!label && <p className="mb-3 text-sm text-black/60">Manual values for the full amount above. Use food lookup for automatic recalculation when the amount changes.</p>}
           <Macros
@@ -188,7 +188,7 @@ function ItemRow({ title, item, index, items, onChange, groups }) {
 
   return (
     <details
-      className="rounded-xl border-2 border-black bg-white p-3"
+      className="min-w-0 self-start rounded-xl border-2 border-black bg-white p-3"
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
@@ -224,23 +224,43 @@ function ItemRow({ title, item, index, items, onChange, groups }) {
   );
 }
 
+function useDesktopColumns() {
+  const query = '(min-width: 1024px)';
+  const [desktop, setDesktop] = useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches);
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const update = () => setDesktop(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+  return desktop;
+}
+
 function Items({ title, items, onChange, groups }) {
+  const desktop = useDesktopColumns();
+  const itemRow = (item, index) => (
+    <ItemRow
+      key={index}
+      title={title}
+      item={item}
+      index={index}
+      items={items}
+      onChange={onChange}
+      groups={groups}
+    />
+  );
   return (
     <section className="space-y-4">
       <h2 className="text-2xl font-bold">{title}</h2>
-      <div className="grid gap-2 lg:grid-cols-2">
-        {items.map((item, index) => (
-          <ItemRow
-          key={index}
-          title={title}
-          item={item}
-          index={index}
-          items={items}
-          onChange={onChange}
-          groups={groups}
-          />
-        ))}
-      </div>
+      {desktop ? (
+        <div className="grid items-start gap-2 lg:grid-cols-2">
+          <div className="min-w-0 space-y-2">{items.map((item, index) => index % 2 === 0 ? itemRow(item, index) : null)}</div>
+          <div className="min-w-0 space-y-2">{items.map((item, index) => index % 2 === 1 ? itemRow(item, index) : null)}</div>
+        </div>
+      ) : (
+        <div className="space-y-2">{items.map(itemRow)}</div>
+      )}
       <button
         type="button"
         className={secondaryButton}
@@ -256,6 +276,7 @@ function Items({ title, items, onChange, groups }) {
 
 export function RecipeFormEditor({ recipe, onChange, editing }) {
   recipe = prepareIngredientEditor(recipe);
+  const ingredientCalculation = ingredientRecipeCalculation(recipe);
   const set = (key, value, options = {}) => {
     const next = { ...recipe, [key]: value };
     if (key === 'nutrition') next.nutritionFromIngredients = false;
@@ -319,9 +340,10 @@ export function RecipeFormEditor({ recipe, onChange, editing }) {
       <details className="rounded-2xl border-2 border-black bg-white p-4" open>
         <summary className="cursor-pointer text-xl font-bold">Recipe nutrition</summary>
         <p className="text-sm text-black/70">
-          {recipe.nutritionFromIngredients ? 'Calculated per serving from ingredient and sauce quantities. Missing values stay unknown. Set the serving count above; alternatives are not included.' : 'Enter macros manually or use food lookup inside an ingredient to calculate from ingredients. Item nutrition describes the full amount listed for that ingredient.'}
+          {recipe.nutritionFromIngredients ? 'Calculated automatically per serving from ingredient and sauce quantities. Set the serving count above; alternatives are not included.' : 'Enter macros manually or use food lookup inside an ingredient to calculate from ingredients. Item nutrition describes the full amount listed for that ingredient.'}
         </p>
         <div className="mt-3"><Macros value={recipe.nutrition} onChange={(value) => set('nutrition', value)} /></div>
+        {recipe.nutritionFromIngredients && Object.values(ingredientCalculation.missing).some((value) => value > 0) && <p className="mt-3 text-sm font-semibold">Showing known per-serving subtotals. Complete the missing ingredient nutrition to calculate the full recipe.</p>}
       </details>
       <Items
         title="Ingredients"

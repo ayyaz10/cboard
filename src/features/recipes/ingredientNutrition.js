@@ -25,10 +25,24 @@ export function ingredientLabelNutrition(item) {
     return [key, Number.isFinite(result) && result >= 0 ? Math.round(result * 10000) / 10000 : null];
   }));
 }
-export function ingredientRecipeTotals(recipe) {
+export function ingredientRecipeCalculation(recipe) {
   const items = [...(recipe.ingredients || []), ...(recipe.sauces || [])];
-  return Object.fromEntries(macroKeys.map((key) => [key, items.length && recipe.servings > 0 && items.every((item) => typeof item.nutrition?.[key] === 'number' && Number.isFinite(item.nutrition[key]))
-    ? Math.round(items.reduce((sum, item) => sum + item.nutrition[key], 0) / recipe.servings * 100) / 100 : null]));
+  const ingredients = items.map((item) => Object.fromEntries(macroKeys.map((key) => {
+    const value = item.nutrition?.[key];
+    return [key, typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null];
+  })));
+  const known = Object.fromEntries(macroKeys.map((key) => [key, ingredients.filter((item) => item[key] != null).length]));
+  const missing = Object.fromEntries(macroKeys.map((key) => [key, ingredients.length - known[key]]));
+  const total = Object.fromEntries(macroKeys.map((key) => [key, known[key]
+    ? ingredients.reduce((sum, item) => sum + (item[key] ?? 0), 0)
+    : null]));
+  const perServing = Object.fromEntries(macroKeys.map((key) => [key, total[key] != null && recipe.servings > 0
+    ? Math.round(total[key] / recipe.servings * 100) / 100
+    : null]));
+  return { ingredients, total, perServing, known, missing };
+}
+export function ingredientRecipeTotals(recipe) {
+  return ingredientRecipeCalculation(recipe).perServing;
 }
 export function prepareIngredientEditor(recipe) {
   if (!recipe.productNutrition) return recipe;

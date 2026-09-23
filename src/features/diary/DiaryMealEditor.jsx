@@ -1,5 +1,6 @@
 import { NutritionTotals } from "./DiaryNutrition";
 import { useEffect, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { NutritionLookup } from "../groceries/NutritionLookup";
 import { NUTRIENTS } from "../nutrition/nutrients";
 import { MEALS, foodItem, itemNutrition, recipeItems } from "./diaryData";
@@ -24,7 +25,9 @@ export function DiaryMealEditor({
   const [portions, setPortions] = useState(1);
   const [individual, setIndividual] = useState(false);
   const [lookup, setLookup] = useState(null);
+  const [openFood, setOpenFood] = useState(null);
   const [error, setError] = useState("");
+  const reduceMotion = useReducedMotion();
   const recipe = recipes.find((item) => item.slug === slug);
   useEffect(() => {
     onDraftChange(draft);
@@ -57,6 +60,7 @@ export function DiaryMealEditor({
   }
   function selectFood(nutrition) {
     const item = foodItem(nutrition);
+    const selectedId = lookup === "new" ? item.id : lookup;
     setDraft((current) => ({
       ...current,
       items:
@@ -73,6 +77,7 @@ export function DiaryMealEditor({
                 : old,
             ),
     }));
+    setOpenFood(selectedId);
     setLookup(null);
   }
   return (
@@ -145,7 +150,7 @@ export function DiaryMealEditor({
                 />
               </label>
             </div>
-            {recipe && !recipe.productNutrition && (
+            {recipe && !recipe.productNutrition && !recipe.nutritionFromIngredients && (
               <>
                 <p className="diary-hint">
                   One portion uses the recipe’s listed macros. Check whether
@@ -175,6 +180,11 @@ export function DiaryMealEditor({
                 Each amount is editable below.
               </p>
             )}
+            {recipe?.nutritionFromIngredients && (
+              <p className="diary-hint">
+                Imports the saved ingredient nutrition for this many servings so known values and incomplete ingredients remain visible.
+              </p>
+            )}
             <button
               type="button"
               disabled={!recipe || draft.items.length >= 100}
@@ -194,15 +204,11 @@ export function DiaryMealEditor({
             <button
               type="button"
               disabled={draft.items.length >= 100}
-              onClick={() =>
-                setDraft({
-                  ...draft,
-                  items: [
-                    ...draft.items,
-                    foodItem({ quantity: 100, unit: "g" }, "New food"),
-                  ],
-                })
-              }
+              onClick={() => {
+                const item = foodItem({ quantity: 100, unit: "g" }, "New food");
+                setDraft({ ...draft, items: [...draft.items, item] });
+                setOpenFood(item.id);
+              }}
             >
               Enter food manually
             </button>
@@ -241,9 +247,40 @@ export function DiaryMealEditor({
               return (
                 <section
                   key={item.id}
-                  className="diary-food"
+                  className="diary-food diary-food-compact"
                   aria-label={`Food ${index + 1}`}
                 >
+                  <button
+                    type="button"
+                    className="diary-food-toggle"
+                    aria-expanded={openFood === item.id}
+                    onClick={() => setOpenFood(openFood === item.id ? null : item.id)}
+                  >
+                    <span className="diary-food-toggle-copy">
+                      <span className="diary-food-title">{item.name}</span>
+                      <span className="diary-food-amount">{format(item.quantity)} {item.unit}</span>
+                      <span className="diary-food-macro-summary">
+                        <span>{totals.calories == null ? "—" : format(totals.calories)} kcal</span>
+                        <span>P {totals.protein == null ? "—" : `${format(totals.protein)} g`}</span>
+                        <span>C {totals.carbs == null ? "—" : `${format(totals.carbs)} g`}</span>
+                        <span>F {totals.fat == null ? "—" : `${format(totals.fat)} g`}</span>
+                        <span>Fibre {totals.fiber == null ? "—" : `${format(totals.fiber)} g`}</span>
+                      </span>
+                    </span>
+                    <motion.svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" className="diary-food-chevron" animate={{ rotate: openFood === item.id ? 180 : 0 }} transition={{ duration: reduceMotion ? 0 : 0.28, ease: [0.22, 1, 0.36, 1] }}>
+                      <path d="m6 9 6 6 6-6" />
+                    </motion.svg>
+                  </button>
+                  <AnimatePresence initial={false}>
+                  {openFood === item.id && <motion.div
+                    key="food-editor"
+                    className="diary-food-editor-body"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ height: { duration: reduceMotion ? 0 : 0.38, ease: [0.22, 1, 0.36, 1] }, opacity: { duration: reduceMotion ? 0 : 0.22 } }}
+                  >
+                  <div className="diary-food-editor-inner">
                   <label>
                     Food name
                     <input
@@ -408,6 +445,9 @@ export function DiaryMealEditor({
                       Remove food
                     </button>
                   </div>
+                  </div>
+                  </motion.div>}
+                  </AnimatePresence>
                 </section>
               );
             })}

@@ -33,7 +33,9 @@ export function RecipeProducts({ recipe, onSaved, onPreview }) {
       const saved = await saveRecipeProducts(recipe, { basis: productBasis(recipe), items }, Number(servings));
       onSaved?.(saved);
       setDirty(false);
-      setMessage('Products and nutrition saved. Recipe macros are per serving.');
+      setMessage(macroKeys.some((key) => calculated.missing[key] > 0)
+        ? 'Known nutrition saved. The recipe card, meal planner and daily log will mark it as incomplete until every ingredient has values.'
+        : 'Products and nutrition saved. Recipe macros are per serving.');
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
   }
@@ -72,8 +74,8 @@ export function RecipeProducts({ recipe, onSaved, onPreview }) {
             }} />}
           </section>;
         })}
-        <div className="recipe-product-values" aria-label="Calculated nutrition">{macroKeys.map((key) => <div key={key}><strong>{labels[key]}</strong><p>Whole recipe: {calculated.total[key] == null ? 'Unknown' : Number(calculated.total[key].toFixed(2))}</p><p>Per serving: {calculated.perServing[key] ?? 'Unknown'}</p></div>)}</div>
-        <p className="text-sm">Saving replaces the recipe’s displayed macros with these per-serving values. A nutrient stays unknown until every ingredient has a value. Saved product choices are reused when you reopen this recipe; look up a product again to refresh its label.</p>
+        <div className="recipe-product-values" aria-label="Calculated nutrition">{macroKeys.map((key) => <div key={key}><strong>{labels[key]}</strong><p>{calculated.missing[key] ? 'Known subtotal' : 'Whole recipe'}: {calculated.total[key] == null ? 'Unknown' : Number(calculated.total[key].toFixed(2))}</p><p>Per serving: {calculated.perServing[key] ?? 'Unknown'}</p>{calculated.missing[key] > 0 && <p className="text-sm">Missing for {calculated.missing[key]} ingredient{calculated.missing[key] === 1 ? '' : 's'}</p>}</div>)}</div>
+        <p className="text-sm">Saving updates the recipe card with these per-serving values. If an ingredient is missing, the known subtotal is shown and clearly marked incomplete. Saved product choices are reused when you reopen this recipe; look up a product again to refresh its label.</p>
         <button type="button" disabled={busy || !Number.isFinite(Number(servings)) || Number(servings) <= 0 || !items.some(Boolean) || items.some((item) => item && (!Number.isFinite(item.quantity) || item.quantity <= 0 || !Number.isFinite(item.nutrition.quantity) || item.nutrition.quantity <= 0))} onClick={save}>{busy ? 'Saving…' : 'Save products & nutrition'}</button>
       </fieldset>
       {error && <p role="alert">{error}</p>}{message && <p role="status">{message}</p>}

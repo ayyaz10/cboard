@@ -87,6 +87,39 @@ test("recipe snapshots are independent and product ingredients scale per serving
   );
   assert.equal(itemNutrition(legacy[0]).calories, 250);
 });
+test("partial recipe products reach the daily log as a known subtotal with missing ingredients", () => {
+  const recipe = {
+    title: "Partial plate",
+    nutrition: { calories: 155, protein: 13 },
+    servings: 1,
+    ingredients: [{ name: "Eggs" }, { name: "Unmatched garnish" }],
+    sauces: [],
+    productNutrition: {
+      items: [
+        { quantity: 100, unit: "g", nutrition: { quantity: 100, unit: "g", calories: 155, protein: 13 } },
+        null,
+      ],
+    },
+  };
+  const totals = diaryTotals([{ ...newMeal("Lunch"), items: recipeItems(recipe) }]);
+  assert.deepEqual(totals.calories, { value: 155, known: 1, missing: 1 });
+  assert.deepEqual(totals.protein, { value: 13, known: 1, missing: 1 });
+});
+test("calculated editor ingredients automatically reach the daily log", () => {
+  const recipe = {
+    title: "Calculated bowl", servings: 2, nutritionFromIngredients: true,
+    ingredients: [
+      { name: "Yoghurt", amount: 300, unit: "g", nutrition: { calories: 180, protein: 30 } },
+      { name: "Unknown topping", amount: 10, unit: "g", nutrition: {} },
+    ],
+    sauces: [],
+  };
+  const items = recipeItems(recipe, 1);
+  assert.equal(items.length, 2);
+  const totals = diaryTotals([{ ...newMeal("Breakfast"), items }]);
+  assert.deepEqual(totals.calories, { value: 90, known: 1, missing: 1 });
+  assert.deepEqual(totals.protein, { value: 15, known: 1, missing: 1 });
+});
 test("individual recipe ingredients use full recipe nutrition and serving count", () => {
   const recipe = {
     title: "Eggs",

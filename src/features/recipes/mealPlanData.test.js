@@ -76,6 +76,37 @@ test('unknown macros, deleted recipes and invalid portions cannot silently count
   assert.equal(calculateMealPlan(plan, recipes).totals.calories.missing, 2);
   assert.equal(calculateMealPlan([], recipes).totals.calories.known, 0);
 });
+test('partial product nutrition contributes a labelled known subtotal', () => {
+  const plan = emptyMealPlan();
+  plan[0].slug = 'partial';
+  const partial = {
+    slug: 'partial', servings: 1,
+    nutrition: { calories: 200, protein: 10, carbs: null, fat: 5, fiber: 0 },
+    productNutrition: { items: [
+      { quantity: 100, unit: 'g', nutrition: { quantity: 100, unit: 'g', calories: 200, protein: 10, carbs: null, fat: 5, fiber: 0 } },
+      null,
+    ] },
+  };
+  const { totals, meals } = calculateMealPlan(plan, [...recipes, partial]);
+  assert.equal(meals[0].nutrition.calories, 200);
+  assert.deepEqual(totals.calories, { value: 200, known: 1, missing: 1 });
+  assert.deepEqual(totals.carbs, { value: 0, known: 0, missing: 1 });
+});
+test('partial editor ingredient nutrition contributes a labelled known subtotal', () => {
+  const plan = emptyMealPlan();
+  plan[0].slug = 'editor-partial';
+  const partial = {
+    slug: 'editor-partial', servings: 1, nutritionFromIngredients: true,
+    nutrition: { calories: 200, protein: 10, carbs: null, fat: 5, fiber: 0 },
+    ingredients: [
+      { nutrition: { calories: 200, protein: 10, carbs: null, fat: 5, fiber: 0 } },
+      { nutrition: { calories: null, protein: null, carbs: null, fat: null, fiber: null } },
+    ],
+  };
+  const { totals } = calculateMealPlan(plan, [...recipes, partial]);
+  assert.deepEqual(totals.calories, { value: 200, known: 1, missing: 1 });
+  assert.deepEqual(totals.carbs, { value: 0, known: 0, missing: 1 });
+});
 test('saved plans validate portions, identities and limits', () => {
   const plan = emptyMealPlan();
   assert.deepEqual(validateMealPlan(JSON.parse(JSON.stringify(plan))), plan);

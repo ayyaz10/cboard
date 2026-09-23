@@ -1,3 +1,6 @@
+import { calculateProducts } from './recipeProducts.js';
+import { ingredientRecipeCalculation } from './ingredientNutrition.js';
+
 export const MEAL_SLOTS = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 export const MACROS = ['calories', 'protein', 'carbs', 'fat', 'fiber'];
 export const emptyMealPlan = () =>
@@ -75,6 +78,11 @@ export function calculateMealPlan(entries, recipes) {
     .filter((entry) => entry.slug)
     .map((entry) => {
       const recipe = bySlug.get(entry.slug);
+      const productCalculation = recipe?.productNutrition
+        ? calculateProducts(recipe.productNutrition.items, recipe.servings)
+        : recipe?.nutritionFromIngredients
+          ? ingredientRecipeCalculation(recipe)
+          : null;
       const validPortions =
         typeof entry.portions === 'number' &&
         Number.isFinite(entry.portions) &&
@@ -94,6 +102,7 @@ export function calculateMealPlan(entries, recipes) {
         else {
           totals[key].known += 1;
           totals[key].value += nutrition[key];
+          if (productCalculation?.missing[key] > 0) totals[key].missing += 1;
         }
       }
       return { ...entry, recipe, nutrition };

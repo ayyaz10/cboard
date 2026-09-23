@@ -228,7 +228,7 @@ export function recipeItems(recipe, portions = 1, ingredients = false) {
           };
     });
   }
-  if (ingredients) {
+  if (ingredients || recipe.nutritionFromIngredients) {
     if (!(recipe.servings > 0))
       throw new Error(
         "This recipe needs a serving count before importing individual ingredients.",
