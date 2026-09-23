@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { getPreference, setPreference } from '../../services/preferenceService';
-import { secondaryButton } from './RecipeComponents';
+import { RecipeLink, secondaryButton } from './RecipeComponents';
 import { calculateMealPlan, MACROS } from './mealPlanData';
 import { readRoutinePresets, saveRoutinePreset } from './routinePresets';
 
@@ -149,17 +149,32 @@ export function QuickRoutines({
                         className="h-12 w-12 shrink-0"
                         title={`${meal.meal}: ${meal.recipe?.title ?? 'Recipe no longer available'}`}
                       >
-                        {meal.recipe?.image ? (
-                          <img
-                            src={meal.recipe.image}
-                            alt={meal.recipe.title}
-                            loading="lazy"
-                            className="h-full w-full rounded-lg border border-black object-cover"
-                          />
+                        {meal.recipe ? (
+                          <RecipeLink
+                            to={`/recipes/${meal.slug}`}
+                            className="block h-full w-full rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
+                          >
+                            {meal.recipe.image ? (
+                              <img
+                                src={meal.recipe.image}
+                                alt={meal.recipe.title}
+                                loading="lazy"
+                                className="h-full w-full rounded-lg border border-black object-cover"
+                              />
+                            ) : (
+                              <span
+                                role="img"
+                                aria-label={`${meal.recipe.title}: no photo`}
+                                className="flex h-full w-full items-center justify-center rounded-lg border border-black bg-white p-1 text-center text-[10px] leading-tight text-black/70"
+                              >
+                                No photo
+                              </span>
+                            )}
+                          </RecipeLink>
                         ) : (
                           <span
                             role="img"
-                            aria-label={`${meal.recipe?.title ?? 'Recipe no longer available'}: no photo`}
+                            aria-label="Recipe no longer available: no photo"
                             className="flex h-full w-full items-center justify-center rounded-lg border border-black bg-white p-1 text-center text-[10px] leading-tight text-black/70"
                           >
                             No photo
@@ -180,7 +195,17 @@ export function QuickRoutines({
                     {meals.map((meal) => (
                       <li key={meal.id}>
                         {meal.meal}:{' '}
-                        {meal.recipe?.title ?? 'Recipe no longer available'} (
+                        {meal.recipe ? (
+                          <RecipeLink
+                            to={`/recipes/${meal.slug}`}
+                            className="font-semibold underline decoration-2 underline-offset-2"
+                          >
+                            {meal.recipe.title}
+                          </RecipeLink>
+                        ) : (
+                          'Recipe no longer available'
+                        )}{' '}
+                        (
                         {meal.portions}×)
                       </li>
                     ))}

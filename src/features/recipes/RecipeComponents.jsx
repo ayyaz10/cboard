@@ -330,7 +330,7 @@ export function RecipePage({ recipe, preview = false, onRecipeUpdated, favourite
   );
 }
 
-export function RecipeCard({ recipe, favourite = false, favouritePending = false, onToggleFavourite }) {
+export function RecipeCard({ recipe, favourite = false, favouritePending = false, onToggleFavourite, onDelete }) {
   return (
     <article className="recipe-card recipe-clickable-card panel flex min-w-0 flex-col gap-4 border-black p-5 text-black">
       <RecipeImage image={recipe.image} title={recipe.title} />
@@ -361,6 +361,16 @@ export function RecipeCard({ recipe, favourite = false, favouritePending = false
           linkClassName={secondaryButton}
           compact
         />
+        {onDelete && (
+          <button
+            type="button"
+            className={secondaryButton}
+            disabled={favouritePending}
+            onClick={() => onDelete(recipe)}
+          >
+            Delete
+          </button>
+        )}
       </div>
     </article>
   );

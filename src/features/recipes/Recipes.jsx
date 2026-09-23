@@ -286,7 +286,13 @@ function RecipesContent({ route }) {
                           key={item.slug}
                           className="flex min-w-0 flex-col gap-3"
                         >
-                          <RecipeCard recipe={item} favourite={favourites.has(item.slug)} favouritePending={favouritePending.has(item.slug)} onToggleFavourite={toggleFavourite} />
+                          <RecipeCard
+                            recipe={item}
+                            favourite={favourites.has(item.slug)}
+                            favouritePending={favouritePending.has(item.slug)}
+                            onToggleFavourite={toggleFavourite}
+                            onDelete={setRemoving}
+                          />
                           {manage && (
                             <div className="flex flex-wrap gap-2">
                               <button
@@ -305,13 +311,6 @@ function RecipesContent({ route }) {
                                 }
                               >
                                 Duplicate
-                              </button>
-                              <button
-                                className={secondaryButton}
-                                disabled={favouritePending.has(item.slug)}
-                                onClick={() => setRemoving(item)}
-                              >
-                                Delete
                               </button>
                             </div>
                           )}

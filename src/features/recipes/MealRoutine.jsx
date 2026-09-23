@@ -38,7 +38,7 @@ export function MealRoutine({ routine, meals, onEdit }) {
                   {selected.map((meal) => (
                     <article
                       key={meal.id}
-                      className="grid min-w-0 gap-3 break-words rounded-2xl border-2 border-black bg-white p-3 sm:grid-cols-[8rem_minmax(0,1fr)]"
+                      className="recipe-clickable-card grid min-w-0 gap-3 break-words rounded-2xl border-2 border-black bg-white p-3 sm:grid-cols-[8rem_minmax(0,1fr)]"
                     >
                       {meal.recipe ? (
                         <>
@@ -50,7 +50,12 @@ export function MealRoutine({ routine, meals, onEdit }) {
                           </div>
                           <div className="min-w-0 space-y-2.5">
                           <h4 className="break-words text-lg font-bold leading-tight">
-                            {meal.recipe.title}
+                            <RecipeLink
+                              to={`/recipes/${meal.slug}`}
+                              className="recipe-card-main-link"
+                            >
+                              {meal.recipe.title}
+                            </RecipeLink>
                           </h4>
                           <p className="text-sm font-semibold">
                             {meal.portions}× portion
