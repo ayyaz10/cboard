@@ -247,34 +247,36 @@ function RecipesContent({ route }) {
                 </header>
                 {recipes.length > 0 ? (
                   <>
-                    <label className="space-y-2 font-bold">
-                      <span>Search recipes</span>
-                      <input
-                        type="search"
-                        className="field-input"
-                        placeholder="Name, ingredient or tag"
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                      />
-                    </label>
-                    <div className="flex flex-wrap items-center gap-3" aria-label="Recipe filters and view">
-                      <button type="button" className={`${secondaryButton.replace('bg-white', '')} min-h-11 ${!favouritesOnly ? 'bg-[#c5ff6f]' : 'bg-white'}`} aria-pressed={!favouritesOnly} onClick={() => setFavouritesOnly(false)}>All recipes</button>
-                      <button type="button" className={`${secondaryButton.replace('bg-white', '')} min-h-11 ${favouritesOnly ? 'bg-[#c5ff6f]' : 'bg-white'}`} aria-pressed={favouritesOnly} onClick={() => setFavouritesOnly(true)}><span aria-hidden="true" className="mr-2">♥</span>Favourites ({recipes.filter(item => favourites.has(item.slug)).length})</button>
-                      <label className="recipe-meal-filter inline-flex min-h-11 items-center gap-2 rounded-full border-2 border-black bg-white px-3 text-sm font-bold">
-                        <span>Meal type</span>
-                        <select
-                          className="min-w-0 bg-transparent font-bold outline-none"
-                          value={category}
-                          onChange={(event) => setCategory(event.target.value)}
-                        >
-                          <option value="All">All meals</option>
-                          {categories.map((value) => (
-                            <option key={value} value={value}>{value}</option>
-                          ))}
-                        </select>
+                    <div className="space-y-5">
+                      <label className="block space-y-2 font-bold">
+                        <span>Search recipes</span>
+                        <input
+                          type="search"
+                          className="field-input"
+                          placeholder="Name, ingredient or tag"
+                          value={search}
+                          onChange={(event) => setSearch(event.target.value)}
+                        />
                       </label>
-                      <p role="status" className="text-sm text-black/70">{filtered.length} recipe{filtered.length === 1 ? '' : 's'}</p>
-                      <RecipeCardViewControl />
+                      <div className="flex flex-wrap items-center gap-3" aria-label="Recipe filters and view">
+                        <button type="button" className={`${secondaryButton.replace('bg-white', '')} min-h-11 ${!favouritesOnly ? 'bg-[#c5ff6f]' : 'bg-white'}`} aria-pressed={!favouritesOnly} onClick={() => setFavouritesOnly(false)}>All recipes</button>
+                        <button type="button" className={`${secondaryButton.replace('bg-white', '')} min-h-11 ${favouritesOnly ? 'bg-[#c5ff6f]' : 'bg-white'}`} aria-pressed={favouritesOnly} onClick={() => setFavouritesOnly(true)}><span aria-hidden="true" className="mr-2">♥</span>Favourites ({recipes.filter(item => favourites.has(item.slug)).length})</button>
+                        <label className="recipe-meal-filter inline-flex min-h-11 items-center gap-2 rounded-full border-2 border-black bg-white px-3 text-sm font-bold">
+                          <span>Meal type</span>
+                          <select
+                            className="min-w-0 bg-transparent font-bold outline-none"
+                            value={category}
+                            onChange={(event) => setCategory(event.target.value)}
+                          >
+                            <option value="All">All meals</option>
+                            {categories.map((value) => (
+                              <option key={value} value={value}>{value}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <p role="status" className="text-sm text-black/70">{filtered.length} recipe{filtered.length === 1 ? '' : 's'}</p>
+                        <RecipeCardViewControl />
+                      </div>
                     </div>
                     <div className={cardGrid}>
                       {filtered.map((item) => (
