@@ -26,8 +26,10 @@ function ReminderStore({ userId, children }) {
   const [presets, setPresets] = useState(() => userId
     ? readReminderPresets(localStorage.getItem(presetStorageKey)) : []);
   const [selectedPresetId, setSelectedPresetId] = useState('');
+  const [widgetOpen, setWidgetOpen] = useState(false);
   const audio = useRef(null);
   const announced = useRef(new Set());
+  const mountedAt = useRef(Date.now());
 
   useEffect(() => {
     if (!userId) return;
@@ -105,12 +107,17 @@ function ReminderStore({ userId, children }) {
   }
 
   useEffect(() => {
-    const newlyDue = reminders.filter((item) => item.status === 'ringing'
+    const unseen = reminders.filter((item) => item.status === 'ringing'
       && !announced.current.has(`${item.id}:${item.alertAt ?? item.dueAt}`));
+    if (!unseen.length) return;
+    const newlyDue = unseen.filter((item) => (item.alertAt ?? item.dueAt) > mountedAt.current);
+    for (const item of unseen) {
+      announced.current.add(`${item.id}:${item.alertAt ?? item.dueAt}`);
+    }
     if (!newlyDue.length) return;
+    setWidgetOpen(true);
     playSound();
     for (const item of newlyDue) {
-      announced.current.add(`${item.id}:${item.alertAt ?? item.dueAt}`);
       try {
         if ('Notification' in window && Notification.permission === 'granted') {
           new Notification('Reminder', { body: item.title, tag: item.id });
@@ -139,21 +146,42 @@ function ReminderStore({ userId, children }) {
   const availablePresets = availableReminderPresets(presets, reminders);
   const selectedPreset = availablePresets.find((preset) => preset.id === selectedPresetId)
     || availablePresets[0] || null;
-  const openReminder = (repeats) => navigateTo(`/focus-timer#reminders-${repeats ? 'repeat' : 'once'}`);
+  const openReminder = (repeats) => {
+    setWidgetOpen(false);
+    navigateTo(`/focus-timer#reminders-${repeats ? 'repeat' : 'once'}`);
+  };
+  const finishAlert = (action, id) => {
+    action(id);
+    if (ringing.length === 1) setWidgetOpen(false);
+  };
   return (
     <ReminderContext.Provider value={{ reminders, history, now, addReminder, dismiss, cancel, snooze, prepareSound, playSound, storageError }}>
       {children}
-      {ringing.length > 0 && (
-        <aside aria-label="Due reminders" className="fixed bottom-4 right-4 left-4 z-50 max-h-[50vh] overflow-y-auto rounded-2xl border-2 border-black bg-[#ffd166] p-5 text-black shadow-[5px_5px_0_#000] sm:left-auto sm:w-96">
-          <p role="alert" className="font-bold">{ringing.length === 1 ? 'Your reminder is ready' : `${ringing.length} reminders are ready`}</p>
+      {widgetOpen && (
+        <aside id="reminder-widget" aria-label="Reminders" className="fixed bottom-20 right-4 left-4 z-50 max-h-[min(70vh,38rem)] overflow-y-auto rounded-2xl border-2 border-black bg-[#ffd166] p-5 text-black shadow-[5px_5px_0_#000] sm:left-auto sm:w-96">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-lg font-bold">Reminders</p>
+              {ringing.length > 0 ? (
+                <p role="alert" className="mt-1 text-sm font-bold">{ringing.length === 1 ? 'Your reminder is ready' : `${ringing.length} reminders are ready`}</p>
+              ) : (
+                <p className="mt-1 text-sm font-semibold text-black/70">Nothing is due right now.</p>
+              )}
+            </div>
+            <button type="button" onClick={() => setWidgetOpen(false)} aria-label="Close reminders" className="grid h-10 w-10 shrink-0 place-items-center rounded-full border-2 border-black bg-white transition hover:-translate-y-px">
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M6 6l12 12M18 6 6 18" />
+              </svg>
+            </button>
+          </div>
           {ringing.map((item) => (
             <div key={item.id} className="mt-4 border-t border-black/20 pt-3">
               <p className="break-words text-lg font-bold">{item.title}</p>
               {item.repeatMs > 0 && <p className="mt-1 text-xs font-semibold">Repeats every {formatReminderInterval(item.repeatMs)}. Dismiss keeps it running; snooze restarts the interval after 5 minutes.</p>}
               <div className="mt-3 flex flex-wrap gap-2">
-                <button type="button" onClick={() => snooze(item.id)} aria-label={`Snooze ${item.title} for 5 minutes`} className="rounded-full border-2 border-black bg-white px-4 py-2 text-sm font-bold">Snooze 5 min</button>
-                <button type="button" onClick={() => dismiss(item.id)} aria-label={`Dismiss ${item.title}`} className="rounded-full border-2 border-black bg-black px-4 py-2 text-sm font-bold text-white">Dismiss</button>
-                {item.repeatMs > 0 && <button type="button" onClick={() => cancel(item.id)} aria-label={`Stop repeating ${item.title}`} className="rounded-full border-2 border-black bg-white px-4 py-2 text-sm font-bold">Stop repeating</button>}
+                <button type="button" onClick={() => finishAlert(snooze, item.id)} aria-label={`Snooze ${item.title} for 5 minutes`} className="rounded-full border-2 border-black bg-white px-4 py-2 text-sm font-bold">Snooze 5 min</button>
+                <button type="button" onClick={() => finishAlert(dismiss, item.id)} aria-label={`Dismiss ${item.title}`} className="rounded-full border-2 border-black bg-black px-4 py-2 text-sm font-bold text-white">Dismiss</button>
+                {item.repeatMs > 0 && <button type="button" onClick={() => finishAlert(cancel, item.id)} aria-label={`Stop repeating ${item.title}`} className="rounded-full border-2 border-black bg-white px-4 py-2 text-sm font-bold">Stop repeating</button>}
                 <button type="button" onClick={() => openReminder(item.repeatMs > 0)} className="rounded-full border-2 border-black bg-white px-4 py-2 text-sm font-bold">Open {item.repeatMs > 0 ? 'Repeat' : 'Just once'}</button>
               </div>
             </div>
@@ -171,8 +199,22 @@ function ReminderStore({ userId, children }) {
               }} className="mt-2 rounded-full border-2 border-black bg-[#c5ff6f] px-4 py-2 text-sm font-bold">Turn on selected preset</button>
             </> : <p className="mt-2 text-xs font-semibold text-black/65">No other saved presets are available.</p>}
           </section>
+          <button type="button" onClick={() => openReminder(false)} className="mt-4 w-full rounded-full border-2 border-black bg-white px-4 py-2 text-sm font-bold">Open reminder settings</button>
         </aside>
       )}
+      <button
+        type="button"
+        className={`fixed bottom-4 right-4 z-50 flex min-h-12 items-center gap-2 rounded-full border-2 border-black px-4 py-3 font-bold text-black shadow-[4px_4px_0_#000] transition hover:-translate-y-px ${ringing.length > 0 ? 'bg-[#ffd166]' : 'bg-[#c5ff6f]'}`}
+        aria-expanded={widgetOpen}
+        aria-controls="reminder-widget"
+        onClick={() => setWidgetOpen((open) => !open)}
+      >
+        <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+          <path d="M10 21h4" />
+        </svg>
+        <span>{ringing.length > 0 ? `${ringing.length} due` : 'Reminders'}</span>
+      </button>
     </ReminderContext.Provider>
   );
 }
