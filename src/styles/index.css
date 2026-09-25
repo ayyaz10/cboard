@@ -270,7 +270,8 @@ html[data-theme="matrix"] {
     }
 
     .app-navigation-list {
-      display: grid;
+      display: grid !important;
+      grid-template-columns: minmax(0, 1fr);
       min-width: 0;
       gap: 0.5rem;
       padding: 0;
@@ -286,7 +287,8 @@ html[data-theme="matrix"] {
     }
 
     .app-navigation-related {
-      display: grid;
+      display: grid !important;
+      grid-template-columns: minmax(0, 1fr);
       align-items: stretch;
       gap: 0.5rem;
       margin-top: 1rem;
