@@ -293,7 +293,7 @@ function RecipesContent({ route }) {
                             favourite={favourites.has(item.slug)}
                             favouritePending={favouritePending.has(item.slug)}
                             onToggleFavourite={toggleFavourite}
-                            onDelete={setRemoving}
+                            onDelete={manage ? setRemoving : undefined}
                           />
                           {manage && (
                             <div className="flex flex-wrap gap-2">

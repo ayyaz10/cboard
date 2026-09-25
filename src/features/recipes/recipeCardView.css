@@ -41,6 +41,7 @@
 .recipe-card {
   overflow-wrap: anywhere;
 }
+.recipe-card-nutrition { padding-top: .7rem; border-top: 1px solid rgb(0 0 0 / .14); }
 .recipe-view-control { display: inline-flex; align-items: center; gap: .5rem; margin-left: auto; order: 1; font-size: .875rem; font-weight: 700; }
 .recipe-view-control select { min-height: 44px; width: auto; max-width: 10rem; border: 2px solid currentColor; border-radius: 999px; padding: .4rem 1.8rem .4rem .8rem; background-color: white; color: black; }
 .recipe-clickable-card { position: relative; }

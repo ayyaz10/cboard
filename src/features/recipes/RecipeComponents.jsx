@@ -98,6 +98,24 @@ function RecipeNutritionStatus({ recipe, preview = false }) {
   </p>;
 }
 
+function RecipeCardNutrition({ recipe }) {
+  const values = [
+    recipe.nutrition?.calories != null && `${recipe.nutrition.calories} kcal`,
+    recipe.nutrition?.protein != null && `${recipe.nutrition.protein} g protein`,
+    recipe.nutrition?.fiber != null && `${recipe.nutrition.fiber} g fibre`,
+  ].filter(Boolean);
+  if (!values.length) return null;
+  const calculation = recipe.productNutrition
+    ? calculateProducts(recipe.productNutrition.items, recipe.servings)
+    : recipe.nutritionFromIngredients
+      ? ingredientRecipeCalculation(recipe)
+      : null;
+  const partial = calculation && Math.max(...Object.values(calculation.missing)) > 0;
+  return <p className="recipe-card-nutrition text-sm font-semibold text-black/70">
+    {values.join(' · ')}{partial && <span className="font-normal"> · partial</span>}
+  </p>;
+}
+
 export function RecipeAlternatives({ group }) {
   const cardGrid = useRecipeCardGrid();
   return (
@@ -339,29 +357,20 @@ export function RecipeCard({ recipe, favourite = false, favouritePending = false
         <h2 className="mt-3 break-words text-2xl font-bold"><RecipeLink to={`/recipes/${recipe.slug}`} className="recipe-card-main-link">{recipe.title}</RecipeLink></h2>
       </div>
       {recipe.description && (
-        <p className="line-clamp-3 text-sm leading-6 text-black/70">
+        <p className="line-clamp-2 text-sm leading-6 text-black/70">
           {recipe.description}
         </p>
       )}
-      <RecipeNutrition nutrition={recipe.nutrition} fibreSource={recipe.fibreSource} />
-      <RecipeNutritionStatus recipe={recipe} />
-      <RecipeHealthReview recipe={recipe} compact />
-      <p className="text-sm text-black/70">
+      <RecipeCardNutrition recipe={recipe} />
+      {(recipe.prepTime || recipe.cookTime) && <p className="text-sm text-black/70">
         {[
           recipe.prepTime && `Prep: ${recipe.prepTime}`,
           recipe.cookTime && `Cook: ${recipe.cookTime}`,
         ]
           .filter(Boolean)
           .join(' · ')}
-      </p>
-      <div className="mt-auto flex flex-wrap gap-3">
-        <RecipeLink to={`/recipes/${recipe.slug}`}>View Recipe →</RecipeLink>
-        <RecipeSource
-          source={recipe.source}
-          linkClassName={secondaryButton}
-          compact
-        />
-        {onDelete && (
+      </p>}
+      {onDelete && <div className="mt-auto flex flex-wrap gap-3">
           <button
             type="button"
             className={secondaryButton}
@@ -370,8 +379,7 @@ export function RecipeCard({ recipe, favourite = false, favouritePending = false
           >
             Delete
           </button>
-        )}
-      </div>
+      </div>}
     </article>
   );
 }
