@@ -25,6 +25,12 @@ export function ingredientLabelNutrition(item) {
     return [key, Number.isFinite(result) && result >= 0 ? Math.round(result * 10000) / 10000 : null];
   }));
 }
+export function updateIngredientField(item, key, value) {
+  const next = { ...item, [key]: value };
+  if (key === 'nutrition') delete next.nutritionLabel;
+  else if (next.nutritionLabel) next.nutrition = ingredientLabelNutrition(next);
+  return next;
+}
 export function ingredientRecipeCalculation(recipe) {
   const items = [...(recipe.ingredients || []), ...(recipe.sauces || [])];
   const ingredients = items.map((item) => Object.fromEntries(macroKeys.map((key) => {

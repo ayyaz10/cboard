@@ -1,9 +1,10 @@
 import { NutritionTotals } from "./DiaryNutrition";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { NutritionLookup } from "../groceries/NutritionLookup";
 import { NUTRIENTS } from "../nutrition/nutrients";
 import { MEALS, foodItem, itemNutrition, recipeItems } from "./diaryData";
+import { applyStoredDiaryFood, findDiaryFoodMatches } from './diaryFoodLibrary';
 
 const number = (value) => (value === "" ? "" : Number(value));
 const format = (value) =>
@@ -12,6 +13,59 @@ const format = (value) =>
     : new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(
         value,
       );
+
+function DiaryStoredFoodName({ item, foodLibrary, onNameChange, onSelect }) {
+  const inputId = useId();
+  const listId = useId();
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const matches = findDiaryFoodMatches(foodLibrary, item.name);
+  const show = open && matches.length > 0;
+  const choose = (entry) => { onSelect(entry.item); setOpen(false); setActive(0); };
+  return <div className="diary-food-name">
+    <label htmlFor={inputId}>Food name</label>
+    <input
+      id={inputId}
+      required
+      maxLength={300}
+      autoComplete="off"
+      role="combobox"
+      aria-autocomplete="list"
+      aria-expanded={show}
+      aria-controls={listId}
+      aria-activedescendant={show ? `${listId}-${active}` : undefined}
+      value={item.name}
+      onFocus={() => setOpen(true)}
+      onBlur={() => setOpen(false)}
+      onChange={(event) => { onNameChange(event.target.value); setOpen(true); setActive(0); }}
+      onKeyDown={(event) => {
+        if (!show && event.key === 'ArrowDown' && matches.length) { event.preventDefault(); setOpen(true); return; }
+        if (!show) return;
+        if (event.key === 'ArrowDown') { event.preventDefault(); setActive((index) => (index + 1) % matches.length); }
+        else if (event.key === 'ArrowUp') { event.preventDefault(); setActive((index) => (index - 1 + matches.length) % matches.length); }
+        else if (event.key === 'Enter') { event.preventDefault(); choose(matches[active]); }
+        else if (event.key === 'Escape') setOpen(false);
+      }}
+    />
+    {show && <div id={listId} className="diary-food-suggestions" role="listbox">
+      {matches.map((entry, index) => <button
+        id={`${listId}-${index}`}
+        key={entry.key}
+        type="button"
+        role="option"
+        aria-selected={active === index}
+        className={active === index ? 'is-active' : ''}
+        onMouseDown={(event) => event.preventDefault()}
+        onMouseEnter={() => setActive(index)}
+        onClick={() => choose(entry)}
+      >
+        <strong>{entry.item.name}</strong>
+        <small>{[entry.item.quantity, entry.item.unit, entry.item.source?.name || entry.item.source?.provider, entry.origins.slice(0, 2).join(', ')].filter((value) => value !== '' && value != null).join(' · ')}</small>
+      </button>)}
+    </div>}
+  </div>;
+}
+
 export function DiaryMealEditor({
   initial,
   recipes,
@@ -19,6 +73,7 @@ export function DiaryMealEditor({
   onSave,
   onCancel,
   onDraftChange,
+  foodLibrary = [],
 }) {
   const [draft, setDraft] = useState(() => structuredClone(initial));
   const [slug, setSlug] = useState("");
@@ -281,17 +336,16 @@ export function DiaryMealEditor({
                     transition={{ height: { duration: reduceMotion ? 0 : 0.38, ease: [0.22, 1, 0.36, 1] }, opacity: { duration: reduceMotion ? 0 : 0.22 } }}
                   >
                   <div className="diary-food-editor-inner">
-                  <label>
-                    Food name
-                    <input
-                      required
-                      maxLength={300}
-                      value={item.name}
-                      onChange={(event) =>
-                        changeItem(item.id, { name: event.target.value })
-                      }
-                    />
-                  </label>
+                  <DiaryStoredFoodName
+                    item={item}
+                    foodLibrary={foodLibrary}
+                    onNameChange={(name) => changeItem(item.id, { name })}
+                    onSelect={(stored) => {
+                      const selected = applyStoredDiaryFood(item, stored);
+                      setDraft((current) => ({ ...current, items: current.items.map((food) => food.id === item.id ? selected : food) }));
+                      setError('');
+                    }}
+                  />
                   <p className="diary-hint">
                     {item.source.provider}
                     {item.source.name ? ` · ${item.source.name}` : ""}

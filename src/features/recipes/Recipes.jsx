@@ -1,5 +1,5 @@
 import { DailyNutritionTargets, useNutritionGoals } from '../nutrition/DailyNutritionTargets';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { navigateTo, getAppHref } from '../../app/useRoute';
 import { PageShell } from '../../components/layout/PageShell';
@@ -21,6 +21,7 @@ import {
   secondaryButton,
 } from './RecipeComponents';
 import { RecipeImporter } from './RecipeImporter';
+import { buildIngredientLibrary } from './ingredientLibrary';
 import { formatIngredient } from './recipeData';
 import { DailyMealPlanner } from './DailyMealPlanner';
 import { FoodDiary } from '../diary/FoodDiary';
@@ -56,6 +57,7 @@ function RecipesContent({ route }) {
   const [draft, setDraft] = useState(null);
   const [removing, setRemoving] = useState(null);
   const [busy, setBusy] = useState(false);
+  const ingredientLibrary = useMemo(() => buildIngredientLibrary(recipes), [recipes]);
   const dialog = useRef(null);
   const deleteLock = useRef(false);
   async function refresh() {
@@ -211,6 +213,7 @@ function RecipesContent({ route }) {
                 key={draft?.key ?? 'new'}
                 initial={draft?.initial}
                 editing={draft?.editing}
+                ingredientLibrary={ingredientLibrary}
                 onSave={save}
                 onSaveBatch={saveBatch}
                 onCancel={() => {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import {
   deleteFoodDiaryDay,
@@ -11,6 +11,7 @@ import { RecipeLink } from "../recipes/RecipeComponents";
 import { NutritionTotals } from "./DiaryNutrition";
 import { DiaryMealEditor } from "./DiaryMealEditor";
 import { DiaryReports } from "./DiaryReports";
+import { buildDiaryFoodLibrary } from "./diaryFoodLibrary";
 import {
   MEALS,
   REQUIRED_MEALS,
@@ -51,6 +52,7 @@ export function FoodDiary({ recipes, nutritionGoals }) {
   const diaryTopRef = useRef(null);
   const day = days.find((entry) => entry.date === date) || emptyDay(date);
   const streak = streaks(days, today);
+  const foodLibrary = useMemo(() => buildDiaryFoodLibrary(days, recipes), [days, recipes]);
   const disabled = busy || Boolean(draft) || Boolean(routine);
   const goals =
     !nutritionGoals.loading && !nutritionGoals.error
@@ -427,6 +429,7 @@ export function FoodDiary({ recipes, nutritionGoals }) {
       {draft && (
         <div ref={editorRef}>
           <DiaryMealEditor
+            foodLibrary={foodLibrary}
             key={draft.id}
             initial={draft}
             recipes={recipes}

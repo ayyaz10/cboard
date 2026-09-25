@@ -2,7 +2,8 @@ import { secondaryButton } from './RecipeComponents';
 import { useEffect, useId, useRef, useState } from 'react';
 import { NutritionLookup } from '../groceries/NutritionLookup';
 import { initialProductAmount } from './recipeProducts.js';
-import { cleanIngredientLabel, ingredientLabelAmount, ingredientLabelNutrition, ingredientRecipeCalculation, ingredientRecipeTotals, prepareIngredientEditor } from './ingredientNutrition.js';
+import { cleanIngredientLabel, ingredientLabelAmount, ingredientLabelNutrition, ingredientRecipeCalculation, ingredientRecipeTotals, prepareIngredientEditor, updateIngredientField } from './ingredientNutrition.js';
+import { applyStoredIngredient, findIngredientMatches, hasStoredNutrition } from './ingredientLibrary.js';
 import '../groceries/groceries.css';
 
 export const emptyRecipe = () => ({
@@ -62,17 +63,66 @@ function Macros({ value = {}, onChange }) {
   );
 }
 
-function ItemEditor({ item, onChange, groups, visible }) {
+function IngredientNameField({ value, onChange, onSelect, library }) {
+  const id = useId();
+  const listId = useId();
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const matches = findIngredientMatches(library, value);
+  const show = open && matches.length > 0;
+  const choose = (entry) => { onSelect(entry.item); setOpen(false); setActive(0); };
+  return <div className="relative min-w-0 space-y-2 font-semibold">
+    <label htmlFor={id} className="block">Name</label>
+    <input
+      id={id}
+      className="field-input"
+      value={value ?? ''}
+      required
+      autoComplete="off"
+      role="combobox"
+      aria-autocomplete="list"
+      aria-expanded={show}
+      aria-controls={listId}
+      aria-activedescendant={show ? `${listId}-${active}` : undefined}
+      onFocus={() => setOpen(true)}
+      onBlur={() => setOpen(false)}
+      onChange={(event) => { onChange(event.target.value); setOpen(true); setActive(0); }}
+      onKeyDown={(event) => {
+        if (!show && event.key === 'ArrowDown' && matches.length) { event.preventDefault(); setOpen(true); return; }
+        if (!show) return;
+        if (event.key === 'ArrowDown') { event.preventDefault(); setActive((index) => (index + 1) % matches.length); }
+        else if (event.key === 'ArrowUp') { event.preventDefault(); setActive((index) => (index - 1 + matches.length) % matches.length); }
+        else if (event.key === 'Enter') { event.preventDefault(); choose(matches[active]); }
+        else if (event.key === 'Escape') setOpen(false);
+      }}
+    />
+    {show && <div id={listId} role="listbox" className="absolute z-20 mt-1 max-h-72 w-full min-w-64 overflow-y-auto rounded-xl border-2 border-black bg-white p-1 shadow-[4px_4px_0_#000]">
+      {matches.map((entry, index) => <button
+        id={`${listId}-${index}`}
+        key={entry.key}
+        type="button"
+        role="option"
+        aria-selected={active === index}
+        className={`block w-full rounded-lg px-3 py-2 text-left ${active === index ? 'bg-[#e8f7d8]' : 'bg-white hover:bg-black/5'}`}
+        onMouseDown={(event) => event.preventDefault()}
+        onMouseEnter={() => setActive(index)}
+        onClick={() => choose(entry)}
+      >
+        <span className="block font-bold">{entry.item.name}</span>
+        <span className="block text-xs font-normal text-black/65">
+          {[entry.item.amount, entry.item.unit, entry.item.nutritionLabel?.source?.name || (hasStoredNutrition(entry.item) ? 'saved nutrition' : ''), entry.recipeTitles.join(', ')].filter((part) => part !== '' && part != null).join(' · ')}
+        </span>
+      </button>)}
+    </div>}
+  </div>;
+}
+
+function ItemEditor({ item, onChange, groups, visible, ingredientLibrary }) {
   const [lookup, setLookup] = useState(false);
   const [nutritionOpen, setNutritionOpen] = useState(Boolean(item.nutritionLabel));
   const nutritionDetails = useRef(null);
   const set = (key, value) => {
-    const next = { ...item, [key]: value };
-    if (key === 'name' && value !== item.name && item.nutritionLabel) {
-      delete next.nutritionLabel;
-      next.nutrition = {};
-    } else if (key === 'nutrition') delete next.nutritionLabel;
-    else if (next.nutritionLabel) next.nutrition = ingredientLabelNutrition(next);
+    const next = updateIngredientField(item, key, value);
     onChange(next, { calculateNutrition: key === 'nutrition' });
   };
   const label = item.nutritionLabel;
@@ -87,11 +137,16 @@ function ItemEditor({ item, onChange, groups, visible }) {
   return (
     <div className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-[minmax(12rem,2fr)_minmax(7rem,1fr)_minmax(7rem,1fr)]">
-        <Field
-          label="Name"
+        <IngredientNameField
           value={item.name}
-          required
           onChange={(value) => set('name', value)}
+          library={ingredientLibrary}
+          onSelect={(stored) => {
+            const next = applyStoredIngredient(item, stored);
+            onChange(next, { calculateNutrition: hasStoredNutrition(next) });
+            setLookup(false);
+            setNutritionOpen(hasStoredNutrition(next));
+          }}
         />
         <Field
           label="Amount"
@@ -165,7 +220,7 @@ function ItemEditor({ item, onChange, groups, visible }) {
             next.nutrition = ingredientLabelNutrition(next); onChange(next);
           }} />}
           <p className="text-sm" role="status">{ingredientLabelAmount(item) == null ? 'Confirm the edible weight or volume of one recipe unit. The API cannot reliably infer the weight of your banana, handful or cup.' : `${ingredientLabelAmount(item)} ${label.unit} used / ${label.quantity} ${label.unit} on the label. The nutrition fields below are calculated for the amount above.`}</p>
-          <p className="text-sm">Changing the amount recalculates automatically. Changing the food name clears the selected label. Editing a nutrition number switches this ingredient to manual values.</p>
+          <p className="text-sm">Changing the amount recalculates automatically. Renaming the ingredient keeps these values; choose a different food result to replace them. Editing a nutrition number switches this ingredient to manual values.</p>
         </>}
       </div>
       <details ref={nutritionDetails} open={nutritionOpen} onToggle={(event) => setNutritionOpen(event.currentTarget.open)}>
@@ -182,7 +237,7 @@ function ItemEditor({ item, onChange, groups, visible }) {
   );
 }
 
-function ItemRow({ title, item, index, items, onChange, groups }) {
+function ItemRow({ title, item, index, items, onChange, groups, ingredientLibrary }) {
   const normalizedItem = typeof item === 'string' ? { name: item } : item;
   const [open, setOpen] = useState(!normalizedItem?.name);
 
@@ -208,6 +263,7 @@ function ItemRow({ title, item, index, items, onChange, groups }) {
           item={normalizedItem}
           groups={groups}
           visible={open}
+          ingredientLibrary={ingredientLibrary}
           onChange={(next, options) =>
             onChange(items.map((current, i) => (i === index ? next : current)), options)
           }
@@ -237,7 +293,7 @@ function useDesktopColumns() {
   return desktop;
 }
 
-function Items({ title, items, onChange, groups }) {
+function Items({ title, items, onChange, groups, ingredientLibrary }) {
   const desktop = useDesktopColumns();
   const itemRow = (item, index) => (
     <ItemRow
@@ -248,6 +304,7 @@ function Items({ title, items, onChange, groups }) {
       items={items}
       onChange={onChange}
       groups={groups}
+      ingredientLibrary={ingredientLibrary}
     />
   );
   return (
@@ -274,7 +331,7 @@ function Items({ title, items, onChange, groups }) {
   );
 }
 
-export function RecipeFormEditor({ recipe, onChange, editing }) {
+export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary = [] }) {
   recipe = prepareIngredientEditor(recipe);
   const ingredientCalculation = ingredientRecipeCalculation(recipe);
   const set = (key, value, options = {}) => {
@@ -349,6 +406,7 @@ export function RecipeFormEditor({ recipe, onChange, editing }) {
         title="Ingredients"
         items={recipe.ingredients ?? []}
         groups={groups}
+        ingredientLibrary={ingredientLibrary}
         onChange={(value, options) => set('ingredients', value, options)}
       />
       <section className="space-y-3">
@@ -395,7 +453,7 @@ export function RecipeFormEditor({ recipe, onChange, editing }) {
       </section>
       <details className="rounded-2xl border-2 border-black bg-white p-4">
         <summary className="cursor-pointer text-xl font-bold">Sauces ({recipe.sauces?.length ?? 0})</summary>
-        <div className="mt-4"><Items title="Sauces" items={recipe.sauces ?? []} onChange={(value, options) => set('sauces', value, options)} /></div>
+        <div className="mt-4"><Items title="Sauces" items={recipe.sauces ?? []} onChange={(value, options) => set('sauces', value, options)} ingredientLibrary={ingredientLibrary} /></div>
       </details>
       {Object.keys(groups).length > 0 && (
         <details className="rounded-2xl border-2 border-black bg-white p-4">
@@ -422,6 +480,7 @@ export function RecipeFormEditor({ recipe, onChange, editing }) {
                 <Items
                   title="Options"
                   items={group.options}
+                  ingredientLibrary={ingredientLibrary}
                   onChange={(value) =>
                     set('alternatives', {
                       ...groups,

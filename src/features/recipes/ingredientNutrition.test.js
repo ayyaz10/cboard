@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ingredientLabelNutrition, cleanIngredientLabel, ingredientRecipeCalculation, ingredientRecipeTotals, prepareIngredientEditor } from './ingredientNutrition.js';
+import { ingredientLabelNutrition, cleanIngredientLabel, ingredientRecipeCalculation, ingredientRecipeTotals, prepareIngredientEditor, updateIngredientField } from './ingredientNutrition.js';
 import { validateRecipe } from './recipeData.js';
 const label = cleanIngredientLabel({ quantity: 100, unit: 'g', calories: 90, protein: 1, carbs: 20, fat: 0, fiber: 3, source: { name: 'Banana', provider: 'Open Food Facts' } });
 test('ingredient editor scales fractions by confirmed piece weight and keeps unknown weight unknown', () => {
@@ -10,6 +10,13 @@ test('ingredient editor scales fractions by confirmed piece weight and keeps unk
   assert.equal(ingredientLabelNutrition(item).calories, 54);
   assert.equal(ingredientLabelNutrition({ ...item, amount: 1 }).calories, 108);
   assert.equal(ingredientLabelNutrition({ ...item, unit: 'cup' }).calories, null);
+});
+test('renaming an ingredient preserves its selected label and calculated nutrition', () => {
+  const item = { name: 'Banana', amount: 100, unit: 'g', nutritionLabel: label, nutrition: ingredientLabelNutrition({ amount: 100, unit: 'g', nutritionLabel: label }) };
+  const renamed = updateIngredientField(item, 'name', 'Medium banana');
+  assert.equal(renamed.name, 'Medium banana');
+  assert.equal(renamed.nutritionLabel, label);
+  assert.deepEqual(renamed.nutrition, item.nutrition);
 });
 test('label metadata and calculated ingredient and overall macros persist through validation', () => {
   const recipe = validateRecipe({ title: 'Banana', slug: 'banana', mealType: 'Snack', servings: 2, steps: ['Serve'], ingredients: [{ name: 'Banana', amount: 200, unit: 'g', nutritionLabel: label }], nutritionFromIngredients: true });

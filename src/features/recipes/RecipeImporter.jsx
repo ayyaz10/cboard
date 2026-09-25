@@ -21,6 +21,7 @@ export function RecipeImporter({
   onCancel,
   getSlugs,
   onAiCreated,
+  ingredientLibrary = [],
 }) {
   const [text, setText] = useState(() => {
     if (!initial) return '';
@@ -333,6 +334,7 @@ export function RecipeImporter({
                 recipe={formData}
                 onChange={setFormData}
                 editing={editing}
+                ingredientLibrary={ingredientLibrary}
               />
             ) : (
               <>
