@@ -38,6 +38,12 @@ export function DailyMealPlanner({ recipes, nutritionGoals }) {
   const [editing, setEditing] = useState(true);
   const [name, setName] = useState('My current meal routine');
   const [notes, setNotes] = useState('');
+  const [routinesOpen, setRoutinesOpen] = useState(() =>
+    typeof window === 'undefined' || !window.matchMedia('(max-width: 47.99rem)').matches,
+  );
+  const [totalsOpen, setTotalsOpen] = useState(() =>
+    typeof window === 'undefined' || !window.matchMedia('(max-width: 47.99rem)').matches,
+  );
   const lock = useRef(false);
   async function load() {
     setLoading(true);
@@ -103,7 +109,7 @@ export function DailyMealPlanner({ recipes, nutritionGoals }) {
   }
   const { meals, totals } = calculateMealPlan(entries, recipes);
   return (
-    <div className="space-y-7 text-black">
+    <div className="daily-meal-planner space-y-5 text-black">
       <header className="space-y-3">
         <span className="pill">Daily meals</span>
         <h1 className="text-4xl font-bold">Daily Meal Planner</h1>
@@ -124,23 +130,35 @@ export function DailyMealPlanner({ recipes, nutritionGoals }) {
         </div>
       ) : (
         <>
-          <QuickRoutines
-            draft={{ version: 1, name, notes, entries }}
-            recipes={recipes}
-            disabled={busy}
-            dirty={dirty}
-            editing={editing}
-            onUse={(preset) => save(null, preset)}
-            onEdit={(preset) => {
-              setEntries(preset.entries);
-              setName(preset.name);
-              setNotes(preset.notes);
-              setEditing(true);
-              setDirty(true);
-              setSaved(false);
-              setError('');
-            }}
-          />
+          <details
+            className="meal-planner-disclosure"
+            open={routinesOpen}
+            onToggle={(event) => setRoutinesOpen(event.currentTarget.open)}
+          >
+            <summary>
+              <span><strong>Quick routines</strong><small>Reuse a saved meal combination</small></span>
+              <span aria-hidden="true">⌄</span>
+            </summary>
+            <div className="pt-4">
+              <QuickRoutines
+                draft={{ version: 1, name, notes, entries }}
+                recipes={recipes}
+                disabled={busy}
+                dirty={dirty}
+                editing={editing}
+                onUse={(preset) => save(null, preset)}
+                onEdit={(preset) => {
+                  setEntries(preset.entries);
+                  setName(preset.name);
+                  setNotes(preset.notes);
+                  setEditing(true);
+                  setDirty(true);
+                  setSaved(false);
+                  setError('');
+                }}
+              />
+            </div>
+          </details>
           {error && !editing && <p role="alert">{error}</p>}
           {!recipes.length && (
             <p className="rounded-2xl border-2 border-black bg-white p-5">
@@ -149,11 +167,21 @@ export function DailyMealPlanner({ recipes, nutritionGoals }) {
               start planning.
             </p>
           )}
-          <section
+          <details
             aria-label="Daily totals"
-            className="space-y-4 rounded-2xl border-2 border-black bg-white p-5"
+            className="meal-planner-disclosure"
+            open={totalsOpen}
+            onToggle={(event) => setTotalsOpen(event.currentTarget.open)}
           >
-            <h2 className="text-2xl font-bold">Daily totals</h2>
+            <summary>
+              <span><strong>Daily totals</strong><small>{meals.length ? `${meals.length} meal${meals.length === 1 ? '' : 's'} selected` : 'Add meals to calculate'}</small></span>
+              <span className="meal-planner-total-preview">
+                {totals.calories.known ? `${format(totals.calories.value)} kcal` : '— kcal'}
+                <span aria-hidden="true"> · </span>
+                {totals.protein.known ? `${format(totals.protein.value)} g protein` : '— protein'}
+              </span>
+            </summary>
+            <div className="space-y-4 pt-4">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
               {MACROS.map((key) => {
                 const target = nutritionGoals.goals[key];
@@ -196,7 +224,8 @@ export function DailyMealPlanner({ recipes, nutritionGoals }) {
               half; 2× counts double. Servings are not divided automatically.
               Missing macros are never counted as zero.
             </p>
-          </section>
+            </div>
+          </details>
           {!editing && routine ? (
             <MealRoutine
               routine={routine}
@@ -207,9 +236,21 @@ export function DailyMealPlanner({ recipes, nutritionGoals }) {
               }}
             />
           ) : (
-            <form className="space-y-5" onSubmit={save}>
+            <form className="meal-plan-editor space-y-5" onSubmit={save}>
               <fieldset disabled={busy} className="min-w-0 space-y-5">
-                <div className="space-y-4">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <span className="pill">Quick plan</span>
+                    <h2 className="mt-2 text-2xl font-bold">Choose today’s meals</h2>
+                    <p className="mt-1 text-sm text-black/65">Swipe through the meal cards, choose recipes, then save.</p>
+                  </div>
+                  <p role="status" className="text-sm font-semibold text-black/70">
+                    {dirty ? 'Unsaved changes' : saved ? 'Daily plan saved' : `${meals.length} selected`}
+                  </p>
+                </div>
+                <details className="meal-plan-options rounded-2xl border-2 border-black bg-white p-4">
+                  <summary className="cursor-pointer font-bold">Routine name & notes</summary>
+                  <div className="mt-4 space-y-4">
                   <label htmlFor="routine-name" className="block font-semibold">
                     Routine name
                   </label>
@@ -242,7 +283,9 @@ export function DailyMealPlanner({ recipes, nutritionGoals }) {
                       setDirty(true);
                     }}
                   />
-                </div>
+                  </div>
+                </details>
+                <div className="meal-plan-entry-list">
                 {entries.map((entry, index) => {
                   const recipe = recipes.find(
                     (recipe) => recipe.slug === entry.slug,
@@ -258,12 +301,22 @@ export function DailyMealPlanner({ recipes, nutritionGoals }) {
                   return (
                     <section
                       key={entry.id}
-                      className="space-y-4 rounded-2xl border-2 border-black p-5"
+                      className="meal-plan-entry space-y-3 rounded-2xl border-2 border-black bg-white p-4"
                       aria-label={`Meal ${index + 1}`}
                     >
-                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_2fr_1fr]">
+                      <div className="meal-plan-entry-heading flex items-center justify-between gap-3">
+                        <strong className="text-lg">{entry.meal}</strong>
+                        <button
+                          type="button"
+                          className="text-sm font-bold underline decoration-2 underline-offset-2"
+                          onClick={() => update(entries.filter((meal) => meal.id !== entry.id))}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <div className="meal-plan-entry-controls grid gap-3">
                         <label className="block space-y-2 font-semibold">
-                          <span>Meal type</span>
+                          <span className="text-sm">Meal type</span>
                           <select
                             className="field-input"
                             value={entry.meal}
@@ -278,7 +331,7 @@ export function DailyMealPlanner({ recipes, nutritionGoals }) {
                           </select>
                         </label>
                         <label className="block min-w-0 space-y-2 font-semibold">
-                          <span>{entry.meal} recipe</span>
+                          <span className="text-sm">Recipe</span>
                           <select
                             className="field-input"
                             value={entry.slug}
@@ -314,7 +367,7 @@ export function DailyMealPlanner({ recipes, nutritionGoals }) {
                           </select>
                         </label>
                         <label className="block space-y-2 font-semibold">
-                          <span>Portion multiplier</span>
+                          <span className="text-sm">Portions</span>
                           <input
                             className="field-input"
                             type="number"
@@ -361,37 +414,28 @@ export function DailyMealPlanner({ recipes, nutritionGoals }) {
                           nutrition is excluded from the known totals.
                         </p>
                       )}
-                      <button
-                        type="button"
-                        className={secondaryButton}
-                        onClick={() =>
-                          update(entries.filter((meal) => meal.id !== entry.id))
-                        }
-                      >
-                        Remove meal {index + 1}
-                      </button>
                     </section>
                   );
                 })}
-                <button
-                  type="button"
-                  className={secondaryButton}
-                  disabled={entries.length >= 24}
-                  onClick={() =>
-                    update([
-                      ...entries,
-                      {
-                        id: crypto.randomUUID(),
-                        meal: 'Snack',
-                        slug: '',
-                        portions: 1,
-                      },
-                    ])
-                  }
-                >
-                  Add another meal
-                </button>
-                <div className="flex flex-wrap items-center gap-3">
+                </div>
+                <div className="meal-plan-quick-add" aria-label="Add another meal">
+                  <span className="text-sm font-bold">Add:</span>
+                  {MEAL_SLOTS.map((meal) => (
+                    <button
+                      key={meal}
+                      type="button"
+                      className={secondaryButton}
+                      disabled={entries.length >= 24}
+                      onClick={() => update([
+                        ...entries,
+                        { id: crypto.randomUUID(), meal, slug: '', portions: 1 },
+                      ])}
+                    >
+                      + {meal}
+                    </button>
+                  ))}
+                </div>
+                <div className="meal-plan-save-bar flex flex-wrap items-center gap-3">
                   <PrimaryButton type="submit">
                     {busy ? 'Saving…' : 'Use this meal routine'}
                   </PrimaryButton>
@@ -411,13 +455,6 @@ export function DailyMealPlanner({ recipes, nutritionGoals }) {
                       Cancel changes
                     </button>
                   )}
-                  <p role="status" className="text-sm text-black/70">
-                    {dirty
-                      ? 'Unsaved changes'
-                      : saved
-                        ? 'Daily plan saved'
-                        : 'Choose your meals, then save your plan.'}
-                  </p>
                 </div>
               </fieldset>
               {error && <p role="alert">{error}</p>}

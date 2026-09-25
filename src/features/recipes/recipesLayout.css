@@ -43,3 +43,180 @@ html[data-theme='matrix'] .recipe-page-shell > .recipe-shortcuts {
   background: var(--matrix-surface);
   color: var(--matrix-text);
 }
+
+.meal-planner-disclosure {
+  border: 2px solid #000;
+  border-radius: 1rem;
+  background: #fff;
+  padding: 1.25rem;
+}
+
+.meal-planner-disclosure > summary {
+  display: flex;
+  cursor: pointer;
+  list-style: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.meal-planner-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.meal-planner-disclosure > summary > span:first-child {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.meal-planner-disclosure > summary strong {
+  font-size: 1.25rem;
+}
+
+.meal-planner-disclosure > summary small {
+  color: rgb(0 0 0 / 0.65);
+}
+
+.meal-planner-disclosure[open] > summary > span:last-child:not(.meal-planner-total-preview) {
+  transform: rotate(180deg);
+}
+
+.meal-planner-disclosure > div > section {
+  border: 0;
+  padding: 0;
+}
+
+.meal-planner-total-preview {
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-align: right;
+}
+
+.meal-plan-entry-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.meal-plan-entry-controls {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(6rem, 0.7fr);
+}
+
+.meal-plan-quick-add {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  scrollbar-width: none;
+}
+
+.meal-plan-quick-add::-webkit-scrollbar {
+  display: none;
+}
+
+.meal-plan-quick-add > * {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 47.99rem) {
+  .daily-meal-planner > header {
+    display: grid;
+    gap: 0.65rem;
+  }
+
+  .daily-meal-planner > header h1 {
+    font-size: 2rem;
+    line-height: 1.05;
+  }
+
+  .daily-meal-planner > header p {
+    display: none;
+  }
+
+  .meal-planner-disclosure {
+    padding: 0.9rem 1rem;
+  }
+
+  .meal-planner-disclosure > summary strong {
+    font-size: 1rem;
+  }
+
+  .meal-planner-total-preview {
+    display: grid;
+    gap: 0.05rem;
+    font-size: 0.75rem;
+  }
+
+  .meal-planner-total-preview > span {
+    display: none;
+  }
+
+  .meal-plan-options {
+    padding: 0.8rem 1rem;
+  }
+
+  .meal-plan-entry-list {
+    display: flex;
+    gap: 0.75rem;
+    overflow-x: auto;
+    margin-inline: -1.25rem;
+    padding: 0.15rem 1.25rem 0.75rem;
+    scroll-padding-inline: 1.25rem;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+
+  .meal-plan-entry-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .meal-plan-entry {
+    width: min(84vw, 21rem);
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+  }
+
+  .meal-plan-entry-controls {
+    grid-template-columns: minmax(0, 1fr) 6.25rem;
+  }
+
+  .meal-plan-entry-controls > label:nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .meal-plan-entry-controls > label:first-child {
+    grid-column: 1;
+  }
+
+  .meal-plan-entry-controls > label:last-child {
+    grid-column: 2;
+  }
+
+  .meal-plan-entry .field-input {
+    min-height: 2.75rem;
+    padding: 0.55rem 0.7rem;
+  }
+
+  .meal-plan-entry > div:not(.meal-plan-entry-heading):last-of-type p {
+    line-height: 1.35;
+  }
+
+  .meal-plan-save-bar {
+    position: sticky;
+    z-index: 45;
+    bottom: calc(4.65rem + env(safe-area-inset-bottom));
+    margin-inline: -0.5rem;
+    padding: 0.65rem;
+    border: 2px solid #000;
+    border-radius: 1rem;
+    background: rgb(255 253 248 / 0.96);
+    box-shadow: 0 -4px 14px rgb(0 0 0 / 0.12);
+    backdrop-filter: blur(10px);
+  }
+
+  .meal-plan-save-bar > button:first-child {
+    flex: 1 1 auto;
+  }
+}
