@@ -1,4 +1,5 @@
 import { getAppHref } from '../../app/useRoute';
+import { useEffect, useRef } from 'react';
 
 const primaryNavItems = [
   { path: '/training', label: 'Training' },
@@ -42,17 +43,24 @@ const relatedCalculators = {
 
 export function AppNavigation({ activePath, extraItems = [] }) {
   const contextualItems = relatedCalculators[activePath] || [];
+  const activeItem = useRef(null);
+  useEffect(() => {
+    if (!window.matchMedia('(max-width: 47.99rem)').matches) return;
+    window.requestAnimationFrame(() => activeItem.current?.scrollIntoView({ block: 'nearest', inline: 'center' }));
+  }, [activePath]);
   return (
-    <div className="space-y-2">
-    <nav className="overflow-x-auto" aria-label="Main navigation">
-      <div className="flex min-w-max gap-2 pb-1">
+    <div className="app-navigation space-y-2">
+    <nav className="app-navigation-primary overflow-x-auto" aria-label="Main navigation">
+      <div className="app-navigation-list flex min-w-max gap-2 pb-1">
         {[...primaryNavItems, ...extraItems].map((item) => {
           const isActive = activePath === item.path;
 
           return (
             <a
+              ref={isActive ? activeItem : null}
               key={item.path}
               href={getAppHref(item.path)}
+              aria-current={isActive ? 'page' : undefined}
               className={`inline-flex items-center rounded-full border border-black/85 px-3.5 py-1.5 text-sm font-semibold tracking-[-0.02em] text-black transition ${
                 isActive
                   ? 'bg-[#c5ff6f]'
@@ -65,7 +73,7 @@ export function AppNavigation({ activePath, extraItems = [] }) {
         })}
       </div>
     </nav>
-    {contextualItems.length > 0 && <nav className="flex flex-wrap items-center gap-2" aria-label="Related calculators">
+    {contextualItems.length > 0 && <nav className="app-navigation-related flex flex-wrap items-center gap-2" aria-label="Related calculators">
       <span className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">Related calculators</span>
       {contextualItems.map((item) => <a key={item.path} href={getAppHref(item.path)} className="inline-flex items-center rounded-full border border-black/70 bg-[#f4f9e9] px-3 py-1.5 text-xs font-semibold text-black transition hover:bg-[#c5ff6f]">{item.label}</a>)}
     </nav>}

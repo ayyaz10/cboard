@@ -1,5 +1,6 @@
 import { getAppHref } from '../../app/useRoute';
 import { PageShell } from '../layout/PageShell';
+import { AppNavigation } from '../layout/AppNavigation';
 
 const appSections = [
   {
@@ -79,7 +80,8 @@ export function AppBoard({ calculators }) {
   return (
     <PageShell>
       <section className="panel p-6 sm:p-8 lg:p-10">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <AppNavigation activePath="/board" />
+        <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
           <span className="pill">Control board</span>
           <span className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
             {appSections.length} app sections

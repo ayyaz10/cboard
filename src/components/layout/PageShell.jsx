@@ -7,7 +7,7 @@ export function PageShell({ children }) {
   const { displayName, user, signOut } = useAuth();
 
   return (
-    <main className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">
+    <main className="page-shell min-h-screen px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-6xl flex-col gap-6 lg:py-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <BrandBadge />
@@ -17,13 +17,13 @@ export function PageShell({ children }) {
               <>
                 <a
                   href={getAppHref('/notes')}
-                  className="rounded-full border-2 border-black bg-[#9fe3ff] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[3px_3px_0_#000] transition hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_#000]"
+                  className="page-shell-quick-action rounded-full border-2 border-black bg-[#9fe3ff] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[3px_3px_0_#000] transition hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_#000]"
                 >
                   Notes
                 </a>
                 <a
                   href={getAppHref('/focus-timer')}
-                  className="rounded-full border-2 border-black bg-[#c5ff6f] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[3px_3px_0_#000] transition hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_#000]"
+                  className="page-shell-quick-action rounded-full border-2 border-black bg-[#c5ff6f] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[3px_3px_0_#000] transition hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_#000]"
                 >
                   Start Focus
                 </a>

@@ -30,6 +30,7 @@ import {
   RecipeCardViewControl,
   useRecipeCardGrid,
 } from './RecipeCardView';
+import './recipesLayout.css';
 
 export function Recipes({ route }) {
   return (
@@ -182,10 +183,10 @@ function RecipesContent({ route }) {
   );
   return (
     <PageShell>
-      <section className="panel space-y-7 border-black p-5 text-black sm:p-8 lg:p-10">
+      <section className="recipe-page-shell panel space-y-7 border-black p-5 text-black sm:p-8 lg:p-10">
         <AppNavigation activePath="/recipes" />
         <DailyNutritionTargets controller={nutritionGoals} />
-        <nav className="flex flex-wrap gap-2" aria-label="Recipe shortcuts">
+        <nav className="recipe-shortcuts flex flex-wrap gap-2" aria-label="Recipe shortcuts">
           {!home && !(recipe && parts.length === 2) && <RecipeLink to="/recipes">Back to recipes</RecipeLink>}
           {!importing && <PrimaryButton onClick={() => startImport()}>Add recipe</PrimaryButton>}
           {!planning && <RecipeLink to="/recipes/planner/day">Meal planner</RecipeLink>}
