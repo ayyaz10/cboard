@@ -393,7 +393,7 @@ export function Groceries() {
               )}
             </div>
             <div className="g-between">
-              <div className="g-tabs">
+              <div className="g-tabs mobile-section-nav" aria-label="Grocery sections">
                 {[
                   ["stock", "My Groceries"],
                   ["shop", "Shopping List"],

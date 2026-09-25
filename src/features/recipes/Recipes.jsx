@@ -28,6 +28,7 @@ import { FoodDiary } from '../diary/FoodDiary';
 import {
   RecipeCardViewProvider,
   RecipeCardViewControl,
+  RecipeMasonryGrid,
   useRecipeCardGrid,
 } from './RecipeCardView';
 import './recipesLayout.css';
@@ -186,7 +187,7 @@ function RecipesContent({ route }) {
       <section className="recipe-page-shell panel space-y-7 border-black p-5 text-black sm:p-8 lg:p-10">
         <AppNavigation activePath="/recipes" />
         <DailyNutritionTargets controller={nutritionGoals} />
-        <nav className="recipe-shortcuts flex flex-wrap gap-2" aria-label="Recipe shortcuts">
+        <nav className="recipe-shortcuts mobile-section-nav flex flex-wrap gap-2" aria-label="Recipe shortcuts">
           {!home && !(recipe && parts.length === 2) && <RecipeLink to="/recipes">Back to recipes</RecipeLink>}
           {!importing && <PrimaryButton onClick={() => startImport()}>Add recipe</PrimaryButton>}
           {!planning && <RecipeLink to="/recipes/planner/day">Meal planner</RecipeLink>}
@@ -282,7 +283,7 @@ function RecipesContent({ route }) {
                         <RecipeCardViewControl />
                       </div>
                     </div>
-                    <div className={cardGrid}>
+                    <RecipeMasonryGrid className={cardGrid}>
                       {filtered.map((item) => (
                         <div
                           key={item.slug}
@@ -318,7 +319,7 @@ function RecipesContent({ route }) {
                           )}
                         </div>
                       ))}
-                    </div>
+                    </RecipeMasonryGrid>
                     {!filtered.length && (
                       <p className="py-8 text-center">
                         {favouritesOnly ? 'No favourites match this view. Tap a recipe’s heart in All recipes to save it here, or clear your search and meal type.' : 'No matching recipes. Try another search or meal type.'}

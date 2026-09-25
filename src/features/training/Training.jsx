@@ -157,7 +157,7 @@ export function Training() {
             )}
           </div>
         </header>
-        <nav aria-label="Training sections" className="tr-tabs">
+        <nav aria-label="Training sections" className="tr-tabs mobile-section-nav">
           {tabs.map((t) => (
             <button
               key={t}

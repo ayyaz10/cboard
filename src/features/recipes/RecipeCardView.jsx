@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import './recipeCardView.css';
 
 const sizes = ['small', 'medium', 'large', 'details'];
@@ -41,6 +41,30 @@ export function RecipeCardViewControl() {
       </select>
     </label>
   );
+}
+
+export function RecipeMasonryGrid({ as: Component = 'div', className = '', children }) {
+  const grid = useRef(null);
+  useEffect(() => {
+    const element = grid.current;
+    if (!element || typeof ResizeObserver === 'undefined') return;
+    const resize = () => {
+      const styles = window.getComputedStyle(element);
+      const row = Number.parseFloat(styles.gridAutoRows) || 8;
+      const gap = Number.parseFloat(styles.rowGap) || 0;
+      [...element.children].forEach((item) => {
+        const height = item.getBoundingClientRect().height;
+        const value = `span ${Math.ceil((height + gap) / (row + gap))}`;
+        if (item.style.gridRowEnd !== value) item.style.gridRowEnd = value;
+      });
+    };
+    const observer = new ResizeObserver(resize);
+    observer.observe(element);
+    [...element.children].forEach((item) => observer.observe(item));
+    resize();
+    return () => observer.disconnect();
+  }, [children]);
+  return <Component ref={grid} className={`${className} recipe-card-masonry`}>{children}</Component>;
 }
 
 export function useRecipeCardGrid() {

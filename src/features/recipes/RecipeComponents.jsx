@@ -5,7 +5,7 @@ import { getAppHref, navigateTo } from '../../app/useRoute';
 import { formatIngredient } from './recipeData';
 import { RecipeSource } from './RecipeSource';
 import { RecipeGroceries } from '../groceries/RecipeGroceries';
-import { useRecipeCardGrid } from './RecipeCardView';
+import { RecipeMasonryGrid, useRecipeCardGrid } from './RecipeCardView';
 import { RecipeFavouriteButton } from './RecipeFavouriteButton';
 import { calculateProducts } from './recipeProducts.js';
 import { ingredientRecipeCalculation } from './ingredientNutrition.js';
@@ -47,7 +47,7 @@ export function RecipeImage({ image, title, large = false }) {
     />
   ) : (
     <div
-      className={`recipe-image-placeholder flex items-center justify-center rounded-[1.35rem] border-2 border-black bg-white text-sm font-semibold text-black/55 ${large ? 'min-h-28 h-full' : 'aspect-[4/3]'}`}
+      className={`recipe-image-placeholder flex items-center justify-center rounded-[1.35rem] border-2 border-black bg-white px-2 text-center text-sm font-semibold leading-5 text-black/55 ${large ? 'min-h-28 h-full' : 'aspect-[4/3]'}`}
     >
       No recipe image yet
     </div>
@@ -121,7 +121,7 @@ export function RecipeAlternatives({ group }) {
   return (
     <section className="space-y-4">
       <h2 className="text-2xl font-bold">{group.title}</h2>
-      <ul className={cardGrid}>
+      <RecipeMasonryGrid as="ul" className={cardGrid}>
         {group.options.map((option, index) => (
           <li
             key={index}
@@ -138,7 +138,7 @@ export function RecipeAlternatives({ group }) {
             )}
           </li>
         ))}
-      </ul>
+      </RecipeMasonryGrid>
     </section>
   );
 }
