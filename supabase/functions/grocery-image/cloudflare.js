@@ -1,5 +1,6 @@
 export const FLUX_MODEL = "@cf/black-forest-labs/flux-1-schnell";
 export const CACHE_PREFIX = "flux-1-schnell:colorful-icon:v2:";
+export const RECIPE_CACHE_PREFIX = "flux-1-schnell:recipe-photo:v1:";
 export const GENERATION_TIMEOUT_MS = 45000;
 
 export function cloudflareConfig(env) {
@@ -24,7 +25,7 @@ export function cloudflareConfig(env) {
   return { accountId, apiToken, reserveUsd, monthlyCapUsd };
 }
 
-export async function generateFluxPhoto(name, config, fetchImpl = fetch) {
+export async function generateFluxPhoto(name, config, fetchImpl = fetch, kind = "grocery") {
   let response;
   try {
     response = await fetchImpl(
@@ -36,7 +37,9 @@ export async function generateFluxPhoto(name, config, fetchImpl = fetch) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          prompt: `Colorful illustrated grocery icon of ${name}. Friendly modern vector-style illustration, bold cheerful colors, simple clean shapes, subtle soft shading, centered single grocery item, isolated on a warm cream background, consistent app icon style, square composition, highly recognizable, no text, no letters, no label, no logo, no branding, no border, no photorealism.`,
+          prompt: kind === "recipe"
+            ? `Appetizing editorial food photograph of a finished serving of ${name}. Natural realistic food styling, warm soft daylight, clean neutral table setting, three-quarter overhead view, full dish in frame, high detail, square composition, no people, no hands, no text, no letters, no label, no logo, no branding, no border.`
+            : `Colorful illustrated grocery icon of ${name}. Friendly modern vector-style illustration, bold cheerful colors, simple clean shapes, subtle soft shading, centered single grocery item, isolated on a warm cream background, consistent app icon style, square composition, highly recognizable, no text, no letters, no label, no logo, no branding, no border, no photorealism.`,
           steps: 4,
         }),
         signal: AbortSignal.timeout(GENERATION_TIMEOUT_MS),

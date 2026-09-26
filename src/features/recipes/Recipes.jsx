@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { navigateTo, getAppHref } from '../../app/useRoute';
 import { PageShell } from '../../components/layout/PageShell';
 import { AppNavigation } from '../../components/layout/AppNavigation';
+import { useAdaptiveNavigation } from '../../hooks/useAdaptiveNavigation.js';
 import { PrimaryButton } from '../../components/ui/PrimaryButton';
 import {
   getRecipes,
@@ -48,6 +49,7 @@ function RecipesContent({ route }) {
   const [recipes, setRecipes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [recipeNotice, setRecipeNotice] = useState('');
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [favourites, setFavourites] = useState(new Set());
@@ -116,7 +118,14 @@ function RecipesContent({ route }) {
   const planning =
     parts.length === 3 && parts[1] === 'planner' && parts[2] === 'day';
   const diary = parts.length === 3 && parts[1] === 'diary' && parts[2] === 'day';
+  const recipeSection = importing ? 'add' : planning ? 'planner' : diary ? 'diary' : manage ? 'manage' : 'home';
+  const shortcutOrder = useAdaptiveNavigation(
+    'recipe-sections',
+    ['home', 'add', 'planner', 'diary', 'manage'],
+    recipeSection,
+  );
   function startImport(initial = null, editing = false) {
+    setRecipeNotice('');
     setDraft({ initial, editing, key: crypto.randomUUID() });
     navigateTo('/recipes/import');
   }
@@ -127,6 +136,7 @@ function RecipesContent({ route }) {
       saved,
     ]);
     setDraft(null);
+    setRecipeNotice('Recipe saved.');
     navigateTo(`/recipes/${saved.slug}`);
   }
   async function remove() {
@@ -188,13 +198,16 @@ function RecipesContent({ route }) {
         <AppNavigation activePath="/recipes" />
         <DailyNutritionTargets controller={nutritionGoals} />
         <nav className="recipe-shortcuts mobile-section-nav flex flex-wrap gap-2" aria-label="Recipe shortcuts">
-          {!home && !(recipe && parts.length === 2) && <RecipeLink to="/recipes">Back to recipes</RecipeLink>}
-          {!importing && <PrimaryButton onClick={() => startImport()}>Add recipe</PrimaryButton>}
-          {!planning && <RecipeLink to="/recipes/planner/day">Meal planner</RecipeLink>}
-          {!diary && <RecipeLink to="/recipes/diary/day">Food diary</RecipeLink>}
-          {!manage && <RecipeLink to="/recipes/manage">Manage recipes</RecipeLink>}
+          {shortcutOrder.map((item) => {
+            if (item === 'home') return !home && !(recipe && parts.length === 2) ? <RecipeLink key={item} to="/recipes">Back to recipes</RecipeLink> : null;
+            if (item === 'add') return !importing ? <PrimaryButton key={item} onClick={() => startImport()}>Add recipe</PrimaryButton> : null;
+            if (item === 'planner') return !planning ? <RecipeLink key={item} to="/recipes/planner/day">Meal planner</RecipeLink> : null;
+            if (item === 'diary') return !diary ? <RecipeLink key={item} to="/recipes/diary/day">Food diary</RecipeLink> : null;
+            return !manage ? <RecipeLink key={item} to="/recipes/manage">Manage recipes</RecipeLink> : null;
+          })}
         </nav>
         {favouriteError && <p role="alert" className="rounded-xl border-2 border-black bg-[#ffe0de] p-3 text-sm font-semibold">{favouriteError}</p>}
+        {recipeNotice && <p role="status" className="rounded-xl border-2 border-black bg-[#c5ff6f] p-3 text-sm font-semibold">{recipeNotice}</p>}
         <p role="status" className="sr-only">{favouriteNotice}</p>
         {loading ? (
           <p role="status" className="py-12 text-center font-bold">
@@ -225,11 +238,12 @@ function RecipesContent({ route }) {
                 getSlugs={async () =>
                   (await getRecipes()).map((item) => item.slug)
                 }
-                onAiCreated={(created) => {
+                onAiCreated={(created, imageWarning = '') => {
                   setRecipes((current) => [
                     ...current.filter((item) => item.slug !== created.slug),
                     created,
                   ]);
+                  setRecipeNotice(imageWarning ? `Recipe saved without an AI image: ${imageWarning}` : 'Recipe and AI image saved.');
                   setDraft(null);
                   navigateTo(`/recipes/${created.slug}`);
                 }}

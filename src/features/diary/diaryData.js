@@ -49,6 +49,31 @@ export const newMeal = (meal = "Breakfast") => ({
   notes: "",
   items: [],
 });
+export function copyMealEntry(meal) {
+  return {
+    ...structuredClone(meal),
+    id: crypto.randomUUID(),
+    items: meal.items.map((item) => ({
+      ...structuredClone(item),
+      id: crypto.randomUUID(),
+    })),
+  };
+}
+export function mealMatchesSearch(meal, query) {
+  const words = String(query || '').trim().toLowerCase();
+  if (!words) return true;
+  const content = [
+    meal?.title,
+    meal?.meal,
+    meal?.notes,
+    ...(Array.isArray(meal?.items) ? meal.items.flatMap((item) => [
+      item?.name,
+      item?.source?.name,
+      item?.source?.provider,
+    ]) : []),
+  ].filter(Boolean).join(' ').toLowerCase();
+  return words.split(/\s+/).every((word) => content.includes(word));
+}
 const positive = (value) =>
   Number.isFinite(value) &&
   typeof value === "number" &&

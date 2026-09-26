@@ -1,8 +1,15 @@
 import { AppNavigation } from '../../components/layout/AppNavigation';
 import { PageShell } from '../../components/layout/PageShell';
 import { CalculatorBoardCard } from '../../components/ui/CalculatorBoardCard';
+import { useAdaptiveNavigation } from '../../hooks/useAdaptiveNavigation.js';
 
 export function CalculatorBoard({ calculators }) {
+  const orderedCalculators = useAdaptiveNavigation(
+    'main-apps',
+    calculators,
+    null,
+    (calculator) => calculator.path,
+  );
   return (
     <PageShell>
       <section className="panel p-6 sm:p-8 lg:p-10">
@@ -24,7 +31,7 @@ export function CalculatorBoard({ calculators }) {
         </p>
 
         <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {calculators.map((calculator, index) => (
+          {orderedCalculators.map((calculator, index) => (
             <CalculatorBoardCard
               key={calculator.id}
               calculator={calculator}

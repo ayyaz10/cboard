@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { PageShell } from "../../components/layout/PageShell";
 import { AppNavigation } from "../../components/layout/AppNavigation";
+import { useAdaptiveNavigation } from "../../hooks/useAdaptiveNavigation";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTraining } from "./useTraining";
 import {
@@ -105,6 +106,7 @@ export function Training() {
     "Exercise Library",
     "Settings",
   ];
+  const orderedTabs = useAdaptiveNavigation("training-sections", tabs, tab);
   const [clock, setClock] = useState(Date.now());
   useEffect(() => {
     const id = setInterval(() => setClock(Date.now()), 1000);
@@ -158,7 +160,7 @@ export function Training() {
           </div>
         </header>
         <nav aria-label="Training sections" className="tr-tabs mobile-section-nav">
-          {tabs.map((t) => (
+          {orderedTabs.map((t) => (
             <button
               key={t}
               type="button"

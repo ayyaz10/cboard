@@ -151,6 +151,13 @@ const ingredientNutrients = [
   ['fiber', 'Fibre', 'g'],
 ];
 
+function ingredientNutritionSummary(item) {
+  const values = ingredientNutrients
+    .filter(([key]) => item.nutrition?.[key] != null)
+    .map(([key, label, unit]) => `${label} ${new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(item.nutrition[key])} ${unit}`);
+  return values.length ? values.join(' · ') : 'Nutrition not calculated yet';
+}
+
 function ChevronDownIcon({ open, reduceMotion }) {
   return <motion.svg
     aria-hidden="true"
@@ -176,7 +183,7 @@ function IngredientNutritionRow({ item, recipe, preview }) {
       <button type="button" className="flex min-w-0 flex-1 items-center justify-between gap-3 bg-transparent px-3 py-2.5 text-left" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
         <span className="min-w-0">
           <span className="block font-semibold">{formatIngredient(item)}</span>
-          {item.note && <span className="mt-0.5 block text-xs leading-5 text-black/65">{item.note}</span>}
+          <span className="mt-0.5 block text-xs leading-5 text-black/65">{ingredientNutritionSummary(item)}</span>
         </span>
         <ChevronDownIcon open={open} reduceMotion={reduceMotion} />
       </button>
@@ -212,6 +219,7 @@ function IngredientNutritionRow({ item, recipe, preview }) {
               <dd className="font-bold">{item.nutrition?.[key] == null ? '—' : `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(item.nutrition[key])} ${unit}`}</dd>
             </div>)}
           </dl>
+          {item.note && <p className="mt-3 text-xs leading-5 text-black/65"><strong>Ingredient note:</strong> {item.note}</p>}
           {!ingredientNutrients.some(([key]) => item.nutrition?.[key] != null) && <p className="mt-2 text-xs text-black/60">Nutrition has not been calculated for this ingredient yet.</p>}
         </motion.div>
       </motion.div>}

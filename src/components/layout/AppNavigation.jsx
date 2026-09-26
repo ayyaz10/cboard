@@ -1,5 +1,6 @@
 import { getAppHref } from '../../app/useRoute';
 import { useEffect, useId, useState } from 'react';
+import { useAdaptiveNavigation } from '../../hooks/useAdaptiveNavigation';
 
 const primaryNavItems = [
   { path: '/training', label: 'Training' },
@@ -43,6 +44,14 @@ const relatedCalculators = {
 
 export function AppNavigation({ activePath, extraItems = [] }) {
   const contextualItems = relatedCalculators[activePath] || [];
+  const homeItem = primaryNavItems.find((item) => item.path === '/board');
+  const adaptiveItems = useAdaptiveNavigation(
+    'main-apps',
+    [...primaryNavItems.filter((item) => item.path !== '/board'), ...extraItems],
+    activePath === '/board' ? null : activePath,
+    (item) => item.path,
+  );
+  const orderedItems = [homeItem, ...adaptiveItems];
   const [open, setOpen] = useState(false);
   const menuId = useId();
   useEffect(() => {
@@ -64,7 +73,7 @@ export function AppNavigation({ activePath, extraItems = [] }) {
     <div className="app-menu-heading"><strong>Navigate</strong><button type="button" aria-label="Close navigation menu" onClick={() => setOpen(false)}>×</button></div>
     <nav className="app-navigation-primary overflow-x-auto" aria-label="Main navigation">
       <div className="app-navigation-list flex min-w-max gap-2 pb-1">
-        {[...primaryNavItems, ...extraItems].map((item) => {
+        {orderedItems.map((item) => {
           const isActive = activePath === item.path;
 
           return (

@@ -102,6 +102,31 @@ export async function parseRecipeText(recipeText) {
   return { ...validateRecipe(data.recipe), image: null, updatedAt: data.recipe.updatedAt };
 }
 
+export async function generateRecipeImage(title) {
+  if (typeof title !== 'string' || !title.trim() || title.length > 160)
+    throw new Error('Use a recipe title between 1 and 160 characters.');
+  const invoke = async (poll) => {
+    const { data, error } = await requireSupabase().functions.invoke('grocery-image', {
+      body: { name: title.trim(), kind: 'recipe', poll },
+    });
+    let message = typeof data?.error === 'string' ? data.error : '';
+    if (!message && error?.context instanceof Response) {
+      try { message = (await error.context.json()).error || ''; }
+      catch { /* Network failures use the safe fallback below. */ }
+    }
+    if (error || message) throw new Error(message || 'Recipe image generation is unavailable. You can still upload a photo.');
+    return data;
+  };
+  let result = await invoke(false);
+  for (let attempt = 0; !result?.url && attempt < 45; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    result = await invoke(true);
+  }
+  if (!isRecipeImage(result?.url))
+    throw new Error('The generated image was not ready. Your recipe was still saved without it.');
+  return result.url;
+}
+
 // One row per recipe reuses CBoard's existing user-scoped JSONB persistence.
 // The existing (user_id, key) unique constraint also protects concurrent imports.
 export async function getRecipes() {

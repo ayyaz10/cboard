@@ -4,6 +4,7 @@ import { createGroceryImageHandler } from "./handler.js";
 import {
   CACHE_PREFIX,
   FLUX_MODEL,
+  RECIPE_CACHE_PREFIX,
   cloudflareConfig,
   generateFluxPhoto,
 } from "./cloudflare.js";
@@ -138,6 +139,22 @@ test("Cloudflare uses the exact FLUX REST model, four steps, and server-side cre
     },
   );
   assert.equal(result, imageUrl);
+});
+
+test("recipe image requests use a separate cache and realistic food-photo prompt", async () => {
+  const config = cloudflareConfig(env);
+  await generateFluxPhoto("chicken fried rice", config, async (_url, request) => {
+    const body = JSON.parse(request.body);
+    assert.match(body.prompt, /editorial food photograph/);
+    assert.match(body.prompt, /chicken fried rice/);
+    assert.match(body.prompt, /no text/);
+    return response();
+  }, "recipe");
+  const { state, call } = harness();
+  const result = await call({ name: "Chicken fried rice", kind: "recipe" });
+  assert.equal(result.status, 200);
+  assert.ok(state.jobs.has(`user-1:${RECIPE_CACHE_PREFIX}chicken fried rice`));
+  assert.equal(state.jobs.has(`user-1:${CACHE_PREFIX}chicken fried rice`), false);
 });
 
 test("missing credentials and invalid operator limits fail closed", () => {

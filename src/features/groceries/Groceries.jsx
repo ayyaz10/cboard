@@ -2,6 +2,7 @@ import { DailyNutritionTargets, useNutritionGoals } from '../nutrition/DailyNutr
 import { useEffect, useRef, useState } from "react";
 import { PageShell } from "../../components/layout/PageShell";
 import { AppNavigation } from "../../components/layout/AppNavigation";
+import { useAdaptiveNavigation } from "../../hooks/useAdaptiveNavigation";
 import { readGroceryImage, resizeGroceryImage } from "./groceryImage";
 import { groceryImage } from "../../services/groceryService";
 import { useGroceries } from "./useGroceries";
@@ -157,6 +158,12 @@ export function Groceries() {
     [query, setQuery] = useState(""),
     [category, setCategory] = useState("All"),
     [status, setStatus] = useState("All");
+  const groceryTabs = useAdaptiveNavigation(
+    "grocery-sections",
+    [["stock", "My Groceries"], ["shop", "Shopping List"]],
+    tab,
+    ([key]) => key,
+  );
   const [selected, setSelected] = useState([]),
     [modal, setModal] = useState(null),
     [text, setText] = useState(""),
@@ -394,10 +401,7 @@ export function Groceries() {
             </div>
             <div className="g-between">
               <div className="g-tabs mobile-section-nav" aria-label="Grocery sections">
-                {[
-                  ["stock", "My Groceries"],
-                  ["shop", "Shopping List"],
-                ].map(([key, name]) => (
+                {groceryTabs.map(([key, name]) => (
                   <button
                     key={key}
                     aria-pressed={tab === key}

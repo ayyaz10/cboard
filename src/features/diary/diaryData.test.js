@@ -16,6 +16,8 @@ import {
   weekDates,
   dailyCalorieReport,
   weeklyCalorieReport,
+  copyMealEntry,
+  mealMatchesSearch,
 } from "./diaryData.js";
 import { offNutrients } from "../nutrition/nutrients.js";
 
@@ -40,6 +42,28 @@ const completed = (date) => ({
   meals: [meal()],
   skipped: ["Lunch", "Dinner"],
   complete: true,
+});
+test("copied diary meals keep nutrition but receive independent ids", () => {
+  const original = { ...meal("Lunch"), title: "Yesterday's lunch" };
+  const copied = copyMealEntry(original);
+  assert.equal(copied.title, original.title);
+  assert.equal(copied.meal, "Lunch");
+  assert.notEqual(copied.id, original.id);
+  assert.notEqual(copied.items[0].id, original.items[0].id);
+  copied.items[0].nutrition.protein = 999;
+  assert.equal(original.items[0].nutrition.protein, 13);
+});
+test("past meal search includes foods, notes, meal type and source names", () => {
+  const snack = {
+    ...meal("Snack"),
+    title: "Afternoon break",
+    notes: "No sugar",
+    items: [{ ...egg(), name: "Tea", source: { provider: "Manual", name: "Yorkshire Tea" } }],
+  };
+  for (const query of ["tea", "snack", "no sugar", "yorkshire", "afternoon tea"]) {
+    assert.equal(mealMatchesSearch(snack, query), true);
+  }
+  assert.equal(mealMatchesSearch(snack, "coffee"), false);
 });
 test("two eggs use confirmed edible weight, scale micronutrients, and preserve zero", () => {
   const item = { ...egg(), quantity: 2, unit: "pieces", perPiece: 50 };

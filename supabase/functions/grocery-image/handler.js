@@ -1,5 +1,6 @@
 import {
   CACHE_PREFIX,
+  RECIPE_CACHE_PREFIX,
   cloudflareConfig,
   generateFluxPhoto,
 } from "./cloudflare.js";
@@ -39,17 +40,19 @@ export function createGroceryImageHandler({ createClient, env, fetchImpl }) {
       if (authError || !auth?.user)
         return json({ error: "Sign in again to generate an image." }, 401);
       const body = await request.json();
+      const kind = body?.kind === "recipe" ? "recipe" : "grocery";
+      const maxNameLength = kind === "recipe" ? 160 : 100;
       if (
         typeof body?.name !== "string" ||
         !body.name.trim() ||
-        body.name.length > 100
+        body.name.length > maxNameLength
       )
         return json(
-          { error: "Use an item name between 1 and 100 characters." },
+          { error: `Use a ${kind === "recipe" ? "recipe title" : "item name"} between 1 and ${maxNameLength} characters.` },
           400,
         );
       const name = body.name.trim().toLowerCase().replace(/\s+/g, " ");
-      const cacheKey = `${CACHE_PREFIX}${name}`;
+      const cacheKey = `${kind === "recipe" ? RECIPE_CACHE_PREFIX : CACHE_PREFIX}${name}`;
       const userId = auth.user.id;
       async function getJob() {
         const { data, error } = await db
@@ -70,7 +73,7 @@ export function createGroceryImageHandler({ createClient, env, fetchImpl }) {
           return json(
             {
               error:
-                "No completed photo yet. Retry from the item editor to create one.",
+                "No completed photo yet. Retry from the image generator to create one.",
             },
             409,
           );
@@ -135,7 +138,7 @@ export function createGroceryImageHandler({ createClient, env, fetchImpl }) {
       }
       let url;
       try {
-        url = await generateFluxPhoto(name, config, fetchImpl);
+        url = await generateFluxPhoto(name, config, fetchImpl, kind);
       } catch (error) {
         // No automatic retry: another attempt consumes another budget reservation.
         await update({ status: "failed" });

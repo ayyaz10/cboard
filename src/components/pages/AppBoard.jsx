@@ -1,6 +1,7 @@
 import { getAppHref } from '../../app/useRoute';
 import { PageShell } from '../layout/PageShell';
 import { AppNavigation } from '../layout/AppNavigation';
+import { useAdaptiveNavigation } from '../../hooks/useAdaptiveNavigation.js';
 
 const appSections = [
   {
@@ -77,6 +78,12 @@ const appSections = [
 const futureAppSections = [];
 
 export function AppBoard({ calculators }) {
+  const orderedSections = useAdaptiveNavigation(
+    'main-apps',
+    appSections,
+    null,
+    (section) => section.path,
+  );
   return (
     <PageShell>
       <section className="panel p-6 sm:p-8 lg:p-10">
@@ -97,7 +104,7 @@ export function AppBoard({ calculators }) {
         </p>
 
         <div className="mt-8 grid gap-4 md:grid-cols-2">
-          {appSections.map((section, index) => (
+          {orderedSections.map((section, index) => (
             <a
               key={section.id}
               href={getAppHref(section.path)}

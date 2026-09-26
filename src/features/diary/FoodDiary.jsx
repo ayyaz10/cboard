@@ -11,14 +11,18 @@ import { RecipeLink } from "../recipes/RecipeComponents";
 import { NutritionTotals } from "./DiaryNutrition";
 import { DiaryMealEditor } from "./DiaryMealEditor";
 import { DiaryReports } from "./DiaryReports";
+import { DiaryCalendar } from "./DiaryCalendar";
+import { DiaryMonthPicker } from "./DiaryMonthPicker";
 import { buildDiaryFoodLibrary } from "./diaryFoodLibrary";
 import {
   MEALS,
   REQUIRED_MEALS,
   canComplete,
+  copyMealEntry,
   diaryTotals,
   emptyDay,
   localDate,
+  mealMatchesSearch,
   newMeal,
   recipeItems,
   shiftDate,
@@ -45,15 +49,25 @@ export function FoodDiary({ recipes, nutritionGoals }) {
   const [removeDay, setRemoveDay] = useState(null);
   const [routine, setRoutine] = useState(null);
   const [selected, setSelected] = useState([]);
+  const [pastOpen, setPastOpen] = useState(false);
+  const [pastSelected, setPastSelected] = useState([]);
+  const [pastSearch, setPastSearch] = useState("");
   const [month, setMonth] = useState("");
   const lock = useRef(false);
   const generation = useRef(0);
   const editorRef = useRef(null);
   const diaryTopRef = useRef(null);
+  const mealsRef = useRef(null);
   const day = days.find((entry) => entry.date === date) || emptyDay(date);
   const streak = streaks(days, today);
   const foodLibrary = useMemo(() => buildDiaryFoodLibrary(days, recipes), [days, recipes]);
-  const disabled = busy || Boolean(draft) || Boolean(routine);
+  const disabled = busy || Boolean(draft) || Boolean(routine) || pastOpen;
+  const allPastMeals = useMemo(() => days
+    .filter((entry) => entry.date !== date)
+    .flatMap((entry) => entry.meals.map((meal) => ({ entryDate: entry.date, meal })))
+    .sort((left, right) => right.entryDate.localeCompare(left.entryDate)), [days, date]);
+  const pastMeals = useMemo(() => allPastMeals
+    .filter(({ meal }) => mealMatchesSearch(meal, pastSearch)), [allPastMeals, pastSearch]);
   const goals =
     !nutritionGoals.loading && !nutritionGoals.error
       ? nutritionGoals.goals
@@ -87,7 +101,7 @@ export function FoodDiary({ recipes, nutritionGoals }) {
       editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [draft?.id]);
   useEffect(() => {
-    if (!draft && !routine) return;
+    if (!draft && !routine && !pastOpen) return;
     const warn = (event) => {
       event.preventDefault();
       event.returnValue = "";
@@ -120,7 +134,7 @@ export function FoodDiary({ recipes, nutritionGoals }) {
       window.removeEventListener("beforeunload", warn);
       document.removeEventListener("click", guardLink, true);
     };
-  }, [draft, routine]);
+  }, [draft, routine, pastOpen]);
   async function persist(next, success) {
     if (lock.current) return false;
     lock.current = true;
@@ -156,9 +170,14 @@ export function FoodDiary({ recipes, nutritionGoals }) {
       setNotice("");
       setRemove(null);
       setRemoveDay(null);
+      setPastOpen(false);
+      setPastSelected([]);
       if (scroll)
         window.requestAnimationFrame(() =>
-          diaryTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+          (scroll === "meals" ? mealsRef.current : diaryTopRef.current)?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          }),
         );
     }
   }
@@ -264,6 +283,25 @@ export function FoodDiary({ recipes, nutritionGoals }) {
       setError(err.message);
     }
   }
+  async function importPastMeals() {
+    const selectedMeals = allPastMeals
+      .filter(({ entryDate, meal }) => pastSelected.includes(`${entryDate}:${meal.id}`))
+      .map(({ meal }) => copyMealEntry(meal));
+    if (!selectedMeals.length) {
+      setError("Choose at least one past meal to copy.");
+      return;
+    }
+    if (await persist({
+      ...day,
+      meals: [...day.meals, ...selectedMeals],
+      skipped: day.skipped.filter((slot) => !selectedMeals.some((meal) => meal.meal === slot)),
+      complete: false,
+    }, `${selectedMeals.length} past meal${selectedMeals.length===1?'':'s'} copied to ${date}.`)) {
+      setPastOpen(false);
+      setPastSelected([]);
+      setPastSearch("");
+    }
+  }
   if (loading) return <p role="status">Loading your food diary…</p>;
   if (loadError)
     return (
@@ -278,7 +316,6 @@ export function FoodDiary({ recipes, nutritionGoals }) {
         <div>
           <span className="pill">Everyday nutrition</span>
           <h1>Food diary</h1>
-          <p>Your meals, your portions, your daily progress.</p>
         </div>
         <RecipeLink to="/recipes/planner/day">Daily Planner</RecipeLink>
       </header>
@@ -290,11 +327,6 @@ export function FoodDiary({ recipes, nutritionGoals }) {
         <p>
           Best: <b>{streak.longest} days</b> · {streak.completed} completed days
         </p>
-        <small>
-          Finish a day after logging or skipping breakfast, lunch and dinner.
-          Snacks are optional. Your streak counts completed calendar days,
-          including backfilled entries. Today can stay open until you finish.
-        </small>
       </section>
       <div className="diary-datebar" ref={diaryTopRef}>
         <button
@@ -305,17 +337,14 @@ export function FoodDiary({ recipes, nutritionGoals }) {
         >
           ←
         </button>
-        <label>
-          Diary date
-          <input
-            type="date"
-            value={date}
-            min="2000-01-01"
-            max={today}
-            disabled={disabled}
-            onChange={(event) => selectDate(event.target.value)}
-          />
-        </label>
+        <DiaryCalendar
+          date={date}
+          today={today}
+          days={days}
+          target={goals?.calories}
+          disabled={disabled}
+          onSelect={selectDate}
+        />
         <button
           type="button"
           disabled={disabled || date >= today}
@@ -351,10 +380,6 @@ export function FoodDiary({ recipes, nutritionGoals }) {
           meals={day.meals}
           goals={goals}
         />
-        <p className="diary-hint">
-          {day.meals.length} meal entries · totals reflect saved meals. Targets
-          are your current targets.
-        </p>
       </section>
       {notice && (
         <p className="diary-notice" role="status">
@@ -369,7 +394,7 @@ export function FoodDiary({ recipes, nutritionGoals }) {
           </button>
         </div>
       )}
-      {!draft && !routine && (
+      {!draft && !routine && !pastOpen && (
         <div className="diary-actions">
           <button
             className="diary-primary"
@@ -385,7 +410,27 @@ export function FoodDiary({ recipes, nutritionGoals }) {
           <button type="button" disabled={busy} onClick={openRoutine}>
             Copy meals from planner
           </button>
+          <button type="button" disabled={busy} onClick={() => { setPastOpen(true); setPastSelected([]); setError(""); }}>
+            Copy a past meal
+          </button>
         </div>
+      )}
+      {pastOpen && (
+        <section className="diary-panel" aria-label="Copy past meals">
+          <div className="diary-section-heading"><div><h2>Copy from meal history</h2><p>Choose any old meal to add a fresh copy to {date}.</p></div><span className="pill">{pastSelected.length} selected</span></div>
+          <label className="mt-4">Search meal names or foods inside them<input type="search" value={pastSearch} onChange={(event) => setPastSearch(event.target.value)} placeholder="Tea, chicken, breakfast, no sugar…" /></label>
+          <div className="diary-copy-list mt-4">
+            {pastMeals.slice(0,100).map(({ entryDate, meal }) => {
+              const key=`${entryDate}:${meal.id}`, totals=diaryTotals([meal]);
+              return <label className="diary-copy-option" key={key}>
+                <input type="checkbox" disabled={busy} checked={pastSelected.includes(key)} onChange={(event)=>setPastSelected(event.target.checked?[...pastSelected,key]:pastSelected.filter((value)=>value!==key))}/>
+                <span><strong>{meal.title}</strong><small>{entryDate} · {meal.meal} · {totals.calories.known?`${format(totals.calories.value)} kcal`:'calories unknown'} · {totals.protein.known?`${format(totals.protein.value)} g protein`:'protein unknown'}</small><span className="diary-copy-foods">{meal.items.map((item)=>`${format(item.quantity)} ${item.unit} ${item.name}`).join(' · ')}</span></span>
+              </label>;
+            })}
+            {!pastMeals.length&&<p>No matching meals are available from another day yet.</p>}
+          </div>
+          <div className="diary-actions"><button className="diary-primary" disabled={busy||!pastSelected.length} onClick={importPastMeals}>Copy selected to {date}</button><button disabled={busy} onClick={()=>{setPastOpen(false);setPastSelected([]);setPastSearch("")}}>Cancel</button></div>
+        </section>
       )}
       {routine && (
         <section className="diary-panel" aria-label="Copy planner meals">
@@ -443,7 +488,7 @@ export function FoodDiary({ recipes, nutritionGoals }) {
           />
         </div>
       )}
-      <div className="diary-meal-sections">
+      <div className="diary-meal-sections" ref={mealsRef}>
         {MEALS.map((slot) => {
           const entries = day.meals.filter((meal) => meal.meal === slot);
           return (
@@ -494,34 +539,52 @@ export function FoodDiary({ recipes, nutritionGoals }) {
                     : `Mark ${slot.toLowerCase()} skipped`}
                 </button>
               )}
-              {entries.map((meal) => (
-                <article className="diary-entry" key={meal.id}>
+              {entries.map((meal) => {
+                const ingredientText = (item) =>
+                  `${format(item.quantity)} ${item.unit} ${item.name}`;
+                const previewItems = meal.items.slice(0, 3);
+                const remainingItems = meal.items.length - previewItems.length;
+                return (
+                  <article className="diary-entry" key={meal.id}>
                   <h3>{meal.title}</h3>
-                  <p>
-                    {meal.items
-                      .map(
-                        (item) =>
-                          `${format(item.quantity)} ${item.unit} ${item.name}`,
-                      )
-                      .join(" · ")}
-                  </p>
+                  {remainingItems > 0 ? (
+                    <details className="diary-ingredients">
+                      <summary>
+                        <span>
+                          {previewItems.map((item) => item.name).join(" · ")} · +{remainingItems} more
+                        </span>
+                        <strong>View ingredients</strong>
+                      </summary>
+                      <ul>
+                        {meal.items.map((item) => (
+                          <li key={item.id}>{ingredientText(item)}</li>
+                        ))}
+                      </ul>
+                    </details>
+                  ) : (
+                    <p className="diary-ingredient-list">
+                      {meal.items.map(ingredientText).join(" · ")}
+                    </p>
+                  )}
                   {meal.notes && <p>{meal.notes}</p>}
                   <NutritionTotals meals={[meal]} compact />
                   <div className="diary-actions">
                     <button
                       disabled={disabled}
+                      aria-label={`Edit ${meal.title}`}
                       onClick={() => {
                         setDraft(meal);
                         setError("");
                       }}
                     >
-                      Edit {meal.title}
+                      Edit
                     </button>
                     <button
                       disabled={disabled}
+                      aria-label={`Delete ${meal.title}`}
                       onClick={() => setRemove(meal.id)}
                     >
-                      Delete {meal.title}
+                      Delete
                     </button>
                   </div>
                   {remove === meal.id && (
@@ -558,18 +621,17 @@ export function FoodDiary({ recipes, nutritionGoals }) {
                       </div>
                     </div>
                   )}
-                </article>
-              ))}
+                  </article>
+                );
+              })}
             </section>
           );
         })}
       </div>
       <section className="diary-panel diary-finish">
         <h2>{day.complete ? "Day logged ✓" : "Ready to finish this day?"}</h2>
-        <p>
-          {day.complete
-            ? "This day counts towards your streak. Editing a meal reopens it so you can review the totals."
-            : `Record ${
+        {!day.complete && (
+          <p>{`Record ${
                 REQUIRED_MEALS.filter(
                   (slot) =>
                     !day.skipped.includes(slot) &&
@@ -577,8 +639,8 @@ export function FoodDiary({ recipes, nutritionGoals }) {
                 )
                   .join(", ")
                   .toLowerCase() || "any snacks, if needed"
-              }, then confirm you have logged everything you ate.`}
-        </p>
+              }, then confirm you have logged everything you ate.`}</p>
+        )}
         <button
           className="diary-primary"
           disabled={disabled || (!day.complete && !canComplete(day))}
@@ -593,25 +655,18 @@ export function FoodDiary({ recipes, nutritionGoals }) {
         >
           {day.complete ? "Reopen day" : "Finish day & update streak"}
         </button>
-        <p className="diary-hint">
-          Completion is about keeping a record, not reaching a calorie target.
-          At least one meal must be logged.
-        </p>
       </section>
       <section className="diary-panel" aria-label="Meal history">
         <h2>Meal history</h2>
         <div className="diary-fields">
-          <label>
-            Filter history by month
-            <input
-              type="month"
-              value={month}
-              onChange={(event) => setMonth(event.target.value)}
-            />
-          </label>
-          {month && (
-            <button onClick={() => setMonth("")}>Show all months</button>
-          )}
+          <DiaryMonthPicker
+            month={month}
+            today={today}
+            days={days}
+            target={goals?.calories}
+            disabled={disabled}
+            onChange={setMonth}
+          />
         </div>
         <div className="diary-history">
           {days
@@ -678,6 +733,19 @@ export function FoodDiary({ recipes, nutritionGoals }) {
             (!month || entry.date.startsWith(month)),
         ) && <p>No meals recorded for this period yet.</p>}
       </section>
+      <details className="diary-panel diary-guide">
+        <summary>How the food diary works</summary>
+        <div className="diary-guide-content">
+          <p><strong>Logging a day</strong></p>
+          <p>Log or skip breakfast, lunch and dinner, then finish the day. Snacks are optional.</p>
+          <p><strong>Streaks</strong></p>
+          <p>Finished calendar days count towards your streak, including days completed later.</p>
+          <p><strong>Editing</strong></p>
+          <p>Editing a finished day reopens it so you can check the updated totals and finish it again.</p>
+          <p><strong>Partial nutrition</strong></p>
+          <p>“Known subtotal” means one or more foods are missing nutrition data; missing values are not counted as zero.</p>
+        </div>
+      </details>
       <p className="diary-hint">
         Food lookup:{" "}
         <a

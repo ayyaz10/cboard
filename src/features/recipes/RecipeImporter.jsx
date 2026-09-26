@@ -10,7 +10,7 @@ import {
 import { RecipePage, secondaryButton } from './RecipeComponents';
 import { RecipeImageUploader } from './RecipeImageUploader';
 import { RecipeFormEditor, emptyRecipe } from './RecipeFormEditor';
-import { parseRecipeText } from '../../services/recipeService';
+import { generateRecipeImage, parseRecipeText, saveRecipe } from '../../services/recipeService';
 import { RecipeJsonGuide } from './RecipeJsonGuide';
 
 export function RecipeImporter({
@@ -38,6 +38,7 @@ export function RecipeImporter({
   const [busy, setBusy] = useState(false);
   const [imageBusy, setImageBusy] = useState(false);
   const [aiText, setAiText] = useState('');
+  const [generateAiImage, setGenerateAiImage] = useState(false);
   const lock = useRef(false);
   async function createWithAi() {
     if (lock.current || !aiText.trim()) return;
@@ -46,9 +47,18 @@ export function RecipeImporter({
     setError('');
     setNotice('');
     try {
-      const recipe = await parseRecipeText(aiText);
-      setNotice('Recipe created securely. Opening it now…');
-      onAiCreated(recipe);
+      let recipe = await parseRecipeText(aiText);
+      let imageWarning = '';
+      if (generateAiImage) {
+        setNotice('Recipe saved. Generating its food image…');
+        try {
+          const generatedImage = await generateRecipeImage(recipe.title);
+          recipe = await saveRecipe(recipe, generatedImage, { edit: true });
+        } catch (imageError) {
+          imageWarning = imageError.message || 'The recipe was saved, but its image could not be generated.';
+        }
+      }
+      onAiCreated(recipe, imageWarning);
     } catch (error) {
       setError(error.message || 'Unable to parse recipe. Please try again.');
     } finally {
@@ -325,8 +335,12 @@ export function RecipeImporter({
                   <span>{aiText.length}/2000 characters</span>
                   <span>Includes a short ingredient review with green positives, red points to watch and suggested improvements. AI can make mistakes; check the saved recipe and report.</span>
                 </div>
+                <label className="flex !grid-cols-[auto_1fr] items-start gap-3 rounded-xl border-2 border-black bg-white p-3">
+                  <input className="mt-1 !w-auto" type="checkbox" checked={generateAiImage} onChange={(event) => setGenerateAiImage(event.target.checked)} />
+                  <span><strong className="block text-black">Generate a recipe image with AI</strong><span className="mt-1 block font-normal text-black/65">Creates a food photo after the recipe is saved. This uses the Cloudflare image allowance configured in Groceries settings; if generation fails, the recipe remains safely saved without an image.</span></span>
+                </label>
                 <PrimaryButton type="button" disabled={busy || !aiText.trim()} onClick={createWithAi}>
-                  {busy ? 'Creating recipe…' : 'Create recipe with AI'}
+                  {busy ? (generateAiImage ? 'Creating recipe and image…' : 'Creating recipe…') : (generateAiImage ? 'Create recipe + image with AI' : 'Create recipe with AI')}
                 </PrimaryButton>
               </section>
             ) : mode === 'form' ? (

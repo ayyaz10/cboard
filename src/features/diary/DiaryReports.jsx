@@ -103,15 +103,24 @@ export function DiaryReports({ days, date, today, goals, disabled, onSelectDate 
             {weekly.entries.map((entry) => {
               const percent = entry.calories == null ? 0 : Math.min(100, (entry.calories / scale) * 100);
               const over = entry.target != null && entry.calories > entry.target;
+              const future = entry.date > today;
               return (
-                <div className="diary-week-day" key={entry.date}>
+                <button
+                  type="button"
+                  className="diary-week-day"
+                  key={entry.date}
+                  disabled={disabled || future}
+                  aria-current={entry.date === date ? "date" : undefined}
+                  aria-label={`${fullDate(entry.date)}: ${entry.calories == null ? "no calories logged" : `${number(entry.calories)} calories`}. Open meals.`}
+                  onClick={() => onSelectDate(entry.date, "meals")}
+                >
                   <div className="diary-week-track" title={entry.calories == null ? "No calories logged" : `${number(entry.calories)} kcal${entry.missing ? ", partial" : ""}`}>
                     <span className={`${over ? "is-over" : ""} ${entry.missing ? "is-partial" : ""}`} style={{ height: `${percent}%` }} />
                     {entry.complete && <b aria-label="Day completed">✓</b>}
                   </div>
                   <strong>{dayLabel(entry.date)}</strong>
                   <small>{entry.calories == null ? "—" : number(entry.calories)}</small>
-                </div>
+                </button>
               );
             })}
           </div>
