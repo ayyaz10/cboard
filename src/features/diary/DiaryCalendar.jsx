@@ -114,7 +114,8 @@ export function DiaryCalendar({ date, today, days, target, disabled, onSelect })
             <div className="diary-calendar-legend" aria-label="Calorie colour guide">
               <span><i className="is-low" />Less</span>
               <span><i className="is-near" />Near target</span>
-              <span><i className="is-over" />Over</span>
+              <span><i className="is-slight-over" />5–20% over</span>
+              <span><i className="is-over" />20%+ over</span>
             </div>
           </div>
         )}

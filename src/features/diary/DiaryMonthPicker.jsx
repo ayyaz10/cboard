@@ -86,7 +86,8 @@ export function DiaryMonthPicker({ month, today, days, target, disabled, onChang
             <div className="diary-calendar-legend" aria-label="Monthly calorie colour guide">
               <span><i className="is-low" />Far under</span>
               <span><i className="is-near" />Near target</span>
-              <span><i className="is-over" />Over target</span>
+              <span><i className="is-slight-over" />5–20% over</span>
+              <span><i className="is-over" />20%+ over</span>
             </div>
             <button type="button" className="diary-month-clear" onClick={() => { onChange(""); setOpen(false); }}>Show all months</button>
           </div>
