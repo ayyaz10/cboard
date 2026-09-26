@@ -18,12 +18,12 @@ test('monthly totals separate income and each outflow type', () => {
   const state = {
     settings: { monthlyIncome: 0 }, budgets: { '2026-09': [{ mode: 'amount', value: 50000 }] },
     transactions: [
-      ['income',300000],['expense',100000],['donation',10000],['investment',30000],['debt',20000],
+      ['income',300000],['expense',100000],['donation',10000],['investment',30000],['debt',20000],['savings',40000],
     ].map(([type, amount], index) => ({ type, amount, date: `2026-09-${10 + index}` })),
   };
   const result = financeSummary(state, '2026-09');
-  assert.deepEqual([result.income,result.expenses,result.donations,result.investments,result.debtPayments,result.remaining],[300000,100000,10000,30000,20000,140000]);
-  assert.equal(result.savingsRate, 4667);
+  assert.deepEqual([result.income,result.expenses,result.donations,result.investments,result.debtPayments,result.savings,result.remaining],[300000,100000,10000,30000,20000,40000,100000]);
+  assert.equal(result.savingsRate, 1333);
   assert.equal(result.budgetUsed, 20000);
 });
 

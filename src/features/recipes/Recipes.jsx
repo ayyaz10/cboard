@@ -406,6 +406,7 @@ function RecipesContent({ route }) {
               )}
           </>
         )}
+        {!importing && <button type="button" className="recipe-mobile-add" onClick={() => startImport()}>＋ Add recipe</button>}
         <dialog
           ref={dialog}
           onCancel={(event) => {

@@ -1,4 +1,4 @@
-export const transactionTypes = ['income', 'expense', 'donation', 'investment', 'debt', 'transfer'];
+export const transactionTypes = ['income', 'expense', 'donation', 'investment', 'debt', 'savings', 'budget', 'goal', 'transfer'];
 
 export function parseMoney(value) {
   if (typeof value === 'number' && Number.isSafeInteger(value)) return value;
@@ -48,14 +48,17 @@ export function financeSummary(state, selectedMonth) {
   const donations = sum('donation');
   const investments = sum('investment');
   const debtPayments = sum('debt');
-  const outflow = expenses + donations + investments + debtPayments;
+  const saved = sum('savings');
+  const budgetAllocated = sum('budget');
+  const goalContributions = sum('goal');
+  const outflow = expenses + donations + investments + debtPayments + saved + budgetAllocated + goalContributions;
   const remaining = income - outflow;
-  const savings = Math.max(0, remaining);
+  const savings = saved;
   const budget = state.budgets[selectedMonth] || [];
   const budgetPlanned = budget.reduce((total, item) => total + budgetTarget(item, income || state.settings.monthlyIncome), 0);
   return {
-    income, expenses, donations, investments, debtPayments, remaining, savings,
-    savingsRate: income ? Math.round(savings * 10000 / income) : 0,
+    income, expenses, donations, investments, debtPayments, remaining, savings, budgetAllocated, goalContributions,
+    savingsRate: income ? Math.round(saved * 10000 / income) : 0,
     budgetPlanned,
     budgetUsed: budgetPlanned ? Math.round(expenses * 10000 / budgetPlanned) : 0,
     transactions,

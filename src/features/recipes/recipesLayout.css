@@ -44,6 +44,13 @@ html[data-theme='matrix'] .recipe-page-shell > .recipe-shortcuts {
   color: var(--matrix-text);
 }
 
+.recipe-mobile-add { display: none; }
+
+@media (max-width: 47.99rem) {
+  .recipe-page-shell { padding-bottom: calc(10rem + env(safe-area-inset-bottom)); }
+  .recipe-mobile-add { position: fixed; z-index: 61; right: 1rem; bottom: calc(4.7rem + env(safe-area-inset-bottom)); left: 1rem; display: block; width: calc(100% - 2rem); border: 2px solid #000; border-radius: 999px; background: #c5ff6f; padding: .9rem 1rem; color: #000; font-weight: 800; box-shadow: 4px 4px #000; }
+}
+
 .meal-planner-disclosure {
   border: 2px solid #000;
   border-radius: 1rem;

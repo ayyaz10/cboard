@@ -9,6 +9,7 @@ export const defaultCategories = [
   ['Travel', 'expense', '#9fe3ff'], ['Personal care', 'expense', '#ff90e8'], ['Insurance', 'expense', '#ffd166'],
   ['Taxes', 'expense', '#ffd166'], ['Other', 'expense', '#d9d9d0'], ['Charity', 'donation', '#c5ff6f'],
   ['Portfolio', 'investment', '#9fe3ff'], ['Repayment', 'debt', '#ffd166'], ['Transfer', 'transfer', '#d9d9d0'],
+  ['Savings', 'savings', '#c5ff6f'], ['Budget pot', 'budget', '#ffd166'], ['Goal contribution', 'goal', '#9fe3ff'],
 ].map(([name, type, color], index) => ({ id: `default-${index}`, name, type, color, icon: '', archived: false, order: index }));
 
 export function defaultCurrency() {
@@ -19,9 +20,9 @@ export function defaultCurrency() {
 export function initialFinanceState() {
   return {
     version: 1,
-    settings: { configured: false, currency: defaultCurrency(), monthlyIncome: 0, budgetStartDay: 1 },
-    categories: structuredClone(defaultCategories), transactions: [], budgets: {}, budgetPresets: [],
-    goals: [], goalContributions: [], investments: [], debts: [], debtPayments: [], recurring: [], transactionPresets: [],
+    settings: { configured: false, currency: defaultCurrency(), monthlyIncome: 0, budgetStartDay: 1, defaultForeignCurrency: 'PKR', leftoverDestination: 'rollover', leftoverGoalId: '' },
+    categories: structuredClone(defaultCategories), transactions: [], budgets: {}, openingBalances: {}, budgetPresets: [],
+    goals: [], goalContributions: [], investments: [], debts: [], debtPayments: [], recurring: [], transactionPresets: [], allocationRules: [],
   };
 }
 
@@ -29,11 +30,15 @@ export function normalizeFinanceState(value) {
   const fallback = initialFinanceState();
   if (!value || typeof value !== 'object') return fallback;
   const state = { ...fallback, ...structuredClone(value), settings: { ...fallback.settings, ...(value.settings || {}) } };
-  for (const key of ['categories', 'transactions', 'budgetPresets', 'goals', 'goalContributions', 'investments', 'debts', 'debtPayments', 'recurring', 'transactionPresets']) {
+  for (const key of ['categories', 'transactions', 'budgetPresets', 'goals', 'goalContributions', 'investments', 'debts', 'debtPayments', 'recurring', 'transactionPresets', 'allocationRules']) {
     if (!Array.isArray(state[key])) state[key] = [];
   }
   if (!state.budgets || typeof state.budgets !== 'object' || Array.isArray(state.budgets)) state.budgets = {};
+  if (!state.openingBalances || typeof state.openingBalances !== 'object' || Array.isArray(state.openingBalances)) state.openingBalances = {};
   state.transactions = state.transactions.filter((item) => item && transactionTypes.includes(item.type) && Number.isSafeInteger(item.amount) && item.amount > 0);
+  for (const category of defaultCategories) {
+    if (!state.categories.some((item) => item.name === category.name && item.type === category.type)) state.categories.push({ ...category, id: `added-${category.id}`, order: state.categories.length });
+  }
   return state;
 }
 

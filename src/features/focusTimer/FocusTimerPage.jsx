@@ -310,6 +310,13 @@ export function FocusTimerPage() {
   }, []);
 
   useEffect(() => {
+    if (isLoading) return;
+    window.dispatchEvent(new CustomEvent('cboard:focus-session-changed', {
+      detail: { session: activeSession },
+    }));
+  }, [activeSession, isLoading]);
+
+  useEffect(() => {
     if (!activeSession) {
       setRemainingSeconds(0);
       return undefined;
