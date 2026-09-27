@@ -263,7 +263,8 @@ inspector_port = 8083
 
 [functions.parse-recipe]
 enabled = true
-verify_jwt = true
+# Authentication is validated inside the handler with auth.getUser.
+verify_jwt = false
 entrypoint = "./functions/parse-recipe/index.ts"
 
 [analytics]
