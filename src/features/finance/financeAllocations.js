@@ -1,5 +1,6 @@
 import { id } from './financeData.js';
 import { inMonth, monthKey } from './financeMath.js';
+import { markGoalCompletion } from './financeReports.js';
 
 export const allocationTargets = ['savings', 'budget', 'goal', 'investment', 'debt', 'donation'];
 
@@ -26,7 +27,7 @@ export function applyAllocation(state, rule, income, date, sourceIncomeId = '') 
     if (!applied) return false;
     transaction.amount = applied;
     goal.saved += applied;
-    if (goal.saved >= goal.target) goal.status = 'completed';
+    markGoalCompletion(goal, date);
     state.goalContributions.push({ id: id(), goalId: goal.id, amount: applied, kind: 'contribution', date, allocationRuleId: rule.id });
   }
   if (rule.targetType === 'investment') {
