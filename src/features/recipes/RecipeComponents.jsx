@@ -1,6 +1,5 @@
 import { RecipeHealthReview } from './RecipeHealthReview';
 import { useEffect, useState } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { getAppHref, navigateTo } from '../../app/useRoute';
 import { formatIngredient } from './recipeData';
 import { RecipeSource } from './RecipeSource';
@@ -9,6 +8,7 @@ import { RecipeMasonryGrid, useRecipeCardGrid } from './RecipeCardView';
 import { RecipeFavouriteButton } from './RecipeFavouriteButton';
 import { calculateProducts } from './recipeProducts.js';
 import { ingredientRecipeCalculation } from './ingredientNutrition.js';
+import { saveRecipeIngredientNutrition } from '../../services/recipeService.js';
 
 export const secondaryButton =
   'inline-flex items-center justify-center rounded-full border-2 border-black bg-white px-4 py-2 text-sm font-bold text-black transition hover:-translate-y-px focus-visible:outline-offset-4 disabled:opacity-50';
@@ -158,72 +158,68 @@ function ingredientNutritionSummary(item) {
   return values.length ? values.join(' · ') : 'Nutrition not calculated yet';
 }
 
-function ChevronDownIcon({ open, reduceMotion }) {
-  return <motion.svg
-    aria-hidden="true"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2.25"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className="h-5 w-5 shrink-0"
-    animate={{ rotate: open ? 180 : 0 }}
-    transition={{ duration: reduceMotion ? 0 : 0.28, ease: [0.22, 1, 0.36, 1] }}
-  >
-    <path d="m6 9 6 6 6-6" />
-  </motion.svg>;
-}
-
-function IngredientNutritionRow({ item, recipe, preview }) {
-  const [open, setOpen] = useState(false);
-  const reduceMotion = useReducedMotion();
-  return <li className="min-w-0 self-start overflow-hidden rounded-xl border-2 border-black bg-white">
-    <div className="flex min-w-0 items-center gap-2">
-      <button type="button" className="flex min-w-0 flex-1 items-center justify-between gap-3 bg-transparent px-3 py-2.5 text-left" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-        <span className="min-w-0">
-          <span className="block font-semibold">{formatIngredient(item)}</span>
-          <span className="mt-0.5 block text-xs leading-5 text-black/65">{ingredientNutritionSummary(item)}</span>
-        </span>
-        <ChevronDownIcon open={open} reduceMotion={reduceMotion} />
-      </button>
+function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
+  const [editing, setEditing] = useState(false);
+  const [values, setValues] = useState(item.nutrition || {});
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  async function save() {
+    setBusy(true);
+    setError('');
+    try {
+      const saved = await saveRecipeIngredientNutrition(recipe, index, values);
+      onSaved?.(saved);
+      setEditing(false);
+    } catch (saveError) {
+      setError(saveError.message || 'Could not save ingredient nutrition. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+  return <li className="min-w-0 self-start rounded-xl border-2 border-black bg-white px-3 py-2.5">
+    <div className="flex min-w-0 items-center justify-between gap-3">
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold">{formatIngredient(item)}</p>
+        {preview ? (
+          <p className="mt-0.5 text-xs leading-5 text-black/65">{ingredientNutritionSummary(item)}</p>
+        ) : (
+          <button
+            type="button"
+            className="group mt-0.5 flex min-h-9 max-w-full items-center gap-1.5 text-left text-xs leading-5 text-black/65 transition hover:text-black focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2"
+            aria-label={`${editing ? 'Close' : 'Edit'} nutrition for ${formatIngredient(item)}`}
+            aria-expanded={editing}
+            title="Edit ingredient nutrition"
+            onClick={() => { setValues(item.nutrition || {}); setError(''); setEditing((value) => !value); }}
+          >
+            <span>{ingredientNutritionSummary(item)}</span>
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 transition-transform group-hover:scale-110">
+              <path d="M12 20h9" />
+              <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z" />
+            </svg>
+          </button>
+        )}
+      </div>
       {item.alternativeGroup && (preview ? (
-        <a className="mr-3 text-sm font-bold underline underline-offset-4" href={`#preview-${item.alternativeGroup}`}>Alternatives →</a>
+        <a className="text-sm font-bold underline underline-offset-4" href={`#preview-${item.alternativeGroup}`}>Alternatives →</a>
       ) : (
         <RecipeLink to={`/recipes/${recipe.slug}/alternatives/${item.alternativeGroup}`}>Alternatives →</RecipeLink>
       ))}
     </div>
-    <AnimatePresence initial={false}>
-      {open && <motion.div
-        key="ingredient-nutrition"
-        initial={{ height: 0, opacity: 0 }}
-        animate={{ height: 'auto', opacity: 1 }}
-        exit={{ height: 0, opacity: 0 }}
-        transition={{
-          height: { duration: reduceMotion ? 0 : 0.38, ease: [0.22, 1, 0.36, 1] },
-          opacity: { duration: reduceMotion ? 0 : 0.24, ease: 'easeOut' },
-        }}
-        className="overflow-hidden"
-      >
-        <motion.div
-          initial={{ y: reduceMotion ? 0 : -8 }}
-          animate={{ y: 0 }}
-          exit={{ y: reduceMotion ? 0 : -5 }}
-          transition={{ duration: reduceMotion ? 0 : 0.32, ease: [0.22, 1, 0.36, 1] }}
-          className="border-t-2 border-black/15 px-3 py-3"
-        >
-          <p className="mb-2 text-xs font-semibold text-black/60">Nutrition for the listed ingredient amount</p>
-          <dl className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-            {ingredientNutrients.map(([key, label, unit]) => <div key={key} className="rounded-lg bg-[#f4f1e8] px-2.5 py-2">
-              <dt className="text-xs text-black/60">{label}</dt>
-              <dd className="font-bold">{item.nutrition?.[key] == null ? '—' : `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 }).format(item.nutrition[key])} ${unit}`}</dd>
-            </div>)}
-          </dl>
-          {item.note && <p className="mt-3 text-xs leading-5 text-black/65"><strong>Ingredient note:</strong> {item.note}</p>}
-          {!ingredientNutrients.some(([key]) => item.nutrition?.[key] != null) && <p className="mt-2 text-xs text-black/60">Nutrition has not been calculated for this ingredient yet.</p>}
-        </motion.div>
-      </motion.div>}
-    </AnimatePresence>
+    {editing && <fieldset disabled={busy} className="mt-3 space-y-3 border-t-2 border-black/15 pt-3">
+      <legend className="sr-only">Edit nutrition for {formatIngredient(item)}</legend>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+        {ingredientNutrients.map(([key, label, unit]) => <label key={key} className="space-y-1 text-xs font-semibold">
+          <span className="block">{label} ({unit})</span>
+          <input className="field-input" type="number" min="0" step="any" value={values[key] ?? ''} onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.value === '' ? null : Number(event.target.value) }))} />
+        </label>)}
+      </div>
+      <p className="text-xs text-black/60">Values are for the full ingredient amount shown above.</p>
+      {error && <p role="alert" className="text-sm font-semibold">{error}</p>}
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className={secondaryButton} disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save nutrition'}</button>
+        <button type="button" className={secondaryButton} disabled={busy} onClick={() => { setError(''); setEditing(false); }}>Cancel</button>
+      </div>
+    </fieldset>}
   </li>;
 }
 
@@ -240,14 +236,16 @@ function useIngredientColumns() {
   return columns;
 }
 
-export function IngredientList({ recipe, preview = false }) {
+export function IngredientList({ recipe, preview = false, onRecipeUpdated }) {
   const columns = useIngredientColumns();
-  const row = (item, index) => <IngredientNutritionRow key={index} item={item} recipe={recipe} preview={preview} />;
+  const row = (item, index) => <IngredientNutritionRow key={index} item={item} index={index} recipe={recipe} preview={preview} onSaved={onRecipeUpdated} />;
   return (
     <section>
       <div className="flex items-end justify-between gap-3">
         <h2 className="text-2xl font-bold">Ingredients</h2>
-        <span className="text-sm text-black/60">{recipe.ingredients.length} items</span>
+        <span className="text-right text-sm text-black/60">
+          {recipe.ingredients.length} items{!preview && <> · Tap macros to edit</>}
+        </span>
       </div>
       {columns ? <div className="mt-3 grid items-start gap-2 md:grid-cols-2">
         <ul className="min-w-0 space-y-2">{recipe.ingredients.map((item, index) => index % 2 === 0 ? row(item, index) : null)}</ul>
@@ -314,7 +312,7 @@ export function RecipePage({ recipe, preview = false, onRecipeUpdated, favourite
           <div className="mt-4"><RecipeHealthReview recipe={recipe} /></div>
         </details>
       )}
-      <IngredientList recipe={recipe} preview={preview} />
+      <IngredientList recipe={recipe} preview={preview} onRecipeUpdated={onRecipeUpdated} />
       <RecipeSteps steps={recipe.steps} />
       {!preview && (
         <details className="rounded-2xl border-2 border-black bg-white p-4">

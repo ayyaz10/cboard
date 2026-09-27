@@ -10,7 +10,7 @@ Tap the **heart** on a saved recipe card or recipe page to add/remove it from yo
 
 1. Open **Recipes → Add Recipe**.
 2. Paste one JSON object or an array of recipe objects from ChatGPT, or upload a `.json` file (up to 2 MB total and 256 KB per recipe).
-3. Optionally upload/drop a JPG, PNG or WebP photo (up to 5 MB).
+3. Optionally upload/drop a JPG, PNG or WebP photo (up to 5 MB), or generate a recipe image with AI from the recipe title.
 4. Select **Preview Recipe**. Review ingredients, instructions, macros and all alternative groups.
 5. Choose **Save Recipe**. The detail page opens only after Supabase confirms the write.
 
@@ -18,9 +18,9 @@ Use **Edit Data** to return to the form, or **Cancel** to discard the draft. Uns
 
 ## Form editing
 
-**Edit Recipe** now opens a form by default. Edit the title, meal category, description, times, servings, tags, recipe macros, ingredient names/amounts/units/notes, optional item macros, instructions, sauces, existing alternative groups/options, and source URL/label/type/card visibility. Ingredients, instructions, sauces, and existing alternative options can be added or removed. Keep at least one ingredient, instruction, and option in each alternative group. New alternative groups can be defined through the JSON editor. Image upload/removal remains available below the form.
+**Edit Recipe** opens a form by default. The source and compact image controls appear first; the image panel supports upload, removal and AI generation from the recipe title. Recipe details and nutrition follow, then ingredient names/amounts/units/notes, optional item macros, instructions, sauces, and existing alternative groups/options. Ingredients, instructions, sauces, and existing alternative options can be added or removed. Keep at least one ingredient, instruction, and option in each alternative group. New alternative groups can be defined through the JSON editor.
 
-Choose **Preview Recipe → Save Recipe** to persist changes. Macros do not recalculate automatically; blank numeric fields remain unknown. **JSON editor** and **Form editor** switches transfer the current draft without saving it. JSON must be valid before switching into the form. New single recipes can also be entered using Form editor from Add Recipe; batch editing remains in JSON until import, after which each saved recipe has its own form. Existing recipe slugs stay fixed to preserve links. Cancel discards unsaved edits.
+Choose **Save Recipe** at the top or bottom to validate and persist an edit immediately; editing no longer opens a preview. Each ingredient's calories, protein, carbs, fat and fibre can also be edited independently from its card on the saved recipe page. Blank numeric fields remain unknown. **JSON editor** and **Form editor** switches transfer the current draft without saving it. JSON must be valid before switching into the form. New single recipes can also be entered using Form editor from Add Recipe; batch editing remains in JSON until import, after which each saved recipe has its own form. Existing recipe slugs stay fixed to preserve links. Cancel discards unsaved edits.
 
 ## Batch import workflow
 

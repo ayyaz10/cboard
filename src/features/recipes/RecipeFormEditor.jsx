@@ -331,7 +331,7 @@ function Items({ title, items, onChange, groups, ingredientLibrary }) {
   );
 }
 
-export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary = [] }) {
+export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary = [], imageEditor = null }) {
   recipe = prepareIngredientEditor(recipe);
   const ingredientCalculation = ingredientRecipeCalculation(recipe);
   const set = (key, value, options = {}) => {
@@ -347,7 +347,7 @@ export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary 
   };
   const groups = recipe.alternatives ?? {};
   return (
-    <div className="space-y-5">
+    <div className="flex flex-col gap-5">
       <section className="space-y-3 rounded-2xl border-2 border-black bg-white p-4">
         <h2 className="text-2xl font-bold">Recipe details</h2>
         <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
@@ -494,7 +494,7 @@ export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary 
           </div>
         </details>
       )}
-      <details className="rounded-2xl border-2 border-black bg-white p-4" open={Boolean(recipe.source)}>
+      <details className="order-first rounded-2xl border-2 border-black bg-white p-4" open={Boolean(recipe.source)}>
         <summary className="cursor-pointer text-xl font-bold">Recipe source</summary>
         <div className="mt-4 space-y-3">
         <label className="flex items-center gap-3 font-semibold">
@@ -560,6 +560,7 @@ export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary 
         )}
         </div>
       </details>
+      {imageEditor && <div className="order-first">{imageEditor}</div>}
     </div>
   );
 }

@@ -9,6 +9,37 @@ import { requireSupabase } from '../lib/supabaseClient';
 const PREFIX = 'recipe:v1:';
 const FAVOURITE_PREFIX = 'recipe-favourite:v1:';
 
+export async function saveRecipeIngredientNutrition(recipe, ingredientIndex, nutrition) {
+  const { client, userId } = await getUserScopedClient();
+  const key = `${PREFIX}${recipe.slug}`;
+  const found = await client.from('user_tool_preferences').select('value,updated_at')
+    .eq('user_id', userId).eq('key', key).single();
+  assertSupabaseResult(found);
+  if (!recipe.updatedAt || found.data.updated_at !== recipe.updatedAt)
+    throw new Error('This recipe changed in another tab. Reload it before saving ingredient nutrition.');
+  const stored = found.data.value.recipe;
+  if (!Number.isInteger(ingredientIndex) || ingredientIndex < 0 || ingredientIndex >= stored.ingredients.length)
+    throw new Error('That ingredient is no longer available. Reload the recipe and try again.');
+  const ingredients = stored.ingredients.map((item, index) => {
+    if (index !== ingredientIndex) return item;
+    const { nutritionLabel, ...manualItem } = item;
+    return { ...manualItem, nutrition };
+  });
+  const draft = { ...stored, ingredients };
+  if (stored.productNutrition) {
+    delete draft.productNutrition;
+    draft.nutritionFromIngredients = true;
+  }
+  const clean = validateRecipe(draft);
+  const updatedAt = new Date().toISOString();
+  const result = await client.from('user_tool_preferences').update({
+    value: { ...found.data.value, recipe: clean }, updated_at: updatedAt,
+  }).eq('user_id', userId).eq('key', key).eq('updated_at', found.data.updated_at).select('updated_at').maybeSingle();
+  assertSupabaseResult(result);
+  if (!result.data) throw new Error('This recipe changed while saving. Reload it before trying again.');
+  return { ...clean, image: found.data.value.image || null, updatedAt: result.data.updated_at };
+}
+
 export async function saveRecipeProducts(recipe, productNutrition, servings) {
   const { client, userId } = await getUserScopedClient();
   const key = `${PREFIX}${recipe.slug}`;

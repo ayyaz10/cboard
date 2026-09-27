@@ -40,6 +40,12 @@ export function RecipeImporter({
   const [aiText, setAiText] = useState('');
   const [generateAiImage, setGenerateAiImage] = useState(false);
   const lock = useRef(false);
+  async function generateDraftImage() {
+    if (mode === 'form') return generateRecipeImage(formData.title);
+    const recipes = parseRecipeBatch(text);
+    if (recipes.length !== 1) throw new Error('Generate an AI image for one recipe at a time.');
+    return generateRecipeImage(recipes[0].title);
+  }
   async function createWithAi() {
     if (lock.current || !aiText.trim()) return;
     lock.current = true;
@@ -98,6 +104,10 @@ export function RecipeImporter({
         setNotice(
           `Existing or repeated slugs were renamed: ${renamed.map((item) => item.slug).join(', ')}.`,
         );
+      if (editing) {
+        await onSave(resolved[0], image, true);
+        return;
+      }
       setPreview(
         resolved.map((item, index) => ({
           recipe: item,
@@ -200,10 +210,6 @@ export function RecipeImporter({
       {notice && <p role="status">{notice}</p>}
       {preview ? (
         <>
-          <p className="text-sm text-black/70">
-            Review your recipe and alternatives before saving. Nutrition values
-            are as imported.
-          </p>
           {preview.length > 1 && (
             <>
               <p className="text-sm text-black/70">
@@ -240,6 +246,7 @@ export function RecipeImporter({
                   }))
                 }
                 onBusy={setImageBusy}
+                onGenerate={() => generateRecipeImage(preview[selected].recipe.title)}
                 disabled={busy}
               />
             </>
@@ -280,6 +287,12 @@ export function RecipeImporter({
         </>
       ) : (
         <form onSubmit={showPreview} className="space-y-6">
+          {editing && <div className="flex flex-wrap gap-3">
+            <PrimaryButton type="submit" disabled={busy || imageBusy}>
+              {busy ? 'Saving…' : 'Save Recipe'}
+            </PrimaryButton>
+            <button type="button" className={secondaryButton} disabled={busy || imageBusy} onClick={onCancel}>Cancel</button>
+          </div>}
           <fieldset disabled={busy || imageBusy} className="min-w-0 space-y-5">
             <div className="flex flex-wrap gap-3" aria-label="Editor mode">
               <button
@@ -349,6 +362,14 @@ export function RecipeImporter({
                 onChange={setFormData}
                 editing={editing}
                 ingredientLibrary={ingredientLibrary}
+                imageEditor={editing ? <RecipeImageUploader
+                  image={image}
+                  onChange={setImage}
+                  onBusy={setImageBusy}
+                  onGenerate={generateDraftImage}
+                  disabled={busy}
+                  compact
+                /> : null}
               />
             ) : (
               <>
@@ -408,19 +429,20 @@ export function RecipeImporter({
               </>
             )}
           </fieldset>
-          {mode !== 'ai' && <RecipeImageUploader
+          {mode !== 'ai' && !(editing && mode === 'form') && <RecipeImageUploader
             image={image}
             onChange={setImage}
             onBusy={setImageBusy}
+            onGenerate={generateDraftImage}
             disabled={busy}
+            compact={editing}
           />}
           {mode !== 'ai' && <p className="text-sm text-black/70">
-            The image above is for a single-recipe import. Batch imports have a
-            separate image uploader for each recipe in the preview.
+            {editing ? 'Upload a replacement image or remove the current one.' : 'The image above is for a single-recipe import. Batch imports have a separate image uploader for each recipe in the preview.'}
           </p>}
           <div className="flex flex-wrap gap-3">
             {mode !== 'ai' && <PrimaryButton type="submit" disabled={busy || imageBusy}>
-              {busy ? 'Checking…' : 'Preview Recipe'}
+              {busy ? (editing ? 'Saving…' : 'Checking…') : (editing ? 'Save Recipe' : 'Preview Recipe')}
             </PrimaryButton>}
             <button
               type="button"
