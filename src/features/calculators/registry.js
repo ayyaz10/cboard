@@ -4,8 +4,20 @@ import { MassCalculator } from './mass/MassCalculator';
 import { PercentageCalculator } from './percentage/PercentageCalculator';
 import { PositionSizeCalculator } from './positionSize/PositionSizeCalculator';
 import { ProteinIntakeCalculator } from './proteinIntake/ProteinIntakeCalculator';
+import { SavingsPlannerCalculator } from './savingsPlanner/SavingsPlannerCalculator';
 
 export const calculators = [
+  {
+    id: 'savings-planner',
+    path: '/calculators/savings-planner',
+    name: 'Savings Goal Planner',
+    boardLabel: 'Money Planner',
+    boardColor: '#9fe3ff',
+    boardDescription: 'See how many saving days and how much time you need to reach a money target.',
+    description: 'Plan a payment or savings target around the days you actually work and save.',
+    showReferenceCards: false,
+    component: SavingsPlannerCalculator,
+  },
   {
     id: 'position-size',
     path: '/calculators/position-size',

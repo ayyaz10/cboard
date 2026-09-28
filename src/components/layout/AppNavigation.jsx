@@ -36,6 +36,7 @@ const relatedCalculators = {
     { path: '/calculators/percentage', label: 'Percentage calculator' },
   ],
   '/finance': [
+    { path: '/calculators/savings-planner', label: 'Savings goal planner' },
     { path: '/calculators/position-size', label: 'Position size' },
     { path: '/calculators/crypto-futures', label: 'Futures trade' },
     { path: '/calculators/percentage', label: 'Percentage calculator' },
