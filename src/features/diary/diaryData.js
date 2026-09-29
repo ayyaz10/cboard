@@ -232,7 +232,7 @@ export function diaryTotals(meals) {
   );
 }
 
-export function nutrientContributions(meals, keys = ["protein", "carbs", "fat", "fiber"]) {
+export function nutrientContributions(meals, keys = ["calories", "protein", "carbs", "fat", "fiber"]) {
   const items = meals.flatMap((meal) => meal.items || []);
   return Object.fromEntries(keys.map((key) => {
     const foods = new Map();

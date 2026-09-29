@@ -88,8 +88,8 @@ test("totals expose missing values and never imply complete totals from partial 
   assert.deepEqual(totals.iron, { value: 0, known: 0, missing: 2 });
 });
 test("nutrient contributions aggregate foods and calculate their share independently per nutrient", () => {
-  const yoghurt = foodItem({ quantity: 100, unit: "g", protein: 10, carbs: 4, fat: 2, fiber: 3 }, "Yoghurt");
-  const chicken = foodItem({ quantity: 100, unit: "g", protein: 30, carbs: 0, fat: 5, fiber: 0 }, "Chicken");
+  const yoghurt = foodItem({ quantity: 100, unit: "g", calories: 80, protein: 10, carbs: 4, fat: 2, fiber: 3 }, "Yoghurt");
+  const chicken = foodItem({ quantity: 100, unit: "g", calories: 160, protein: 30, carbs: 0, fat: 5, fiber: 0 }, "Chicken");
   const unknown = foodItem({ quantity: 1, unit: "servings" }, "Unknown topping");
   const result = nutrientContributions([{ ...newMeal("Lunch"), items: [yoghurt, chicken, { ...yoghurt, id: crypto.randomUUID() }, unknown] }]);
 
@@ -102,6 +102,10 @@ test("nutrient contributions aggregate foods and calculate their share independe
   ]);
   assert.equal(result.protein.missing, 1);
   assert.equal(result.fiber.missing, 1);
+  assert.equal(result.calories.total, 320);
+  assert.equal(result.calories.missing, 1);
+  assert.equal(result.calories.foods.length, 2);
+  assert.ok(result.calories.foods.every(food => food.value === 160 && food.percentage === 50));
 });
 test("recipe snapshots are independent and product ingredients scale per serving", () => {
   const recipe = {

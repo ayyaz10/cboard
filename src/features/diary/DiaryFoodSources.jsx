@@ -2,10 +2,11 @@ import { useMemo } from "react";
 import { nutrientContributions } from "./diaryData";
 
 const NUTRIENTS = [
-  ["protein", "Protein", "Build & repair", "#347c4b"],
-  ["carbs", "Carbs", "Energy", "#bd7b16"],
-  ["fat", "Fat", "Energy & hormones", "#99623e"],
-  ["fiber", "Fibre", "Digestion & fullness", "#536fa8"],
+  ["calories", "Calories", "Energy from your food", "#a34e3c", "kcal"],
+  ["protein", "Protein", "Build & repair", "#347c4b", "g"],
+  ["carbs", "Carbs", "Energy", "#bd7b16", "g"],
+  ["fat", "Fat", "Energy & hormones", "#99623e", "g"],
+  ["fiber", "Fibre", "Digestion & fullness", "#536fa8", "g"],
 ];
 
 const format = (value) => new Intl.NumberFormat(undefined, {
@@ -29,7 +30,7 @@ export function DiaryFoodSources({ meals, goals, date, today }) {
     <section className="diary-sources" aria-labelledby="food-sources-heading">
       <div className="diary-sources-intro">
         <div>
-          <span className="pill">Macro breakdown</span>
+          <span className="pill">Calories &amp; macro breakdown</span>
           <h2 id="food-sources-heading">What your food is giving you</h2>
           <p>
             Each percentage is that food&apos;s share of the nutrient you logged for {dateLabel(date, today)}.
@@ -42,11 +43,11 @@ export function DiaryFoodSources({ meals, goals, date, today }) {
       {!foodCount ? (
         <div className="diary-panel diary-sources-empty">
           <strong>No foods logged for this day yet.</strong>
-          <p>Open the Day log tab and add a meal to see where your macros and fibre come from.</p>
+          <p>Open the Day log tab and add a meal to see where your calories, macros and fibre come from.</p>
         </div>
       ) : (
         <div className="diary-source-grid">
-          {NUTRIENTS.map(([key, label, description, color]) => {
+          {NUTRIENTS.map(([key, label, description, color, unit]) => {
             const nutrient = contributions[key];
             const target = goals?.[key];
             const targetPercent = target > 0 ? (nutrient.total / target) * 100 : null;
@@ -58,8 +59,8 @@ export function DiaryFoodSources({ meals, goals, date, today }) {
                     <h3>{label}</h3>
                   </div>
                   <div className="diary-source-total">
-                    <strong>{format(nutrient.total)} g</strong>
-                    {target > 0 && <small>{format(targetPercent)}% of {format(target)} g target</small>}
+                    <strong>{format(nutrient.total)} {unit}</strong>
+                    {target > 0 && <small>{format(targetPercent)}% of {format(target)} {unit} target</small>}
                   </div>
                 </header>
 
@@ -69,7 +70,7 @@ export function DiaryFoodSources({ meals, goals, date, today }) {
                       <li key={food.name.toLocaleLowerCase()}>
                         <div className="diary-source-row">
                           <strong>{food.name}</strong>
-                          <span><b>{format(food.value)} g</b> · {format(food.percentage)}%</span>
+                          <span><b>{format(food.value)} {unit}</b> · {format(food.percentage)}%</span>
                         </div>
                         <div className="diary-source-track" aria-hidden="true">
                           <span style={{ width: `${food.percentage}%` }} />
