@@ -18,6 +18,7 @@ import {
   weeklyCalorieReport,
   copyMealEntry,
   mealMatchesSearch,
+  nutrientContributions,
 } from "./diaryData.js";
 import { offNutrients } from "../nutrition/nutrients.js";
 
@@ -85,6 +86,22 @@ test("totals expose missing values and never imply complete totals from partial 
   ]);
   assert.deepEqual(totals.protein, { value: 13, known: 1, missing: 1 });
   assert.deepEqual(totals.iron, { value: 0, known: 0, missing: 2 });
+});
+test("nutrient contributions aggregate foods and calculate their share independently per nutrient", () => {
+  const yoghurt = foodItem({ quantity: 100, unit: "g", protein: 10, carbs: 4, fat: 2, fiber: 3 }, "Yoghurt");
+  const chicken = foodItem({ quantity: 100, unit: "g", protein: 30, carbs: 0, fat: 5, fiber: 0 }, "Chicken");
+  const unknown = foodItem({ quantity: 1, unit: "servings" }, "Unknown topping");
+  const result = nutrientContributions([{ ...newMeal("Lunch"), items: [yoghurt, chicken, { ...yoghurt, id: crypto.randomUUID() }, unknown] }]);
+
+  assert.deepEqual(result.protein.foods.map(({ name, value, percentage }) => [name, value, percentage]), [
+    ["Chicken", 30, 60],
+    ["Yoghurt", 20, 40],
+  ]);
+  assert.deepEqual(result.fiber.foods.map(({ name, value, percentage }) => [name, value, percentage]), [
+    ["Yoghurt", 6, 100],
+  ]);
+  assert.equal(result.protein.missing, 1);
+  assert.equal(result.fiber.missing, 1);
 });
 test("recipe snapshots are independent and product ingredients scale per serving", () => {
   const recipe = {

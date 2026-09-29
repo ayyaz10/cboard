@@ -1,3 +1,5 @@
+import { useSavedFoods } from '../nutrition/useSavedFoods';
+import { findSavedFoods, applySavedGrocery, matchSavedGrocery } from '../nutrition/savedFoods.js';
 import { DailyNutritionTargets, useNutritionGoals } from '../nutrition/DailyNutritionTargets';
 import { useEffect, useRef, useState } from "react";
 import { PageShell } from "../../components/layout/PageShell";
@@ -75,14 +77,23 @@ function NumberEdit({ value, label, onSave }) {
     />
   );
 }
+function SavedFoodSuggestions({ item, library, onChange }) {
+  const matches = findSavedFoods(library, item.name);
+  if (item.nutrition || !matches.length) return null;
+  return <div className="g-saved-foods" aria-label="Matching saved foods">
+    {matches.map(entry => <button type="button" key={entry.key} onClick={() => onChange(applySavedGrocery(item, entry.item))}>
+      <strong>{entry.item.name}</strong><small>{entry.origins.slice(0, 2).join(' · ')} · Per {entry.item.basis} {entry.item.nutritionUnit}</small>
+    </button>)}
+  </div>;
+}
 function NutritionFields({ item, onChange }) {
   const [open, setOpen] = useState(false);
   const nutrition = item.nutrition || { quantity: 100, unit: "g" };
   const update = (values) => onChange({ ...item, nutrition: { ...nutrition, ...values, ...(nutrition.source ? { source: { ...nutrition.source, modified: true } } : {}) } });
   const number = (value) => value === "" ? null : Number(value);
   return <details className="g-nutrition-fields" onToggle={(e) => setOpen(e.currentTarget.open)}>
-    <summary>Nutrition (optional)</summary>
-    <NutritionLookup name={item.name} visible={open} active={open && !item.nutrition} onSelect={(value) => onChange({ ...item, nutrition: value })} />
+    <summary>{item.nutrition ? `Nutrition saved · per ${nutrition.quantity} ${nutrition.unit}` : 'Nutrition (optional)'}</summary>
+    <NutritionLookup name={item.name} amountUnit={item.unit} visible={open} active={open && !item.nutrition} onSelect={(value) => onChange({ ...item, nutrition: value })} />
     {nutrition.source && <p className="g-hint">{nutrition.source.modified ? "Edited after importing" : "Imported"} from {nutrition.source.provider || "Open Food Facts"}: {nutrition.source.name}. Values fill the fields below; save the item to keep them.</p>}
     <p className="g-hint">You can also enter or adjust values manually. For a serving, enter its weight, volume or number of pieces. Leave unknown values blank.</p>
     <div className="g-tools">
@@ -170,6 +181,23 @@ export function Groceries() {
     [entries, setEntries] = useState(null),
     [edit, setEdit] = useState(null),
     [buy, setBuy] = useState([]);
+  const savedFoods = useSavedFoods();
+  const [selectedFoods, setSelectedFoods] = useState({});
+  const [activeLine, setActiveLine] = useState(0);
+  const quickLine = text.split('\n')[activeLine] || '';
+  let quickQuery = '';
+  try { quickQuery = parseEntry(quickLine).name; } catch { /* Incomplete typed line. */ }
+  const suggestions = findSavedFoods(savedFoods.library, quickQuery);
+  function chooseFood(entry) {
+    const lines = text.split('\n');
+    const parsed = parseEntry(lines[activeLine]);
+    const prefix = lines[activeLine].slice(0, lines[activeLine].lastIndexOf(parsed.name));
+    lines[activeLine] = prefix + entry.item.name;
+    setText(lines.join('\n'));
+    setSelectedFoods(current => ({ ...current, [entry.item.name]: entry.item }));
+    setEntries(null);
+    add.current?.focus();
+  }
   const [imageJobs, setImageJobs] = useState({});
   const search = useRef(null),
     add = useRef(null),
@@ -198,6 +226,8 @@ export function Groceries() {
   }, []);
   function openAdd() {
     setText("");
+    setSelectedFoods({});
+    setActiveLine(0);
     setEntries(null);
     setModal("add");
   }
@@ -320,7 +350,10 @@ export function Groceries() {
           text
             .split(/\n/)
             .filter((t) => t.trim())
-            .map(parseEntry),
+            .map(line => {
+              const item = parseEntry(line);
+              return selectedFoods[item.name] ? applySavedGrocery(item, selectedFoods[item.name]) : matchSavedGrocery(item, savedFoods.library);
+            }),
         );
       } catch (e) {
         setError(e.message);
@@ -592,7 +625,7 @@ export function Groceries() {
             {tab === "shop" && data.shopping.length > 0 && (
               <p className="g-alert" role="status">
                 {estimate.missing ? "Estimated subtotal" : "Estimated total"}: <strong>{money(estimate.total)}</strong>
-                {estimate.missing > 0 && ` ? ${estimate.missing} item${estimate.missing === 1 ? "" : "s"} missing prices`}
+                {estimate.missing > 0 && ` / ${estimate.missing} item${estimate.missing === 1 ? "" : "s"} missing prices`}
               </p>
             )}
             <fieldset disabled={busy} className="g-list">
@@ -795,8 +828,10 @@ export function Groceries() {
                 required
                 placeholder={"6 bananas\n500 g chicken breast\n2 L milk"}
                 value={text}
+                onSelect={(e) => setActiveLine(e.currentTarget.value.slice(0, e.currentTarget.selectionStart).split('\n').length - 1)}
                 onChange={(e) => {
                   setText(e.target.value);
+                  setActiveLine(e.target.value.slice(0, e.target.selectionStart).split('\n').length - 1);
                   setEntries(null);
                 }}
                 onKeyDown={(e) => {
@@ -804,28 +839,16 @@ export function Groceries() {
                     e.currentTarget.form.requestSubmit();
                 }}
               />
-              {!entries && data && (
-                <div className="g-suggestions">
-                  {data.items
-                    .filter(
-                      (i) =>
-                        text.trim() &&
-                        i.name
-                          .toLowerCase()
-                          .includes(text.trim().toLowerCase()),
-                    )
-                    .slice(0, 5)
-                    .map((i) => (
-                      <button
-                        type="button"
-                        key={i.id}
-                        onClick={() => setText(i.name)}
-                      >
-                        {i.name}
-                      </button>
-                    ))}
-                </div>
-              )}
+              {savedFoods.loading && <p role="status">Loading your saved foods...</p>}
+              {savedFoods.error && <p role="alert">{savedFoods.error}</p>}
+              {!entries && suggestions.length > 0 && <div className="g-saved-foods" aria-label="Saved food suggestions">
+                <p className="g-hint">From your recipes, food diary and food library</p>
+                {suggestions.map(entry => <button type="button" key={entry.key} onClick={() => chooseFood(entry)}>
+                  <strong>{entry.item.name}</strong>
+                  <small>{entry.origins.slice(0, 2).join(' / ')} / {entry.item.basis} {entry.item.nutritionUnit}
+                    {entry.item.nutrition?.calories != null ? ` / ${entry.item.nutrition.calories} kcal` : ' / Nutrition not set'}</small>
+                </button>)}
+              </div>}
               {entries?.map((item, index) => (
                 <div key={item.id} className="g-preview">
                   <input
@@ -835,7 +858,7 @@ export function Groceries() {
                     onChange={(e) =>
                       setEntries((a) =>
                         a.map((i, n) =>
-                          n === index ? { ...i, name: e.target.value } : i,
+                          n === index ? matchSavedGrocery({ ...i, name: e.target.value, nutrition: null }, savedFoods.library) : i,
                         ),
                       )
                     }
@@ -893,6 +916,8 @@ export function Groceries() {
                       <option key={c}>{c}</option>
                     ))}
                   </select>
+                  <SavedFoodSuggestions item={item} library={savedFoods.library}
+                    onChange={value => setEntries(rows => rows.map((row, n) => n === index ? value : row))} />
                   <PriceFields item={item} currency={currency}
                     onChange={(value) => setEntries((rows) => rows.map((row, n) => n === index ? value : row))} />
                   <NutritionFields item={item}
@@ -907,7 +932,7 @@ export function Groceries() {
                   )}
                 </div>
               ))}
-              <button className="g-primary" disabled={busy || !text.trim()}>
+              <button className="g-primary" disabled={busy || savedFoods.loading || !text.trim()}>
                 {entries
                   ? `Save ${entries.length} item${entries.length === 1 ? "" : "s"}`
                   : "Review items →"}
@@ -971,7 +996,7 @@ export function Groceries() {
                 <input
                   required
                   value={edit.name}
-                  onChange={(e) => setEdit({ ...edit, name: e.target.value })}
+                  onChange={(e) => setEdit(matchSavedGrocery({ ...edit, name: e.target.value, nutrition: null }, savedFoods.library))}
                 />
               </label>
               <div className="g-tools">
@@ -1010,6 +1035,7 @@ export function Groceries() {
                 Changing the unit clears the quantity and estimated price so you can enter the
                 correct amount.
               </p>
+              <SavedFoodSuggestions item={edit} library={savedFoods.library} onChange={setEdit} />
               <PriceFields item={edit} currency={currency} onChange={setEdit} />
               <NutritionFields item={edit} onChange={setEdit} />
               <label>

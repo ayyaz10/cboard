@@ -1,6 +1,13 @@
 import { useState } from "react";
 import { Button, Card, Field, NumberField } from "./Training";
-import { csv, uid, validateState, safeUrl } from "./trainingData";
+import {
+  csv,
+  uid,
+  validateState,
+  safeUrl,
+  safeImage,
+  exercisePrescription,
+} from "./trainingData";
 export function download(name, content, type = "application/json") {
   const url = URL.createObjectURL(new Blob([content], { type }));
   const a = document.createElement("a");
@@ -46,51 +53,62 @@ export function PlanEditor({ data, change }) {
   const current = draft.days[day];
   return (
     <>
-      <Card title="Your two-week foundation">
+      <Card title="Your weekly plan">
         <p>
-          Phase 1: conservative loads, standardized clean technique, usually at
-          least 2 RIR. In week two, add a rep only with clean technique and no
-          symptom increase. This weekly schedule repeats; phase changes are
-          always explicit.
+          Choose your training days, add exercises and set your targets. Changes
+          apply to your next workout.
         </p>
-        <p>
-          Phase 2 uses two working sets for exercises marked “Main strength”,
-          usually at 1–2 RIR. Existing active workouts retain their
-          prescription.
-        </p>
-        <div className="tr-grid">
-          <Field
-            label="Plan name"
-            value={draft.name}
-            onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-          />
-          <Field
-            label="Re-entry start date"
-            type="date"
-            value={draft.start}
-            onChange={(e) => setDraft((d) => ({ ...d, start: e.target.value }))}
-          />
-          <Field label="Program phase">
-            <select
-              value={data.settings.phase}
-              onChange={(e) => {
-                const phase = Number(e.target.value);
-                if (
-                  window.confirm(
-                    `Switch to Phase ${phase}? This changes future sessions only.`,
+        <details>
+          <summary>Programme settings</summary>
+          <p>
+            Phase 1: conservative loads, standardized clean technique, usually
+            at least 2 RIR. In week two, add a rep only with clean technique and
+            no symptom increase. This weekly schedule repeats; phase changes are
+            always explicit.
+          </p>
+          <p>
+            Phase 2 uses two working sets for exercises marked “Main strength”,
+            usually at 1–2 RIR. Existing active workouts retain their
+            prescription.
+          </p>
+          <div className="tr-grid">
+            <Field
+              label="Plan name"
+              value={draft.name}
+              onChange={(e) =>
+                setDraft((d) => ({ ...d, name: e.target.value }))
+              }
+            />
+            <Field
+              label="Re-entry start date"
+              type="date"
+              value={draft.start}
+              onChange={(e) =>
+                setDraft((d) => ({ ...d, start: e.target.value }))
+              }
+            />
+            <Field label="Program phase">
+              <select
+                value={data.settings.phase}
+                onChange={(e) => {
+                  const phase = Number(e.target.value);
+                  if (
+                    window.confirm(
+                      `Switch to Phase ${phase}? This changes future sessions only.`,
+                    )
                   )
-                )
-                  change((d) => {
-                    d.settings.phase = phase;
-                    return d;
-                  });
-              }}
-            >
-              <option value={1}>1 · Re-entry / calibration</option>
-              <option value={2}>2 · Proper two-set method</option>
-            </select>
-          </Field>
-        </div>
+                    change((d) => {
+                      d.settings.phase = phase;
+                      return d;
+                    });
+                }}
+              >
+                <option value={1}>1 · Re-entry / calibration</option>
+                <option value={2}>2 · Proper two-set method</option>
+              </select>
+            </Field>
+          </div>
+        </details>
       </Card>
       <Card title="Edit the weekly schedule">
         <div className="tr-tabs">
@@ -192,15 +210,9 @@ export function PlanEditor({ data, change }) {
                         ...v,
                         exercises: [
                           ...v.exercises,
-                          {
-                            exerciseId,
-                            sets: 2,
-                            min: 8,
-                            max: 12,
-                            rest: 90,
-                            rir: 2,
-                            load: 0,
-                          },
+                          exercisePrescription(
+                            data.exercises.find((e) => e.id === exerciseId),
+                          ),
                         ],
                       }
                     : v,
@@ -213,7 +225,9 @@ export function PlanEditor({ data, change }) {
             </option>
             {data.exercises
               .filter(
-                (e) => !current.exercises.some((p) => p.exerciseId === e.id),
+                (e) =>
+                  !e.archived &&
+                  !current.exercises.some((p) => p.exerciseId === e.id),
               )
               .map((e) => (
                 <option key={e.id} value={e.id}>
@@ -238,158 +252,241 @@ export function PlanEditor({ data, change }) {
         </Button>
         <p role="status">{message}</p>
       </Card>
-      <Card title="Temporary Ankle Recovery">
-        <label className="tr-check">
-          <input
-            type="checkbox"
-            checked={data.recovery.enabled}
-            onChange={(e) =>
-              change((d) => {
-                d.recovery.enabled = e.target.checked;
-                return d;
-              })
-            }
-          />
-          Show temporary recovery section
-        </label>
-        <Field label="Your existing recovery instructions / notes">
-          <textarea
-            value={data.recovery.notes}
-            onChange={(e) =>
-              change((d) => {
-                d.recovery.notes = e.target.value;
-                return d;
-              })
-            }
-          />
-        </Field>
-        <p className="tr-muted">
-          Kept separate from permanent workouts. Walking is recorded in the
-          daily check-in.
-        </p>
-      </Card>
+      <details>
+        <summary>Optional recovery notes</summary>
+        <Card title="Recovery">
+          <label className="tr-check">
+            <input
+              type="checkbox"
+              checked={data.recovery.enabled}
+              onChange={(e) =>
+                change((d) => {
+                  d.recovery.enabled = e.target.checked;
+                  return d;
+                })
+              }
+            />
+            Show temporary recovery section
+          </label>
+          <Field label="Your existing recovery instructions / notes">
+            <textarea
+              value={data.recovery.notes}
+              onChange={(e) =>
+                change((d) => {
+                  d.recovery.notes = e.target.value;
+                  return d;
+                })
+              }
+            />
+          </Field>
+          <p className="tr-muted">
+            Kept separate from your permanent workout schedule.
+          </p>
+        </Card>
+      </details>
     </>
   );
 }
 export function Library({ data, change }) {
-  const [query, setQuery] = useState(""),
-    [edit, setEdit] = useState(null),
-    [message, setMessage] = useState("");
-  const fresh = () => ({
-    id: uid(),
-    name: "",
-    type: "bodyweight",
-    unilateral: false,
-    category: "Strength",
-    pattern: "",
-    classification: "Strength",
-    equipment: "",
-    purpose: "",
-    muscles: "",
-    secondary: "",
-    joints: "",
-    cues: "",
-    mistakes: ["Lost position", "Momentum"],
-    progressions: "",
-    regressions: "",
-    reference: "",
-    restrictions: "",
-    main: false,
-  });
+  const [query, setQuery] = useState("");
+  const [edit, setEdit] = useState(null);
+  const [message, setMessage] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
+  const fresh = () =>
+    Object.fromEntries([
+      ...[
+        "name",
+        "pattern",
+        "equipment",
+        "purpose",
+        "muscles",
+        "secondary",
+        "joints",
+        "cues",
+        "progressions",
+        "regressions",
+        "reference",
+        "restrictions",
+        "image",
+      ].map((k) => [k, ""]),
+      ["id", uid()],
+      ["type", "bodyweight"],
+      ["category", "Strength"],
+      ["classification", "Strength"],
+      ["unilateral", false],
+      ["main", false],
+      ["mistakes", []],
+      ["timerSeconds", 60],
+      ["restSeconds", 90],
+      ["defaultSets", 3],
+      ["defaultReps", 8],
+    ]);
+  async function upload(file) {
+    if (!file) return;
+    if (
+      !["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
+      file.size > 500000
+    ) {
+      setMessage("Choose a JPG, PNG or WebP image under 500 KB.");
+      return;
+    }
+    const editingId = edit.id;
+    try {
+      const image = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      setEdit((current) =>
+        current?.id === editingId ? { ...current, image } : current,
+      );
+      setMessage("");
+    } catch {
+      setMessage("Could not read that image. Please try another file.");
+    }
+  }
+  const filtered = data.exercises.filter(
+    (e) =>
+      !!e.archived === showArchived &&
+      `${e.name} ${e.muscles} ${e.equipment}`
+        .toLowerCase()
+        .includes(query.toLowerCase()),
+  );
   return (
     <>
-      <Card title="Exercise Library">
+      <Card title="Your exercise library">
         <div className="tr-toolbar">
           <Field
-            label="Search name, muscle, equipment or purpose"
+            label="Search exercises"
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <Button primary onClick={() => setEdit(fresh())}>
+          <Button
+            primary
+            onClick={() => {
+              setEdit(fresh());
+              setMessage("");
+            }}
+          >
             + Create exercise
           </Button>
         </div>
-        <p>
-          Current restrictions: no floor handstands, wrist-loaded push-ups or
-          flat-palm planche. Handstands use parallettes or securely placed
-          dumbbells.
+        <p className="tr-muted">
+          Set up an exercise once: reps or holds, timer, rest, a photo and a
+          technique link.
         </p>
+        <label className="tr-check">
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(e) => setShowArchived(e.target.checked)}
+          />
+          Show removed exercises
+        </label>
       </Card>
       {edit && (
         <Card title={edit.name || "New exercise"}>
           <div className="tr-grid">
             <Field
-              label="Name"
+              label="Exercise name"
               value={edit.name}
               onChange={(e) => setEdit({ ...edit, name: e.target.value })}
             />
-            <Field label="Set type">
+            <Field label="Track">
               <select
                 value={edit.type}
                 onChange={(e) => setEdit({ ...edit, type: e.target.value })}
               >
                 {[
-                  "bodyweight",
-                  "weighted",
-                  "assisted",
-                  "hold",
-                  "timed",
-                  "skill",
-                ].map((t) => (
-                  <option key={t} value={t}>
-                    {t}
+                  ["bodyweight", "Bodyweight reps"],
+                  ["weighted", "Reps + weight"],
+                  ["assisted", "Reps + assistance"],
+                  ["hold", "Hold (seconds)"],
+                  ["timed", "Timed exercise"],
+                  ["skill", "Skill practice"],
+                ].map(([id, label]) => (
+                  <option key={id} value={id}>
+                    {label}
                   </option>
                 ))}
               </select>
             </Field>
-            {[
-              ["category", "Category"],
-              ["pattern", "Movement pattern"],
-              ["classification", "Skill / strength classification"],
-              ["equipment", "Equipment"],
-              ["purpose", "Purpose"],
-              ["muscles", "Primary muscles (comma separated)"],
-              ["secondary", "Secondary muscles"],
-              ["joints", "Tendons / joints"],
-            ].map(([key, label]) => (
-              <Field
-                key={key}
-                label={label}
-                value={edit[key]}
-                onChange={(e) => setEdit({ ...edit, [key]: e.target.value })}
-              />
-            ))}
+            <NumberField
+              label="Default sets"
+              min={1}
+              max={50}
+              value={edit.defaultSets ?? 3}
+              onChange={(defaultSets) => setEdit({ ...edit, defaultSets })}
+            />
+            <NumberField
+              label="Target reps / hold seconds"
+              max={1000}
+              value={edit.defaultReps ?? 8}
+              onChange={(defaultReps) => setEdit({ ...edit, defaultReps })}
+            />
+            <NumberField
+              label="Exercise timer (seconds)"
+              min={1}
+              max={3600}
+              value={edit.timerSeconds ?? 60}
+              onChange={(timerSeconds) => setEdit({ ...edit, timerSeconds })}
+            />
+            <NumberField
+              label="Rest between sets (seconds)"
+              max={3600}
+              value={edit.restSeconds ?? 90}
+              onChange={(restSeconds) => setEdit({ ...edit, restSeconds })}
+            />
+            <Field
+              label="Equipment"
+              value={edit.equipment}
+              onChange={(e) => setEdit({ ...edit, equipment: e.target.value })}
+            />
+            <Field
+              label="Muscles"
+              value={edit.muscles}
+              onChange={(e) => setEdit({ ...edit, muscles: e.target.value })}
+            />
           </div>
-          {[
-            ["cues", "Technique cues"],
-            ["progressions", "Progressions"],
-            ["regressions", "Regressions"],
-            ["restrictions", "Safety / symptom restrictions"],
-          ].map(([key, label]) => (
-            <Field key={key} label={label}>
-              <textarea
-                value={edit[key]}
-                onChange={(e) => setEdit({ ...edit, [key]: e.target.value })}
-              />
-            </Field>
-          ))}
+          <Field label="Technique notes">
+            <textarea
+              value={edit.cues}
+              onChange={(e) => setEdit({ ...edit, cues: e.target.value })}
+            />
+          </Field>
           <Field
-            label="Technique / reference URL"
+            label="Technique / video link"
             type="url"
             value={edit.reference}
             onChange={(e) => setEdit({ ...edit, reference: e.target.value })}
           />
           <Field
-            label="Mistake tags (comma separated)"
-            value={edit.mistakes.join(", ")}
-            onChange={(e) =>
-              setEdit({
-                ...edit,
-                mistakes: e.target.value.split(",").map((x) => x.trim()),
-              })
-            }
+            label="Image URL"
+            type="url"
+            value={edit.image?.startsWith("data:") ? "" : edit.image || ""}
+            onChange={(e) => setEdit({ ...edit, image: e.target.value })}
           />
+          <Field label="Or upload an image (JPG, PNG, WebP; up to 500 KB)">
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={(e) => upload(e.target.files?.[0])}
+            />
+          </Field>
+          {safeImage(edit.image) && (
+            <>
+              <img
+                className="tr-exercise-image"
+                src={safeImage(edit.image)}
+                alt="Exercise preview"
+              />
+              <Button onClick={() => setEdit({ ...edit, image: "" })}>
+                Remove image
+              </Button>
+            </>
+          )}
           <label className="tr-check">
             <input
               type="checkbox"
@@ -398,26 +495,30 @@ export function Library({ data, change }) {
                 setEdit({ ...edit, unilateral: e.target.checked })
               }
             />
-            Left / right unilateral
+            Track left and right sides separately
           </label>
-          <label className="tr-check">
-            <input
-              type="checkbox"
-              checked={edit.main}
-              onChange={(e) => setEdit({ ...edit, main: e.target.checked })}
-            />
-            Main strength exercise · use two sets in Phase 2
-          </label>
+          <details>
+            <summary>Additional exercise details</summary>
+            {["purpose", "progressions", "regressions", "restrictions"].map(
+              (key) => (
+                <Field key={key} label={key}>
+                  <textarea
+                    value={edit[key]}
+                    onChange={(e) =>
+                      setEdit({ ...edit, [key]: e.target.value })
+                    }
+                  />
+                </Field>
+              ),
+            )}
+          </details>
           <div className="tr-actions">
             <Button
               primary
               onClick={() => {
                 if (
                   change((d) => {
-                    const item = {
-                      ...edit,
-                      mistakes: [...new Set(edit.mistakes.filter(Boolean))],
-                    };
+                    const item = { ...edit, name: edit.name.trim() };
                     d.exercises = d.exercises.some((e) => e.id === item.id)
                       ? d.exercises.map((e) => (e.id === item.id ? item : e))
                       : [...d.exercises, item];
@@ -425,7 +526,7 @@ export function Library({ data, change }) {
                   })
                 ) {
                   setMessage(
-                    "Exercise saved. Add it to your schedule in Training Plan.",
+                    "Exercise saved. Add it to a workout or your weekly plan.",
                   );
                   setEdit(null);
                 }
@@ -439,73 +540,72 @@ export function Library({ data, change }) {
       )}
       <p role="status">{message}</p>
       <div className="tr-grid">
-        {data.exercises
-          .filter((e) =>
-            `${e.name} ${e.muscles} ${e.equipment} ${e.purpose}`
-              .toLowerCase()
-              .includes(query.toLowerCase()),
-          )
-          .map((e) => (
-            <Card key={e.id} title={e.name}>
-              <p className="tr-muted">
-                {e.type} · {e.equipment}
-                {e.unilateral ? " · each side" : ""}
+        {filtered.map((e) => (
+          <Card key={e.id} title={e.name}>
+            {safeImage(e.image) && (
+              <img
+                className="tr-exercise-image"
+                loading="lazy"
+                src={safeImage(e.image)}
+                alt={e.name}
+              />
+            )}
+            <p className="tr-muted">
+              {e.type} · {e.equipment || "No equipment specified"}
+            </p>
+            <div className="tr-actions">
+              <span className="pill">{e.timerSeconds ?? 60}s timer</span>
+              <span className="pill">{e.restSeconds ?? 90}s rest</span>
+            </div>
+            {e.cues && <p>{e.cues}</p>}
+            {safeUrl(e.reference) && (
+              <p>
+                <a href={safeUrl(e.reference)} target="_blank" rel="noreferrer">
+                  Watch technique ↗
+                </a>
               </p>
-              <p>{e.purpose}</p>
-              <details>
-                <summary>Technique & exercise details</summary>
-                <p>
-                  {e.category} · {e.pattern} · {e.classification}
-                </p>
-                <p>
-                  Primary: {e.muscles}. Secondary: {e.secondary}.
-                </p>
-                <p>Preparation: {e.joints}</p>
-                <p>{e.cues}</p>
-                <p>Common mistakes: {e.mistakes.join(", ")}</p>
-                <p>Progression: {e.progressions}</p>
-                <p>Regression: {e.regressions}</p>
-                <p>{e.restrictions}</p>
-                {safeUrl(e.reference) && (
-                  <a
-                    href={safeUrl(e.reference)}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Technique reference ↗
-                  </a>
-                )}
-                {data.plan.days
-                  .filter((day) =>
-                    day.exercises.some((p) => p.exerciseId === e.id),
-                  )
-                  .map((day, i) => {
-                    const p = day.exercises.find((p) => p.exerciseId === e.id);
-                    return (
-                      <p key={i}>
-                        {day.name}: {p.sets} × {p.min}–{p.max}{" "}
-                        {["hold", "timed", "skill"].includes(e.type)
-                          ? "sec"
-                          : "reps"}{" "}
-                        · {p.rest}s rest · {p.rir}+ RIR
-                      </p>
-                    );
-                  })}
-                <p>Edit these prescriptions in Training Plan.</p>
-              </details>
-              <Button onClick={() => setEdit(structuredClone(e))}>
+            )}
+            <div className="tr-actions">
+              <Button
+                onClick={() => {
+                  setEdit(structuredClone(e));
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+              >
                 Edit exercise
               </Button>
-            </Card>
-          ))}
+              <Button
+                onClick={() => {
+                  if (
+                    change((d) => {
+                      d.exercises = d.exercises.map((x) =>
+                        x.id === e.id ? { ...x, archived: !e.archived } : x,
+                      );
+                      if (!e.archived)
+                        d.plan.days.forEach((day) => {
+                          day.exercises = day.exercises.filter(
+                            (p) => p.exerciseId !== e.id,
+                          );
+                        });
+                      return d;
+                    })
+                  )
+                    setMessage(
+                      e.archived
+                        ? "Exercise restored."
+                        : "Exercise removed from library and future plans. Saved workouts are kept.",
+                    );
+                }}
+              >
+                {e.archived ? "Restore exercise" : "Remove exercise"}
+              </Button>
+            </div>
+          </Card>
+        ))}
       </div>
-      {!data.exercises.some((e) =>
-        `${e.name} ${e.muscles} ${e.equipment} ${e.purpose}`
-          .toLowerCase()
-          .includes(query.toLowerCase()),
-      ) && (
+      {!filtered.length && (
         <Card title="No matching exercises">
-          <p>Try another term or create your own exercise.</p>
+          <p>Create an exercise or try another search.</p>
         </Card>
       )}
     </>

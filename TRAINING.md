@@ -1,6 +1,16 @@
 # Training tracker
 
-Open **C Board → Training** (`/cboard/training`). Sign in with the existing Cboard account. Today shows the scheduled workout, readiness, recent strict-form records, walking, recovery and pending next-morning checks. Start Workout, adjust the prefilled reps/seconds/load if needed, and tap Complete Set. The rest timer starts automatically. Finish Session records completed, partial or skipped status; open Calendar/History to review it.
+Open **C Board > Training** (`/cboard/training`) and sign in. Overview shows today's plan, last-session performance, weekly totals and recent workouts. Start the planned workout or an empty custom workout, add exercises, adjust reps/seconds/load, then tap Complete Set. Every set saves immediately. Finish the session to review it in Calendar.
+
+The main sections are Overview, Workout, Calendar, Progress and Exercises. Weekly plan and Backup & settings are secondary actions. Optional symptom fields and programme settings remain available under details.
+
+- Exercise library: create/edit exercises, upload JPG/PNG/WebP images up to 500 KB or provide an image URL, add technique links, and configure default sets, reps/hold seconds, exercise timer and rest. Removing an exercise archives it and removes it from future plans; historical and active workouts retain it. Restore it using Show removed exercises.
+- Workout: add/remove exercises, reorder, rename the session, log/delete sets and undo the last action. Exercises with saved sets stay in the session; delete their sets before removing them. Prior performance and saved sets are visible while logging.
+- Exercise timer: Start, Pause, Reset and configurable seconds. It persists across navigation/reload, uses timestamps, and shows completion without automatically logging a set. Switching exercises resets the exercise timer to that exercise's preset. Pausing the workout pauses the exercise timer; restart it explicitly when ready. No background notification or sound is currently provided.
+- Rest timer: starts automatically after each saved set. Set targets & rest timer also lets you change rest seconds and start it manually; Skip rest stops it.
+- Goals: select a rep or hold target with an optional target date in Progress. Progress uses the best clean set from finished sessions, across recorded loads. Existing exercise charts and calendar history remain available.
+
+Images, presets, timers and goals are optional additions to schema 1, so existing accounts and backups continue to load. Uploaded images count toward the existing 4 MB workspace limit.
 
 The four-day, two-week re-entry schedule is seeded on first successful cloud load. Friday–Sunday are recovery days. Where the supplied plan specifies only “3 sets” for core work, 10 reps is an editable starting placeholder. Handstand holds start at zero because actual hold time must be recorded; prescribed attempt ranges and practice minutes are displayed. The weekly schedule continues until edited; Phase 2 never activates automatically.
 
@@ -63,6 +73,7 @@ node node_modules/vite/bin/vite.js --host=127.0.0.1 --port=5178
 # In a second terminal:
 $env:TRAINING_PLAYWRIGHT_PATH='<qa>/node_modules/@playwright/test'
 node scripts/check-training-browser.mjs
+node scripts/check-training-product.mjs
 ```
 
 The test uses installed Microsoft Edge headlessly. It checks first-use, logging under ten seconds, undo, timer/refresh recovery, pause, finishing, history, progress, plan/library editing, export/invalid restore, offline replay, mobile overflow, both themes and the existing board. The SQL test executes the actual migration in disposable PGlite PostgreSQL and exercises owner isolation, schema constraints and stale-revision protection. Neither test accesses real user records.

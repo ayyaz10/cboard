@@ -12,6 +12,24 @@ export const lastSession = (state, id) =>
 export const displaySet = (s, e) =>
   `${["hold", "timed", "skill"].includes(e.type) ? `${s.seconds}s` : `${s.reps} reps`}${s.load ? ` · ${s.load} kg${e.type === "assisted" ? " assistance" : ""}` : ""}${e.unilateral ? ` · ${s.side}` : ""} · ${s.technique}`;
 export const targetCount = (p, e) => p.sets * (e.unilateral ? 2 : 1);
+export const exercisePrescription = (e) => ({
+  exerciseId: e.id,
+  sets: e.defaultSets ?? 3,
+  min: e.defaultReps ?? 8,
+  max: e.defaultReps ?? 8,
+  rest: e.restSeconds ?? 90,
+  rir: 2,
+  load: 0,
+});
+export function safeImage(value) {
+  if (typeof value !== "string") return "";
+  if (
+    value.length <= 700000 &&
+    /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(value)
+  )
+    return value;
+  return safeUrl(value);
+}
 /** @param {import('./models').TrainingState} state
  * @returns {import('./models').Session} */
 export function startSession(state, date = localDate()) {
@@ -289,6 +307,35 @@ export function validateState(value) {
       throw new Error("Invalid exercise details.");
     if (e.reference && !safeUrl(e.reference))
       throw new Error("Invalid reference URL.");
+    if (e.image && !safeImage(e.image))
+      throw new Error(
+        "Use an HTTP(S) image link or upload a JPG, PNG or WebP image.",
+      );
+    for (const [key, min, max] of [
+      ["timerSeconds", 1, 3600],
+      ["restSeconds", 0, 3600],
+      ["defaultSets", 1, 50],
+      ["defaultReps", 0, 1000],
+    ]) {
+      if (e[key] !== undefined) numeric(e[key], min, max, key);
+    }
+    if (e.defaultSets !== undefined && !Number.isInteger(e.defaultSets))
+      throw new Error("Sets must be a whole number.");
+    if (e.archived !== undefined && typeof e.archived !== "boolean")
+      throw new Error("Invalid archived exercise.");
+  }
+  if (value.goals !== undefined) {
+    if (!Array.isArray(value.goals)) throw new Error("Invalid goals.");
+    for (const goal of value.goals) {
+      if (
+        !ids.has(goal.exerciseId) ||
+        !["reps", "seconds", "load"].includes(goal.metric)
+      )
+        throw new Error("Invalid exercise goal.");
+      textValue(goal.id, "goal ID", 200);
+      numeric(goal.target, 1, 86400, "Goal target");
+      if (goal.deadline) dateValue(goal.deadline);
+    }
   }
   function prescription(p) {
     if (!ids.has(p.exerciseId)) throw new Error("Unknown exercise in plan.");
@@ -336,6 +383,11 @@ export function validateState(value) {
     numeric(s.index, 0, Math.max(0, s.exercises.length - 1), "Exercise index");
     numeric(s.started, 0, 1e15, "Start time");
     numeric(s.pausedMs, 0, 1e15, "Paused time");
+    if (s.timer) {
+      numeric(s.timer.duration, 1, 3600, "Timer duration");
+      numeric(s.timer.remaining, 0, 3600000, "Timer remaining");
+      if (s.timer.until !== null) numeric(s.timer.until, 0, 1e15, "Timer end");
+    }
     for (const set of s.sets) {
       if (!ids.has(set.exerciseId)) throw new Error("Unknown exercise in set.");
       validateSet(set);

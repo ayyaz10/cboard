@@ -1,5 +1,6 @@
 import { cleanNutrients, nutrientKeys } from '../nutrition/nutrients.js';
 import { ingredientLabelAmount } from '../recipes/ingredientNutrition.js';
+import { diaryItemFromCatalog } from '../nutrition/foodCatalog.js';
 
 const normalise = (value) => String(value || '').trim().toLocaleLowerCase();
 const supportedUnits = new Set(['g', 'ml', 'pieces', 'servings']);
@@ -40,7 +41,7 @@ const signature = (item) => [
   ...nutrientKeys.map((key) => item.nutrition?.[key] ?? ''),
 ].join('|');
 
-export function buildDiaryFoodLibrary(days = [], recipes = []) {
+export function buildDiaryFoodLibrary(days = [], recipes = [], foodCatalog = []) {
   const entries = new Map();
   const add = (item, origin) => {
     if (!normalise(item?.name)) return;
@@ -52,6 +53,7 @@ export function buildDiaryFoodLibrary(days = [], recipes = []) {
       entries.set(key, { key, item, origins: origin ? [origin] : [] });
     }
   };
+  foodCatalog.forEach((item) => add(diaryItemFromCatalog({ name: item.name, quantity: item.quantity, unit: item.unit, basis: item.quantity, nutritionUnit: item.unit, perPiece: null }, item), 'Main food library'));
   [...days].sort((a, b) => String(b.date).localeCompare(String(a.date))).forEach((day) =>
     (day.meals || []).forEach((meal) => (meal.items || []).forEach((item) => add(item, day.date))),
   );

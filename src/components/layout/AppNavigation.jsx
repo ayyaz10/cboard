@@ -8,6 +8,7 @@ const primaryNavItems = [
   { path: '/calculators', label: 'Calculator Tools' },
   { path: '/progress-tracker', label: 'Progress Tracker' },
   { path: '/notes', label: 'Notes' },
+  { path: '/food-diary', label: 'Food Diary' },
   { path: '/recipes', label: 'Recipes' },
   { path: '/groceries', label: 'Groceries' },
   { path: '/focus-timer', label: 'Focus Timer' },
@@ -23,6 +24,10 @@ const relatedCalculators = {
     { path: '/calculators/protein-intake', label: 'Protein calculator' },
     { path: '/calculators/calorie', label: 'Calorie portions' },
     { path: '/calculators/mass', label: 'Unit converter' },
+  ],
+  '/food-diary': [
+    { path: '/calculators/protein-intake', label: 'Protein calculator' },
+    { path: '/calculators/calorie', label: 'Calorie portions' },
   ],
   '/groceries': [
     { path: '/calculators/calorie', label: 'Calorie portions' },

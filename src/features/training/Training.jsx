@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { cloneElement, useEffect, useId, useState } from "react";
 import { PageShell } from "../../components/layout/PageShell";
 import { AppNavigation } from "../../components/layout/AppNavigation";
-import { useAdaptiveNavigation } from "../../hooks/useAdaptiveNavigation";
+
 import { useAuth } from "../../contexts/AuthContext";
 import { useTraining } from "./useTraining";
 import {
@@ -11,8 +11,8 @@ import {
   lastSession,
   exerciseSets,
   displaySet,
-  personalRecords,
 } from "./trainingData";
+import { TrainingGoals } from "./TrainingGoals";
 import { Workout } from "./Workout";
 import { History, Progress } from "./TrainingReview";
 import { PlanEditor, Library, Settings } from "./TrainingEditors";
@@ -29,11 +29,12 @@ export function Button({ children, primary = false, ...props }) {
   );
 }
 export function Field({ label, children, ...props }) {
+  const id = useId();
   return (
-    <label className="tr-field">
-      <span>{label}</span>
-      {children || <input {...props} />}
-    </label>
+    <div className="tr-field">
+      <label htmlFor={id}>{label}</label>
+      {children ? cloneElement(children, { id }) : <input id={id} {...props} />}
+    </div>
   );
 }
 export function NumberField({
@@ -94,19 +95,33 @@ export function Training() {
   const { user } = useAuth();
   const store = useTraining(user.id);
   const { data, change } = store;
-  const [tab, setTab] = useState(
-    () => new URLSearchParams(location.search).get("section") || "Today",
-  );
-  const tabs = [
+  const [tab, setTab] = useState(() => {
+    const section = new URLSearchParams(location.search).get("section");
+    return [
+      "Today",
+      "Active Workout",
+      "Calendar/History",
+      "Progress",
+      "Exercise Library",
+      "Training Plan",
+      "Settings",
+    ].includes(section)
+      ? section
+      : "Today";
+  });
+  const orderedTabs = [
     "Today",
     "Active Workout",
     "Calendar/History",
     "Progress",
-    "Training Plan",
     "Exercise Library",
-    "Settings",
   ];
-  const orderedTabs = useAdaptiveNavigation("training-sections", tabs, tab);
+  const labels = {
+    Today: "Overview",
+    "Active Workout": "Workout",
+    "Calendar/History": "Calendar",
+    "Exercise Library": "Exercises",
+  };
   const [clock, setClock] = useState(Date.now());
   useEffect(() => {
     const id = setInterval(() => setClock(Date.now()), 1000);
@@ -114,19 +129,35 @@ export function Training() {
   }, []);
   function go(next) {
     setTab(next);
+    window.scrollTo({ top: 0 });
     const url = new URL(location.href);
     url.searchParams.set("section", next);
     history.replaceState({}, "", url);
   }
   const active = data?.sessions.find((s) => s.status === "active");
-  function begin() {
+  function begin(empty = false) {
     if (active) {
       go("Active Workout");
       return;
     }
     if (
       change((d) => {
-        d.sessions.push(startSession(d));
+        const session = startSession(
+          empty
+            ? {
+                ...d,
+                plan: {
+                  ...d.plan,
+                  days: d.plan.days.map((day) => ({
+                    ...day,
+                    name: "Custom workout",
+                    exercises: [],
+                  })),
+                },
+              }
+            : d,
+        );
+        d.sessions.push(session);
         return d;
       })
     )
@@ -146,7 +177,7 @@ export function Training() {
           <div>
             <span className="pill">Strength · skill · recovery</span>
             <h1>Training</h1>
-            <p>Good form. Small steps. Consistent progress.</p>
+            <p>Your sets, your progress, your next personal best.</p>
           </div>
           <div>
             <p role="status" className="tr-muted">
@@ -159,7 +190,7 @@ export function Training() {
             )}
           </div>
         </header>
-        <nav aria-label="Training sections" className="tr-tabs mobile-section-nav">
+        <nav aria-label="Training sections" className="tr-tabs">
           {orderedTabs.map((t) => (
             <button
               key={t}
@@ -167,10 +198,24 @@ export function Training() {
               aria-current={tab === t ? "page" : undefined}
               onClick={() => go(t)}
             >
-              {t}
+              {labels[t] || t}
             </button>
           ))}
         </nav>
+        <div className="tr-actions tr-secondary-nav">
+          <Button
+            aria-pressed={tab === "Training Plan"}
+            onClick={() => go("Training Plan")}
+          >
+            Weekly plan
+          </Button>
+          <Button
+            aria-pressed={tab === "Settings"}
+            onClick={() => go("Settings")}
+          >
+            Backup & settings
+          </Button>
+        </div>
         {store.error && (
           <div className="tr-notice" role="alert">
             {store.error} <Button onClick={store.retry}>Retry</Button>
@@ -214,7 +259,12 @@ export function Training() {
                 sessionChange={sessionChange}
               />
             )}
-            {tab === "Progress" && <Progress data={data} change={change} />}
+            {tab === "Progress" && (
+              <>
+                <TrainingGoals data={data} change={change} />
+                <Progress data={data} change={change} />
+              </>
+            )}
             {tab === "Training Plan" && (
               <PlanEditor data={data} change={change} />
             )}
@@ -228,232 +278,138 @@ export function Training() {
     </PageShell>
   );
 }
-const emptyCheckin = {
-  energy: 5,
-  sleep: 5,
-  wrist: 0,
-  ankle: 0,
-  walking: 0,
-  weight: 0,
-  recovery: "",
-  concerning: false,
-};
-export function Today({ data, change, begin, active, sessionChange, go }) {
-  const today = localDate(),
-    day = data.plan.days[dayIndex(today)],
-    check = data.checkins[today] || emptyCheckin;
+export function Today({ data, begin, active, go }) {
+  const today = localDate();
+  const day = data.plan.days[dayIndex(today)];
+  const recent = [...data.sessions]
+    .filter((s) => s.status !== "active" && s.sets.length)
+    .sort((a, b) => b.date.localeCompare(a.date) || b.started - a.started)
+    .slice(0, 4);
   const start = new Date(`${today}T12:00:00`);
   start.setDate(start.getDate() - dayIndex(today));
-  const week = localDate(start);
-  const done = new Set(
-    data.sessions
-      .filter(
-        (s) =>
-          s.date >= week &&
-          s.date <= today &&
-          s.status === "completed" &&
-          s.exercises.length > 0,
-      )
-      .map((s) => s.date),
-  ).size;
-  const planned = data.plan.days.filter((d) => d.exercises.length).length;
-  const pending = data.sessions.filter(
+  const weekSessions = data.sessions.filter(
     (s) =>
-      s.date < today &&
-      s.sets.length &&
+      s.date >= localDate(start) &&
+      s.date <= today &&
       s.status !== "active" &&
-      [...new Set(s.sets.map((x) => x.exerciseId))].some(
-        (id) => s.morning[id] == null,
-      ),
+      s.sets.length,
   );
-  function checkin(patch) {
-    change((d) => {
-      d.checkins[today] = { ...check, ...patch };
-      return d;
-    });
-  }
-  const recent = data.sessions
-    .filter((s) => s.status !== "active")
-    .slice(-3)
-    .reverse();
   return (
     <>
       <div className="tr-grid">
-        <Card className="tr-hero" title={day.name}>
-          <p className="tr-muted">
+        <Card
+          className="tr-hero"
+          title={active ? "Your workout is in progress" : day.name}
+        >
+          <span className="tr-eyebrow">
             {new Date(`${today}T12:00:00`).toLocaleDateString(undefined, {
               weekday: "long",
               day: "numeric",
               month: "long",
-            })}{" "}
-            · Phase {data.settings.phase}
-          </p>
+            })}
+          </span>
           <p>
-            {day.exercises.length
-              ? `${day.exercises.length} exercises · build a clean baseline`
-              : "A recovery day. Optional walking and comfortable mobility."}
-          </p>
-          <Button primary onClick={begin}>
             {active
-              ? "Resume Workout"
-              : day.exercises.length
-                ? "Start Workout"
-                : "Start recovery session"}{" "}
-            →
-          </Button>
-          <p className="tr-muted">
-            {done} / {planned} planned days completed this week
+              ? `${active.sets.length} sets saved. Pick up where you left off.`
+              : `${day.exercises.length} planned exercises. Record each set and compare it with last time.`}
           </p>
-          <progress
-            aria-label="Weekly workout completion"
-            value={done}
-            max={Math.max(planned, done, 1)}
-          />
+          <div className="tr-actions">
+            <Button primary onClick={() => begin(false)}>
+              {active ? "Resume workout" : "Start planned workout"} →
+            </Button>
+            {!active && (
+              <Button onClick={() => begin(true)}>Start empty workout</Button>
+            )}
+          </div>
         </Card>
-        <Card title="How are you arriving?">
-          <div className="tr-grid">
-            {[
-              ["energy", "Energy"],
-              ["sleep", "Sleep quality"],
-              ["wrist", "Wrist pain"],
-              ["ankle", "Ankle pain"],
-            ].map(([key, label]) => (
-              <Field key={key} label={`${label} · ${check[key]}/10`}>
-                <input
-                  type="range"
-                  min="0"
-                  max="10"
-                  value={check[key]}
-                  onChange={(e) => checkin({ [key]: Number(e.target.value) })}
-                />
-              </Field>
-            ))}
+        <Card title="This week">
+          <div className="tr-stats">
+            <div>
+              <strong>{weekSessions.length}</strong>
+              <span>workouts logged</span>
+            </div>
+            <div>
+              <strong>
+                {weekSessions.reduce((n, s) => n + s.sets.length, 0)}
+              </strong>
+              <span>sets completed</span>
+            </div>
           </div>
           <p className="tr-muted">
-            {data.checkins[today]
-              ? "Check-in saved"
-              : "Defaults shown · tap Save check-in to record"}{" "}
-            · 0 = low / none, 10 = highest
+            Build consistency. Every saved set adds to your history.
           </p>
-          <Button onClick={() => checkin({})}>Save check-in</Button>
-          <details>
-            <summary>Bodyweight, walking & symptoms</summary>
-            <div className="tr-grid">
-              <NumberField
-                label="Bodyweight (kg, optional)"
-                value={check.weight}
-                max={600}
-                step={0.1}
-                onChange={(weight) => checkin({ weight })}
-              />
-              <NumberField
-                label="Walking today (minutes)"
-                value={check.walking}
-                max={1440}
-                onChange={(walking) => checkin({ walking })}
-              />
-            </div>
-            <Button onClick={() => checkin({ walking: 80 })}>
-              Log gym walk · 40 + 40 min
-            </Button>
-            <label className="tr-check">
-              <input
-                type="checkbox"
-                checked={check.concerning}
-                onChange={(e) => checkin({ concerning: e.target.checked })}
-              />
-              Persistent or worsening swelling/lump, weakness, numbness or
-              significant wrist pain
-            </label>
-          </details>
-          {check.concerning && (
-            <p className="tr-notice">
-              Arrange a professional medical assessment for these wrist
-              symptoms.
-            </p>
-          )}
-          {Math.max(check.wrist, check.ankle) >= 3 && (
-            <p className="tr-notice">
-              Review or stop movements that aggravate symptoms. Progression is
-              on hold.
-            </p>
-          )}
+          <Button onClick={() => go("Progress")}>
+            View progress & goals →
+          </Button>
         </Card>
       </div>
-      {pending.map((s) => (
-        <Card key={s.id} title={`Next-morning check-in · ${s.date}`}>
-          <p>Record the symptoms you experienced the following morning.</p>
-          <SymptomFields
-            data={data}
-            session={s}
-            kind="morning"
-            update={(fn) => sessionChange(s.id, fn)}
-          />
-        </Card>
-      ))}
-      <Card title="On the plan">
+      <Card title="Today's exercises">
+        <div className="tr-toolbar">
+          <p className="tr-muted">
+            Your previous performance is here so you know where to start.
+          </p>
+          <Button onClick={() => go("Training Plan")}>Edit weekly plan</Button>
+        </div>
         <div className="tr-list">
-          {day.exercises.length ? (
-            day.exercises.map((p) => {
-              const e = data.exercises.find((x) => x.id === p.exerciseId),
-                last = lastSession(data, e.id);
-              return (
-                <div key={e.id} className="tr-row">
-                  <div>
-                    <h3>{e.name}</h3>
-                    <Prescription p={p} e={e} />
-                  </div>
-                  <p className="tr-muted">
+          {day.exercises.map((p) => {
+            const e = data.exercises.find((x) => x.id === p.exerciseId),
+              last = lastSession(data, e.id);
+            return (
+              <div className="tr-row tr-overview-exercise" key={e.id}>
+                <div>
+                  <h3>{e.name}</h3>
+                  <Prescription p={p} e={e} />
+                </div>
+                <div className="tr-previous">
+                  <span className="tr-eyebrow">
+                    {last ? `Last trained · ${last.date}` : "First session"}
+                  </span>
+                  <p>
                     {last
-                      ? `Last · ${exerciseSets(last, e.id)
+                      ? exerciseSets(last, e.id)
                           .map((s) => displaySet(s, e))
-                          .join(" / ")}`
-                      : "First session · establish a comfortable baseline"}
+                          .join(" / ")
+                      : "Log a set to establish your starting point."}
                   </p>
                 </div>
-              );
-            })
-          ) : (
-            <p>No strength work scheduled. Recovery counts too.</p>
-          )}
+              </div>
+            );
+          })}
         </div>
-      </Card>
-      {data.recovery.enabled && (
-        <Card title="Temporary Ankle Recovery">
+        {!day.exercises.length && (
           <p>
-            Separate from your permanent training plan. Your gym walk already
-            adds around 80 minutes of lower-body workload.
+            Nothing scheduled today. Start an empty workout and add any
+            exercises you want to train.
           </p>
-          <Field label="Recovery / mobility notes">
-            <textarea
-              value={check.recovery}
-              onChange={(e) => checkin({ recovery: e.target.value })}
-              placeholder="Record your existing recovery work and response"
-            />
-          </Field>
-          {data.recovery.notes && <p>{data.recovery.notes}</p>}
-        </Card>
-      )}
-      <Card title="Recent sessions & strict-form records">
-        {personalRecords(data)
-          .slice(0, 3)
-          .map((r, i) => (
-            <p key={i}>
-              <strong>PR · {r.exercise}</strong> · {r.value} {r.unit}
-              {r.load ? ` at ${r.load} kg` : ""}
-              {r.side !== "both" ? ` · ${r.side}` : ""} · {r.date}
-            </p>
-          ))}
+        )}
+      </Card>
+      <Card title="Recent workouts">
         {recent.length ? (
           recent.map((s) => (
-            <p key={s.id}>
-              {s.date} · {s.name} · {s.sets.length} sets · {s.status}
-            </p>
+            <div className="tr-row tr-toolbar" key={s.id}>
+              <div>
+                <h3>{s.name}</h3>
+                <p className="tr-muted">
+                  {s.date} · {s.sets.length} sets · {s.status}
+                </p>
+              </div>
+              <p>
+                {s.exercises
+                  .filter((p) => exerciseSets(s, p.exerciseId).length)
+                  .map(
+                    (p) =>
+                      data.exercises.find((e) => e.id === p.exerciseId)?.name,
+                  )
+                  .join(", ")}
+              </p>
+            </div>
           ))
         ) : (
-          <p>Your first clean sets will establish your personal records.</p>
+          <p>Your workouts will appear here after your first session.</p>
         )}
-        <Button onClick={() => go("Progress")}>View records & trends →</Button>
+        <Button onClick={() => go("Calendar/History")}>
+          Open calendar & history →
+        </Button>
       </Card>
     </>
   );

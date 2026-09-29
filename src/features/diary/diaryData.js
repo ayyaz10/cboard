@@ -231,6 +231,38 @@ export function diaryTotals(meals) {
     ]),
   );
 }
+
+export function nutrientContributions(meals, keys = ["protein", "carbs", "fat", "fiber"]) {
+  const items = meals.flatMap((meal) => meal.items || []);
+  return Object.fromEntries(keys.map((key) => {
+    const foods = new Map();
+    let missing = 0;
+    for (const item of items) {
+      const value = itemNutrition(item)[key];
+      if (value == null) {
+        missing += 1;
+        continue;
+      }
+      if (value <= 0) continue;
+      const name = String(item.name || "Food").trim() || "Food";
+      const identity = name.toLocaleLowerCase();
+      const current = foods.get(identity) || { name, value: 0 };
+      current.value += value;
+      foods.set(identity, current);
+    }
+    const total = [...foods.values()].reduce((sum, food) => sum + food.value, 0);
+    return [key, {
+      total,
+      missing,
+      foods: [...foods.values()]
+        .map((food) => ({
+          ...food,
+          percentage: total > 0 ? (food.value / total) * 100 : 0,
+        }))
+        .sort((left, right) => right.value - left.value || left.name.localeCompare(right.name)),
+    }];
+  }));
+}
 export function dailyCalorieReport(day, target) {
   const calories = diaryTotals(day?.meals || []).calories;
   const hasTarget = Number.isFinite(target) && target > 0;

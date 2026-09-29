@@ -242,6 +242,7 @@ export function DiaryMealEditor({
             )}
             <button
               type="button"
+              className="diary-find-food-button"
               disabled={!recipe || draft.items.length >= 100}
               onClick={addRecipe}
             >
@@ -251,6 +252,7 @@ export function DiaryMealEditor({
           <div className="diary-actions">
             <button
               type="button"
+              className="diary-manual-food-button"
               disabled={draft.items.length >= 100}
               onClick={() => setLookup(lookup === "new" ? null : "new")}
             >

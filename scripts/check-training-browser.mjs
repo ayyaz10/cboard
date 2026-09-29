@@ -83,7 +83,7 @@ try {
   await page.clock.install({ time: new Date("2026-09-14T12:00:00") });
   await page.goto("http://127.0.0.1:5178/cboard/training");
   await expect(
-    page.getByRole("heading", { name: "Upper chest and push", exact: true }),
+    page.getByRole("heading", { name: "Upper chest and push", exact: true, level: 2 }),
   ).toBeVisible();
   await expect(page.getByRole("status").first()).toContainText(
     "Saved to cloud",
@@ -93,7 +93,7 @@ try {
     fullPage: true,
   });
   await page
-    .getByRole("button", { name: "Start Workout →", exact: true })
+    .getByRole("button", { name: "Start planned workout →", exact: true })
     .click();
   await expect(
     page.getByRole("heading", { name: "Parallette handstand", exact: true }),
@@ -161,29 +161,28 @@ try {
     path: `${output}/progress-mobile-matrix.png`,
     fullPage: true,
   });
-  await page
-    .getByRole("button", { name: "Training Plan", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Weekly plan", exact: true }).click();
+  await page.getByText("Programme settings", { exact: true }).click();
   await page.getByLabel("Plan name", { exact: true }).fill("My re-entry plan");
   await page.getByRole("button", { name: "Save training plan" }).click();
   await expect(
     page.getByText("Plan saved. Future workouts use this schedule."),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Exercise Library", exact: true })
-    .click();
-  await page
-    .getByLabel("Search name, muscle, equipment or purpose")
-    .fill("missing-exercise");
+  await page.getByRole("button", { name: "Exercises", exact: true }).click();
+  await page.getByLabel("Search exercises").fill("missing-exercise");
   await expect(
     page.getByRole("heading", { name: "No matching exercises" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "+ Create exercise" }).click();
-  await page.getByLabel("Name", { exact: true }).fill("Band assisted row");
+  await page
+    .getByLabel("Exercise name", { exact: true })
+    .fill("Band assisted row");
   await page
     .getByRole("button", { name: "Save exercise", exact: true })
     .click();
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Backup & settings", exact: true })
+    .click();
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export JSON backup" }).click();
   const backup = await downloadPromise;
@@ -224,12 +223,12 @@ try {
   await page
     .getByRole("button", { name: "Confirm restore", exact: true })
     .click();
-  await page.getByRole("button", { name: "Today", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "Next-morning check-in · 2026-09-13" }),
-  ).toBeVisible();
+  await page.getByRole("button", { name: "Calendar", exact: true }).click();
+  await page.getByLabel("Open date", { exact: true }).fill("2026-09-13");
+  await page.getByText("Following-morning symptoms", { exact: true }).click();
   await page
     .getByRole("combobox", { name: /Low-incline machine press/ })
+    .last()
     .selectOption("0");
   await page.getByRole("button", { name: "Progress", exact: true }).click();
   await page
@@ -249,17 +248,18 @@ try {
       .min,
     9,
   );
-  await page.getByRole("button", { name: "Today", exact: true }).click();
+  await page.getByRole("button", { name: "Overview", exact: true }).click();
   offline = true;
+  await page.getByRole("button", { name: "Weekly plan", exact: true }).click();
   await page
-    .getByRole("button", { name: "Save check-in", exact: true })
+    .getByRole("button", { name: "Save training plan", exact: true })
     .click();
   await expect(page.getByRole("status").first()).toContainText(
     "Saved on this device",
   );
   await page.reload();
   await expect(
-    page.getByRole("heading", { name: "Upper chest and push", exact: true }),
+    page.getByRole("heading", { name: "Your weekly plan", exact: true }),
   ).toBeVisible();
   offline = false;
   await page.getByRole("button", { name: "Retry", exact: true }).click();
@@ -275,8 +275,9 @@ try {
       plan: { ...remote.data.plan, name: "Other device plan" },
     },
   };
+  await page.getByRole("button", { name: "Weekly plan", exact: true }).click();
   await page
-    .getByRole("button", { name: "Save check-in", exact: true })
+    .getByRole("button", { name: "Save training plan", exact: true })
     .click();
   await expect(page.getByRole("alert")).toContainText("Conflict:");
   const pending = await page.evaluate(() =>
@@ -287,7 +288,9 @@ try {
     ),
   );
   assert.equal(pending.dirty, true, "Conflict preserves pending local backup");
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Backup & settings", exact: true })
+    .click();
   await page.getByText("Resolve a cloud conflict", { exact: true }).click();
   await page
     .getByRole("button", { name: "Load cloud copy", exact: true })
@@ -295,19 +298,25 @@ try {
   await expect(page.getByRole("status").first()).toContainText(
     "Cloud copy loaded",
   );
-  await page.getByRole("button", { name: "Today", exact: true }).click();
+  await page.getByRole("button", { name: "Overview", exact: true }).click();
   const peer = await context.newPage();
   await peer.clock.install({ time: new Date("2026-09-14T12:00:00") });
   await peer.goto("http://127.0.0.1:5178/cboard/training");
   await expect(
-    peer.getByRole("heading", { name: "Upper chest and push", exact: true }),
+    peer.getByRole("heading", { name: "Upper chest and push", exact: true, level: 2 }),
   ).toBeVisible();
-  await peer.getByLabel("Energy · 5/10", { exact: true }).fill("8");
+  await peer.getByRole("button", { name: "Weekly plan", exact: true }).click();
+  await peer.getByText("Programme settings", { exact: true }).click();
+  await peer.getByLabel("Plan name", { exact: true }).fill("Peer plan");
+  await peer
+    .getByRole("button", { name: "Save training plan", exact: true })
+    .click();
   await expect(peer.getByRole("status").first()).toContainText(
     "Saved to cloud",
   );
+  await page.getByRole("button", { name: "Weekly plan", exact: true }).click();
   await page
-    .getByRole("button", { name: "Save check-in", exact: true })
+    .getByRole("button", { name: "Save training plan", exact: true })
     .click();
   await expect(page.getByRole("alert")).toContainText("another tab");
   assert.equal(
@@ -317,9 +326,9 @@ try {
           localStorage.getItem(
             "cboard:training:v1:11111111-1111-4111-8111-111111111111",
           ),
-        ).data.checkins["2026-09-14"].energy,
+        ).data.plan.name,
     ),
-    8,
+    "Peer plan",
   );
   await peer.close();
   await page

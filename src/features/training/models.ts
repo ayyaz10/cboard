@@ -13,6 +13,12 @@ export interface Prescription {
   attemptsMax?: number;
 }
 export interface Exercise {
+  image?: string;
+  archived?: boolean;
+  timerSeconds?: number;
+  restSeconds?: number;
+  defaultSets?: number;
+  defaultReps?: number;
   id: string;
   name: string;
   type: SetType;
@@ -70,6 +76,7 @@ export interface SetLog {
   rest: number;
 }
 export interface Session {
+  timer?: { duration: number; remaining: number; until: number | null };
   id: string;
   date: string;
   name: string;
@@ -104,6 +111,13 @@ export interface MistakeTag {
 }
 export interface TrainingState {
   version: 1;
+  goals?: {
+    id: string;
+    exerciseId: string;
+    metric: "reps" | "seconds" | "load";
+    target: number;
+    deadline?: string;
+  }[];
   plan: Plan;
   exercises: Exercise[];
   sessions: Session[];

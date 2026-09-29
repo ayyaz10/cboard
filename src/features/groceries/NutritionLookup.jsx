@@ -1,3 +1,5 @@
+import { useSavedFoods } from '../nutrition/useSavedFoods';
+import { findSavedFoods, savedFoodNutrition } from '../nutrition/savedFoods.js';
 import { useEffect, useRef, useState } from "react";
 import { searchNutrition, lookupBarcode } from "../../services/nutritionLookup";
 import { BarcodeScanner } from "./BarcodeScanner";
@@ -6,10 +8,12 @@ import { nutrients } from "./groceryData";
 import { searchNaturalFoods, naturalPortionNutrition, nutritionForOnePortion, suggestedNaturalPortion } from '../../services/naturalFoods';
 
 export function NutritionLookup({ name, active, visible, onSelect, amountUnit, portionMode = 'unit' }) {
-  const [mode, setMode] = useState("name");
+  const [mode, setMode] = useState("saved");
+  const savedFoods = useSavedFoods(visible && mode === 'saved');
   const [barcode, setBarcode] = useState("");
   const [scanning, setScanning] = useState(false);
   const [query, setQuery] = useState(name);
+  const savedMatches = findSavedFoods(savedFoods.library, query, 24).filter(entry => savedFoodNutrition(entry.item));
   const [results, setResults] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -44,11 +48,27 @@ export function NutritionLookup({ name, active, visible, onSelect, amountUnit, p
   useEffect(() => { if (!visible) setScanning(false); }, [visible]);
   return <div className="g-nutrition-lookup">
     <div className="g-actions" aria-label="Nutrition lookup method">
-      {[["name", "Branded products"], ["natural", "Natural foods"], ["barcode", "Scan barcode"], ["photo", "Label photo"]].map(([key, title]) =>
+      {[["saved", "My saved foods"], ["name", "Branded products"], ["natural", "Natural foods"], ["barcode", "Scan barcode"], ["photo", "Label photo"]].map(([key, title]) =>
         <button type="button" key={key} aria-pressed={mode === key} onClick={() => {
           request.current++; setMode(key); setScanning(false); setBusy(false); setResults(null); setError("");
         }}>{title}</button>)}
     </div>
+    {mode === 'saved' && <>
+      <label>Search recipes, diary and groceries
+        <input value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') event.preventDefault(); }} />
+      </label>
+      {savedFoods.loading && <p role="status">Loading saved foods...</p>}
+      {savedFoods.error && <p role="alert">{savedFoods.error}</p>}
+      <div className="g-saved-foods">
+        {savedMatches.map(entry => <button key={entry.key} type="button" onClick={() => onSelect(savedFoodNutrition(entry.item))}>
+          <strong>{entry.item.name}</strong>
+          <small>{entry.origins.slice(0, 2).join(' / ')} / Per {entry.item.basis} {entry.item.nutritionUnit}</small>
+          <small>{nutrients.map(([key, label, suffix]) => `${label}: ${entry.item.nutrition[key] == null ? 'unknown' : `${entry.item.nutrition[key]} ${suffix}`}`).join(' / ')}</small>
+        </button>)}
+      </div>
+      {!savedFoods.loading && query.trim().length >= 2 && !savedMatches.length && <p role="status">No saved nutrition matches. Try Branded products, Natural foods, a barcode or a label photo.</p>}
+      {query.trim().length < 2 && <p className="g-hint">Type at least two characters to find a saved food.</p>}
+    </>}
     {mode === "photo" && <NutritionLabel key={name} onSelect={onSelect} />}
     {mode === "barcode" && <div>
       {scanning && visible && <BarcodeScanner onClose={() => setScanning(false)} onCode={(code) => { setScanning(false); setBarcode(code); lookup(code, true); }} />}

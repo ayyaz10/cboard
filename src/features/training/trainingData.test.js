@@ -10,8 +10,56 @@ import {
   csv,
   exerciseRestriction,
   personalRecords,
+  exercisePrescription,
+  safeImage,
 } from "./trainingData.js";
 import { readCache, writeCache, equivalentData } from "./trainingStorage.js";
+test("exercise presets, uploaded images, timers and goals survive backup roundtrip", () => {
+  const state = seedState();
+  const e = state.exercises[0];
+  Object.assign(e, {
+    defaultSets: 4,
+    defaultReps: 12,
+    restSeconds: 75,
+    timerSeconds: 45,
+    image: "data:image/png;base64,YWJj",
+  });
+  const session = startSession(state, "2026-09-14");
+  session.exercises = [exercisePrescription(e)];
+  session.timer = { duration: 45, remaining: 35000, until: null };
+  state.sessions = [session];
+  state.goals = [
+    { id: "goal-1", exerciseId: e.id, metric: "seconds", target: 30 },
+  ];
+  const restored = validateState(JSON.parse(JSON.stringify(state)));
+  assert.equal(restored.sessions[0].exercises[0].rest, 75);
+  assert.equal(restored.sessions[0].exercises[0].sets, 4);
+  assert.equal(restored.sessions[0].timer.remaining, 35000);
+  assert.equal(restored.goals[0].target, 30);
+  assert.equal(safeImage(restored.exercises[0].image), e.image);
+  e.archived = true;
+  assert.doesNotThrow(
+    () => validateState(state),
+    "Archived exercises remain available to historical sessions",
+  );
+});
+
+test("new training fields reject unsafe images and invalid timing or goal values", () => {
+  const state = seedState();
+  assert.equal(safeImage("javascript:alert(1)"), "");
+  assert.equal(safeImage("data:image/svg+xml;base64,YWJj"), "");
+  state.exercises[0].timerSeconds = -1;
+  assert.throws(() => validateState(state), /timerSeconds/);
+  delete state.exercises[0].timerSeconds;
+  state.sessions = [startSession(state, "2026-09-14")];
+  state.sessions[0].timer = { duration: 60, remaining: -1, until: null };
+  assert.throws(() => validateState(state), /Timer remaining/);
+  delete state.sessions[0].timer;
+  state.goals = [
+    { id: "goal-1", exerciseId: "missing", metric: "reps", target: 10 },
+  ];
+  assert.throws(() => validateState(state), /exercise goal/);
+});
 function fixture(id = "incline") {
   const state = seedState();
   let session = startSession(state, "2026-09-14");

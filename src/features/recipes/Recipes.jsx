@@ -23,6 +23,8 @@ import {
 } from './RecipeComponents';
 import { RecipeImporter } from './RecipeImporter';
 import { buildIngredientLibrary } from './ingredientLibrary';
+import { applyFoodCatalogToRecipes, catalogItemsFromRecipe } from '../nutrition/foodCatalog.js';
+import { getFoodCatalog, upsertFoodCatalogItems } from '../../services/foodCatalogService.js';
 import { formatIngredient } from './recipeData';
 import { DailyMealPlanner } from './DailyMealPlanner';
 import { FoodDiary } from '../diary/FoodDiary';
@@ -34,19 +36,20 @@ import {
 } from './RecipeCardView';
 import './recipesLayout.css';
 
-export function Recipes({ route }) {
+export function Recipes({ route, navigationPath = '/recipes' }) {
   return (
     <RecipeCardViewProvider>
-      <RecipesContent route={route} />
+      <RecipesContent route={route} navigationPath={navigationPath} />
     </RecipeCardViewProvider>
   );
 }
 
-function RecipesContent({ route }) {
+function RecipesContent({ route, navigationPath }) {
   const { user } = useAuth();
   const cardGrid = useRecipeCardGrid();
   const nutritionGoals = useNutritionGoals();
   const [recipes, setRecipes] = useState([]);
+  const [foodCatalog, setFoodCatalog] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [recipeNotice, setRecipeNotice] = useState('');
@@ -61,21 +64,34 @@ function RecipesContent({ route }) {
   const [draft, setDraft] = useState(null);
   const [removing, setRemoving] = useState(null);
   const [busy, setBusy] = useState(false);
-  const ingredientLibrary = useMemo(() => buildIngredientLibrary(recipes), [recipes]);
+  const ingredientLibrary = useMemo(() => buildIngredientLibrary(recipes, foodCatalog), [recipes, foodCatalog]);
   const dialog = useRef(null);
   const deleteLock = useRef(false);
   async function refresh() {
     setLoading(true);
     setError('');
     try {
-      const [loadedRecipes, loadedFavourites] = await Promise.all([getRecipes(), getRecipeFavourites()]);
-      setRecipes(loadedRecipes);
+      const [loadedRecipes, loadedFavourites, loadedFoodCatalog] = await Promise.all([getRecipes(), getRecipeFavourites(), getFoodCatalog(user.id)]);
+      setFoodCatalog(loadedFoodCatalog);
+      setRecipes(applyFoodCatalogToRecipes(loadedRecipes, loadedFoodCatalog));
       setFavourites(new Set(loadedFavourites));
     } catch (error) {
       setError(error.message || 'Could not load recipes. Please try again.');
     } finally {
       setLoading(false);
     }
+  }
+  async function saveMainFoodItems(items) {
+    if (!items.length) return foodCatalog;
+    const saved = await upsertFoodCatalogItems(items, user.id);
+    setFoodCatalog(saved);
+    setRecipes(current => applyFoodCatalogToRecipes(current, saved));
+    return saved;
+  }
+  function recipeUpdated(updated) {
+    setRecipes(current => current.map(item => item.slug === updated.slug ? updated : item));
+    const catalogItems = catalogItemsFromRecipe(updated);
+    if (catalogItems.length) saveMainFoodItems(catalogItems).catch(error => setRecipeNotice(error.message || 'Recipe saved, but the main food library could not be updated.'));
   }
   useEffect(() => {
     refresh();
@@ -136,6 +152,8 @@ function RecipesContent({ route }) {
       saved,
     ]);
     setDraft(null);
+    const catalogItems = catalogItemsFromRecipe(saved);
+    if (catalogItems.length) await saveMainFoodItems(catalogItems);
     setRecipeNotice('Recipe saved.');
     navigateTo(`/recipes/${saved.slug}`);
   }
@@ -162,6 +180,8 @@ function RecipesContent({ route }) {
   async function saveBatch(entries) {
     const saved = await saveRecipeBatch(entries);
     setRecipes((current) => [...current, ...saved]);
+    const catalogItems = saved.flatMap(catalogItemsFromRecipe);
+    if (catalogItems.length) await saveMainFoodItems(catalogItems);
     setDraft(null);
     setSearch('');
     setCategory('All');
@@ -195,14 +215,14 @@ function RecipesContent({ route }) {
   return (
     <PageShell>
       <section className="recipe-page-shell panel space-y-7 border-black p-5 text-black sm:p-8 lg:p-10">
-        <AppNavigation activePath="/recipes" />
+        <AppNavigation activePath={navigationPath} />
         <DailyNutritionTargets controller={nutritionGoals} />
         <nav className="recipe-shortcuts mobile-section-nav flex flex-wrap gap-2" aria-label="Recipe shortcuts">
           {shortcutOrder.map((item) => {
             if (item === 'home') return !home && !(recipe && parts.length === 2) ? <RecipeLink key={item} to="/recipes">Back to recipes</RecipeLink> : null;
             if (item === 'add') return !importing ? <PrimaryButton key={item} onClick={() => startImport()}>Add recipe</PrimaryButton> : null;
             if (item === 'planner') return !planning ? <RecipeLink key={item} to="/recipes/planner/day">Meal planner</RecipeLink> : null;
-            if (item === 'diary') return !diary ? <RecipeLink key={item} to="/recipes/diary/day">Food diary</RecipeLink> : null;
+            if (item === 'diary') return !diary ? <RecipeLink key={item} to="/food-diary">Food diary</RecipeLink> : null;
             return !manage ? <RecipeLink key={item} to="/recipes/manage">Manage recipes</RecipeLink> : null;
           })}
         </nav>
@@ -250,7 +270,7 @@ function RecipesContent({ route }) {
               />
             ) : null}
             {!error && planning && <DailyMealPlanner recipes={recipes} nutritionGoals={nutritionGoals} />}
-            {!error && diary && <FoodDiary recipes={recipes} nutritionGoals={nutritionGoals} />}
+            {!error && diary && <FoodDiary recipes={recipes} nutritionGoals={nutritionGoals} foodCatalog={foodCatalog} onFoodCatalogChange={saveMainFoodItems} />}
             {!error && (home || manage) && (
               <>
                 <header className="flex flex-wrap items-start justify-between gap-4">
@@ -398,7 +418,7 @@ function RecipesContent({ route }) {
                   <RecipeLink to="/recipes">Back to recipes</RecipeLink>
                   <button className={secondaryButton} onClick={() => startImport(recipe, true)}>Edit Recipe</button>
                 </div>
-                <RecipePage key={recipe.slug} recipe={recipe} favourite={favourites.has(recipe.slug)} favouritePending={favouritePending.has(recipe.slug)} onToggleFavourite={toggleFavourite} onRecipeUpdated={(updated) => setRecipes((current) => current.map((item) => item.slug === updated.slug ? updated : item))} />
+                <RecipePage key={recipe.slug} recipe={recipe} favourite={favourites.has(recipe.slug)} favouritePending={favouritePending.has(recipe.slug)} onToggleFavourite={toggleFavourite} onRecipeUpdated={recipeUpdated} />
               </div>
             )}
             {!error &&

@@ -1,3 +1,4 @@
+import { NUTRIENTS } from '../nutrition/nutrients.js';
 export const categories = {
   "Grains & Bakery": [
     "Oats",
@@ -49,6 +50,7 @@ export const categoryIcon = (name) =>
   icons[Object.keys(categories).indexOf(name)] || "🛒";
 export const units = [
   "pieces",
+  "servings",
   "g",
   "kg",
   "ml",
@@ -201,13 +203,7 @@ export function parseEntry(text) {
     canonicalUnit(match[2]?.toLowerCase() || "pieces"),
   );
 }
-export const nutrients = [
-  ["calories", "Calories", "kcal"],
-  ["protein", "Protein", "g"],
-  ["carbs", "Carbs", "g"],
-  ["fat", "Fat", "g"],
-  ["fiber", "Fibre", "g"],
-];
+export const nutrients = NUTRIENTS.map(([key, label, unit]) => [key, label, unit]);
 export function validateNutrition(nutrition) {
   if (nutrition == null) return;
   if (!Number.isFinite(nutrition.quantity) || nutrition.quantity <= 0 || !units.includes(nutrition.unit))

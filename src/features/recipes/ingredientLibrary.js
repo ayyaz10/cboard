@@ -1,3 +1,5 @@
+import { catalogIngredient } from '../nutrition/foodCatalog.js';
+
 const normalise = (value) => String(value || '').trim().toLocaleLowerCase();
 
 const nutritionSignature = (item) => {
@@ -6,8 +8,13 @@ const nutritionSignature = (item) => {
   return ['nutrition', ...['calories', 'protein', 'carbs', 'fat', 'fiber'].map((key) => item.nutrition?.[key] ?? '')].join('|');
 };
 
-export function buildIngredientLibrary(recipes = []) {
+export function buildIngredientLibrary(recipes = [], foodCatalog = []) {
   const entries = new Map();
+  foodCatalog.forEach((catalogItem) => {
+    const item = catalogIngredient(catalogItem);
+    const key = [normalise(item.name), normalise(item.unit), String(item.amount ?? ''), nutritionSignature(item)].join('|');
+    entries.set(key, { key, item, recipeTitles: ['Main food library'] });
+  });
   recipes.forEach((recipe) => {
     const alternatives = Object.values(recipe.alternatives || {}).flatMap((group) => group.options || []);
     [...(recipe.ingredients || []), ...(recipe.sauces || []), ...alternatives].forEach((item) => {

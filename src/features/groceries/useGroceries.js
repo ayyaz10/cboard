@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { loadGroceries, saveGroceries } from "../../services/groceryService";
+import { upsertFoodCatalogItems } from '../../services/foodCatalogService';
+import { groceryCatalogUpdates } from '../nutrition/savedFoods.js';
 export function useGroceries() {
   const [data, setData] = useState(null),
     [error, setError] = useState(""),
@@ -45,6 +47,14 @@ export function useGroceries() {
       current.current = { state, version, userId: before.userId };
       setUndo(allowUndo ? before.state : null);
       setNotice(message);
+      const updates = groceryCatalogUpdates(before.state, state);
+      if (updates.length) {
+        try {
+          await upsertFoodCatalogItems(updates, before.userId);
+        } catch (error) {
+          setError(`Groceries saved, but the shared food library could not be updated: ${error.message}`);
+        }
+      }
       return true;
     } catch (e) {
       setData(before.state);

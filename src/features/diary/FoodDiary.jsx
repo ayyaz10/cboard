@@ -13,7 +13,9 @@ import { DiaryMealEditor } from "./DiaryMealEditor";
 import { DiaryReports } from "./DiaryReports";
 import { DiaryCalendar } from "./DiaryCalendar";
 import { DiaryMonthPicker } from "./DiaryMonthPicker";
-import { buildDiaryFoodLibrary } from "./diaryFoodLibrary";
+import { DiaryFoodSources } from "./DiaryFoodSources";
+import { buildSavedFoods } from '../nutrition/savedFoods.js';
+import { catalogItemsFromDiaryMeal } from "../nutrition/foodCatalog.js";
 import {
   MEALS,
   REQUIRED_MEALS,
@@ -34,7 +36,7 @@ import "./foodDiary.css";
 
 const format = (n) =>
   new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(n);
-export function FoodDiary({ recipes, nutritionGoals }) {
+export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCatalogChange }) {
   const { user } = useAuth();
   const [today, setToday] = useState(localDate);
   const [date, setDate] = useState(localDate);
@@ -53,6 +55,7 @@ export function FoodDiary({ recipes, nutritionGoals }) {
   const [pastSelected, setPastSelected] = useState([]);
   const [pastSearch, setPastSearch] = useState("");
   const [month, setMonth] = useState("");
+  const [view, setView] = useState("day");
   const lock = useRef(false);
   const generation = useRef(0);
   const editorRef = useRef(null);
@@ -60,7 +63,7 @@ export function FoodDiary({ recipes, nutritionGoals }) {
   const mealsRef = useRef(null);
   const day = days.find((entry) => entry.date === date) || emptyDay(date);
   const streak = streaks(days, today);
-  const foodLibrary = useMemo(() => buildDiaryFoodLibrary(days, recipes), [days, recipes]);
+  const foodLibrary = useMemo(() => buildSavedFoods(recipes, days, foodCatalog), [days, recipes, foodCatalog]);
   const disabled = busy || Boolean(draft) || Boolean(routine) || pastOpen;
   const allPastMeals = useMemo(() => days
     .filter((entry) => entry.date !== date)
@@ -203,6 +206,15 @@ export function FoodDiary({ recipes, nutritionGoals }) {
     }
   }
   async function saveMeal(meal) {
+    const mainFoodItems = catalogItemsFromDiaryMeal(meal);
+    if (mainFoodItems.length && onFoodCatalogChange) {
+      try {
+        await onFoodCatalogChange(mainFoodItems);
+      } catch (err) {
+        setError(err.message || "Could not update the main food nutrition record.");
+        return;
+      }
+    }
     const exists = day.meals.some((entry) => entry.id === meal.id);
     const meals = exists
       ? day.meals.map((entry) => (entry.id === meal.id ? meal : entry))
@@ -215,7 +227,7 @@ export function FoodDiary({ recipes, nutritionGoals }) {
           skipped: day.skipped.filter((slot) => slot !== meal.meal),
           complete: false,
         },
-        "Meal saved. Finish the day when all your meals are recorded.",
+        mainFoodItems.length ? "Meal saved and edited nutrition updated in your main food library." : "Meal saved. Finish the day when all your meals are recorded.",
       )
     )
       setDraft(null);
@@ -319,7 +331,27 @@ export function FoodDiary({ recipes, nutritionGoals }) {
         </div>
         <RecipeLink to="/recipes/planner/day">Daily Planner</RecipeLink>
       </header>
-      <section className="diary-streak" aria-label="Logging streak">
+      <nav className="diary-view-tabs" role="tablist" aria-label="Food diary views">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === "day"}
+          disabled={view !== "day" && disabled}
+          onClick={() => setView("day")}
+        >
+          Day log
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={view === "sources"}
+          disabled={view !== "sources" && disabled}
+          onClick={() => setView("sources")}
+        >
+          Food sources
+        </button>
+      </nav>
+      {view === "day" && <section className="diary-streak" aria-label="Logging streak">
         <div>
           <strong>{streak.current}</strong>
           <span>day logging streak</span>
@@ -327,7 +359,7 @@ export function FoodDiary({ recipes, nutritionGoals }) {
         <p>
           Best: <b>{streak.longest} days</b> · {streak.completed} completed days
         </p>
-      </section>
+      </section>}
       <div className="diary-datebar" ref={diaryTopRef}>
         <button
           type="button"
@@ -361,6 +393,9 @@ export function FoodDiary({ recipes, nutritionGoals }) {
           Today
         </button>
       </div>
+      {view === "sources" ? (
+        <DiaryFoodSources meals={day.meals} goals={goals} date={date} today={today} />
+      ) : <>
       <DiaryReports
         days={days}
         date={date}
@@ -746,6 +781,7 @@ export function FoodDiary({ recipes, nutritionGoals }) {
           <p>“Known subtotal” means one or more foods are missing nutrition data; missing values are not counted as zero.</p>
         </div>
       </details>
+      </>}
       <p className="diary-hint">
         Food lookup:{" "}
         <a

@@ -141,6 +141,10 @@ export default function App() {
   if (route === '/finance') return <FinancePage key={user.id} />;
   if (route === '/training') return <Suspense fallback={<main className="panel m-6 p-6" role="status">Loading Training…</main>}><Training key={user.id} /></Suspense>;
 
+  if (route === '/food-diary') {
+    return <Recipes key={user.id} route="/recipes/diary/day" navigationPath="/food-diary" />;
+  }
+
   if (route === '/recipes' || route.startsWith('/recipes/')) {
     return <Recipes key={user.id} route={route} />;
   }

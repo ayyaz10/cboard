@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { WorkoutTimer, timerRemaining } from "./WorkoutTimer";
+import { exercisePrescription, safeImage } from "./trainingData";
 import {
   Button,
   Card,
@@ -37,9 +39,10 @@ export function Workout({
           Start today’s plan. Every completed set saves immediately on this
           device.
         </p>
-        <Button primary onClick={begin}>
+        <Button primary onClick={() => begin(false)}>
           Start Workout →
         </Button>
+        <Button onClick={() => begin(true)}>Start empty workout</Button>
       </Card>
     );
   const p = session.exercises[session.index],
@@ -59,24 +62,33 @@ export function Workout({
           }
         : {
             ...s,
+            timer: s.timer
+              ? {
+                  ...s.timer,
+                  remaining: timerRemaining(s.timer, Date.now()),
+                  until: null,
+                }
+              : undefined,
             pausedAt: Date.now(),
             restRemaining: Math.max(0, (s.restUntil || 0) - Date.now()),
             restUntil: null,
           },
     );
   }
-  const fullyDone = session.exercises.every((p) => {
-    const sets = exerciseSets(session, p.exerciseId),
-      exercise = data.exercises.find((e) => e.id === p.exerciseId);
-    return (
-      !session.skipped.includes(p.exerciseId) &&
-      (exercise.unilateral
-        ? ["left", "right"].every(
-            (side) => sets.filter((s) => s.side === side).length >= p.sets,
-          )
-        : sets.length >= p.sets)
-    );
-  });
+  const fullyDone =
+    session.exercises.length > 0 &&
+    session.exercises.every((p) => {
+      const sets = exerciseSets(session, p.exerciseId),
+        exercise = data.exercises.find((e) => e.id === p.exerciseId);
+      return (
+        !session.skipped.includes(p.exerciseId) &&
+        (exercise.unilateral
+          ? ["left", "right"].every(
+              (side) => sets.filter((s) => s.side === side).length >= p.sets,
+            )
+          : sets.length >= p.sets)
+      );
+    });
   function finish() {
     if (
       update((s) => ({
@@ -86,6 +98,7 @@ export function Workout({
         pausedMs: s.pausedMs + (s.pausedAt ? Date.now() - s.pausedAt : 0),
         pausedAt: null,
         restUntil: null,
+        timer: undefined,
       }))
     ) {
       setFinishing(false);
@@ -124,13 +137,15 @@ export function Workout({
               ? "All prescribed sets completed."
               : `This will be saved as ${session.sets.length ? "a partial" : "a skipped"} session. You can still review every logged set.`}
           </p>
-          <h3>Pain immediately afterward</h3>
-          <SymptomFields
-            data={data}
-            session={session}
-            kind="after"
-            update={update}
-          />
+          <details>
+            <summary>Optional symptom check-in</summary>
+            <SymptomFields
+              data={data}
+              session={session}
+              kind="after"
+              update={update}
+            />
+          </details>
           <Field label="Session notes">
             <textarea
               value={session.notes}
@@ -144,6 +159,12 @@ export function Workout({
       ) : (
         <div className="tr-workout-grid">
           <div className="tr-current">
+            <WorkoutTimer
+              session={session}
+              update={update}
+              clock={clock}
+              exercise={e}
+            />
             {e ? (
               <SetCard
                 key={`${session.id}-${e.id}-${session.sets.length}`}
@@ -155,10 +176,8 @@ export function Workout({
                 rest={rest}
               />
             ) : (
-              <Card title="Recovery session">
-                <p>
-                  Log walking and recovery notes on Today, then finish here.
-                </p>
+              <Card title="Build your workout">
+                <p>Add an exercise from the library to start logging sets.</p>
               </Card>
             )}
             <div className="tr-rest" role="status">
@@ -181,6 +200,45 @@ export function Workout({
             </div>
           </div>
           <Card title="Session exercises">
+            <Field label="Workout name">
+              <input
+                value={session.name}
+                onChange={(event) =>
+                  update((s) => ({ ...s, name: event.target.value }))
+                }
+              />
+            </Field>
+            <Field label="Add exercise to workout">
+              <select
+                value=""
+                onChange={(event) => {
+                  const exercise = data.exercises.find(
+                    (e) => e.id === event.target.value,
+                  );
+                  update((s) => ({
+                    ...s,
+                    exercises: [...s.exercises, exercisePrescription(exercise)],
+                    index: s.exercises.length,
+                    timer: undefined,
+                  }));
+                }}
+              >
+                <option value="" disabled>
+                  Choose an exercise
+                </option>
+                {data.exercises
+                  .filter(
+                    (e) =>
+                      !e.archived &&
+                      !session.exercises.some((p) => p.exerciseId === e.id),
+                  )
+                  .map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.name}
+                    </option>
+                  ))}
+              </select>
+            </Field>
             <ol className="tr-list">
               {session.exercises.map((item, index) => {
                 const exercise = data.exercises.find(
@@ -193,13 +251,52 @@ export function Workout({
                       aria-current={
                         index === session.index ? "step" : undefined
                       }
-                      onClick={() => update((s) => ({ ...s, index }))}
+                      onClick={() =>
+                        update((s) => ({
+                          ...s,
+                          index,
+                          timer: index === s.index ? s.timer : undefined,
+                        }))
+                      }
                     >
                       {index + 1}. {exercise.name} · {count}/
                       {targetCount(item, exercise)}{" "}
                       {session.skipped.includes(exercise.id) ? "· skipped" : ""}
                     </Button>
                     <div className="tr-actions">
+                      <Button
+                        disabled={count > 0}
+                        title={
+                          count
+                            ? "Keep exercises with saved sets in your history"
+                            : "Remove from this workout"
+                        }
+                        onClick={() =>
+                          update((s) => {
+                            const selected = s.exercises[s.index]?.exerciseId;
+                            const exercises = s.exercises.filter(
+                              (p) => p.exerciseId !== exercise.id,
+                            );
+                            return {
+                              ...s,
+                              exercises,
+                              skipped: s.skipped.filter(
+                                (id) => id !== exercise.id,
+                              ),
+                              timer:
+                                selected === exercise.id ? undefined : s.timer,
+                              index: Math.max(
+                                0,
+                                exercises.findIndex(
+                                  (p) => p.exerciseId === selected,
+                                ),
+                              ),
+                            };
+                          })
+                        }
+                      >
+                        Remove
+                      </Button>
                       <Button
                         aria-label={`Move ${exercise.name} up`}
                         disabled={index === 0}
@@ -310,11 +407,24 @@ function SetCard({ data, session, p, e, update, rest }) {
       <p>
         <Prescription p={p} e={e} />
       </p>
-      <p>{e.purpose}</p>
-      <p className="tr-muted">
-        {e.muscles} · {e.joints}
-      </p>
-      <p className="tr-muted">
+      {safeImage(e.image) && (
+        <img
+          className="tr-exercise-image"
+          src={safeImage(e.image)}
+          alt={e.name}
+        />
+      )}
+      {safeUrl(e.reference) && (
+        <a href={safeUrl(e.reference)} target="_blank" rel="noreferrer">
+          Watch technique ↗
+        </a>
+      )}
+      {(e.muscles || e.joints) && (
+        <p className="tr-muted">
+          {[e.muscles, e.joints].filter(Boolean).join(" / ")}
+        </p>
+      )}
+      <p className="tr-previous">
         Previous:{" "}
         {last
           ? exerciseSets(last, e.id)
@@ -322,6 +432,50 @@ function SetCard({ data, session, p, e, update, rest }) {
               .join(" / ")
           : "No previous performance"}
       </p>
+      <details>
+        <summary>Set targets & rest timer</summary>
+        <div className="tr-grid">
+          <NumberField
+            label="Target sets"
+            min={1}
+            max={50}
+            value={p.sets}
+            onChange={(sets) =>
+              update((s) => ({
+                ...s,
+                exercises: s.exercises.map((x) =>
+                  x.exerciseId === e.id ? { ...x, sets } : x,
+                ),
+              }))
+            }
+          />
+          <NumberField
+            label="Rest seconds"
+            max={3600}
+            value={p.rest}
+            onChange={(rest) =>
+              update((s) => ({
+                ...s,
+                exercises: s.exercises.map((x) =>
+                  x.exerciseId === e.id ? { ...x, rest } : x,
+                ),
+              }))
+            }
+          />
+          <Button
+            disabled={!!session.pausedAt}
+            onClick={() =>
+              update((s) => ({
+                ...s,
+                restUntil: Date.now() + p.rest * 1000,
+                restRemaining: 0,
+              }))
+            }
+          >
+            Start rest timer
+          </Button>
+        </div>
+      </details>
       <div className="tr-grid">
         {["hold", "timed", "skill"].includes(e.type) ? (
           <Counter
@@ -506,6 +660,7 @@ function SetCard({ data, session, p, e, update, rest }) {
               ...s,
               skipped: [...new Set([...s.skipped, e.id])],
               index: Math.min(s.index + 1, s.exercises.length - 1),
+              timer: undefined,
             }))
           }
         >
@@ -513,7 +668,9 @@ function SetCard({ data, session, p, e, update, rest }) {
         </Button>
         <Button
           disabled={session.index === session.exercises.length - 1}
-          onClick={() => update((s) => ({ ...s, index: s.index + 1 }))}
+          onClick={() =>
+            update((s) => ({ ...s, index: s.index + 1, timer: undefined }))
+          }
         >
           Next exercise →
         </Button>
@@ -535,14 +692,27 @@ function SetCard({ data, session, p, e, update, rest }) {
         )}
       </details>
       {!!sets.length && (
-        <details>
-          <summary>Logged sets ({sets.length})</summary>
+        <section className="tr-saved-sets">
+          <h3>Saved sets ({sets.length})</h3>
           {sets.map((s, i) => (
             <p key={s.id}>
-              {i + 1}. {displaySet(s, e)} · {s.rir} RIR · pain {s.pain}/10
+              <span>
+                {i + 1}. {displaySet(s, e)}
+              </span>
+              <Button
+                aria-label={`Delete set ${i + 1}`}
+                onClick={() =>
+                  update((session) => ({
+                    ...session,
+                    sets: session.sets.filter((x) => x.id !== s.id),
+                  }))
+                }
+              >
+                Delete set
+              </Button>
             </p>
           ))}
-        </details>
+        </section>
       )}
     </Card>
   );
