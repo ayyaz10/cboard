@@ -76,6 +76,7 @@ export function ingredientFromCatalog(current, catalogItem) {
 export function applyFoodCatalogToRecipes(recipes = [], catalog = []) {
   const byName = new Map(catalog.map(item => [normalizeFoodName(item.name), item]));
   const replace = item => {
+    if (item.nutritionLabel?.source?.recipeOnly) return item;
     const catalogItem = byName.get(normalizeFoodName(item?.name));
     return catalogItem ? ingredientFromCatalog(item, catalogItem) : item;
   };

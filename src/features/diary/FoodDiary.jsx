@@ -1,3 +1,6 @@
+import { DiaryRecipeConfirm } from './DiaryRecipeConfirm';
+import { buildDiaryRecipeUpdate } from './diaryRecipeUpdate.js';
+import { saveDiaryRecipeUpdate } from '../../services/recipeService';
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import {
@@ -36,7 +39,7 @@ import "./foodDiary.css";
 
 const format = (n) =>
   new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(n);
-export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCatalogChange }) {
+export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCatalogChange, onDiaryRecipeUpdated }) {
   const { user } = useAuth();
   const [today, setToday] = useState(localDate);
   const [date, setDate] = useState(localDate);
@@ -47,6 +50,8 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState(null);
+  const [pendingRecipe, setPendingRecipe] = useState(null);
+  const [recipeError, setRecipeError] = useState('');
   const [remove, setRemove] = useState(null);
   const [removeDay, setRemoveDay] = useState(null);
   const [routine, setRoutine] = useState(null);
@@ -205,32 +210,50 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
       if (id === generation.current) setBusy(false);
     }
   }
-  async function saveMeal(meal) {
-    const mainFoodItems = catalogItemsFromDiaryMeal(meal);
-    if (mainFoodItems.length && onFoodCatalogChange) {
-      try {
-        await onFoodCatalogChange(mainFoodItems);
-      } catch (err) {
-        setError(err.message || "Could not update the main food nutrition record.");
+  function saveMeal(meal) {
+    setRecipeError('');
+    setPendingRecipe({ meal: structuredClone(meal), diarySaved: false, savedRecipe: null });
+  }
+  async function confirmMeal(recipe, selections, share) {
+    if (lock.current || !pendingRecipe) return;
+    const { meal } = pendingRecipe;
+    setRecipeError('');
+    let prepared;
+    try {
+      prepared = recipe && !pendingRecipe.savedRecipe ? buildDiaryRecipeUpdate(recipe, meal, selections, share) : pendingRecipe.savedRecipe;
+    } catch (err) { setRecipeError(err.message); return; }
+    if (!pendingRecipe.diarySaved) {
+      const exists = day.meals.some(entry => entry.id === meal.id);
+      if (!await persist({ ...day,
+        meals: exists ? day.meals.map(entry => entry.id === meal.id ? meal : entry) : [...day.meals, meal],
+        skipped: day.skipped.filter(slot => slot !== meal.meal), complete: false,
+      }, 'Meal saved.')) {
+        setRecipeError('Could not save the diary. Your draft is still here; the recipe has not been changed.');
         return;
       }
+      setPendingRecipe(current => ({ ...current, diarySaved: true }));
     }
-    const exists = day.meals.some((entry) => entry.id === meal.id);
-    const meals = exists
-      ? day.meals.map((entry) => (entry.id === meal.id ? meal : entry))
-      : [...day.meals, meal];
-    if (
-      await persist(
-        {
-          ...day,
-          meals,
-          skipped: day.skipped.filter((slot) => slot !== meal.meal),
-          complete: false,
-        },
-        mainFoodItems.length ? "Meal saved and edited nutrition updated in your main food library." : "Meal saved. Finish the day when all your meals are recorded.",
-      )
-    )
-      setDraft(null);
+    if (recipe) {
+      lock.current = true;
+      setBusy(true);
+      try {
+        if (!pendingRecipe.savedRecipe) {
+          const saved = await saveDiaryRecipeUpdate(prepared, user.id);
+          setPendingRecipe(current => ({ ...current, savedRecipe: saved }));
+          onDiaryRecipeUpdated?.(saved);
+        }
+        if (share && onFoodCatalogChange) {
+          const selected = new Set(selections.filter(row => row.selected).map(row => row.id));
+          await onFoodCatalogChange(catalogItemsFromDiaryMeal({ items: meal.items.filter(item => selected.has(item.id)).map(item => ({ ...item, source: { ...item.source, modified: true } })) }));
+        }
+        setNotice(`Meal saved and ${recipe.title} updated.${share ? ' Shared food nutrition updated too.' : ''}`);
+      } catch (err) {
+        setRecipeError(`Your diary is saved. ${err.message}`);
+        return;
+      } finally { lock.current = false; setBusy(false); }
+    }
+    setPendingRecipe(null);
+    setDraft(null);
   }
   async function openRoutine() {
     if (lock.current) return;
@@ -506,6 +529,9 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
           </div>
         </section>
       )}
+      {pendingRecipe && <DiaryRecipeConfirm meal={pendingRecipe.meal} recipes={recipes} busy={busy}
+        diarySaved={pendingRecipe.diarySaved} recipeSaved={pendingRecipe.savedRecipe} error={recipeError}
+        onSave={confirmMeal} onClose={() => { if (pendingRecipe.diarySaved) setDraft(null); setPendingRecipe(null); }} />}
       {draft && (
         <div ref={editorRef}>
           <DiaryMealEditor

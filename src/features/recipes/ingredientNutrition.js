@@ -6,7 +6,7 @@ export function cleanIngredientLabel(label) {
   return { ...cleanNutrients(label), quantity: label.quantity, unit: label.unit,
     amountPerUnit: Number.isFinite(label.amountPerUnit) && label.amountPerUnit > 0 ? label.amountPerUnit : null,
     recipeUnit: typeof label.recipeUnit === 'string' ? label.recipeUnit.slice(0, 80) : '',
-    source: { name: String(label.source?.name || '').slice(0, 500), provider: String(label.source?.provider || 'Label').slice(0, 100), code: /^\d+$/.test(label.source?.code || '') ? String(label.source.code).slice(0, 30) : '', estimatedPortion: label.source?.estimatedPortion === true, portionDescription: String(label.source?.portionDescription || '').slice(0, 200) },
+    source: { recipeOnly: label.source?.recipeOnly === true, name: String(label.source?.name || '').slice(0, 500), provider: String(label.source?.provider || 'Label').slice(0, 100), code: /^\d+$/.test(label.source?.code || '') ? String(label.source.code).slice(0, 30) : '', estimatedPortion: label.source?.estimatedPortion === true, portionDescription: String(label.source?.portionDescription || '').slice(0, 200) },
   };
 }
 export function ingredientLabelAmount(item) {

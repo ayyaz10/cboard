@@ -219,6 +219,20 @@ export async function deleteRecipe(slug) {
   assertSupabaseResult(result);
 }
 
+export async function saveDiaryRecipeUpdate(recipe, expectedUserId) {
+  const { client, userId } = await getUserScopedClient();
+  if (userId !== expectedUserId) throw new Error('Your account changed. Reload before updating the recipe.');
+  if (!recipe.updatedAt) throw new Error('Reload the recipe before updating it.');
+  const clean = validateRecipe(recipe);
+  const updatedAt = new Date().toISOString();
+  const result = await client.from('user_tool_preferences').update({
+    value: { recipe: clean, image: recipe.image || null }, updated_at: updatedAt,
+  }).eq('user_id', userId).eq('key', `${PREFIX}${clean.slug}`).eq('updated_at', recipe.updatedAt).select('updated_at').maybeSingle();
+  assertSupabaseResult(result);
+  if (!result.data) throw new Error('This recipe changed in another tab. Your diary is saved; reload before updating the recipe.');
+  return { ...clean, image: recipe.image || null, updatedAt: result.data.updated_at };
+}
+
 export async function saveRecipeBatch(entries) {
   if (
     !Array.isArray(entries) ||

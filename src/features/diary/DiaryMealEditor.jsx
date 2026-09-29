@@ -139,8 +139,7 @@ export function DiaryMealEditor({
     <section className="diary-editor" aria-label="Meal entry editor">
       <h2>{initial.items.length ? "Edit meal entry" : "Log a meal"}</h2>
       <p>
-        Adjust this meal freely. Your recipe library and other diary days stay
-        unchanged.
+        Adjust this meal freely. When you save, you can choose whether to update a recipe too. Other diary days stay unchanged.
       </p>
       <form
         onSubmit={(event) => {
