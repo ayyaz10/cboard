@@ -237,6 +237,7 @@ export function nutrientContributions(meals, keys = ["calories", "protein", "car
   return Object.fromEntries(keys.map((key) => {
     const foods = new Map();
     let missing = 0;
+    let known = 0;
     for (const item of items) {
       const nutrition = itemNutrition(item);
       const value = nutrition[key];
@@ -244,6 +245,7 @@ export function nutrientContributions(meals, keys = ["calories", "protein", "car
         missing += 1;
         continue;
       }
+      known += 1;
       if (value <= 0) continue;
       const name = String(item.name || "Food").trim() || "Food";
       const identity = name.toLocaleLowerCase();
@@ -260,6 +262,7 @@ export function nutrientContributions(meals, keys = ["calories", "protein", "car
     return [key, {
       total,
       missing,
+      known,
       calories: [...foods.values()].reduce((sum, food) => sum + food.calories, 0),
       caloriesKnown: [...foods.values()].reduce((sum, food) => sum + food.caloriesKnown, 0),
       caloriesMissing: [...foods.values()].reduce((sum, food) => sum + food.caloriesMissing, 0),

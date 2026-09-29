@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { nutrientContributions } from "./diaryData";
+import { nutrientEnergy } from './nutrientEnergy.js';
 
 const NUTRIENTS = [
   ["calories", "Calories", "Energy from your food", "#a34e3c", "kcal"],
@@ -37,9 +38,9 @@ export function DiaryFoodSources({ meals, goals, date, today }) {
           <span className="pill">Calories &amp; macro breakdown</span>
           <h2 id="food-sources-heading">What your food is giving you</h2>
           <p>
-            Each percentage is that food&apos;s share of the nutrient you logged for {dateLabel(date, today)}.
-            Calories are for the logged portions of foods listed, not calories from that nutrient alone.
-            Foods appear in multiple cards, so card calorie totals overlap—do not add them together.
+            Each food-row percentage is that food&apos;s share of the nutrient you logged for {dateLabel(date, today)}.
+            Calories beside food names are for the whole logged portion. Each macro card also estimates calories from that nutrient.
+            The “foods listed” totals overlap across cards—do not add them together.
           </p>
         </div>
         <span className="diary-source-count">{foodCount} food {foodCount === 1 ? "entry" : "entries"}</span>
@@ -54,6 +55,7 @@ export function DiaryFoodSources({ meals, goals, date, today }) {
         <div className="diary-source-grid">
           {NUTRIENTS.map(([key, label, description, color, unit]) => {
             const nutrient = contributions[key];
+            const energy = nutrientEnergy(key, nutrient, contributions.calories);
             const target = goals?.[key];
             const targetPercent = target > 0 ? (nutrient.total / target) * 100 : null;
             return (
@@ -68,6 +70,13 @@ export function DiaryFoodSources({ meals, goals, date, today }) {
                     {target > 0 && <small>{format(targetPercent)}% of {format(target)} {unit} target</small>}
                   </div>
                 </header>
+                {energy && <div className="diary-source-energy">
+                  <strong>Estimated calories from {label.toLocaleLowerCase()}</strong>
+                  <span>{energy.calories == null ? 'Unknown' : <>{format(nutrient.total)} g × {energy.factor} kcal/g = <b>{format(energy.calories)} kcal</b></>}</span>
+                  {energy.percentage != null && <small>About {format(energy.percentage)}% of {format(contributions.calories.total)} logged kcal{energy.partial ? ' (partial data)' : ''}</small>}
+                  {key === 'carbs' && <small>Uses carbs × 4. If your food record includes fibre in carbs, this estimate overlaps with fibre calories.</small>}
+                  {key === 'fiber' && <small>Uses an average of 2 kcal/g for fibre; actual energy varies.</small>}
+                </div>}
                 {key !== 'calories' && nutrient.foods.length > 0 && <p className="diary-source-calories">
                   <span>Calories from foods listed</span>
                   <strong>{calorieLabel(nutrient)}</strong>
@@ -103,6 +112,7 @@ export function DiaryFoodSources({ meals, goals, date, today }) {
           })}
         </div>
       )}
+      {foodCount > 0 && <p className="diary-source-none">Nutrient energy is approximate and may not add up to label calories because of fibre definitions, sugar alcohols and rounding. <a href="https://www.legislation.gov.uk/eur/2011/1169/annex/XIV" target="_blank" rel="noreferrer">Energy conversion factors</a>.</p>}
     </section>
   );
 }

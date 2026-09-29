@@ -155,6 +155,18 @@
   font-size: .8rem;
   font-weight: 500;
 }
+.diary-source-energy {
+  display: grid;
+  gap: .35rem;
+  margin-top: .85rem;
+  padding: .75rem;
+  border: 1px solid var(--g-border);
+  border-left: 3px solid var(--source-color);
+  border-radius: .65rem;
+  font-size: .9rem;
+  overflow-wrap: anywhere;
+}
+.diary-source-energy small { font-size: .8rem; }
 .diary-source-list {
   display: grid;
   gap: 0.9rem;
