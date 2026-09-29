@@ -2,7 +2,7 @@ import { getAppHref } from '../../app/useRoute';
 import { useEffect, useId, useState } from 'react';
 import { useAdaptiveNavigation } from '../../hooks/useAdaptiveNavigation';
 
-const primaryNavItems = [
+export const primaryNavItems = [
   { path: '/training', label: 'Training' },
   { path: '/board', label: 'C Board' },
   { path: '/calculators', label: 'Calculator Tools' },

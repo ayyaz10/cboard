@@ -182,11 +182,12 @@ export async function getRecipes() {
   }));
 }
 
-export async function saveRecipe(recipe, image, { edit = false } = {}) {
+export async function saveRecipe(recipe, image, { edit = false, expectedUserId } = {}) {
   const clean = validateRecipe(recipe);
   if (image && !isRecipeImage(image))
     throw new Error('Please upload a valid recipe image.');
   const { client, userId } = await getUserScopedClient();
+  if (expectedUserId && userId !== expectedUserId) throw new Error('Your account changed. Reload before saving the recipe.');
   const payload = {
     user_id: userId,
     key: `${PREFIX}${clean.slug}`,

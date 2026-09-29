@@ -119,8 +119,9 @@ export async function getNotes() {
   return (result.data ?? []).map(toNote);
 }
 
-export async function createNote(note) {
+export async function createNote(note, expectedUserId) {
   const { client, userId } = await getUserScopedClient();
+  if (expectedUserId && userId !== expectedUserId) throw new Error('Your account changed. Reopen your app note before saving.');
   const result = await client
     .from('notes')
     .insert(toNotePayload(note, userId))

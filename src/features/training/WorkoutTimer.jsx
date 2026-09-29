@@ -69,7 +69,7 @@ export function WorkoutTimer({ session, update, clock, exercise }) {
           </Button>
         )}
       </div>
-      <p className="tr-muted" role="status">
+      <p className="tr-muted" role="status" data-complete={done}>
         {done
           ? "Time complete. Record your actual reps or hold below."
           : "Start when you are ready. Your set is saved only when you log it."}

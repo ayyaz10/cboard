@@ -82,7 +82,7 @@ page.on("pageerror", (error) => errors.push(error.message));
 page.on("dialog", (dialog) => dialog.accept());
 try {
   await page.clock.install({ time: new Date("2026-09-14T12:00:00") });
-  await page.goto("http://127.0.0.1:5178/cboard/training");
+  await page.goto(`${process.env.TRAINING_QA_URL || 'http://127.0.0.1:5178'}/cboard/training`);
   await expect(
     page.getByRole("heading", { name: "Upper chest and push", exact: true }),
   ).toBeVisible();
@@ -131,6 +131,15 @@ try {
     page.getByRole("link", { name: "Watch technique" }),
   ).toHaveAttribute("href", "https://example.com/row-technique");
   await page.getByRole("button", { name: "Start timer", exact: true }).click();
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    const dock = await page.locator('.tr-timer-dock').boundingBox();
+    assert.ok(dock && dock.y >= 0 && Math.abs(dock.y + dock.height - 844) < 2, 'Timers stay at the viewport bottom');
+    assert.ok(dock.x >= 0 && dock.x + dock.width <= width, 'Timer dock fits the viewport width');
+    await expect(page.getByRole('button', { name: 'Pause timer', exact: true })).toBeVisible();
+    await page.screenshot({ path: `${output}/timer-dock-${width}.png` });
+  }
   await page.clock.fastForward(10000);
   await expect(page.getByRole("timer")).toHaveText("0:35");
   await page.getByRole("button", { name: "Pause timer", exact: true }).click();

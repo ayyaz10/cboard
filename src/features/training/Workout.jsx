@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { WorkoutTimer, timerRemaining } from "./WorkoutTimer";
 import { exercisePrescription, safeImage } from "./trainingData";
 import {
@@ -32,6 +32,16 @@ export function Workout({
   onFinish,
 }) {
   const [finishing, setFinishing] = useState(false);
+  const timerDock = useRef(null);
+  useEffect(() => {
+    const dock = timerDock.current;
+    if (!dock) return;
+    const measure = () => document.body.style.setProperty('--workout-dock-height', `${dock.getBoundingClientRect().height}px`);
+    const observer = new ResizeObserver(measure);
+    observer.observe(dock);
+    measure();
+    return () => { observer.disconnect(); document.body.style.removeProperty('--workout-dock-height'); };
+  }, [session?.id, finishing]);
   if (!session)
     return (
       <Card title="Ready when you are">
@@ -158,28 +168,13 @@ export function Workout({
         </Card>
       ) : (
         <div className="tr-workout-grid">
-          <div className="tr-current">
+          <div ref={timerDock} className="tr-timer-dock" aria-label="Workout timers">
             <WorkoutTimer
               session={session}
               update={update}
               clock={clock}
               exercise={e}
             />
-            {e ? (
-              <SetCard
-                key={`${session.id}-${e.id}-${session.sets.length}`}
-                data={data}
-                session={session}
-                p={p}
-                e={e}
-                update={update}
-                rest={rest}
-              />
-            ) : (
-              <Card title="Build your workout">
-                <p>Add an exercise from the library to start logging sets.</p>
-              </Card>
-            )}
             <div className="tr-rest" role="status">
               <strong>
                 {session.pausedAt
@@ -198,6 +193,24 @@ export function Workout({
                 </Button>
               )}
             </div>
+          </div>
+          <div className="tr-current">
+            {e ? (
+              <SetCard
+                key={`${session.id}-${e.id}-${session.sets.length}`}
+                data={data}
+                session={session}
+                p={p}
+                e={e}
+                update={update}
+                rest={rest}
+              />
+            ) : (
+              <Card title="Build your workout">
+                <p>Add an exercise from the library to start logging sets.</p>
+              </Card>
+            )}
+
           </div>
           <Card title="Session exercises">
             <Field label="Workout name">

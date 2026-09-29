@@ -1,6 +1,6 @@
 import { DiaryRecipeConfirm } from './DiaryRecipeConfirm';
-import { buildDiaryRecipeUpdate } from './diaryRecipeUpdate.js';
-import { saveDiaryRecipeUpdate } from '../../services/recipeService';
+import { buildDiaryRecipe, buildDiaryRecipeUpdate } from './diaryRecipeUpdate.js';
+import { saveRecipe, saveDiaryRecipeUpdate } from '../../services/recipeService';
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import {
@@ -136,9 +136,14 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
         event.stopPropagation();
       }
     };
+    const guardSwitcher = (event) => {
+      if (!window.confirm("Leave this diary and discard your unsaved meal or planner selection?")) event.preventDefault();
+    };
+    window.addEventListener("workspace:navigate", guardSwitcher);
     window.addEventListener("beforeunload", warn);
     document.addEventListener("click", guardLink, true);
     return () => {
+      window.removeEventListener("workspace:navigate", guardSwitcher);
       window.removeEventListener("beforeunload", warn);
       document.removeEventListener("click", guardLink, true);
     };
@@ -214,13 +219,13 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
     setRecipeError('');
     setPendingRecipe({ meal: structuredClone(meal), diarySaved: false, savedRecipe: null });
   }
-  async function confirmMeal(recipe, selections, share) {
+  async function confirmMeal(recipe, selections, share, newRecipe) {
     if (lock.current || !pendingRecipe) return;
     const { meal } = pendingRecipe;
     setRecipeError('');
     let prepared;
     try {
-      prepared = recipe && !pendingRecipe.savedRecipe ? buildDiaryRecipeUpdate(recipe, meal, selections, share) : pendingRecipe.savedRecipe;
+      prepared = pendingRecipe.savedRecipe || (newRecipe ? buildDiaryRecipe(meal, recipes, newRecipe) : recipe ? buildDiaryRecipeUpdate(recipe, meal, selections, share) : null);
     } catch (err) { setRecipeError(err.message); return; }
     if (!pendingRecipe.diarySaved) {
       const exists = day.meals.some(entry => entry.id === meal.id);
@@ -233,12 +238,12 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
       }
       setPendingRecipe(current => ({ ...current, diarySaved: true }));
     }
-    if (recipe) {
+    if (recipe || newRecipe) {
       lock.current = true;
       setBusy(true);
       try {
         if (!pendingRecipe.savedRecipe) {
-          const saved = await saveDiaryRecipeUpdate(prepared, user.id);
+          const saved = newRecipe ? await saveRecipe(prepared, null, { expectedUserId: user.id }) : await saveDiaryRecipeUpdate(prepared, user.id);
           setPendingRecipe(current => ({ ...current, savedRecipe: saved }));
           onDiaryRecipeUpdated?.(saved);
         }
@@ -246,7 +251,7 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
           const selected = new Set(selections.filter(row => row.selected).map(row => row.id));
           await onFoodCatalogChange(catalogItemsFromDiaryMeal({ items: meal.items.filter(item => selected.has(item.id)).map(item => ({ ...item, source: { ...item.source, modified: true } })) }));
         }
-        setNotice(`Meal saved and ${recipe.title} updated.${share ? ' Shared food nutrition updated too.' : ''}`);
+        setNotice(`Meal saved and ${prepared.title} ${newRecipe ? 'added to Recipes' : 'updated'}.${share ? ' Shared food nutrition updated too.' : ''}`);
       } catch (err) {
         setRecipeError(`Your diary is saved. ${err.message}`);
         return;

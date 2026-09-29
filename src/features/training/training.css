@@ -480,6 +480,19 @@ body:has(.training) button[aria-controls="reminder-widget"] {
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.06em;
 }
+
+.tr-workout-grid { padding-bottom: calc(var(--workout-dock-height, 290px) + 20px); }
+.tr-timer-dock { position: fixed; bottom: 0; left: 12px; right: 12px; z-index: 30; max-width: 1000px; margin: auto; max-height: 45dvh; overflow: auto; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); border: 2px solid var(--tr-border); border-radius: 18px 18px 0 0; background: var(--tr-surface); box-shadow: 0 -4px 18px #0002; }
+.tr-timer-dock .tr-timer { padding: 0; margin: 0; border: 0; }
+.tr-timer-dock { width: calc(100% - 24px); min-width: 0; box-sizing: border-box; }
+.tr-timer-dock .tr-timer-digits { font-size: 2rem; }
+.tr-timer-dock .tr-timer > p { display: none; }
+.tr-timer-dock .tr-timer > p[data-complete="true"] { display: block; margin: 6px 0; }
+.tr-timer-dock .tr-rest { margin: 8px 0 0; padding: 8px; align-items: center; }
+.tr-timer-dock .tr-toolbar { margin-bottom: 6px; }
+.tr-timer-dock .tr-button { min-height: 36px; padding: 6px 10px; }
+.tr-workout-grid .tr-log-action { position: static; }
+body:has(.tr-timer-dock) { --grocery-action-offset: var(--workout-dock-height, 290px); }
 .tr-exercise-image {
   display: block;
   width: 100%;
@@ -512,7 +525,7 @@ body:has(.training) button[aria-controls="reminder-widget"] {
     display: flex;
     flex-direction: column;
   }
-  .tr-workout-grid > * {
+  .tr-workout-grid > :not(.tr-timer-dock) {
     width: 100%;
   }
   .tr-log-action {

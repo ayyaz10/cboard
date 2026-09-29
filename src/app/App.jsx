@@ -8,6 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { migrateLocalStorageData } from '../services/dataMigrationService';
 import { navigateTo, useRoute } from './useRoute';
 import { observeWorkspaceSetup } from './workspaceSetup';
+import { WorkspaceTools } from '../components/layout/WorkspaceTools';
 import { CalculatorBoard } from '../features/calculators/CalculatorBoard';
 import {
   calculators,
@@ -23,6 +24,12 @@ import { FinancePage } from '../features/finance/FinancePage.jsx';
 const Training = lazy(() => import('../features/training/Training.jsx').then(module => ({ default: module.Training })));
 
 export default function App() {
+  const { isAuthenticated, user } = useAuth();
+  const route = useRoute();
+  return <><AppContent />{isAuthenticated && route !== '/' && route !== '/login' && <WorkspaceTools key={user.id} userId={user.id} route={route} />}</>;
+}
+
+function AppContent() {
   const { isAuthenticated, isLoading, user } = useAuth();
   const route = useRoute();
   const [isMigrating, setIsMigrating] = useState(false);

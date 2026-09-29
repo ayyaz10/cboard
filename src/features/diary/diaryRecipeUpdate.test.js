@@ -1,13 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildDiaryRecipeUpdate, recipeUpdateRows, suggestedDiaryRecipe } from './diaryRecipeUpdate.js';
+import { buildDiaryRecipe, buildDiaryRecipeUpdate, recipeUpdateRows, suggestedDiaryRecipe } from './diaryRecipeUpdate.js';
 import { foodItem } from './diaryData.js';
 import { applyFoodCatalogToRecipes } from '../nutrition/foodCatalog.js';
 
 const recipe = { ...JSON.parse(readFileSync(new URL('../../../public/recipes/greek-yogurt-oats.json', import.meta.url))), updatedAt: '2026-09-29T00:00:00Z' };
 const item = foodItem({ quantity: 100, unit: 'g', calories: 100, protein: 8, source: { provider: 'Recipe ingredient', name: recipe.title } }, 'New yogurt');
 const meal = { items: [item] };
+
+test('new diary recipes preserve quantities, divide nutrition by servings and avoid existing slugs', () => {
+  const original = structuredClone(meal);
+  const saved = buildDiaryRecipe(meal, [{ slug: 'my-meal' }], { title: 'My meal', servings: 2, steps: 'Mix.\nServe.' });
+  assert.equal(saved.slug, 'my-meal-2');
+  assert.equal(saved.ingredients[0].amount, 100);
+  assert.equal(saved.nutrition.protein, 4);
+  assert.equal(saved.nutrition.calories, 50);
+  assert.deepEqual(saved.steps, ['Mix.', 'Serve.']);
+  assert.deepEqual(meal, original);
+  assert.throws(() => buildDiaryRecipe(meal, [], { title: 'Meal', servings: 0, steps: 'Mix.' }), /positive/);
+  assert.throws(() => buildDiaryRecipe(meal, [], { title: 'Meal', servings: 1, steps: '' }), /non-empty/);
+});
 
 test('recipe updates are opt-in, append selected foods and use whole-recipe quantities', () => {
   const rows = recipeUpdateRows(meal, recipe);

@@ -270,7 +270,7 @@ function RecipesContent({ route, navigationPath }) {
               />
             ) : null}
             {!error && planning && <DailyMealPlanner recipes={recipes} nutritionGoals={nutritionGoals} />}
-            {!error && diary && <FoodDiary recipes={recipes} nutritionGoals={nutritionGoals} foodCatalog={foodCatalog} onFoodCatalogChange={saveMainFoodItems} onDiaryRecipeUpdated={updated => setRecipes(current => current.map(item => item.slug === updated.slug ? updated : item))} />}
+            {!error && diary && <FoodDiary recipes={recipes} nutritionGoals={nutritionGoals} foodCatalog={foodCatalog} onFoodCatalogChange={saveMainFoodItems} onDiaryRecipeUpdated={updated => setRecipes(current => [updated, ...current.filter(item => item.slug !== updated.slug)])} />}
             {!error && (home || manage) && (
               <>
                 <header className="flex flex-wrap items-start justify-between gap-4">

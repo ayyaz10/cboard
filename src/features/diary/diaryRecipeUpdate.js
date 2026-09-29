@@ -1,6 +1,24 @@
 import { validateItem, itemNutrition } from './diaryData.js';
 import { prepareIngredientEditor, ingredientLabelNutrition } from '../recipes/ingredientNutrition.js';
-import { validateRecipe } from '../recipes/recipeData.js';
+import { validateRecipe, slugify, uniqueSlug } from '../recipes/recipeData.js';
+
+export function buildDiaryRecipe(meal, recipes, { title, servings, steps }) {
+  if (!meal.items.length) throw new Error('Add at least one food first.');
+  const ingredients = meal.items.map(raw => {
+    const item = validateItem(raw);
+    return { name: item.name, amount: item.quantity, unit: item.unit, nutrition: itemNutrition(item),
+      ...(['g', 'ml', 'pieces'].includes(item.nutritionUnit) ? { nutritionLabel: {
+        ...item.nutrition, quantity: item.basis, unit: item.nutritionUnit,
+        source: { ...item.source, recipeOnly: true },
+        ...(item.unit === 'pieces' && item.perPiece > 0 ? { amountPerUnit: item.perPiece, recipeUnit: 'pieces' } : {}),
+      } } : {}),
+    };
+  });
+  return validateRecipe({ title: title.trim(), slug: uniqueSlug(slugify(title.trim()), recipes.map(recipe => recipe.slug)),
+    mealType: meal.meal || 'Meal', servings: Number(servings), ingredients,
+    steps: steps.split('\n').map(step => step.trim()).filter(Boolean), nutritionFromIngredients: true,
+    description: 'Saved from Food Diary.', tags: ['food-diary'] });
+}
 
 const nameKey = name => String(name || '').trim().toLowerCase();
 export function suggestedDiaryRecipe(meal, recipes) {

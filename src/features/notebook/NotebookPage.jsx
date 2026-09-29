@@ -43,6 +43,8 @@ export function NotebookPage() {
 
   useEffect(() => {
     loadNotebookData();
+    window.addEventListener('notes-changed', loadNotebookData);
+    return () => window.removeEventListener('notes-changed', loadNotebookData);
   }, []);
 
   useEffect(() => {

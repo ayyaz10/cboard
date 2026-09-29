@@ -47,6 +47,7 @@ await context.addInitScript(
 );
 
 const records = new Map();
+const notes = [];
 const { emptyDay, newMeal, foodItem, localDate } = await import('../src/features/diary/diaryData.js');
 const today = localDate();
 const diaryMeal = { ...newMeal('Breakfast'), title: 'My breakfast', items: [foodItem({ quantity: 100, unit: 'g', calories: 100, protein: 8, source: { provider: 'Recipe ingredient', name: 'Yogurt breakfast', modified: true } }, 'Added yogurt')] };
@@ -63,6 +64,10 @@ await context.route('https://training-qa.supabase.co/**', async route => {
   const req = route.request(), url = new URL(req.url());
   let data = [];
   if (url.pathname.endsWith('/auth/v1/user')) data = user;
+  else if (url.pathname.includes('/notes')) {
+    if (req.method() === 'POST') { const note = { ...req.postDataJSON(), id: crypto.randomUUID() }; notes.push(note); data = note; }
+    else data = notes;
+  }
   else if (url.pathname.includes('/profiles')) data = { username: 'grocery_test' };
   else if (url.pathname.includes('/user_tool_preferences')) {
     if (req.method() === 'GET') {
@@ -94,7 +99,7 @@ try {
   await page.getByRole('button', { name: 'Edit My breakfast', exact: true }).click();
   await page.getByRole('button', { name: 'Save meal entry', exact: true }).click();
   let dialog = page.getByRole('dialog');
-  await expect(dialog.getByRole('heading', { name: 'Update the original recipe too?' })).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: 'Save this meal to Recipes?' })).toBeVisible();
   assert.deepEqual(records.get(recipeKey), originalRecipe);
   await dialog.getByRole('button', { name: 'Save diary only', exact: true }).click();
   await expect(dialog).not.toBeVisible();
@@ -137,6 +142,51 @@ try {
   assert.equal(records.get('food-catalog:v1').value.items.length, 1);
   assert.equal(records.get('food-catalog:v1').value.items[0].name, 'Added yogurt');
   assert.equal(records.get(recipeKey).value.recipe.ingredients.filter(item => item.name === 'Added yogurt').length, 1);
+  await page.getByRole('button', { name: 'Edit My breakfast', exact: true }).click();
+  await page.getByRole('button', { name: 'Save meal entry', exact: true }).click();
+  await page.getByLabel('Recipe action').selectOption('new');
+  await page.getByLabel('Recipe name', { exact: true }).fill('Diary creation');
+  await page.getByLabel('Servings in this meal').fill('2');
+  await page.getByLabel('Preparation steps (one per line)').fill('Mix well.');
+  await page.getByRole('button', { name: 'Save diary and new recipe', exact: true }).click();
+  await expect(page.getByRole('dialog')).not.toBeVisible();
+  assert.equal(records.get('recipe:v1:diary-creation').value.recipe.nutrition.protein, 4);
+  await page.getByRole('button', { name: '+ App note', exact: true }).click();
+  await page.getByLabel('Your idea').fill('Add / weekly meal view <script>');
+  await expect(page.getByRole('dialog')).not.toBeVisible();
+  await page.getByRole('button', { name: 'Save to Notes', exact: true }).click();
+  await expect(page.getByText('Saved to Notes.', { exact: true })).toBeVisible();
+  assert.equal(notes[0].tags[0], 'Food Diary');
+  assert.ok(notes[0].content_html.includes('&lt;script&gt;'));
+  await page.getByRole('button', { name: 'Close note', exact: true }).click();
+  await page.keyboard.press('/');
+  await page.getByRole('combobox', { name: 'Search apps' }).fill('notes');
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\/notes$/);
+  await expect(page.getByRole('button', { name: /Food Diary .* Recommendation/ })).toBeVisible();
+  await page.screenshot({ path: output + '/workspace-notes-mobile.png' });
+  for (const app of ['Groceries', 'Finance']) {
+    await page.keyboard.press('/');
+    await page.getByRole('combobox', { name: 'Search apps' }).fill(app);
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(new RegExp('/' + app.toLowerCase() + '$'));
+    await page.keyboard.press('/');
+    await expect(page.getByRole('combobox', { name: 'Search apps' })).toBeVisible();
+    await page.keyboard.press('Escape');
+  }
+  await page.keyboard.press('/');
+  await page.getByRole('combobox', { name: 'Search apps' }).fill('Food Diary');
+  await page.keyboard.press('Enter');
+  await page.getByRole('button', { name: 'Edit My breakfast', exact: true }).click();
+  await page.getByRole('button', { name: 'Switch app (slash)' }).click();
+  await page.getByRole('combobox', { name: 'Search apps' }).fill('notes');
+  page.once('dialog', dialog => dialog.dismiss());
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\/food-diary$/);
+  await expect(page.getByRole('combobox', { name: 'Search apps' })).toBeVisible();
+  page.once('dialog', dialog => dialog.accept());
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\/notes$/);
   assert.deepEqual(errors, []);
   console.log('PASS: confirmation, diary-only isolation, explicit recipe addition, recipe-only nutrition, independent diary amount and persisted update');
 } catch (error) { console.error(errors); console.error((await page.locator('body').innerText()).slice(-3000)); throw error; }
