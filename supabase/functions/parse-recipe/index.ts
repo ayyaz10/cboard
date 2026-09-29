@@ -2,9 +2,10 @@ import { geminiJson, geminiResult, GeminiError } from "../_shared/gemini.js";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { createParseRecipeHandler } from "./handler.js";
 import { recipeSystemInstruction } from "./recipeParser.js";
+import { foodItemInstruction } from "../_shared/foodItem.js";
 
 
-async function generateRecipe(recipeText: string, apiKey: string): Promise<unknown> {
+async function generateRecipe(recipeText: string, apiKey: string, mode = "recipe"): Promise<unknown> {
   const modelsResponse = await geminiJson("https://generativelanguage.googleapis.com/v1beta/models", {
     headers: { "x-goog-api-key": apiKey },
   }, { timeoutMs: 5000 });
@@ -24,7 +25,7 @@ async function generateRecipe(recipeText: string, apiKey: string): Promise<unkno
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
     body: JSON.stringify({
-      system_instruction: { parts: [{ text: recipeSystemInstruction }] },
+      system_instruction: { parts: [{ text: mode === "food" ? foodItemInstruction : recipeSystemInstruction }] },
       contents: [{ role: "user", parts: [{ text: `UNTRUSTED_RECIPE_DATA_START\n${recipeText}\nUNTRUSTED_RECIPE_DATA_END` }] }],
       generationConfig: {
         temperature: 0.1,

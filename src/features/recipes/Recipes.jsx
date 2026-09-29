@@ -22,6 +22,7 @@ import {
   secondaryButton,
 } from './RecipeComponents';
 import { RecipeImporter } from './RecipeImporter';
+import { FoodItemEditor } from '../nutrition/FoodItemEditor';
 import { buildIngredientLibrary } from './ingredientLibrary';
 import { applyFoodCatalogToRecipes, catalogItemsFromRecipe } from '../nutrition/foodCatalog.js';
 import { getFoodCatalog, upsertFoodCatalogItems } from '../../services/foodCatalogService.js';
@@ -62,6 +63,7 @@ function RecipesContent({ route, navigationPath }) {
   const [favouriteNotice, setFavouriteNotice] = useState('');
   const favouriteLocks = useRef(new Set());
   const [draft, setDraft] = useState(null);
+  const [addingFood, setAddingFood] = useState(false);
   const [removing, setRemoving] = useState(null);
   const [busy, setBusy] = useState(false);
   const ingredientLibrary = useMemo(() => buildIngredientLibrary(recipes, foodCatalog), [recipes, foodCatalog]);
@@ -218,6 +220,7 @@ function RecipesContent({ route, navigationPath }) {
         <AppNavigation activePath={navigationPath} />
         <DailyNutritionTargets controller={nutritionGoals} />
         <nav className="recipe-shortcuts mobile-section-nav flex flex-wrap gap-2" aria-label="Recipe shortcuts">
+          <button type="button" className={secondaryButton} disabled={loading} onClick={() => setAddingFood(true)}>Add item</button>
           {shortcutOrder.map((item) => {
             if (item === 'home') return !home && !(recipe && parts.length === 2) ? <RecipeLink key={item} to="/recipes">Back to recipes</RecipeLink> : null;
             if (item === 'add') return !importing ? <PrimaryButton key={item} onClick={() => startImport()}>Add recipe</PrimaryButton> : null;
@@ -226,6 +229,10 @@ function RecipesContent({ route, navigationPath }) {
             return !manage ? <RecipeLink key={item} to="/recipes/manage">Manage recipes</RecipeLink> : null;
           })}
         </nav>
+        {addingFood && <FoodItemEditor catalog={foodCatalog} onClose={() => setAddingFood(false)} onSave={async item => {
+          await saveMainFoodItems([item]);
+          setRecipeNotice(`${item.name} saved to your food library. Search for it when adding a Food Diary meal.`);
+        }} />}
         {favouriteError && <p role="alert" className="rounded-xl border-2 border-black bg-[#ffe0de] p-3 text-sm font-semibold">{favouriteError}</p>}
         {recipeNotice && <p role="status" className="rounded-xl border-2 border-black bg-[#c5ff6f] p-3 text-sm font-semibold">{recipeNotice}</p>}
         <p role="status" className="sr-only">{favouriteNotice}</p>
@@ -249,6 +256,7 @@ function RecipesContent({ route, navigationPath }) {
                 initial={draft?.initial}
                 editing={draft?.editing}
                 ingredientLibrary={ingredientLibrary}
+                onAddItem={() => setAddingFood(true)}
                 onSave={save}
                 onSaveBatch={saveBatch}
                 onCancel={() => {

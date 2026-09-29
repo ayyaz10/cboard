@@ -3,6 +3,7 @@ import { findSavedFoods, savedFoodNutrition } from '../nutrition/savedFoods.js';
 import { useEffect, useRef, useState } from "react";
 import { searchNutrition, lookupBarcode } from "../../services/nutritionLookup";
 import { BarcodeScanner } from "./BarcodeScanner";
+import { BarcodeImage } from './BarcodeImage';
 import { NutritionLabel } from "./NutritionLabel";
 import { nutrients } from "./groceryData";
 import { searchNaturalFoods, naturalPortionNutrition, nutritionForOnePortion, suggestedNaturalPortion } from '../../services/naturalFoods';
@@ -73,6 +74,7 @@ export function NutritionLookup({ name, active, visible, onSelect, amountUnit, p
     {mode === "barcode" && <div>
       {scanning && visible && <BarcodeScanner onClose={() => setScanning(false)} onCode={(code) => { setScanning(false); setBarcode(code); lookup(code, true); }} />}
       {!scanning && <button type="button" onClick={() => setScanning(true)}>Start camera</button>}
+      <BarcodeImage onCode={code => { setScanning(false); setBarcode(code); lookup(code, true); }} />
       <div className="g-tools">
         <label>Barcode number<input inputMode="numeric" value={barcode} onChange={(e) => { request.current++; setBusy(false); setResults(null); setBarcode(e.target.value); }} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); lookup(barcode, true); } }} /></label>
         <button type="button" disabled={busy || !barcode.trim()} onClick={() => lookup(barcode, true)}>Look up barcode</button>

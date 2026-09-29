@@ -18,7 +18,7 @@ function setup({ auth = true, allowance = true, generate = async () => generated
   const handler = createParseRecipeHandler({
     createClient: (_url, _key, options) => { calls.clientOptions = options; return db; },
     env: (key) => ({ SUPABASE_URL: "https://example.supabase.co", SUPABASE_ANON_KEY: "anon", GEMINI_API_KEY: "secret", APP_ALLOWED_ORIGINS: "https://app.example.com" })[key],
-    generateRecipe: async (text, key) => { calls.generated++; calls.text = text; calls.key = key; return generate(text); },
+    generateRecipe: async (text, key, mode) => { calls.generated++; calls.text = text; calls.key = key; calls.mode = mode; return generate(text); },
   });
   return { handler, calls };
 }
@@ -26,6 +26,25 @@ const request = (body = { recipeText: "Soup with water. Boil for 20 minutes." },
   method: options.method || "POST",
   headers: { Authorization: options.token === false ? "" : "Bearer user-token", Origin: options.origin || "https://app.example.com", "Content-Type": "application/json" },
   body: options.method === "GET" ? undefined : typeof body === "string" ? body : JSON.stringify(body),
+});
+
+test('food mode returns a reviewable draft without creating a recipe or food record', async () => {
+  const food = { name: 'Burger', quantity: 1, unit: 'pieces', nutrition: { calories: 250, protein: 12, fiber: null } };
+  const { handler, calls } = setup({ generate: async () => food });
+  const response = await handler(request({ mode: 'food', recipeText: 'One burger, 250 kcal, 12 g protein' }));
+  assert.equal(response.status, 200);
+  assert.deepEqual((await response.json()).food, food);
+  assert.equal(calls.mode, 'food');
+  assert.equal(calls.reserved, 1);
+  assert.equal(calls.inserts, 0);
+});
+
+test('food drafts reject ambiguous basis and invalid nutrient values without saving', async () => {
+  for (const food of [null, { name: 'Burger', quantity: 0, unit: 'pieces', nutrition: {} }, { name: 'Burger', quantity: 1, unit: 'pieces', nutrition: { calories: -10 } }]) {
+    const { handler, calls } = setup({ generate: async () => food });
+    assert.equal((await handler(request({ mode: 'food', recipeText: 'Burger' }))).status, 422);
+    assert.equal(calls.inserts, 0);
+  }
 });
 
 test("method, origin, auth, JSON, size, and rate limits fail before Gemini", async () => {

@@ -1,4 +1,5 @@
 import { geminiErrorMessage } from "../_shared/gemini.js";
+import { validateFoodItem } from "../_shared/foodItem.js";
 import { MAX_RECIPE_TEXT_LENGTH, toStoredRecipe, uniqueRecipeSlug, validateGeminiRecipe, validateRequestBody } from "./recipeParser.js";
 
 const localOrigins = new Set(["http://localhost:5173", "http://127.0.0.1:5173", "https://ayyaz10.github.io"]);
@@ -52,9 +53,11 @@ export function createParseRecipeHandler({ createClient, env, generateRecipe }) 
       return json({ error: "Please sign in again." }, 401, cors.headers);
     }
 
-    let recipeText;
+    let recipeText, foodMode = false;
     try {
-      recipeText = validateRequestBody(await request.json());
+      const body = await request.json();
+      recipeText = validateRequestBody(body);
+      foodMode = body.mode === 'food';
     } catch (error) {
       const status = error?.status === 413 ? 413 : 400;
       return json({ error: status === 413 ? `Recipe text must be ${MAX_RECIPE_TEXT_LENGTH} characters or fewer.` : "Enter valid recipe text." }, status, cors.headers);
@@ -69,7 +72,7 @@ export function createParseRecipeHandler({ createClient, env, generateRecipe }) 
       if (!allowance.data) return json({ error: "Daily AI recipe limit reached. Try again tomorrow." }, 429, cors.headers);
       let generated;
       try {
-        generated = await generateRecipe(recipeText, env("GEMINI_API_KEY"));
+        generated = await generateRecipe(recipeText, env("GEMINI_API_KEY"), foodMode ? 'food' : 'recipe');
       } catch (error) {
         const providerStatus = Number(error?.status || error?.code) || 0;
         console.error("parse-recipe Gemini request failed", error instanceof Error ? error.name : "unknown", providerStatus || "unknown");
@@ -82,6 +85,10 @@ export function createParseRecipeHandler({ createClient, env, generateRecipe }) 
         if (providerStatus === 404)
           return json({ error: "No compatible Gemini Flash model is available for this API key." }, 502, cors.headers);
         return json({ error: geminiErrorMessage(error, "The AI recipe service is unavailable right now. Please try again.") }, 502, cors.headers);
+      }
+      if (foodMode) {
+        try { return json({ success: true, food: validateFoodItem(generated) }, 200, cors.headers); }
+        catch { return json({ error: 'Describe one food with its quantity and any known label values.' }, 422, cors.headers); }
       }
       let extracted;
       try {

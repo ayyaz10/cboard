@@ -22,6 +22,7 @@ export function RecipeImporter({
   getSlugs,
   onAiCreated,
   ingredientLibrary = [],
+  onAddItem,
 }) {
   const [text, setText] = useState(() => {
     if (!initial) return '';
@@ -199,6 +200,7 @@ export function RecipeImporter({
             ? 'Edit Recipe'
             : 'Add Recipe'}
       </h1>
+      {!editing && <p>Saving a single food instead? <button type="button" className={secondaryButton} onClick={onAddItem}>Add food item</button></p>}
       {error && (
         <p
           role="alert"
