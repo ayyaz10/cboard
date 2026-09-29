@@ -142,6 +142,19 @@
 .diary-source-total small {
   color: rgb(0 0 0 / 0.6);
 }
+.diary-source-calories {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: .25rem .75rem;
+  margin-top: .8rem;
+  font-size: .85rem;
+}
+.diary-source-food-calories {
+  display: inline;
+  font-size: .8rem;
+  font-weight: 500;
+}
 .diary-source-list {
   display: grid;
   gap: 0.9rem;

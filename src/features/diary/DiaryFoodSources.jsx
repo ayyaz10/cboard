@@ -13,6 +13,10 @@ const format = (value) => new Intl.NumberFormat(undefined, {
   maximumFractionDigits: 1,
 }).format(value);
 
+const calorieLabel = (value) => value.caloriesKnown
+  ? `${format(value.calories)} kcal${value.caloriesMissing ? ' (known subtotal)' : ''}`
+  : 'Calories unknown';
+
 const dateLabel = (date, today) => date === today
   ? "today"
   : new Intl.DateTimeFormat(undefined, {
@@ -34,7 +38,8 @@ export function DiaryFoodSources({ meals, goals, date, today }) {
           <h2 id="food-sources-heading">What your food is giving you</h2>
           <p>
             Each percentage is that food&apos;s share of the nutrient you logged for {dateLabel(date, today)}.
-            The same food can appear in more than one group.
+            Calories are for the logged portions of foods listed, not calories from that nutrient alone.
+            Foods appear in multiple cards, so card calorie totals overlap—do not add them together.
           </p>
         </div>
         <span className="diary-source-count">{foodCount} food {foodCount === 1 ? "entry" : "entries"}</span>
@@ -63,13 +68,17 @@ export function DiaryFoodSources({ meals, goals, date, today }) {
                     {target > 0 && <small>{format(targetPercent)}% of {format(target)} {unit} target</small>}
                   </div>
                 </header>
+                {key !== 'calories' && nutrient.foods.length > 0 && <p className="diary-source-calories">
+                  <span>Calories from foods listed</span>
+                  <strong>{calorieLabel(nutrient)}</strong>
+                </p>}
 
                 {nutrient.foods.length ? (
                   <ol className="diary-source-list">
                     {nutrient.foods.map((food) => (
                       <li key={food.name.toLocaleLowerCase()}>
                         <div className="diary-source-row">
-                          <strong>{food.name}</strong>
+                          <strong>{food.name}{key !== 'calories' && <small className="diary-source-food-calories"> · {calorieLabel(food)}</small>}</strong>
                           <span><b>{format(food.value)} {unit}</b> · {format(food.percentage)}%</span>
                         </div>
                         <div className="diary-source-track" aria-hidden="true">
@@ -86,6 +95,9 @@ export function DiaryFoodSources({ meals, goals, date, today }) {
                     {nutrient.missing} food {nutrient.missing === 1 ? "is" : "items are"} missing {label.toLocaleLowerCase()} data, so this breakdown is partial.
                   </p>
                 )}
+                {key !== 'calories' && nutrient.caloriesMissing > 0 && <p className="diary-source-warning">
+                  Calories are missing for {nutrient.caloriesMissing} contributing food {nutrient.caloriesMissing === 1 ? 'entry' : 'entries'}.
+                </p>}
               </article>
             );
           })}

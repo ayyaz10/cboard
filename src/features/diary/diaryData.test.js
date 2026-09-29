@@ -106,6 +106,23 @@ test("nutrient contributions aggregate foods and calculate their share independe
   assert.equal(result.calories.missing, 1);
   assert.equal(result.calories.foods.length, 2);
   assert.ok(result.calories.foods.every(food => food.value === 160 && food.percentage === 50));
+  assert.equal(result.protein.calories, 320);
+  assert.equal(result.fiber.calories, 160);
+  assert.equal(result.fiber.foods[0].calories, 160);
+});
+
+test('card calories scale logged portions and flag missing calories without including non-contributors', () => {
+  const banana = { ...foodItem({ quantity: 100, unit: 'g', calories: 90, fiber: 3 }, 'Banana'), quantity: 50 };
+  const unknown = foodItem({ quantity: 100, unit: 'g', fiber: 2 }, 'Banana');
+  const oil = foodItem({ quantity: 100, unit: 'g', calories: 900, fiber: 0 }, 'Oil');
+  const result = nutrientContributions([{ items: [banana, unknown, oil] }]);
+  assert.equal(result.fiber.total, 3.5);
+  assert.equal(result.fiber.calories, 45);
+  assert.equal(result.fiber.caloriesKnown, 1);
+  assert.equal(result.fiber.caloriesMissing, 1);
+  assert.equal(result.fiber.foods.length, 1);
+  assert.equal(result.fiber.foods[0].calories, 45);
+  assert.equal(result.fiber.foods[0].caloriesMissing, 1);
 });
 test("recipe snapshots are independent and product ingredients scale per serving", () => {
   const recipe = {

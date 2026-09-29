@@ -238,7 +238,8 @@ export function nutrientContributions(meals, keys = ["calories", "protein", "car
     const foods = new Map();
     let missing = 0;
     for (const item of items) {
-      const value = itemNutrition(item)[key];
+      const nutrition = itemNutrition(item);
+      const value = nutrition[key];
       if (value == null) {
         missing += 1;
         continue;
@@ -246,14 +247,22 @@ export function nutrientContributions(meals, keys = ["calories", "protein", "car
       if (value <= 0) continue;
       const name = String(item.name || "Food").trim() || "Food";
       const identity = name.toLocaleLowerCase();
-      const current = foods.get(identity) || { name, value: 0 };
+      const current = foods.get(identity) || { name, value: 0, calories: 0, caloriesKnown: 0, caloriesMissing: 0 };
       current.value += value;
+      if (nutrition.calories == null) current.caloriesMissing += 1;
+      else {
+        current.calories += nutrition.calories;
+        current.caloriesKnown += 1;
+      }
       foods.set(identity, current);
     }
     const total = [...foods.values()].reduce((sum, food) => sum + food.value, 0);
     return [key, {
       total,
       missing,
+      calories: [...foods.values()].reduce((sum, food) => sum + food.calories, 0),
+      caloriesKnown: [...foods.values()].reduce((sum, food) => sum + food.caloriesKnown, 0),
+      caloriesMissing: [...foods.values()].reduce((sum, food) => sum + food.caloriesMissing, 0),
       foods: [...foods.values()]
         .map((food) => ({
           ...food,
