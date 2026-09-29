@@ -271,7 +271,7 @@ function ReminderStore({ userId, children }) {
         </aside>
       )}
       {widgetOpen && (
-        <aside id="reminder-widget" aria-label="Reminders" className="fixed bottom-20 right-4 left-4 z-50 max-h-[min(70vh,38rem)] overflow-y-auto rounded-2xl border-2 border-black bg-[#ffd166] p-5 text-black shadow-[5px_5px_0_#000] sm:left-auto sm:w-96">
+        <aside id="reminder-widget" aria-label="Reminders" className="reminder-widget fixed right-4 left-4 z-50 overflow-y-auto rounded-2xl border-2 border-black bg-[#ffd166] p-5 text-black shadow-[5px_5px_0_#000] sm:left-auto sm:w-96">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-lg font-bold">Reminders</p>
@@ -317,7 +317,7 @@ function ReminderStore({ userId, children }) {
       )}
       <button
         type="button"
-        className={`fixed bottom-4 right-4 z-50 flex min-h-12 items-center gap-2 rounded-full border-2 border-black px-4 py-3 font-bold text-black shadow-[4px_4px_0_#000] transition hover:-translate-y-px ${ringing.length > 0 ? 'bg-[#ffd166]' : 'bg-[#c5ff6f]'}`}
+        className={`reminder-toggle fixed right-4 z-50 flex min-h-12 items-center gap-2 rounded-full border-2 border-black px-4 py-3 font-bold text-black shadow-[4px_4px_0_#000] transition hover:-translate-y-px ${ringing.length > 0 ? 'bg-[#ffd166]' : 'bg-[#c5ff6f]'}`}
         aria-expanded={widgetOpen}
         aria-controls="reminder-widget"
         onClick={() => {

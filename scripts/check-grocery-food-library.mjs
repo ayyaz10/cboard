@@ -101,6 +101,22 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: output + '/grocery-suggestions-mobile.png', fullPage: true });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await page.getByRole('dialog').getByRole('button', { name: 'Close dialog', exact: true }).click();
+  await page.evaluate(() => window.scrollTo(0, 1200));
+  const addButton = page.getByRole('button', { name: '+ Add groceries', exact: true });
+  await expect(addButton).toBeInViewport();
+  const footerBox = await page.locator('.g-footer').boundingBox();
+  const navBox = await page.locator('.mobile-section-nav').boundingBox();
+  const reminderBox = await page.locator('.reminder-toggle').boundingBox();
+  assert.ok(footerBox.y + footerBox.height <= navBox.y, 'Grocery actions stay above navigation');
+  assert.ok(reminderBox.y + reminderBox.height <= footerBox.y, 'Reminders stay above grocery actions');
+  await page.screenshot({ path: output + '/grocery-mobile-actions.png' });
+  await addButton.click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Close dialog', exact: true }).click();
+  await page.setViewportSize({ width: 1240, height: 900 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  assert.equal(await page.locator('.app-navigation-primary').evaluate(el => el.scrollWidth > el.clientWidth), false);
+  await page.screenshot({ path: output + '/navigation-desktop.png' });
   assert.deepEqual(errors, []);
   console.log('PASS: recipe autocomplete, multiline amount preservation, full nutrition, shared catalog save, reload, mobile layout');
 } catch (error) { console.error(errors); console.error((await page.locator('body').innerText()).slice(-4000)); throw error; } finally { await browser.close(); }

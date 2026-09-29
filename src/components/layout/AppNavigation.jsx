@@ -77,8 +77,8 @@ export function AppNavigation({ activePath, extraItems = [] }) {
     {open && <button type="button" className="app-menu-backdrop" aria-label="Close navigation menu" onClick={() => setOpen(false)} />}
     <aside id={menuId} className="app-navigation-content" data-open={open} aria-label="Application navigation">
     <div className="app-menu-heading"><strong>Navigate</strong><button type="button" aria-label="Close navigation menu" onClick={() => setOpen(false)}>×</button></div>
-    <nav className="app-navigation-primary overflow-x-auto" aria-label="Main navigation">
-      <div className="app-navigation-list flex min-w-max gap-2 pb-1">
+    <nav className="app-navigation-primary" aria-label="Main navigation">
+      <div className="app-navigation-list flex flex-wrap gap-2 pb-1">
         {orderedItems.map((item) => {
           const isActive = activePath === item.path;
 

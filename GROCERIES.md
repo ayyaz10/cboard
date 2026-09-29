@@ -45,6 +45,10 @@ Requests are cached separately by model version, user, and normalized item name.
 
 ## Verification
 
+Saved-food suggestions reuse recipe ingredients (including confirmed product labels and alternatives), diary foods, grocery records, and the shared food catalog. Catalog values take precedence over older labels. Grocery nutrition edits update the catalog; stock quantity changes do not overwrite it. Unknown nutrients stay unknown, and label quantities remain separate from purchase quantities.
+
+Run `node --test src/features/nutrition/savedFoods.test.js` for transfer and precedence checks. For the mocked browser check, start Vite on port 5181 with `VITE_SUPABASE_URL=https://training-qa.supabase.co` and `VITE_SUPABASE_ANON_KEY=training-test-key`, then run `node scripts/check-grocery-food-library.mjs`. Set `GROCERY_PLAYWRIGHT_PATH` to an external `@playwright/test` installation if needed. The check covers multiline suggestions, nutrient persistence, mobile action/reminder spacing, and desktop navigation wrapping; all account requests are mocked.
+
 `node --test src/features/groceries/groceryData.test.js supabase/functions/grocery-image/handler.test.js` covers grocery operations plus the Cloudflare request/response contract, authentication, configuration, malformed responses, caching, concurrent requests, allowance enforcement, and explicit retries. Provider calls and database operations are mocked in these tests. `npm run build` checks the integrated production bundle.
 
 Live Supabase persistence and Cloudflare generation require the configured account/project. The migrations and Edge Function are supplied as source; building the frontend does not deploy them.

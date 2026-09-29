@@ -796,8 +796,11 @@ export function Groceries() {
                 <button onClick={openAdd}>＋ Add an item</button>
               </div>
             )}
-            <div className="g-footer" role="status">
-              <span>
+            <div className="g-footer">
+              <button type="button" className="g-primary" onClick={openAdd} disabled={busy}>
+                {tab === 'shop' ? '+ Add to list' : '+ Add groceries'}
+              </button>
+              <span role="status">
                 {busy
                   ? "Saving…"
                   : notice || `${list.length} items · Saved to your account`}
