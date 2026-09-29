@@ -3,7 +3,7 @@ import { isSupabaseConfigured, requireSupabase, supabase } from '../lib/supabase
 import { getCurrentProfile, normalizeUsername, resolveLoginEmail } from '../services/profileService';
 
 const AuthContext = createContext(null);
-const AUTH_BOOT_TIMEOUT_MS = 8000;
+const AUTH_BOOT_TIMEOUT_MS = 45000;
 const PROFILE_TIMEOUT_MS = 5000;
 
 function withTimeout(promise, timeoutMs, message) {
@@ -47,19 +47,19 @@ export function AuthProvider({ children }) {
     };
 
     setProfile(fallbackProfile);
-
-    withTimeout(
-      getCurrentProfile(),
-      PROFILE_TIMEOUT_MS,
-      'Profile lookup timed out.',
-    )
-      .then((nextProfile) => {
-        setProfile(nextProfile ?? fallbackProfile);
-      })
-      .catch(() => {
-        setProfile(fallbackProfile);
-      });
   }
+
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    // Run outside onAuthStateChange: profile queries acquire the auth lock too.
+    const timer = setTimeout(() => {
+      withTimeout(getCurrentProfile(), PROFILE_TIMEOUT_MS, 'Profile lookup timed out.')
+        .then(nextProfile => { if (!cancelled && nextProfile) setProfile(nextProfile); })
+        .catch(() => { /* Keep the session's username while offline or busy. */ });
+    }, 0);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [user?.id]);
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -69,14 +69,15 @@ export function AuthProvider({ children }) {
     }
 
     let isMounted = true;
+    let receivedAuthEvent = false;
 
     withTimeout(
       supabase.auth.getSession(),
       AUTH_BOOT_TIMEOUT_MS,
-      'Saved session expired. Please log in again.',
+      'Your session is taking longer to load. Please reload and try again.',
     )
       .then(({ data, error }) => {
-        if (!isMounted) {
+        if (!isMounted || receivedAuthEvent) {
           return;
         }
 
@@ -87,7 +88,7 @@ export function AuthProvider({ children }) {
         applySession(data.session);
       })
       .catch((error) => {
-        if (!isMounted) {
+        if (!isMounted || receivedAuthEvent) {
           return;
         }
 
@@ -95,7 +96,7 @@ export function AuthProvider({ children }) {
         setUser(null);
         setProfile(null);
         setAuthError(error.message);
-        supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+        // A network/lock timeout must not delete a valid saved session.
       })
       .finally(() => {
         if (isMounted) {
@@ -105,6 +106,8 @@ export function AuthProvider({ children }) {
 
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, nextSession) => {
+        if (!isMounted) return;
+        receivedAuthEvent = true;
         applySession(nextSession);
         setIsLoading(false);
         setAuthError('');

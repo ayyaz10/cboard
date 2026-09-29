@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { authLock } from './authLock.js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -10,6 +11,7 @@ export const supabase = isSupabaseConfigured
       auth: {
         persistSession: true,
         autoRefreshToken: true,
+        lock: authLock,
       },
     })
   : null;
