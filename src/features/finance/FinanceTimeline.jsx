@@ -49,41 +49,47 @@ function TargetCard({ item, currency }) {
 
 function buildTargetCards(data, month) {
   const currency = data.settings.currency;
-  const monthly = data.transactions.filter((item) => item.date.startsWith(month));
-  const income = monthly.filter((item) => item.type==='income').reduce((sum,item)=>sum+item.amount,0);
+  const monthly = data.transactions.filter((item) => (month===null || item.date.startsWith(month)));
   const cards = [];
   const saved = data.transactions.filter((item)=>item.type==='savings').reduce((sum,item)=>sum+item.amount,0);
   cards.push({group:'savings',title:'Total savings moved',value:saved,target:0,caption:'All recorded savings allocations.'});
   for (const goal of data.goals) cards.push({group:'goals',title:goal.title,value:goal.saved,target:goal.target,caption:goal.status==='completed'?'Target reached.':`${formatMoney(Math.max(0,goal.target-goal.saved),currency)} left.`});
   for (const investment of data.investments) cards.push({group:'investments',title:investment.name,value:investment.currentValue,target:investment.target||0,caption:`${formatMoney(investment.contributed,currency)} contributed · ${formatMoney(investment.currentValue-investment.contributed,currency)} gain/loss.`});
   const donationCategories = new Set(data.categories.filter((item)=>item.type==='donation').map((item)=>item.id));
-  const donationTargets = (data.budgets[month]||[]).filter((item)=>donationCategories.has(item.categoryId)).reduce((sum,item)=>sum+budgetTarget(item,income||data.settings.monthlyIncome),0);
+  const scopedBudgets = (month===null?Object.keys(data.budgets):[month]).flatMap(key=>{
+    const monthIncome=data.transactions.filter(item=>item.type==='income'&&item.date.startsWith(key)).reduce((sum,item)=>sum+item.amount,0);
+    return (data.budgets[key]||[]).map(item=>({...item,month:key,target:budgetTarget(item,monthIncome||data.settings.monthlyIncome)}));
+  });
+  const donationTargets = scopedBudgets.filter((item)=>donationCategories.has(item.categoryId)).reduce((sum,item)=>sum+item.target,0);
   const donated = monthly.filter((item)=>item.type==='donation').reduce((sum,item)=>sum+item.amount,0);
-  cards.push({group:'donations',title:'Giving this month',value:donated,target:donationTargets,caption:donationTargets?'Against your monthly giving target.':'Add a donation target in Monthly Budget.'});
+  cards.push({group:'donations',title:month===null?'Giving across all time':'Giving this month',value:donated,target:donationTargets,caption:donationTargets?(month===null?'Against all monthly giving targets.':'Against your monthly giving target.'):'Add a donation target in Monthly Budget.'});
   const expenseCategories = new Set(data.categories.filter((item)=>item.type==='expense').map((item)=>item.id));
-  for (const budget of (data.budgets[month]||[]).filter((item)=>expenseCategories.has(item.categoryId))) {
+  for (const budget of scopedBudgets.filter((item)=>expenseCategories.has(item.categoryId))) {
     const category = data.categories.find((item)=>item.id===budget.categoryId);
-    const actual = monthly.filter((item)=>item.type==='expense'&&item.categoryId===budget.categoryId).reduce((sum,item)=>sum+item.amount,0);
-    cards.push({group:'budgets',title:category?.name||'Deleted category',value:actual,target:budgetTarget(budget,income||data.settings.monthlyIncome),caption:'Spent against this month’s budget.'});
+    const actual = monthly.filter((item)=>item.type==='expense'&&item.categoryId===budget.categoryId&&item.date.startsWith(budget.month)).reduce((sum,item)=>sum+item.amount,0);
+    cards.push({group:'budgets',title:(category?.name||'Deleted category')+(month===null?' · '+budget.month:''),value:actual,target:budget.target,caption:'Spent against the monthly budget.'});
   }
   for (const debt of data.debts) cards.push({group:'debts',title:debt.name,value:Math.max(0,debt.original-debt.remaining),target:debt.original,caption:`${formatMoney(debt.remaining,currency)} left to pay.`});
   return cards;
 }
 
-export function FinanceTimeline({ data, month, setMonth, change }) {
+export function FinanceTimeline({ data, month, setMonth, change, transactionScope, setTransactionScope }) {
+  const allTime = transactionScope === 'all';
+  const rangeMonth = allTime ? null : month;
+  const openingMonth = allTime ? (data.transactions.map(item=>item.date.slice(0,7)).sort()[0] || month) : month;
   const currency = data.settings.currency;
   const [showLogos,setShowLogos] = useState(true);
   const [visibleTypes,setVisibleTypes] = useState(()=>new Set(markerTypes));
   const [visibleProgress,setVisibleProgress] = useState(()=>new Set(Object.keys(progressLabels)));
-  const savedOpening = data.openingBalances?.[month] || 0;
+  const savedOpening = data.openingBalances?.[openingMonth] || 0;
   const [opening,setOpening] = useState(moneyInput(savedOpening));
   const [openingError,setOpeningError] = useState('');
   const chartViewport = useRef(null);
   const drag = useRef(null);
   const pinch = useRef(null);
   const wheelHandler = useRef(null);
-  useEffect(()=>setOpening(moneyInput(savedOpening)),[month,savedOpening]);
-  const timeline = useMemo(()=>buildCashTimeline(data.transactions,month,savedOpening),[data.transactions,month,savedOpening]);
+  useEffect(()=>setOpening(moneyInput(savedOpening)),[openingMonth,savedOpening]);
+  const timeline = useMemo(()=>buildCashTimeline(data.transactions,rangeMonth,savedOpening),[data.transactions,rangeMonth,savedOpening]);
   const fullViewport = useMemo(()=>{
     const balances=timeline.map((point)=>point.balance);
     const minimum=Math.min(0,...balances);
@@ -94,8 +100,8 @@ export function FinanceTimeline({ data, month, setMonth, change }) {
   },[timeline]);
   const [viewport,setViewport] = useState(fullViewport);
   const [dragging,setDragging] = useState(false);
-  useEffect(()=>setViewport(fullViewport),[month,fullViewport.x0,fullViewport.x1,fullViewport.y0,fullViewport.y1]);
-  const targets = useMemo(()=>buildTargetCards(data,month),[data,month]);
+  useEffect(()=>setViewport(fullViewport),[rangeMonth,fullViewport.x0,fullViewport.x1,fullViewport.y0,fullViewport.y1]);
+  const targets = useMemo(()=>buildTargetCards(data,rangeMonth),[data,rangeMonth]);
   const endBalance = timeline.at(-1)?.balance || 0;
   const fullXSpan=fullViewport.x1-fullViewport.x0;
   const fullYSpan=fullViewport.y1-fullViewport.y0;
@@ -108,7 +114,7 @@ export function FinanceTimeline({ data, month, setMonth, change }) {
   }
   function constrainX(next) {
     const span=next.x1-next.x0;
-    if(span>=fullXSpan)return {...next,x0:fullViewport.x0,x1:fullViewport.x1};
+    if(span>=fullXSpan){const padding=(span-fullXSpan)/2;return {...next,x0:fullViewport.x0-padding,x1:fullViewport.x1+padding};}
     if(next.x0<fullViewport.x0)return {...next,x0:fullViewport.x0,x1:fullViewport.x0+span};
     if(next.x1>fullViewport.x1)return {...next,x0:fullViewport.x1-span,x1:fullViewport.x1};
     return next;
@@ -118,8 +124,8 @@ export function FinanceTimeline({ data, month, setMonth, change }) {
     setViewport((current)=>{
       const oldX=current.x1-current.x0;
       const oldY=current.y1-current.y0;
-      const nextX=clamp(oldX*factor,Math.min(2,fullXSpan),fullXSpan);
-      const nextY=clamp(oldY*factor,fullYSpan*.22,fullYSpan);
+      const nextX=clamp(oldX*factor,fullXSpan/5,fullXSpan*4);
+      const nextY=clamp(oldY*factor,fullYSpan/5,fullYSpan*4);
       const anchorX=current.x0+ratios.x*oldX;
       const anchorY=current.y0+ratios.y*oldY;
       return constrainX({x0:anchorX-ratios.x*nextX,x1:anchorX+(1-ratios.x)*nextX,y0:anchorY-ratios.y*nextY,y1:anchorY+(1-ratios.y)*nextY});
@@ -171,22 +177,24 @@ export function FinanceTimeline({ data, month, setMonth, change }) {
     element.addEventListener('wheel',handleWheel,{passive:false});
     return ()=>element.removeEventListener('wheel',handleWheel);
   },[timeline.length]);
-  async function saveOpening(event){event.preventDefault();try{const amount=parseOpeningBalance(opening);await change(state=>{state.openingBalances||={};state.openingBalances[month]=amount;return state},'Opening balance saved');setOpeningError('')}catch(error){setOpeningError(error.message)}}
+  async function saveOpening(event){event.preventDefault();try{const amount=parseOpeningBalance(opening);await change(state=>{state.openingBalances||={};state.openingBalances[openingMonth]=amount;return state},'Opening balance saved');setOpeningError('')}catch(error){setOpeningError(error.message)}}
   return <div className="f-timeline-page">
-    <div className="f-between f-timeline-month"><div className="f-actions"><button className="f-button" onClick={()=>setMonth(shiftMonth(month,-1))} aria-label="Previous month">←</button><span className="f-month">{new Date(`${month}-15`).toLocaleDateString([],{month:'long',year:'numeric'})}</span><button className="f-button" onClick={()=>setMonth(shiftMonth(month,1))} aria-label="Next month">→</button></div><button className="f-button" onClick={()=>setMonth(monthKey())}>Current month</button></div>
-    <div className="f-between f-timeline-heading"><div><span className="pill">Money movement</span><h2 className="text-3xl font-bold mt-4">Money Timeline</h2><p className="f-help mt-2">The line rises with income and falls when money leaves your available cash.</p></div><div className="f-stat" data-tone={endBalance>=0?'blue':'pink'}><strong>{formatMoney(endBalance,currency)}</strong><span>Available at month end</span></div></div>
+    <div className="f-tabs" role="group" aria-label="Timeline date range"><button type="button" aria-pressed={!allTime} onClick={()=>setTransactionScope('month')}>By month</button><button type="button" aria-pressed={allTime} onClick={()=>setTransactionScope('all')}>All time</button></div>
+    {!allTime&&<div className="f-between f-timeline-month"><div className="f-actions"><button className="f-button" onClick={()=>setMonth(shiftMonth(month,-1))} aria-label="Previous month">←</button><span className="f-month">{new Date(`${month}-15`).toLocaleDateString([],{month:'long',year:'numeric'})}</span><button className="f-button" onClick={()=>setMonth(shiftMonth(month,1))} aria-label="Next month">→</button></div><button className="f-button" onClick={()=>setMonth(monthKey())}>Current month</button></div>}
+    <div className="f-between f-timeline-heading"><div><span className="pill">Money movement</span><h2 className="text-3xl font-bold mt-4">Money Timeline</h2><p className="f-help mt-2">The line rises with income and falls when money leaves your available cash.</p></div><div className="f-stat" data-tone={endBalance>=0?'blue':'pink'}><strong>{formatMoney(endBalance,currency)}</strong><span>{allTime?'Available after all transactions':'Available at month end'}</span></div></div>
     <section className="f-card f-timeline-card mt-5">
-      <div className="f-timeline-controls"><form className="f-opening-form" onSubmit={saveOpening}><label>Opening balance for {month}<input inputMode="decimal" value={opening} onChange={(event)=>setOpening(event.target.value)} /></label><button className="f-button">Save</button></form><label className="f-logo-toggle"><input type="checkbox" checked={showLogos} onChange={(event)=>setShowLogos(event.target.checked)}/> Show recognised merchant logos</label></div>
+      <div className="f-timeline-controls"><form className="f-opening-form" onSubmit={saveOpening}><label>Opening balance for {openingMonth}<input inputMode="decimal" value={opening} onChange={(event)=>setOpening(event.target.value)} /></label><button className="f-button">Save</button></form><label className="f-logo-toggle"><input type="checkbox" checked={showLogos} onChange={(event)=>setShowLogos(event.target.checked)}/> Show recognised merchant logos</label></div>
+      {allTime&&<p className="f-help">Starts with the opening balance for the earliest transaction month ({openingMonth}), then applies every recorded transaction once. Later monthly opening balances are not added again.</p>}
       {openingError&&<p className="f-alert" role="alert">{openingError}</p>}
       <fieldset className="f-filter-fieldset"><legend>Marker visibility</legend><div className="f-filter-chips">{markerTypes.map((type)=><label key={type} className="f-filter-chip" data-active={visibleTypes.has(type)}><input type="checkbox" checked={visibleTypes.has(type)} onChange={()=>toggle(setVisibleTypes,visibleTypes,type)}/>{markerLabels[type]}</label>)}</div></fieldset>
-      {timeline.length===1?<div className="f-empty mt-5">No transactions in this month yet. Your opening balance is ready for the first movement.</div>:<div className="f-chart-shell">
+      {timeline.length===1?<div className="f-empty mt-5">{allTime?'No transactions recorded yet.':'No transactions in this month yet.'} Your opening balance is ready for the first movement.</div>:<div className="f-chart-shell">
         <div className="f-chart-toolbar">
           <p><strong>Explore timeline</strong><span>Drag to pan · Ctrl/⌘ + wheel or pinch to zoom</span></p>
           <div className="f-chart-zoom" aria-label="Timeline zoom controls">
-            <button type="button" onClick={()=>zoomChart(1.25)} disabled={chartZoom<=100} aria-label="Zoom out">−</button>
+            <button type="button" onClick={()=>zoomChart(1.25)} disabled={chartZoom<=25} aria-label="Zoom out">−</button>
             <output aria-live="polite">{chartZoom}%</output>
             <button type="button" onClick={()=>zoomChart(.8)} disabled={chartZoom>=500} aria-label="Zoom in">+</button>
-            <button type="button" onClick={()=>setViewport(fullViewport)} disabled={chartZoom===100&&viewport.y0===fullViewport.y0&&viewport.y1===fullViewport.y1}>Reset</button>
+            <button type="button" onClick={()=>setViewport(fullViewport)} disabled={viewport.x0===fullViewport.x0&&viewport.x1===fullViewport.x1&&viewport.y0===fullViewport.y0&&viewport.y1===fullViewport.y1}>Reset</button>
           </div>
         </div>
         <div
@@ -206,7 +214,7 @@ export function FinanceTimeline({ data, month, setMonth, change }) {
         <ResponsiveContainer width="100%" height="100%"><ComposedChart data={timeline} margin={{top:30,right:28,bottom:12,left:8}}>
           <defs><linearGradient id="financeBalanceFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--f-green)" stopOpacity=".42"/><stop offset="100%" stopColor="var(--f-green)" stopOpacity=".04"/></linearGradient></defs>
           <CartesianGrid stroke="var(--finance-chart-grid,#1112)" strokeDasharray="4 5" vertical={false}/>
-          <XAxis type="number" dataKey="index" domain={[viewport.x0,viewport.x1]} allowDataOverflow ticks={timeline.map((_,index)=>index)} interval="preserveStartEnd" minTickGap={22} tickFormatter={(index)=>timeline[index]?.date!==timeline[index-1]?.date?timeline[index]?.date?.slice(8,10):''} tick={{fontSize:12,fontWeight:700,fill:'currentColor'}} axisLine={{stroke:'var(--finance-chart-line,#111)'}} tickLine={false}/>
+          <XAxis type="number" dataKey="index" domain={[viewport.x0,viewport.x1]} allowDataOverflow ticks={timeline.map((_,index)=>index)} interval="preserveStartEnd" minTickGap={22} tickFormatter={(index)=>timeline[index]?.date!==timeline[index-1]?.date?(allTime?timeline[index]?.date:timeline[index]?.date?.slice(8,10)):''} tick={{fontSize:12,fontWeight:700,fill:'currentColor'}} axisLine={{stroke:'var(--finance-chart-line,#111)'}} tickLine={false}/>
           <YAxis width={74} domain={[viewport.y0,viewport.y1]} allowDataOverflow tickFormatter={(value)=>new Intl.NumberFormat(undefined,{style:'currency',currency,notation:'compact',maximumFractionDigits:1}).format(value/100)} tick={{fontSize:11,fontWeight:700,fill:'currentColor'}} axisLine={false} tickLine={false}/>
           <ReferenceLine y={0} stroke="var(--finance-chart-line,#111)" strokeDasharray="6 4"/>
           <Tooltip content={<TimelineTooltip currency={currency} showLogos={showLogos}/>} cursor={{stroke:'var(--finance-chart-line,#111)',strokeDasharray:'3 3'}}/>
@@ -216,7 +224,7 @@ export function FinanceTimeline({ data, month, setMonth, change }) {
         </div>
         </div>
       </div>}
-      <p className="f-help">Day of month runs along the bottom. Recognised logos load from the merchant’s own website; failed or unknown logos automatically use a category marker. Transfers between your own accounts do not change available cash.</p>
+      <p className="f-help">{allTime?'Transaction dates run along the bottom.':'Day of month runs along the bottom.'} Zoom ranges from 25% to 500%. Recognised logos load from the merchant’s own website; failed or unknown logos automatically use a category marker. Transfers between your own accounts do not change available cash.</p>
     </section>
     <section className="mt-6" aria-labelledby="target-progress-heading"><div><h3 id="target-progress-heading" className="text-2xl font-bold">Targets and progress</h3><p className="f-help mt-1">Progress is kept separate from the cash line so percentages and money are never mixed.</p></div>
       <fieldset className="f-filter-fieldset"><legend>Show progress</legend><div className="f-filter-chips">{Object.entries(progressLabels).map(([key,label])=><label key={key} className="f-filter-chip" data-active={visibleProgress.has(key)}><input type="checkbox" checked={visibleProgress.has(key)} onChange={()=>toggle(setVisibleProgress,visibleProgress,key)}/>{label}</label>)}</div></fieldset>

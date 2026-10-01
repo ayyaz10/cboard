@@ -5,7 +5,7 @@ import {
   copyFileSync,
   writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { join, resolve, sep } from "node:path";
 
 const src = "dist";
 const dest = "docs";
@@ -23,7 +23,17 @@ function copyRecursive(srcDir, destDir) {
   }
 }
 
-rmSync(dest, { recursive: true, force: true });
+// Remove only old generated bundles, preserving project documentation in docs/.
+const assetsDir = resolve(dest, 'assets');
+if (!assetsDir.startsWith(resolve(dest) + sep)) throw new Error('Invalid assets directory');
+mkdirSync(assetsDir, { recursive: true });
+for (const entry of readdirSync(assetsDir, { withFileTypes: true })) {
+  if (entry.isFile() && /\.(js|css|png|svg|woff2?)$/.test(entry.name)) {
+    const target = resolve(assetsDir, entry.name);
+    if (!target.startsWith(assetsDir + sep)) throw new Error('Invalid asset path');
+    rmSync(target);
+  }
+}
 copyRecursive(src, dest);
 writeFileSync(
   join(dest, "404.html"),

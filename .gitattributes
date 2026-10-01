@@ -1,0 +1,3 @@
+# Deployment files must keep their exact build bytes for service-worker integrity.
+docs/** -text
+docs/**/*.md text=auto

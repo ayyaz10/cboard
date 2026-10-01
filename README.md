@@ -48,6 +48,8 @@ Auth supports email/password signup with a unique username. Users can log in wit
 
 ## Run locally
 
+PWA installation, offline behavior, updates and hosting requirements: [PWA guide](./PWA.md).
+
 ```bash
 npm install
 npm run dev

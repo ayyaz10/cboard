@@ -2,6 +2,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildCashTimeline, merchantDomain, parseOpeningBalance, transactionCashEffect } from './financeChartData.js';
 
+test('all-time timeline carries cash across months and years from a single opening balance', () => {
+  const items=[
+    {id:'expense',type:'expense',amount:400,date:'2026-01-02'},
+    {id:'income',type:'income',amount:1000,date:'2025-12-31'},
+    {id:'transfer',type:'transfer',amount:500,date:'2026-02-01'},
+  ];
+  const points=buildCashTimeline(items,null,200);
+  assert.deepEqual(points.map(point=>point.balance),[200,1200,800,800]);
+  assert.equal(points[0].date,'2025-12-31');
+  assert.equal(buildCashTimeline(items,'2026-01',200).at(-1).balance,-200);
+  assert.equal(buildCashTimeline([],null,200).length,1);
+});
+
 test('cash timeline sorts transactions and applies every real cash movement', () => {
   const items = [
     { id: 'expense', title: 'Aldi', type: 'expense', amount: 1_000, date: '2026-09-03', createdAt: 'b' },
