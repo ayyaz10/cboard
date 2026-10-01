@@ -1,3 +1,4 @@
+import { convert } from '../groceries/groceryData.js';
 import { cleanNutrients } from '../nutrition/nutrients.js';
 import { initialProductAmount, macroKeys } from './recipeProducts.js';
 
@@ -29,6 +30,12 @@ export function updateIngredientField(item, key, value) {
   const next = { ...item, [key]: value };
   if (key === 'nutrition') delete next.nutritionLabel;
   else if (next.nutritionLabel) next.nutrition = ingredientLabelNutrition(next);
+  else if (key === 'amount' || key === 'unit') {
+    const before = initialProductAmount({ amount: item.amount, unit: 'pieces' }, 'pieces');
+    const after = initialProductAmount({ amount: next.amount, unit: 'pieces' }, 'pieces');
+    const scaled = key === 'unit' ? convert(after, next.unit, item.unit) : after;
+    if (before > 0 && scaled > 0) next.nutrition = Object.fromEntries(macroKeys.map(key => [key, item.nutrition?.[key] == null ? null : item.nutrition[key] * scaled / before]));
+  }
   return next;
 }
 export function ingredientRecipeCalculation(recipe) {

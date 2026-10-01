@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { recipeUpdateRows, suggestedDiaryRecipe } from './diaryRecipeUpdate.js';
 
-export function DiaryRecipeConfirm({ meal, recipes, busy, error, diarySaved, recipeSaved, onSave, onClose }) {
+export function DiaryRecipeConfirm({ meal, initial, recipes, busy, error, diarySaved, recipeSaved, onSave, onClose }) {
   const dialog = useRef(null);
   const [slug, setSlug] = useState(() => suggestedDiaryRecipe(meal, recipes));
   const recipe = recipes.find(recipe => recipe.slug === slug);
-  const [rows, setRows] = useState(() => recipeUpdateRows(meal, recipe));
+  const [rows, setRows] = useState(() => recipeUpdateRows(meal, recipe, initial));
   const [share, setShare] = useState(false);
   const [mode, setMode] = useState('update');
   const [title, setTitle] = useState(meal.title || '');
@@ -27,7 +27,7 @@ export function DiaryRecipeConfirm({ meal, recipes, busy, error, diarySaved, rec
       </> : <>
       <label>Recipe to update<select value={slug} onChange={event => {
         setSlug(event.target.value);
-        setRows(recipeUpdateRows(meal, recipes.find(recipe => recipe.slug === event.target.value)));
+        setRows(recipeUpdateRows(meal, recipes.find(recipe => recipe.slug === event.target.value), initial));
       }}><option value="">Choose a recipe</option>{recipes.map(recipe => <option key={recipe.slug} value={recipe.slug}>{recipe.title}</option>)}</select></label>
       {recipe && <>
         <p>Amounts below are for the <strong>whole recipe ({recipe.servings || 'unknown'} servings)</strong>, not just the portion you ate. Unselected ingredients stay unchanged. Recipe nutrition will be recalculated from its ingredients.</p>

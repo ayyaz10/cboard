@@ -46,6 +46,7 @@ export function findIngredientMatches(library, query, limit = 8) {
 
 export function applyStoredIngredient(current, stored) {
   const next = {
+    ...(current.id ? { id: current.id } : {}),
     name: stored.name,
     amount: stored.amount ?? null,
     unit: stored.unit || '',

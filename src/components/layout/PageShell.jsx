@@ -1,3 +1,4 @@
+import { ScrollControls } from './ScrollControls';
 import { getAppHref } from '../../app/useRoute';
 import { BrandBadge } from './BrandBadge';
 import { ThemeToggle } from './ThemeToggle';
@@ -48,6 +49,7 @@ export function PageShell({ children }) {
           </div>
         </div>
         {children}
+        <ScrollControls />
       </div>
     </main>
   );

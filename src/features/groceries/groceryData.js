@@ -74,6 +74,7 @@ export function normalizeGroceryState(value) {
   const fallback = initialState();
   const state = value && typeof value === "object" ? structuredClone(value) : fallback;
   state.items = Array.isArray(state.items) ? state.items : fallback.items;
+  state.wishlist = Array.isArray(state.wishlist) ? state.wishlist : [];
   state.shopping = Array.isArray(state.shopping) ? state.shopping : [];
   state.settings = { ...fallback.settings, ...(state.settings || {}) };
   state.imageLibrary =
@@ -142,13 +143,14 @@ export const initialState = () => ({
     ),
   ),
   shopping: [],
+  wishlist: [],
   imageLibrary: {},
   settings: { currency: "GBP", autoImages: false, expiryReminders: true, imageLimit: 0 },
 });
 export const stockStatus = (item) =>
   item.quantity == null
     ? "Set quantity"
-    : item.quantity === 0
+    : item.quantity <= 0
       ? "Out of stock"
       : item.quantity <= item.threshold
         ? "Low stock"
@@ -213,10 +215,16 @@ export function validateNutrition(nutrition) {
       throw new Error(`${label} must be blank or a non-negative number.`);
 }
 // Calculate directly from ingredients: nutrition units are independent of stock units.
+export const ingredientKey = (recipe, item, index) => `${recipe.slug}/${item.id || `ingredient:${index}`}`;
+function recipeStock(recipe, ingredient, index, state) {
+  const linkedId = state.ingredientLinks?.[ingredientKey(recipe, ingredient, index)];
+  const linked = linkedId && state.items.find(item => item.id === linkedId);
+  return linked || state.items.find(item => normalizeName(item.name) === normalizeName(ingredient.name));
+}
 export function recipeNutrition(recipe, state, multiplier = 1) {
   const totals = Object.fromEntries(nutrients.map(([key]) => [key, { value: null, missing: [] }]));
-  for (const ingredient of recipe.ingredients) {
-    const item = state.items.find((i) => normalizeName(i.name) === normalizeName(ingredient.name));
+  for (const [index, ingredient] of [...recipe.ingredients, ...(recipe.sauces || [])].entries()) {
+    const item = recipeStock(recipe, ingredient, index, state);
     const nutrition = item?.nutrition;
     const amount = nutrition && Number.isFinite(ingredient.amount) && ingredient.amount > 0
       ? convert(ingredient.amount * multiplier, ingredient.unit, nutrition.unit) : null;
@@ -277,6 +285,7 @@ export function addItems(state, entries, shopping = false) {
       (i) => normalizeName(i.name) === normalizeName(entry.name),
     );
     if (existing) {
+      existing.recipeOnly = false;
       copyPrice(existing, entry);
       if (entry.nutrition != null) existing.nutrition = structuredClone(entry.nutrition);
       if (entry.quantity == null) continue;
@@ -327,6 +336,7 @@ export function purchase(state, purchases) {
       (i) => normalizeName(i.name) === normalizeName(entry.name),
     );
     if (existing) {
+      existing.recipeOnly = false;
       const amount = convert(quantity, entry.unit, existing.unit);
       if (
         existing.quantity == null &&
@@ -353,15 +363,13 @@ export function purchase(state, purchases) {
 }
 export function recipeNeeds(recipe, state, multiplier = 1) {
   const grouped = [];
-  for (const ingredient of recipe.ingredients) {
+  for (const [index, ingredient] of [...recipe.ingredients, ...(recipe.sauces || [])].entries()) {
     const unit = canonicalUnit(ingredient.unit);
     const amount =
       typeof ingredient.amount === "number" && ingredient.amount > 0
         ? round(ingredient.amount * multiplier)
         : null;
-    const item = state.items.find(
-      (i) => normalizeName(i.name) === normalizeName(ingredient.name),
-    );
+    const item = recipeStock(recipe, ingredient, index, state);
     const targetUnit = item?.unit || unit;
     const required = amount == null ? null : convert(amount, unit, targetUnit);
     const existing = grouped.find(

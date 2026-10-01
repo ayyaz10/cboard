@@ -1,9 +1,11 @@
+import { ingredientLabelAmount } from '../recipes/ingredientNutrition.js';
+import { convert, canonicalUnit } from '../groceries/groceryData.js';
 import {
   cleanNutrients,
   nutrientKeys,
   validNutrient,
 } from "../nutrition/nutrients.js";
-import { productIngredients } from "../recipes/recipeProducts.js";
+import { productIngredients, initialProductAmount } from "../recipes/recipeProducts.js";
 
 export const MEALS = ["Breakfast", "Lunch", "Dinner", "Snack"];
 export const REQUIRED_MEALS = MEALS.slice(0, 3);
@@ -118,6 +120,9 @@ export function validateItem(item) {
   return {
     id: text(item.id, 100, true),
     name: text(item.name, 300, true),
+    ...(Array.isArray(item.inventoryUnresolved) ? { inventoryUnresolved: item.inventoryUnresolved.filter(name => typeof name === 'string').slice(0, 200) } : {}),
+    ...(item.recipeOrigin ? { recipeOrigin: structuredClone(item.recipeOrigin) } : {}),
+    ...(Array.isArray(item.inventoryUsage) ? { inventoryUsage: item.inventoryUsage.filter(use => typeof use.key === 'string' && typeof use.name === 'string' && Number.isFinite(use.amount) && use.amount >= 0 && ['g', 'ml', 'pieces'].includes(use.unit)).map(use => ({ ...(typeof use.code === 'string' ? { code: use.code.slice(0, 30) } : {}), ...(typeof use.itemId === 'string' ? { itemId: use.itemId.slice(0, 150) } : {}), key: use.key.slice(0, 300), name: use.name.slice(0, 300), amount: use.amount, unit: use.unit })) } : {}),
     quantity: item.quantity,
     unit: item.unit,
     basis: item.basis,
@@ -317,7 +322,7 @@ export function foodItem(nutrition, name = "") {
     source: nutrition.source || { provider: "Manual" },
   };
 }
-export function recipeItems(recipe, portions = 1, ingredients = false) {
+function rawRecipeItems(recipe, portions = 1, ingredients = false) {
   if (!positive(portions)) throw new Error("Enter a positive portion count.");
   if (recipe.productNutrition && recipe.servings > 0) {
     return productIngredients(recipe).map((ingredient, index) => {
@@ -339,20 +344,22 @@ export function recipeItems(recipe, portions = 1, ingredients = false) {
         "This recipe needs a serving count before importing individual ingredients.",
       );
     return productIngredients(recipe).map((ingredient) => {
-      const supported =
-        positive(ingredient.amount) && units.includes(ingredient.unit);
+      const canonical = canonicalUnit(ingredient.unit);
+      const targetUnit = canonical === 'kg' ? 'g' : canonical === 'L' ? 'ml' : canonical;
+      const amount = convert(Number(ingredient.amount), ingredient.unit, targetUnit);
+      const supported = positive(amount) && units.includes(targetUnit);
       return {
         ...foodItem(
           {
             ...ingredient.nutrition,
-            quantity: supported ? ingredient.amount : 1,
-            unit: supported ? ingredient.unit : "servings",
+            quantity: supported ? amount : 1,
+            unit: supported ? targetUnit : "servings",
             source: { provider: "Recipe ingredient", name: recipe.title },
           },
           ingredient.name,
         ),
         quantity:
-          ((supported ? ingredient.amount : 1) / recipe.servings) * portions,
+          ((supported ? amount : 1) / recipe.servings) * portions,
       };
     });
   }
@@ -370,6 +377,24 @@ export function recipeItems(recipe, portions = 1, ingredients = false) {
       quantity: portions,
     },
   ];
+}
+// Snapshot ingredient usage per diary unit. Later recipe edits never rewrite history.
+export function recipeItems(recipe, portions = 1, ingredients = false) {
+  const items = rawRecipeItems(recipe, portions, ingredients);
+  const parts = productIngredients({ ...recipe, ingredients: recipe.ingredients || [] });
+  const individual = Boolean(recipe.productNutrition || recipe.nutritionFromIngredients || ingredients);
+  const usage = (part, index, divisor) => {
+    const product = recipe.productNutrition?.items[index];
+    const rawUnit = product?.unit || part.nutritionLabel?.unit || part.unit;
+    const unit = ['kg', 'g'].includes(canonicalUnit(rawUnit)) ? 'g' : ['L', 'ml'].includes(canonicalUnit(rawUnit)) ? 'ml' : 'pieces';
+    const amount = convert(Number(product?.quantity ?? (part.nutritionLabel ? ingredientLabelAmount(part) : part.amount)), rawUnit, unit);
+    return amount != null && amount > 0 && divisor > 0 ? [{ key: `${recipe.slug}/${part.id || `ingredient:${index}`}`, name: part.name, amount: amount / divisor, unit }] : [];
+  };
+  return items.map((item, index) => ({ ...item,
+    recipeOrigin: { slug: recipe.slug, ingredientId: individual ? parts[index]?.id : null, ingredientAmount: individual ? initialProductAmount({ amount: parts[index]?.amount, unit: 'pieces' }, 'pieces') : null, baseline: structuredClone(item) },
+    inventoryUnresolved: (individual ? [index] : parts.map((_, index) => index)).filter(i => !usage(parts[i], i, 1).length || !(recipe.servings > 0)).map(i => parts[i].name),
+    inventoryUsage: individual ? usage(parts[index], index, item.quantity * recipe.servings / portions) : parts.flatMap((part, index) => usage(part, index, recipe.servings)),
+  }));
 }
 export function streaks(days, today = localDate()) {
   const dates = [

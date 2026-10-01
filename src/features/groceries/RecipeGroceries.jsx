@@ -126,14 +126,14 @@ export function RecipeGroceries({ recipe, onRecipeUpdated }) {
         >
           ＋ Add missing to shopping list
         </button>
-        <button
+        {data.settings.stockTrackingPaused ? <button
           disabled={busy || !needs.length || needs.some((i) => i.missing !== 0)}
           onClick={() => setReview(true)}
         >
           Mark as cooked
-        </button>
+        </button> : <a href={getAppHref('/food-diary')}>Log consumption in Food Diary to update stock</a>}
       </div>
-      {review && (
+      {review && data.settings.stockTrackingPaused && (
         <div className="g-hint">
           <p>Deduct the amounts shown above from your groceries?</p>
           <div className="g-actions">

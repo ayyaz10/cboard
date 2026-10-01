@@ -1,3 +1,4 @@
+import { DiaryFoodAnalysis } from './DiaryFoodAnalysis';
 import { DiaryRecipeConfirm } from './DiaryRecipeConfirm';
 import { buildDiaryRecipe, buildDiaryRecipeUpdate } from './diaryRecipeUpdate.js';
 import { saveRecipe, saveDiaryRecipeUpdate } from '../../services/recipeService';
@@ -217,7 +218,7 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
   }
   function saveMeal(meal) {
     setRecipeError('');
-    setPendingRecipe({ meal: structuredClone(meal), diarySaved: false, savedRecipe: null });
+    setPendingRecipe({ meal: structuredClone(meal), initial: structuredClone(day.meals.find(entry => entry.id === meal.id)), diarySaved: false, savedRecipe: null });
   }
   async function confirmMeal(recipe, selections, share, newRecipe) {
     if (lock.current || !pendingRecipe) return;
@@ -439,6 +440,7 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
             {day.complete ? "Day complete" : "Day in progress"}
           </span>
         </div>
+        <DiaryFoodAnalysis key={date} meals={day.meals} />
         <NutritionTotals
           meals={day.meals}
           goals={goals}
@@ -534,7 +536,7 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
           </div>
         </section>
       )}
-      {pendingRecipe && <DiaryRecipeConfirm meal={pendingRecipe.meal} recipes={recipes} busy={busy}
+      {pendingRecipe && <DiaryRecipeConfirm meal={pendingRecipe.meal} initial={pendingRecipe.initial} recipes={recipes} busy={busy}
         diarySaved={pendingRecipe.diarySaved} recipeSaved={pendingRecipe.savedRecipe} error={recipeError}
         onSave={confirmMeal} onClose={() => { if (pendingRecipe.diarySaved) setDraft(null); setPendingRecipe(null); }} />}
       {draft && (

@@ -1,3 +1,4 @@
+import { nextTransactionSequence } from './transactionOrder.js';
 import { id } from './financeData.js';
 import { inMonth, monthKey } from './financeMath.js';
 import { markGoalCompletion } from './financeReports.js';
@@ -18,8 +19,9 @@ function allocationTitle(rule, state) {
 export function applyAllocation(state, rule, income, date, sourceIncomeId = '') {
   const amount = amountFor(rule, income);
   if (!amount || amount < 0) return false;
-  const now = new Date().toISOString();
-  const transaction = { id: id(), title: allocationTitle(rule, state), amount, type: rule.targetType, categoryId: rule.categoryId || '', date, note: rule.note || 'Automatic income allocation', paymentMethod: '', createdAt: now, updatedAt: now, allocationRuleId: rule.id, sourceIncomeId };
+  const previousTime = Math.max(0, ...state.transactions.map(item => Date.parse(item.createdAt) || 0));
+  const now = new Date(Math.max(Date.now(), previousTime + 1)).toISOString();
+  const transaction = { id: id(), sequence: nextTransactionSequence(state), title: allocationTitle(rule, state), amount, type: rule.targetType, categoryId: rule.categoryId || '', date, note: rule.note || 'Automatic income allocation', paymentMethod: '', createdAt: now, updatedAt: now, allocationRuleId: rule.id, sourceIncomeId };
   if (rule.targetType === 'goal') {
     const goal = state.goals.find(x => x.id === rule.targetId);
     if (!goal) return false;

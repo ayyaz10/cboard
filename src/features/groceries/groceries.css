@@ -492,3 +492,7 @@ kbd {
 .g-saved-foods { display: grid; gap: .5rem; margin: .75rem 0; }
 .g-saved-foods button { display: grid; gap: .25rem; text-align: left; width: 100%; white-space: normal; }
 .g-saved-foods small { font-weight: normal; overflow-wrap: anywhere; }
+
+.g-inventory-extras { display: grid; gap: 1rem; margin-block: 1.5rem; }
+.g-inventory-extras > details { padding: 1rem; border: 2px solid; border-radius: 1rem; }
+.g-inventory-extras summary { cursor: pointer; font-weight: 700; min-height: 44px; }

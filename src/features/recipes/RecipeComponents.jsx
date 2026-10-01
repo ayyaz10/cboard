@@ -1,3 +1,5 @@
+import { NUTRIENTS } from '../nutrition/nutrients.js';
+import { updateIngredientField } from './ingredientNutrition.js';
 import { RecipeHealthReview } from './RecipeHealthReview';
 import { useEffect, useState } from 'react';
 import { getAppHref, navigateTo } from '../../app/useRoute';
@@ -6,8 +8,8 @@ import { RecipeSource } from './RecipeSource';
 import { RecipeGroceries } from '../groceries/RecipeGroceries';
 import { RecipeMasonryGrid, useRecipeCardGrid } from './RecipeCardView';
 import { RecipeFavouriteButton } from './RecipeFavouriteButton';
-import { calculateProducts } from './recipeProducts.js';
-import { ingredientRecipeCalculation } from './ingredientNutrition.js';
+import { calculateProducts, initialProductAmount } from './recipeProducts.js';
+import { ingredientRecipeCalculation, prepareIngredientEditor } from './ingredientNutrition.js';
 import { saveRecipeIngredientNutrition } from '../../services/recipeService.js';
 
 export const secondaryButton =
@@ -55,13 +57,7 @@ export function RecipeImage({ image, title, large = false }) {
 }
 
 export function RecipeNutrition({ nutrition = {}, fibreSource }) {
-  const values = [
-    ['calories', 'kcal'],
-    ['protein', 'g protein'],
-    ['carbs', 'g carbs'],
-    ['fat', 'g fat'],
-    ['fiber', 'g fibre'],
-  ].filter(([key]) => nutrition[key] != null);
+  const values = NUTRIENTS.map(([key, label, unit]) => [key, `${unit} ${label.toLowerCase()}`]).filter(([key]) => nutrition[key] != null);
   return values.length ? (
     <dl className="flex flex-wrap gap-3">
       {values.map(([key, unit]) => (
@@ -143,13 +139,7 @@ export function RecipeAlternatives({ group }) {
   );
 }
 
-const ingredientNutrients = [
-  ['calories', 'Calories', 'kcal'],
-  ['protein', 'Protein', 'g'],
-  ['carbs', 'Carbs', 'g'],
-  ['fat', 'Fat', 'g'],
-  ['fiber', 'Fibre', 'g'],
-];
+const ingredientNutrients = NUTRIENTS;
 
 function ingredientNutritionSummary(item) {
   const values = ingredientNutrients
@@ -159,15 +149,19 @@ function ingredientNutritionSummary(item) {
 }
 
 function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
+  item = prepareIngredientEditor(recipe).ingredients[index] || item;
+  const editableAmount = initialProductAmount({ amount: item.amount, unit: 'pieces' }, 'pieces');
   const [editing, setEditing] = useState(false);
   const [values, setValues] = useState(item.nutrition || {});
+  const [amount, setAmount] = useState(editableAmount);
+  const [unit, setUnit] = useState(item.unit);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   async function save() {
     setBusy(true);
     setError('');
     try {
-      const saved = await saveRecipeIngredientNutrition(recipe, index, values);
+      const saved = await saveRecipeIngredientNutrition(recipe, index, values, { amount: Number(amount), unit });
       onSaved?.(saved);
       setEditing(false);
     } catch (saveError) {
@@ -189,7 +183,7 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
             aria-label={`${editing ? 'Close' : 'Edit'} nutrition for ${formatIngredient(item)}`}
             aria-expanded={editing}
             title="Edit ingredient nutrition"
-            onClick={() => { setValues(item.nutrition || {}); setError(''); setEditing((value) => !value); }}
+            onClick={() => { setValues(item.nutrition || {}); setAmount(editableAmount); setUnit(item.unit); setError(''); setEditing((value) => !value); }}
           >
             <span>{ingredientNutritionSummary(item)}</span>
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 transition-transform group-hover:scale-110">
@@ -207,6 +201,10 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
     </div>
     {editing && <fieldset disabled={busy} className="mt-3 space-y-3 border-t-2 border-black/15 pt-3">
       <legend className="sr-only">Edit nutrition for {formatIngredient(item)}</legend>
+      <div className="grid grid-cols-2 gap-2"><label>Amount<input className="field-input" type="number" min="0.0001" step="any" value={amount ?? ''} onChange={event => {
+        const next = updateIngredientField({ amount, unit, nutrition: values }, 'amount', event.target.value);
+        setAmount(event.target.value); setValues(next.nutrition);
+      }} /></label><label>Unit<input className="field-input" value={unit} onChange={event => { const next = updateIngredientField({ amount, unit, nutrition: values }, 'unit', event.target.value); setUnit(event.target.value); setValues(next.nutrition); }} /></label></div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         {ingredientNutrients.map(([key, label, unit]) => <label key={key} className="space-y-1 text-xs font-semibold">
           <span className="block">{label} ({unit})</span>

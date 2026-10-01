@@ -1,3 +1,4 @@
+import { orderedTransactions } from './transactionOrder.js';
 import { inMonth } from './financeMath.js';
 
 const outflowTypes = new Set(['expense', 'donation', 'investment', 'debt', 'savings', 'budget', 'goal']);
@@ -9,11 +10,7 @@ export function transactionCashEffect(transaction) {
 }
 
 export function buildCashTimeline(transactions, month, openingBalance = 0) {
-  const ordered = transactions
-    .filter((item) => inMonth(item.date, month))
-    .sort((left, right) => left.date.localeCompare(right.date)
-      || (left.createdAt || '').localeCompare(right.createdAt || '')
-      || left.id.localeCompare(right.id));
+  const ordered = orderedTransactions(transactions, false).filter(item => inMonth(item.date, month));
   let balance = Number.isSafeInteger(openingBalance) ? openingBalance : 0;
   const points = [{ index: 0, date: `${month}-01`, balance, change: 0, transaction: null }];
 

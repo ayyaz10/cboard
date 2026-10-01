@@ -61,3 +61,19 @@ test('ambiguous duplicate foods and incompatible units cannot silently corrupt a
   assert.throws(() => buildDiaryRecipeUpdate(recipe, meal, [row, row]), /only one/);
   assert.equal(recipeUpdateRows({ items: [{ ...item, source: { provider: 'Recipe' } }] }, recipe).length, 0);
 });
+
+test('confirmation excludes unchanged foods but detects every supported nutrient and quantity', async () => {
+  const { recipeItems } = await import('./diaryData.js');
+  const { nutrientKeys } = await import('../nutrition/nutrients.js');
+  const { validateRecipe } = await import('../recipes/recipeData.js');
+  const r = validateRecipe({ title: 'Meal', mealType: 'Lunch', servings: 2, steps: ['Cook'], nutritionFromIngredients: true, ingredients: [{ name: 'Chicken', amount: 300, unit: 'g', nutrition: { calories: 300 } }, { name: 'Rice', amount: 100, unit: 'g', nutrition: { calories: 100 } }] });
+  const meal = { items: recipeItems(r) };
+  assert.equal(recipeUpdateRows(meal, r).length, 0);
+  for (const key of nutrientKeys) {
+    const edited = structuredClone(meal); edited.items[0].nutrition[key] = 123;
+    assert.deepEqual(recipeUpdateRows(edited, r, meal).map(row=>row.id), [edited.items[0].id]);
+  }
+  const edited = structuredClone(meal); edited.items[0].quantity = 180;
+  const rows = recipeUpdateRows(edited, r, meal);
+  assert.equal(rows.length, 1); assert.equal(rows[0].amount, 360);
+});

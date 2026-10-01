@@ -1,5 +1,5 @@
-import { cleanNutrients } from '../nutrition/nutrients.js';
-export const macroKeys = ['calories', 'protein', 'carbs', 'fat', 'fiber'];
+import { cleanNutrients, nutrientKeys } from '../nutrition/nutrients.js';
+export const macroKeys = nutrientKeys;
 export const productIngredients = (recipe) => [...recipe.ingredients, ...(recipe.sauces || [])];
 export const productBasis = (recipe) => JSON.stringify(productIngredients(recipe).map(({ name, amount, unit, note }) => [name, amount, unit, note || '']));
 const positive = (n) => typeof n === 'number' && Number.isFinite(n) && n > 0;

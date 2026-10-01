@@ -734,3 +734,6 @@ html[data-theme="matrix"] {
     color: var(--matrix-text) !important;
   }
 }
+
+.global-scroll-controls { position: sticky; bottom: max(5.5rem, env(safe-area-inset-bottom)); align-self: flex-end; display: flex; gap: .4rem; z-index: 15; padding-top: 1rem; }
+.global-scroll-controls button { min-height: 44px; padding: .55rem .8rem; border: 2px solid currentColor; border-radius: 999px; background: var(--color-surface, #fffdf8); color: #171717; box-shadow: 2px 2px 0 #171717; }

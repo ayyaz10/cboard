@@ -1,3 +1,5 @@
+import { loadGroceries } from './groceryService';
+import { reconcileInventory } from '../features/groceries/inventory.js';
 import { getUserScopedClient, assertSupabaseResult } from "./supabaseCrud";
 import { validateDay } from "../features/diary/diaryData.js";
 
@@ -28,52 +30,35 @@ export async function getFoodDiary(expectedUserId) {
     return { ...day, updatedAt: row.updated_at };
   });
 }
-export async function saveFoodDiary(day, expectedUserId) {
+async function commitDay(day, expectedUserId, deleting = false) {
   const clean = validateDay(day);
   const { client, userId } = await getUserScopedClient();
-  if (userId !== expectedUserId)
-    throw new Error("Your account changed. Reload the diary before saving.");
-  const payload = {
-    user_id: userId,
-    key: `${PREFIX}${clean.date}`,
-    value: clean,
-    updated_at: new Date().toISOString(),
-  };
-  const query = day.updatedAt
-    ? client
-        .from("user_tool_preferences")
-        .update({ value: clean, updated_at: payload.updated_at })
-        .eq("user_id", userId)
-        .eq("key", payload.key)
-        .eq("updated_at", day.updatedAt)
-    : client.from("user_tool_preferences").insert(payload);
-  const result = await query.select("updated_at").maybeSingle();
-  if (result.error?.code === "23505" || (!result.error && !result.data))
-    throw new Error(
-      "This day changed in another tab. Reload the diary before saving again. Your draft is still here.",
-    );
+  if (userId !== expectedUserId) throw new Error('Your account changed. Reload the diary.');
+  const [groceries, found] = await Promise.all([
+    loadGroceries(),
+    client.from('user_tool_preferences').select('value,updated_at').eq('user_id', userId).eq('key', `${PREFIX}${clean.date}`).maybeSingle(),
+  ]);
+  assertSupabaseResult(found);
+  if (groceries.userId !== userId) throw new Error('Your account changed. Reload the diary.');
+  if ((found.data?.updated_at || null) !== (day.updatedAt || null)) throw new Error('This day changed in another tab. Reload before saving. Your draft is still here.');
+  const next = deleting ? null : clean;
+  if (next) for (const meal of next.meals) for (const food of meal.items) {
+    if (!food.inventoryUsage && food.unit !== 'servings') food.inventoryUsage = [{
+      key: `food:${food.source?.code || food.name.trim().toLowerCase().replace(/\s+/g, ' ')}:${food.nutritionUnit}`,
+      name: food.name, code: food.source?.code || '', unit: food.nutritionUnit, amount: 1,
+    }];
+  }
+  const inventory = reconcileInventory(groceries.state, found.data?.value, next);
+  const result = await client.rpc('commit_diary_inventory', {
+    p_date: clean.date, p_day: next, p_day_version: day.updatedAt || null,
+    p_grocery: inventory.state, p_grocery_version: groceries.version,
+    p_adjustments: inventory.adjustments,
+  });
   assertSupabaseResult(result);
-  return { ...clean, updatedAt: result.data.updated_at };
+  return deleting ? clean.date : { ...clean, updatedAt: result.data };
 }
-export async function deleteFoodDiaryDay(day, expectedUserId) {
-  const clean = validateDay(day);
-  if (!day.updatedAt)
-    throw new Error("This diary day is not saved yet.");
-  const { client, userId } = await getUserScopedClient();
-  if (userId !== expectedUserId)
-    throw new Error("Your account changed. Reload the diary before deleting.");
-  const result = await client
-    .from("user_tool_preferences")
-    .delete()
-    .eq("user_id", userId)
-    .eq("key", `${PREFIX}${clean.date}`)
-    .eq("updated_at", day.updatedAt)
-    .select("key")
-    .maybeSingle();
-  if (!result.error && !result.data)
-    throw new Error(
-      "This day changed in another tab. Reload the diary before deleting it.",
-    );
-  assertSupabaseResult(result);
-  return clean.date;
+export const saveFoodDiary = (day, expectedUserId) => commitDay(day, expectedUserId);
+export function deleteFoodDiaryDay(day, expectedUserId) {
+  if (!day.updatedAt) throw new Error('This diary day is not saved yet.');
+  return commitDay(day, expectedUserId, true);
 }

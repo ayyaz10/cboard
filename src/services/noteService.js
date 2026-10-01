@@ -12,6 +12,7 @@ const noteSelect = `
   content_html,
   content_text,
   linked_goal_id,
+  app_key,
   tags,
   media,
   created_at,
@@ -73,6 +74,7 @@ function normalizeMedia(media) {
 export function toNote(row) {
   return {
     id: row.id,
+    appKey: row.app_key || null,
     userId: row.user_id,
     title: row.title ?? 'Untitled note',
     contentHtml: row.content_html ?? '',
@@ -138,23 +140,23 @@ export async function createNote(note, expectedUserId) {
 
 export async function updateNote(noteId, updates) {
   const { client, userId } = await getUserScopedClient();
+  if (updates.userId && updates.userId !== userId) throw new Error('Your account changed. Reopen this note.');
   const { user_id: _userId, created_at: _createdAt, id: _id, ...payload } = toNotePayload(
     updates,
     userId,
   );
 
-  const result = await client
-    .from('notes')
-    .update(payload)
-    .eq('id', noteId)
-    .select(noteSelect)
-    .single();
+  let query = client.from('notes').update(payload).eq('id', noteId).eq('user_id', userId);
+  if (updates.updatedAt) query = query.eq('updated_at', updates.updatedAt);
+  const result = await query.select(noteSelect).maybeSingle();
+  if (!result.error && !result.data) throw new Error('This note changed elsewhere. Reopen it before saving; your edits have not been applied.');
 
   if (isMissingNotesTable(result.error)) {
     throw new Error(getMissingNotesMessage());
   }
 
   assertSupabaseResult(result);
+  window.dispatchEvent(new Event('notes-changed'));
   return toNote(result.data);
 }
 
@@ -188,4 +190,19 @@ export function subscribeToNotes(userId, onChange) {
       onChange,
     )
     .subscribe();
+}
+
+export async function getAppNote(appKey, expectedUserId) {
+  const { client, userId } = await getUserScopedClient();
+  if (userId !== expectedUserId) throw new Error('Your account changed. Reopen the note.');
+  const result = await client.from('notes').select(noteSelect).eq('user_id', userId).eq('app_key', appKey).maybeSingle();
+  assertSupabaseResult(result);
+  return result.data ? toNote(result.data) : null;
+}
+export async function appendAppNote(appKey, note, expectedUserId) {
+  const { client, userId } = await getUserScopedClient();
+  if (userId !== expectedUserId) throw new Error('Your account changed. Reopen the note.');
+  const result = await client.rpc('append_app_note', { p_app: appKey, p_title: note.title, p_text: note.contentText, p_html: note.contentHtml });
+  assertSupabaseResult(result);
+  return result.data;
 }

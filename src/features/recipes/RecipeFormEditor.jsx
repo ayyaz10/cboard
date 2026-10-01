@@ -1,3 +1,4 @@
+import { NUTRIENTS } from '../nutrition/nutrients.js';
 import { secondaryButton } from './RecipeComponents';
 import { useEffect, useId, useRef, useState } from 'react';
 import { NutritionLookup } from '../groceries/NutritionLookup';
@@ -11,7 +12,9 @@ export const emptyRecipe = () => ({
   mealType: '',
   description: '',
   nutrition: {},
-  ingredients: [{ name: '', amount: null, unit: '' }],
+  servings: 1,
+  nutritionFromIngredients: true,
+  ingredients: [{ id: crypto.randomUUID(), name: '', amount: null, unit: '' }],
   steps: [''],
   sauces: [],
   alternatives: {},
@@ -40,13 +43,7 @@ function Field({ label, value, onChange, multiline = false, ...props }) {
 function Macros({ value = {}, onChange }) {
   return (
     <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
-      {[
-        ['calories', 'Calories (kcal)'],
-        ['protein', 'Protein (g)'],
-        ['carbs', 'Carbs (g)'],
-        ['fat', 'Fat (g)'],
-        ['fiber', 'Fibre (g)'],
-      ].map(([key, label]) => (
+      {NUTRIENTS.map(([key, label, unit]) => [key, `${label} (${unit})`]).map(([key, label]) => (
         <Field
           key={key}
           label={label}
@@ -123,7 +120,7 @@ function ItemEditor({ item, onChange, groups, visible, ingredientLibrary }) {
   const nutritionDetails = useRef(null);
   const set = (key, value) => {
     const next = updateIngredientField(item, key, value);
-    onChange(next, { calculateNutrition: key === 'nutrition' });
+    onChange(next, { calculateNutrition: ['nutrition', 'amount', 'unit'].includes(key) && Boolean(next.nutrition) });
   };
   const label = item.nutritionLabel;
   function useLabel(nutrition) {
@@ -226,7 +223,7 @@ function ItemEditor({ item, onChange, groups, visible, ingredientLibrary }) {
       <details ref={nutritionDetails} open={nutritionOpen} onToggle={(event) => setNutritionOpen(event.currentTarget.open)}>
         <summary className="font-semibold">{label ? 'Item nutrition (calculated)' : 'Item nutrition (optional)'}</summary>
         <div className="mt-4">
-          {!label && <p className="mb-3 text-sm text-black/60">Manual values for the full amount above. Use food lookup for automatic recalculation when the amount changes.</p>}
+          {!label && <p className="mb-3 text-sm text-black/60">Manual values for the full amount above. Changing the amount scales these values automatically.</p>}
           <Macros
             value={item.nutrition}
             onChange={(value) => set('nutrition', value)}
@@ -322,7 +319,7 @@ function Items({ title, items, onChange, groups, ingredientLibrary }) {
         type="button"
         className={secondaryButton}
         onClick={() =>
-          onChange([...items, { name: '', amount: null, unit: '' }])
+          onChange([...items, { id: crypto.randomUUID(), name: '', amount: null, unit: '' }])
         }
       >
         Add {title.toLowerCase()}

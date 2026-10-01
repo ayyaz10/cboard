@@ -1,3 +1,6 @@
+import { getRecipes } from './recipeService';
+import { getFoodDiary } from './foodDiaryService';
+import { linkRecipeInventory } from '../features/groceries/inventory.js';
 import { getUserScopedClient, assertSupabaseResult } from "./supabaseCrud";
 import {
   initialState,
@@ -13,18 +16,24 @@ export async function loadGroceries() {
     .eq("key", key)
     .maybeSingle();
   assertSupabaseResult(result);
-  return result.data
+  const [recipes, days] = await Promise.all([getRecipes(), getFoodDiary(userId)]);
+  const loaded = result.data
     ? {
         state: normalizeGroceryState(result.data.value),
         version: result.data.updated_at,
         userId,
       }
     : { state: initialState(), version: null, userId };
+  loaded.state = linkRecipeInventory(loaded.state, recipes, days);
+  return loaded;
 }
 export async function saveGroceries(state, version, expectedUserId) {
   const { client, userId } = await getUserScopedClient();
   if (userId !== expectedUserId)
     throw new Error("Your account changed. Reload groceries before saving.");
+  for (const entry of Object.values(state.inventoryLedger || {})) for (const id of Object.keys(entry)) {
+    if (!state.items.some(item => item.id === id)) throw new Error('This stock item has tracked diary usage. Set its stock to zero instead of deleting it.');
+  }
   const updated_at = new Date().toISOString();
   const query = version
     ? client

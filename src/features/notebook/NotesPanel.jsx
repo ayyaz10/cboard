@@ -85,7 +85,7 @@ function fileToDataUrl(file) {
   });
 }
 
-function NoteEditor({
+export function NoteEditor({
   value,
   onChange,
   media,
@@ -305,6 +305,7 @@ export function NotesPanel({
   onDeleteNote,
   isSaving = false,
 }) {
+  const loadedNote = useRef(null);
   const [selectedNoteId, setSelectedNoteId] = useState('');
   const [draft, setDraft] = useState(null);
   const [title, setTitle] = useState('');
@@ -335,6 +336,7 @@ export function NotesPanel({
 
   useEffect(() => {
     if (!selectedNote) {
+      loadedNote.current = null;
       setTitle('');
       setContentHtml('');
       setLinkedGoalId(activeGoal?.id || '');
@@ -343,6 +345,14 @@ export function NotesPanel({
       return;
     }
 
+    const previous = loadedNote.current;
+    if (previous?.id === selectedNote.id && previous.updatedAt !== selectedNote.updatedAt &&
+      (title !== (previous.title || '') || contentHtml !== (previous.contentHtml || '') ||
+       tagText !== (previous.tags || []).join(', ') || linkedGoalId !== (isGoalLocked ? activeGoal.id : previous.linkedGoalId || '') || JSON.stringify(media) !== JSON.stringify(previous.media || []))) {
+      setError('This note changed elsewhere. Your draft is preserved. Reopen the saved note before applying these edits.');
+      return;
+    }
+    loadedNote.current = selectedNote;
     setTitle(selectedNote.title || '');
     setContentHtml(selectedNote.contentHtml || '');
     setLinkedGoalId(isGoalLocked ? activeGoal.id : selectedNote.linkedGoalId || '');
@@ -381,8 +391,11 @@ export function NotesPanel({
         tags: tagText,
         media,
         createdAt: selectedNote?.createdAt || new Date().toISOString(),
+        updatedAt: loadedNote.current?.updatedAt,
       });
 
+      loadedNote.current = savedNote;
+      setError('');
       setDraft(null);
       setSelectedNoteId(savedNote?.id || selectedNote?.id || '');
     } catch (saveError) {

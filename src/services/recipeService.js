@@ -1,3 +1,4 @@
+import { prepareIngredientEditor } from '../features/recipes/ingredientNutrition.js';
 import { getUserScopedClient, assertSupabaseResult } from './supabaseCrud';
 import {
   validateRecipe,
@@ -9,7 +10,7 @@ import { requireSupabase } from '../lib/supabaseClient';
 const PREFIX = 'recipe:v1:';
 const FAVOURITE_PREFIX = 'recipe-favourite:v1:';
 
-export async function saveRecipeIngredientNutrition(recipe, ingredientIndex, nutrition) {
+export async function saveRecipeIngredientNutrition(recipe, ingredientIndex, nutrition, quantity = {}) {
   const { client, userId } = await getUserScopedClient();
   const key = `${PREFIX}${recipe.slug}`;
   const found = await client.from('user_tool_preferences').select('value,updated_at')
@@ -17,15 +18,16 @@ export async function saveRecipeIngredientNutrition(recipe, ingredientIndex, nut
   assertSupabaseResult(found);
   if (!recipe.updatedAt || found.data.updated_at !== recipe.updatedAt)
     throw new Error('This recipe changed in another tab. Reload it before saving ingredient nutrition.');
-  const stored = found.data.value.recipe;
+  const stored = prepareIngredientEditor(found.data.value.recipe);
   if (!Number.isInteger(ingredientIndex) || ingredientIndex < 0 || ingredientIndex >= stored.ingredients.length)
     throw new Error('That ingredient is no longer available. Reload the recipe and try again.');
   const ingredients = stored.ingredients.map((item, index) => {
     if (index !== ingredientIndex) return item;
     const { nutritionLabel, ...manualItem } = item;
-    return { ...manualItem, nutrition };
+    return { ...manualItem, ...quantity, nutrition };
   });
-  const draft = { ...stored, ingredients };
+  if (quantity.amount != null && !(quantity.amount > 0)) throw new Error("Enter a positive ingredient amount.");
+  const draft = { ...stored, ingredients, nutritionFromIngredients: true };
   if (stored.productNutrition) {
     delete draft.productNutrition;
     draft.nutritionFromIngredients = true;

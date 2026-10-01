@@ -49,3 +49,15 @@ test('existing saved product choices move into editor labels without losing actu
   assert.equal(prepared.ingredients[0].amount, 200);
   assert.equal(ingredientLabelNutrition(prepared.ingredients[0]).calories, 180);
 });
+
+test('manual ingredient edits scale every nutrient and persist per-serving totals', () => {
+  const item = {name:'Food',amount:100,unit:'g',nutrition:{calories:100,sugars:8,salt:1,vitaminC:20}};
+  const changed = updateIngredientField(item,'amount',150);
+  const recipe = validateRecipe({title:'Meal',mealType:'Lunch',servings:3,steps:['Serve'],ingredients:[changed],nutritionFromIngredients:true});
+  assert.equal(recipe.nutrition.calories,50);
+  assert.equal(recipe.nutrition.sugars,4);
+  assert.equal(recipe.nutrition.salt,0.5);
+  assert.equal(recipe.nutrition.vitaminC,10);
+  assert.equal(recipe.nutrition.iron,null);
+  assert.equal(validateRecipe({...recipe,servings:1}).nutrition.sugars,12);
+});

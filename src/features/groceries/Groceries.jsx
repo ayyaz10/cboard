@@ -1,3 +1,4 @@
+import { InventoryExtras, RecipeReferences } from './InventoryExtras';
 import { useSavedFoods } from '../nutrition/useSavedFoods';
 import { findSavedFoods, applySavedGrocery, matchSavedGrocery } from '../nutrition/savedFoods.js';
 import { DailyNutritionTargets, useNutritionGoals } from '../nutrition/DailyNutritionTargets';
@@ -331,7 +332,7 @@ export function Groceries() {
   const currency = data?.settings.currency || "GBP";
   const money = (amount) => new Intl.NumberFormat(undefined, { style: "currency", currency }).format(amount);
   const estimate = shoppingEstimate(data?.shopping || []);
-  const list = data ? (tab === "stock" ? data.items : data.shopping) : [];
+  const list = data ? (tab === "stock" ? data.items.filter(item => !item.recipeOnly) : data.shopping) : [];
   const filtered = list.filter(
     (i) =>
       i.name.toLowerCase().includes(query.toLowerCase()) &&
@@ -424,7 +425,7 @@ export function Groceries() {
                     <strong>
                       {label === "Shopping list"
                         ? data.shopping.length
-                        : data.items.filter((i) => stockStatus(i) === label)
+                        : data.items.filter((i) => !i.recipeOnly && stockStatus(i) === label)
                             .length}
                     </strong>
                     <span>{label}</span>
@@ -511,7 +512,7 @@ export function Groceries() {
                     onClick={() =>
                       toShop(
                         data.items.filter((i) =>
-                          ["Low stock", "Out of stock"].includes(
+                          !i.recipeOnly && ["Low stock", "Out of stock"].includes(
                             stockStatus(i),
                           ),
                         ),
@@ -668,7 +669,8 @@ export function Groceries() {
                             {tab === "stock"
                               ? stockStatus(item)
                               : "To purchase"}
-                            {tab === "stock" && item.location
+                            {tab === "stock" && <RecipeReferences item={item} />}
+                          {tab === "stock" && item.location
                               ? ` · ${item.location}`
                               : ""}
                           </small>
@@ -814,6 +816,7 @@ export function Groceries() {
             </div>
           </>
         )}
+        {data && <InventoryExtras data={data} change={change} busy={busy} />}
         {modal === "add" && (
           <Modal
             error={error}

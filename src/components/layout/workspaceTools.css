@@ -22,3 +22,5 @@ body:has(.workspace-tools) .page-shell { padding-top: 60px; }
 html[data-theme="matrix"] .workspace-tools, html[data-theme="matrix"] .workspace-switcher { color: var(--matrix-text); }
 html[data-theme="matrix"] .workspace-note, html[data-theme="matrix"] .workspace-switcher, html[data-theme="matrix"] .workspace-tools button, html[data-theme="matrix"] .workspace-switcher button { background: var(--matrix-surface-raised); }
 html[data-theme="matrix"] .workspace-switcher [aria-selected="true"] { background: var(--matrix-accent); color: var(--matrix-accent-text); }
+
+.workspace-note-editing { width: min(700px, calc(100vw - 24px)); }

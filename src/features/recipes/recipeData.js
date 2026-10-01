@@ -52,7 +52,7 @@ function nutrition(value, label = 'Nutrition') {
   if (value == null) value = {};
   if (!object(value)) throw new Error(`${label} must be an object.`);
   return Object.fromEntries(
-    ['calories', 'protein', 'carbs', 'fat', 'fiber'].map((key) => [
+    macroKeys.map((key) => [
       key,
       number(value[key], `${label}: ${key}`),
     ]),
@@ -67,6 +67,7 @@ function ingredient(value, label) {
       ? string(value.amount, `${label} amount`, true, 80)
       : number(value.amount, `${label} amount`);
   const result = {
+    ...(value.id ? { id: string(value.id, `${label} ID`, true, 150) } : {}),
     name: string(value.name, `${label} name`, true, 200),
     amount,
     unit: string(value.unit, `${label} unit`, false, 80),
@@ -207,6 +208,9 @@ export function validateRecipe(data) {
       string(tag, `Tag #${index + 1}`, true, 100),
     ),
   };
+  for (const group of ['ingredients', 'sauces']) clean[group].forEach((item, index) => { item.id ||= `${slug}:${group}:${index}`; });
+  const ingredientIds = [...clean.ingredients, ...clean.sauces].map(item => item.id);
+  if (new Set(ingredientIds).size !== ingredientIds.length) throw new Error('Ingredient IDs must be unique within a recipe.');
   const source = normaliseFibreSource(data.fibreSource, clean);
   if (source && source.ingredients !== fibreBasis(clean)) clean.nutrition.fiber = null;
   else if (source) clean.fibreSource = source;
