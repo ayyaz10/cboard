@@ -1,3 +1,4 @@
+import { FoodLibrary } from './FoodLibrary';
 import { DailyNutritionTargets, useNutritionGoals } from '../nutrition/DailyNutritionTargets';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -122,6 +123,7 @@ function RecipesContent({ route, navigationPath }) {
     }
   }
   const parts = route.replace(/\/$/, '').split('/').filter(Boolean);
+  const foods = parts.length === 3 && parts[1] === 'library' && parts[2] === 'items';
   const manage = parts.length === 2 && parts[1] === 'manage';
   const importing = parts.length === 2 && parts[1] === 'import';
   const recipe = recipes.find((item) => item.slug === parts[1]);
@@ -136,10 +138,10 @@ function RecipesContent({ route, navigationPath }) {
   const planning =
     parts.length === 3 && parts[1] === 'planner' && parts[2] === 'day';
   const diary = parts.length === 3 && parts[1] === 'diary' && parts[2] === 'day';
-  const recipeSection = importing ? 'add' : planning ? 'planner' : diary ? 'diary' : manage ? 'manage' : 'home';
+  const recipeSection = foods ? 'foods' : importing ? 'add' : planning ? 'planner' : diary ? 'diary' : manage ? 'manage' : 'home';
   const shortcutOrder = useAdaptiveNavigation(
     'recipe-sections',
-    ['home', 'add', 'planner', 'diary', 'manage'],
+    ['home', 'foods', 'add', 'planner', 'diary', 'manage'],
     recipeSection,
   );
   function startImport(initial = null, editing = false) {
@@ -222,6 +224,7 @@ function RecipesContent({ route, navigationPath }) {
         <nav className="recipe-shortcuts mobile-section-nav flex flex-wrap gap-2" aria-label="Recipe shortcuts">
           <button type="button" className={secondaryButton} disabled={loading} onClick={() => setAddingFood(true)}>Add item</button>
           {shortcutOrder.map((item) => {
+            if (item === 'foods') return <RecipeLink key={item} to="/recipes/library/items">All food items</RecipeLink>;
             if (item === 'home') return !home && !(recipe && parts.length === 2) ? <RecipeLink key={item} to="/recipes">Back to recipes</RecipeLink> : null;
             if (item === 'add') return !importing ? <PrimaryButton key={item} onClick={() => startImport()}>Add recipe</PrimaryButton> : null;
             if (item === 'planner') return !planning ? <RecipeLink key={item} to="/recipes/planner/day">Meal planner</RecipeLink> : null;
@@ -277,6 +280,7 @@ function RecipesContent({ route, navigationPath }) {
                 }}
               />
             ) : null}
+            {!error && foods && <FoodLibrary library={ingredientLibrary} recipes={recipes} onAdd={() => setAddingFood(true)} />}
             {!error && planning && <DailyMealPlanner recipes={recipes} nutritionGoals={nutritionGoals} />}
             {!error && diary && <FoodDiary recipes={recipes} nutritionGoals={nutritionGoals} foodCatalog={foodCatalog} onFoodCatalogChange={saveMainFoodItems} onDiaryRecipeUpdated={updated => setRecipes(current => [updated, ...current.filter(item => item.slug !== updated.slug)])} />}
             {!error && (home || manage) && (
@@ -431,6 +435,7 @@ function RecipesContent({ route, navigationPath }) {
             )}
             {!error &&
               !home &&
+              !foods &&
               !manage &&
               !importing &&
               !planning &&

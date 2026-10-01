@@ -227,3 +227,13 @@ html[data-theme='matrix'] .recipe-page-shell > .recipe-shortcuts {
     flex: 1 1 auto;
   }
 }
+.food-library{display:grid;gap:1.25rem}
+.food-library-filters{display:grid;grid-template-columns:2fr 1fr;gap:1rem}
+.food-library-filters label{display:grid;gap:.5rem;font-weight:700}
+.food-library-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr));gap:1rem}
+.food-library-grid article{min-width:0;overflow-wrap:anywhere}
+.food-library-nutrients{display:grid;gap:.35rem;margin-block:1rem;font-size:.875rem}
+.food-library-nutrients>div{display:flex;justify-content:space-between;gap:1rem}
+.food-library-nutrients dd{font-weight:700;text-align:right}
+.food-library summary{cursor:pointer;font-weight:700;min-height:44px}
+@media(max-width:600px){.food-library-filters{grid-template-columns:1fr}}

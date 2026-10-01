@@ -172,7 +172,7 @@ export function Groceries() {
     [status, setStatus] = useState("All");
   const groceryTabs = useAdaptiveNavigation(
     "grocery-sections",
-    [["stock", "My Groceries"], ["shop", "Shopping List"]],
+    [["stock", "My Groceries"], ["shop", "Shopping List"], ["unused", "Unused recipe ingredients"], ["links", "Ingredient links"], ["wishlist", "Wishlist"]],
     tab,
     ([key]) => key,
   );
@@ -434,7 +434,7 @@ export function Groceries() {
               )}
             </div>
             <div className="g-between">
-              <div className="g-tabs mobile-section-nav" aria-label="Grocery sections">
+              <div className="g-tabs g-section-tabs" role="group" aria-label="Grocery sections">
                 {groceryTabs.map(([key, name]) => (
                   <button
                     key={key}
@@ -445,7 +445,7 @@ export function Groceries() {
                       setStatus("All");
                     }}
                   >
-                    {name}
+                    {name}{key === 'unused' ? ` (${data.items.filter(item => item.recipeOnly).length})` : key === 'wishlist' ? ` (${data.wishlist?.length || 0})` : ''}
                   </button>
                 ))}
               </div>
@@ -453,6 +453,9 @@ export function Groceries() {
                 ⚙ Preferences
               </button>
             </div>
+            <InventoryExtras data={data} change={change} busy={busy} section={tab} />
+            {tab !== 'stock' && tab !== 'shop' && <div className="g-between"><p role="status">{busy ? 'Saving...' : notice}</p>{undo && <button disabled={busy} onClick={undo}>Undo</button>}</div>}
+            {(tab === 'stock' || tab === 'shop') && <>
             <div className="g-tools">
               <input
                 ref={search}
@@ -814,9 +817,9 @@ export function Groceries() {
               )}
               <small>/ Search · N Add · Enter Save</small>
             </div>
+            </>}
           </>
         )}
-        {data && <InventoryExtras data={data} change={change} busy={busy} />}
         {modal === "add" && (
           <Modal
             error={error}

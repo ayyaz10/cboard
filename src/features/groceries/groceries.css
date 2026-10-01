@@ -496,3 +496,8 @@ kbd {
 .g-inventory-extras { display: grid; gap: 1rem; margin-block: 1.5rem; }
 .g-inventory-extras > details { padding: 1rem; border: 2px solid; border-radius: 1rem; }
 .g-inventory-extras summary { cursor: pointer; font-weight: 700; min-height: 44px; }
+.g-section-tabs{flex-wrap:wrap;max-width:100%;gap:.5rem}
+.g-section-tabs button{white-space:normal;min-height:44px}
+.g-inventory-extras>section{padding:1rem;border:2px solid;border-radius:1rem}
+.g-inventory-extras>section h2{font-weight:800;margin-bottom:1rem}
+.g-inventory-extras>section>.g-between{padding-block:.75rem;border-bottom:1px solid #17251b33}
