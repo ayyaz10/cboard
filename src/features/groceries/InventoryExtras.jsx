@@ -22,7 +22,7 @@ export function InventoryExtras({ data, change, busy, section }) {
   }
   return <section className="g-inventory-extras">
     <label className="g-check"><input type="checkbox" disabled={busy} checked={!data.settings.stockTrackingPaused} onChange={event => change(state => { state.settings.stockTrackingPaused = !event.target.checked; return state; }, 'Stock tracking updated', false)} />Automatic stock tracking: {data.settings.stockTrackingPaused ? 'PAUSED' : 'ON'}</label>
-    <p className="g-hint">Only new diary activity adjusts stock. Paused activity is never deducted later. Negative stock shows a shortage; update it after buying more.</p>
+    <p className="g-hint">Only new diary activity adjusts stock. Use Auto stock on each grocery to turn tracking off for that item. The global pause overrides every item. Paused activity is never deducted later. Manual stock changes still work.</p>
     <section hidden={section !== 'unused'}><h2>Ingredients from unused recipes ({unused.length})</h2>
       {!unused.length && <p>No additional ingredients from unused recipes.</p>}
       {unused.map(item => <div key={item.id} className="g-between"><div><strong>{item.name}</strong><p>{item.quantity ?? 0} {item.unit}</p><RecipeReferences item={item}/></div><button disabled={busy} onClick={() => change(state => { state.items.find(row => row.id === item.id).recipeOnly = false; return state; })}>Move to inventory</button></div>)}

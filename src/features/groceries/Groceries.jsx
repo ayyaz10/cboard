@@ -693,6 +693,15 @@ export function Groceries() {
                               ? ` · ${item.location}`
                               : ""}
                           </small>
+                          {tab === "stock" && <div className="g-item-tracking">
+                            <label className="g-check">
+                              <input type="checkbox" checked={!item.stockTrackingPaused}
+                                aria-label={`Automatic stock tracking for ${item.name}`}
+                                onChange={event => patch(item.id, { stockTrackingPaused: !event.target.checked })} />
+                              Auto stock: {item.stockTrackingPaused ? 'Off' : 'On'}
+                            </label>
+                            {data.settings.stockTrackingPaused && !item.stockTrackingPaused && <small>Paused by the global setting</small>}
+                          </div>}
                           {tab === "stock" &&
                             data.settings.expiryReminders &&
                             item.expiry && (

@@ -57,6 +57,45 @@ test('historical entries never backfill deductions or refund stock that was not 
   assert.equal(quantity(reconcileInventory(stock(), first, null).state), 1000);
 });
 
+test('per-item pause skips only that food, survives reload, and never catches up paused logs', () => {
+  const initial = stock();
+  initial.items[0].stockTrackingPaused = true;
+  initial.items.push({ id: 'rice', name: 'Rice', quantity: 500, unit: 'g' });
+  const first = day([foodItem({ quantity: 100, unit: 'g' }, 'Chicken'), foodItem({ quantity: 50, unit: 'g' }, 'Rice')]);
+  let state = reconcileInventory(initial, null, first).state;
+  assert.equal(quantity(state), 1000);
+  assert.equal(state.items.find(item => item.id === 'rice').quantity, 450);
+  state = JSON.parse(JSON.stringify(state));
+  assert.equal(state.items[0].stockTrackingPaused, true);
+  state.items[0].stockTrackingPaused = false;
+  state = reconcileInventory(state, first, first).state;
+  assert.equal(quantity(state), 1000);
+  const edited = structuredClone(first);
+  edited.meals[0].items[0].quantity = 150;
+  state = reconcileInventory(state, first, edited).state;
+  assert.equal(quantity(state), 950);
+  state = reconcileInventory(state, edited, null).state;
+  assert.equal(quantity(state), 1000);
+  assert.equal(state.items.find(item => item.id === 'rice').quantity, 500);
+});
+
+test('item pause freezes edits and deletions; global pause overrides item tracking', () => {
+  const first = day([foodItem({ quantity: 100, unit: 'g' }, 'Chicken')]);
+  let state = reconcileInventory(stock(), null, first).state;
+  state.items[0].stockTrackingPaused = true;
+  const edited = structuredClone(first);
+  edited.meals[0].items[0].quantity = 200;
+  state = reconcileInventory(state, first, edited).state;
+  assert.equal(quantity(state), 900);
+  assert.equal(quantity(reconcileInventory(state, edited, null).state), 900);
+  state.items[0].stockTrackingPaused = false;
+  state.settings.stockTrackingPaused = true;
+  const another = day([foodItem({ quantity: 50, unit: 'g' }, 'Chicken')]);
+  assert.equal(quantity(reconcileInventory(state, null, another).state), 900);
+  state.settings.stockTrackingPaused = false;
+  assert.equal(quantity(reconcileInventory(state, null, another).state), 850);
+});
+
 test('shortages remain reversible, unset stock stays unset, copies are separate consumption', () => {
   const first = day(recipeItems(recipe())); const initial = stock(); initial.items[0].quantity = 20;
   const result = reconcileInventory(initial, null, first);
