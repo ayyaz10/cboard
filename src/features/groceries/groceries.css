@@ -108,6 +108,8 @@
   background: #17251b;
   color: white;
 }
+.g-recipe-usage-filter { display: grid; gap: .25rem; font-size: .8rem; font-weight: 700; }
+.g-recipe-usage-filter select { width: 100%; }
 .g-tools {
   display: flex;
   gap: 10px;

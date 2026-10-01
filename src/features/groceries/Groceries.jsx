@@ -169,7 +169,8 @@ export function Groceries() {
   const [tab, setTab] = useState("stock"),
     [query, setQuery] = useState(""),
     [category, setCategory] = useState("All"),
-    [status, setStatus] = useState("All");
+    [status, setStatus] = useState("All"),
+    [recipeUsage, setRecipeUsage] = useState("all");
   const groceryTabs = useAdaptiveNavigation(
     "grocery-sections",
     [["stock", "My Groceries"], ["shop", "Shopping List"], ["unused", "Unused recipe ingredients"], ["links", "Ingredient links"], ["wishlist", "Wishlist"]],
@@ -337,6 +338,7 @@ export function Groceries() {
     (i) =>
       i.name.toLowerCase().includes(query.toLowerCase()) &&
       (category === "All" || i.category === category) &&
+      (tab !== "stock" || recipeUsage === "all" || (recipeUsage === "used" ? Boolean(i.recipeRefs?.length) : !i.recipeRefs?.length)) &&
       (tab !== "stock" || status === "All" || stockStatus(i) === status),
   );
   function beginBuy(items) {
@@ -475,6 +477,19 @@ export function Groceries() {
                 ))}
               </select>
               {tab === "stock" && (
+                <label className="g-recipe-usage-filter">Recipe usage
+                  <select
+                    aria-label="Recipe usage filter"
+                    value={recipeUsage}
+                    onChange={(e) => { setRecipeUsage(e.target.value); setSelected([]); }}
+                  >
+                    <option value="all">All items</option>
+                    <option value="used">Used in recipes</option>
+                    <option value="unused">Not used in recipes</option>
+                  </select>
+                </label>
+              )}
+              {tab === "stock" && (
                 <select
                   aria-label="Stock filter"
                   value={status}
@@ -492,6 +507,7 @@ export function Groceries() {
                 </select>
               )}
             </div>
+            {tab === 'stock' && <p className="g-hint" role="status">Showing {filtered.length} of {list.length} groceries. Recipe usage is based on links to saved recipe ingredients and sauces.</p>}
             <div className="g-between">
               <label className="g-check">
                 <input
