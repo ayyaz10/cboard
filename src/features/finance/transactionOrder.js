@@ -15,5 +15,5 @@ export function orderedTransactions(transactions, newestFirst = true) {
 }
 export const nextTransactionSequence = state => Math.max(0, ...state.transactions.map((item, index) => item.sequence ?? index + 1)) + 1;
 export function filterTransactions(transactions, { month, query = '', type = 'all', category = 'all' }) {
-  return orderedTransactions(transactions).filter(item => item.date.slice(0, 7) === month && item.title.toLowerCase().includes(query.toLowerCase()) && (type === 'all' || item.type === type) && (category === 'all' || (category === 'uncategorized' ? !item.categoryId : item.categoryId === category)));
+  return orderedTransactions(transactions).filter(item => (!month || item.date.slice(0, 7) === month) && item.title.toLowerCase().includes(query.toLowerCase()) && (type === 'all' || item.type === type) && (category === 'all' || (category === 'uncategorized' ? !item.categoryId : item.categoryId === category)));
 }

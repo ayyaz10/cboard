@@ -41,7 +41,8 @@ export function budgetTarget(item, income) {
 }
 
 export function financeSummary(state, selectedMonth) {
-  const transactions = state.transactions.filter((item) => inMonth(item.date, selectedMonth));
+  const allTime = selectedMonth === null;
+  const transactions = allTime ? state.transactions : state.transactions.filter((item) => inMonth(item.date, selectedMonth));
   const sum = (type) => transactions.filter((item) => item.type === type).reduce((total, item) => total + item.amount, 0);
   const income = sum('income');
   const expenses = sum('expense');
@@ -54,8 +55,11 @@ export function financeSummary(state, selectedMonth) {
   const outflow = expenses + donations + investments + debtPayments + saved + budgetAllocated + goalContributions;
   const remaining = income - outflow;
   const savings = saved;
-  const budget = state.budgets[selectedMonth] || [];
-  const budgetPlanned = budget.reduce((total, item) => total + budgetTarget(item, income || state.settings.monthlyIncome), 0);
+  const budgetMonths = allTime ? Object.keys(state.budgets) : [selectedMonth];
+  const budgetPlanned = budgetMonths.reduce((total, month) => {
+    const monthIncome = allTime ? transactions.filter(item => item.type === 'income' && inMonth(item.date, month)).reduce((sum, item) => sum + item.amount, 0) : income;
+    return total + (state.budgets[month] || []).reduce((sum, item) => sum + budgetTarget(item, monthIncome || state.settings.monthlyIncome), 0);
+  }, 0);
   return {
     income, expenses, donations, investments, debtPayments, remaining, savings, budgetAllocated, goalContributions,
     savingsRate: income ? Math.round(saved * 10000 / income) : 0,

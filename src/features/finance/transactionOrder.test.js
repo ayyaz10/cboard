@@ -21,3 +21,15 @@ test('category, month and title filters produce the correct selected spending', 
   assert.equal(selected.length,2); assert.equal(selected.reduce((sum,row)=>sum+row.amount,0),8000);
   assert.equal(filterTransactions(rows,{month:'2026-09',category:'fitness',query:'shoes'}).length,1);
 });
+
+test('all-month history includes previous years while retaining search and category filters', () => {
+  const rows=[
+    {id:'old',date:'2025-12-31',type:'expense',title:'Gym membership',categoryId:'fitness'},
+    {id:'new',date:'2026-01-01',type:'expense',title:'Gym membership',categoryId:'fitness'},
+    {id:'food',date:'2026-01-02',type:'expense',title:'Food',categoryId:'groceries'},
+  ];
+  assert.deepEqual(filterTransactions(rows,{month:null}).map(row=>row.id),['food','new','old']);
+  assert.deepEqual(filterTransactions(rows,{month:null,query:'GYM',type:'expense',category:'fitness'}).map(row=>row.id),['new','old']);
+  assert.deepEqual(filterTransactions(rows,{month:'2026-01',category:'fitness'}).map(row=>row.id),['new']);
+  assert.deepEqual(filterTransactions(rows,{month:'2026-02'}),[]);
+});
