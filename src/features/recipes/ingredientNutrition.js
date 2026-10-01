@@ -1,6 +1,6 @@
 import { convert } from '../groceries/groceryData.js';
 import { cleanNutrients } from '../nutrition/nutrients.js';
-import { initialProductAmount, macroKeys } from './recipeProducts.js';
+import { calculateProducts, initialProductAmount, macroKeys } from './recipeProducts.js';
 
 export function cleanIngredientLabel(label) {
   if (!label || !['g', 'ml', 'pieces'].includes(label.unit) || !Number.isFinite(label.quantity) || label.quantity <= 0) return null;
@@ -56,6 +56,20 @@ export function ingredientRecipeCalculation(recipe) {
 }
 export function ingredientRecipeTotals(recipe) {
   return ingredientRecipeCalculation(recipe).perServing;
+}
+// Keep stored per-serving values separate from whole-recipe display totals.
+// Diary imports still require a serving count before dividing ingredients.
+export function recipeNutritionDisplay(recipe) {
+  const calculation = recipe.productNutrition
+    ? calculateProducts(recipe.productNutrition.items, recipe.servings)
+    : recipe.nutritionFromIngredients ? ingredientRecipeCalculation(recipe) : null;
+  const wholeRecipe = Boolean(calculation && !(recipe.servings > 0));
+  const nutrition = calculation
+    ? Object.fromEntries(macroKeys.map(key => [key, (wholeRecipe ? calculation.total : calculation.perServing)[key] == null
+      ? null : Math.round((wholeRecipe ? calculation.total : calculation.perServing)[key] * 100) / 100]))
+    : recipe.nutrition;
+  const partialKeys = calculation ? macroKeys.filter(key => calculation.known[key] > 0 && calculation.missing[key] > 0) : [];
+  return { nutrition, wholeRecipe, partialKeys, calculated: Boolean(calculation) };
 }
 export function prepareIngredientEditor(recipe) {
   if (!recipe.productNutrition) return recipe;

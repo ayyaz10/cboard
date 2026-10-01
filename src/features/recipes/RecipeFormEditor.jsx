@@ -3,7 +3,7 @@ import { secondaryButton } from './RecipeComponents';
 import { useEffect, useId, useRef, useState } from 'react';
 import { NutritionLookup } from '../groceries/NutritionLookup';
 import { initialProductAmount } from './recipeProducts.js';
-import { cleanIngredientLabel, ingredientLabelAmount, ingredientLabelNutrition, ingredientRecipeCalculation, ingredientRecipeTotals, prepareIngredientEditor, updateIngredientField } from './ingredientNutrition.js';
+import { cleanIngredientLabel, ingredientLabelAmount, ingredientLabelNutrition, recipeNutritionDisplay, ingredientRecipeTotals, prepareIngredientEditor, updateIngredientField } from './ingredientNutrition.js';
 import { applyStoredIngredient, findIngredientMatches, hasStoredNutrition } from './ingredientLibrary.js';
 import '../groceries/groceries.css';
 
@@ -330,7 +330,7 @@ function Items({ title, items, onChange, groups, ingredientLibrary }) {
 
 export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary = [], imageEditor = null }) {
   recipe = prepareIngredientEditor(recipe);
-  const ingredientCalculation = ingredientRecipeCalculation(recipe);
+  const nutritionDisplay = recipeNutritionDisplay(recipe);
   const set = (key, value, options = {}) => {
     const next = { ...recipe, [key]: value };
     if (key === 'nutrition') next.nutritionFromIngredients = false;
@@ -394,10 +394,10 @@ export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary 
       <details className="rounded-2xl border-2 border-black bg-white p-4" open>
         <summary className="cursor-pointer text-xl font-bold">Recipe nutrition</summary>
         <p className="text-sm text-black/70">
-          {recipe.nutritionFromIngredients ? 'Calculated automatically per serving from ingredient and sauce quantities. Set the serving count above; alternatives are not included.' : 'Enter macros manually or use food lookup inside an ingredient to calculate from ingredients. Item nutrition describes the full amount listed for that ingredient.'}
+          {recipe.nutritionFromIngredients ? 'Calculated from ingredient and sauce quantities. Shows the whole recipe until a serving count is set, then per serving; alternatives are not included.' : 'Enter macros manually or use food lookup inside an ingredient to calculate from ingredients. Item nutrition describes the full amount listed for that ingredient.'}
         </p>
-        <div className="mt-3"><Macros value={recipe.nutrition} onChange={(value) => set('nutrition', value)} /></div>
-        {recipe.nutritionFromIngredients && Object.values(ingredientCalculation.missing).some((value) => value > 0) && <p className="mt-3 text-sm font-semibold">Showing known per-serving subtotals. Complete the missing ingredient nutrition to calculate the full recipe.</p>}
+        <div className="mt-3"><Macros value={nutritionDisplay.nutrition} onChange={(value) => set('nutrition', value)} /></div>
+        {recipe.nutritionFromIngredients && nutritionDisplay.partialKeys.length > 0 && <p className="mt-3 text-sm font-semibold">Some nutrient totals are partial because they are missing from one or more ingredients.</p>}
       </details>
       <Items
         title="Ingredients"

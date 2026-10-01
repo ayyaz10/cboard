@@ -8,8 +8,8 @@ import { RecipeSource } from './RecipeSource';
 import { RecipeGroceries } from '../groceries/RecipeGroceries';
 import { RecipeMasonryGrid, useRecipeCardGrid } from './RecipeCardView';
 import { RecipeFavouriteButton } from './RecipeFavouriteButton';
-import { calculateProducts, initialProductAmount } from './recipeProducts.js';
-import { ingredientRecipeCalculation, prepareIngredientEditor } from './ingredientNutrition.js';
+import { initialProductAmount } from './recipeProducts.js';
+import { recipeNutritionDisplay, prepareIngredientEditor } from './ingredientNutrition.js';
 import { saveRecipeIngredientNutrition } from '../../services/recipeService.js';
 
 export const secondaryButton =
@@ -81,34 +81,26 @@ export function RecipeNutrition({ nutrition = {}, fibreSource }) {
 function RecipeNutritionStatus({ recipe, preview = false }) {
   if (preview)
     return <p className="text-sm" role="status">Unsaved nutrition preview · per serving. Complete the ingredient amounts, then save products & nutrition.</p>;
-  if (!recipe.productNutrition && !recipe.nutritionFromIngredients) return null;
-  const calculation = recipe.productNutrition
-    ? calculateProducts(recipe.productNutrition.items, recipe.servings)
-    : recipe.nutritionFromIngredients
-      ? ingredientRecipeCalculation(recipe)
-      : null;
-  const missing = calculation ? Math.max(...Object.values(calculation.missing)) : 0;
+  const display = recipeNutritionDisplay(recipe);
+  if (!display.calculated) return null;
+  const partialNames = NUTRIENTS.filter(([key]) => display.partialKeys.includes(key)).map(([, label]) => label.toLowerCase());
   return <p className="text-sm">
-    Ingredient nutrition · per serving
-    {missing > 0 && <> · <strong>known subtotal</strong> ({missing} ingredient{missing === 1 ? '' : 's'} incomplete)</>}
+    Ingredient nutrition · {display.wholeRecipe ? 'whole recipe (serving count not set)' : 'per serving'}
+    {partialNames.length > 0 && <> · <strong>Known subtotals</strong> for {partialNames.join(', ')}; some ingredients are missing these values.</>}
   </p>;
 }
 
 function RecipeCardNutrition({ recipe }) {
+  const { nutrition, wholeRecipe, partialKeys } = recipeNutritionDisplay(recipe);
   const values = [
-    recipe.nutrition?.calories != null && `${recipe.nutrition.calories} kcal`,
-    recipe.nutrition?.protein != null && `${recipe.nutrition.protein} g protein`,
-    recipe.nutrition?.fiber != null && `${recipe.nutrition.fiber} g fibre`,
+    nutrition?.calories != null && `${nutrition.calories} kcal`,
+    nutrition?.protein != null && `${nutrition.protein} g protein`,
+    nutrition?.fiber != null && `${nutrition.fiber} g fibre`,
   ].filter(Boolean);
   if (!values.length) return null;
-  const calculation = recipe.productNutrition
-    ? calculateProducts(recipe.productNutrition.items, recipe.servings)
-    : recipe.nutritionFromIngredients
-      ? ingredientRecipeCalculation(recipe)
-      : null;
-  const partial = calculation && Math.max(...Object.values(calculation.missing)) > 0;
+  const partial = ['calories', 'protein', 'fiber'].some(key => partialKeys.includes(key));
   return <p className="recipe-card-nutrition text-sm font-semibold text-black/70">
-    {values.join(' · ')}{partial && <span className="font-normal"> · partial</span>}
+    {values.join(' · ')}{wholeRecipe && <span className="font-normal"> · whole recipe</span>}{partial && <span className="font-normal"> · partial</span>}
   </p>;
 }
 
@@ -287,7 +279,7 @@ export function RecipePage({ recipe, preview = false, onRecipeUpdated, favourite
             </h1>
             {recipe.description && <p className="text-sm leading-6 text-black/70">{recipe.description}</p>}
           </header>
-          <RecipeNutrition nutrition={recipe.nutrition} fibreSource={recipe.fibreSource} />
+          <RecipeNutrition nutrition={recipeNutritionDisplay(recipe).nutrition} fibreSource={recipe.fibreSource} />
           <RecipeNutritionStatus recipe={recipe} />
           <dl className="flex flex-wrap gap-x-6 gap-y-2">
             {[

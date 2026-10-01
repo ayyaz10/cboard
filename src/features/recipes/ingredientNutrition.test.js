@@ -1,8 +1,38 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ingredientLabelNutrition, cleanIngredientLabel, ingredientRecipeCalculation, ingredientRecipeTotals, prepareIngredientEditor, updateIngredientField } from './ingredientNutrition.js';
+import { ingredientLabelNutrition, cleanIngredientLabel, ingredientRecipeCalculation, ingredientRecipeTotals, prepareIngredientEditor, updateIngredientField, recipeNutritionDisplay } from './ingredientNutrition.js';
 import { validateRecipe } from './recipeData.js';
 const label = cleanIngredientLabel({ quantity: 100, unit: 'g', calories: 90, protein: 1, carbs: 20, fat: 0, fiber: 3, source: { name: 'Banana', provider: 'Open Food Facts' } });
+test('recipes without servings display whole totals while stored serving nutrition stays unknown', () => {
+  const recipe = validateRecipe({ title: 'Meal', mealType: 'Lunch', steps: ['Serve'], nutritionFromIngredients: true,
+    ingredients: [{ name: 'Food', nutrition: { calories: 180, protein: 20, carbs: 10, fat: 3, fiber: 0 } }],
+    sauces: [{ name: 'Sauce', nutrition: { calories: 20, protein: 0, carbs: 5, fat: 0, fiber: 0, salt: 1 } }],
+  });
+  const display = recipeNutritionDisplay(recipe);
+  assert.equal(display.wholeRecipe, true);
+  assert.equal(display.nutrition.calories, 200);
+  assert.equal(display.nutrition.protein, 20);
+  assert.equal(display.nutrition.fiber, 0);
+  assert.equal(display.nutrition.iron, null);
+  assert.deepEqual(display.partialKeys, ['salt']);
+  assert.equal(recipe.nutrition.calories, null);
+  const divided = recipeNutritionDisplay(validateRecipe({ ...recipe, servings: 2 }));
+  assert.equal(divided.wholeRecipe, false);
+  assert.equal(divided.nutrition.calories, 100);
+});
+test('product nutrition also displays whole recipe totals without servings', () => {
+  const display = recipeNutritionDisplay({ productNutrition: { items: [{ quantity: 200, unit: 'g', nutrition: label }] } });
+  assert.equal(display.nutrition.calories, 180);
+  assert.equal(display.wholeRecipe, true);
+  assert.deepEqual(display.partialKeys, []);
+});
+test('manual recipe nutrition and completely unknown ingredients remain unchanged', () => {
+  const nutrition = { calories: 300 };
+  assert.equal(recipeNutritionDisplay({ nutrition }).nutrition, nutrition);
+  const display = recipeNutritionDisplay({ nutritionFromIngredients: true, ingredients: [{ name: 'Unknown' }] });
+  assert.equal(display.nutrition.calories, null);
+  assert.deepEqual(display.partialKeys, []);
+});
 test('ingredient editor scales fractions by confirmed piece weight and keeps unknown weight unknown', () => {
   const item = { name: 'Banana', amount: '1/2', unit: 'piece', nutritionLabel: label };
   assert.equal(ingredientLabelNutrition(item).calories, null);
