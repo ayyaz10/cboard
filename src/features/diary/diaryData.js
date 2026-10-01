@@ -379,7 +379,10 @@ function rawRecipeItems(recipe, portions = 1, ingredients = false) {
   ];
 }
 // Snapshot ingredient usage per diary unit. Later recipe edits never rewrite history.
-export function recipeItems(recipe, portions = 1, ingredients = false) {
+export function recipeItems(recipe, portions = 1, ingredients = false, { wholeRecipe = false } = {}) {
+  // A whole-recipe import is explicitly labelled by the caller. Do not change
+  // the saved recipe's serving count or silently reinterpret serving imports.
+  if (wholeRecipe) recipe = { ...recipe, servings: 1 };
   const items = rawRecipeItems(recipe, portions, ingredients);
   const parts = productIngredients({ ...recipe, ingredients: recipe.ingredients || [] });
   const individual = Boolean(recipe.productNutrition || recipe.nutritionFromIngredients || ingredients);

@@ -84,8 +84,11 @@ export function DiaryMealEditor({
   const [openFood, setOpenFood] = useState(null);
   const [manualId, setManualId] = useState(null);
   const [error, setError] = useState("");
+  const [recipeError, setRecipeError] = useState("");
+  const [recipeNotice, setRecipeNotice] = useState("");
   const reduceMotion = useReducedMotion();
   const recipe = recipes.find((item) => item.slug === slug);
+  const wholeRecipe = Boolean(recipe && !(recipe.servings > 0) && (recipe.productNutrition || recipe.nutritionFromIngredients || individual));
   useEffect(() => {
     onDraftChange(draft);
   }, [draft, onDraftChange]);
@@ -99,9 +102,10 @@ export function DiaryMealEditor({
     setError("");
   }
   function addRecipe() {
+    setRecipeNotice("");
     try {
       if (!recipe) throw new Error("Choose a recipe first.");
-      const items = recipeItems(recipe, Number(portions), individual);
+      const items = recipeItems(recipe, Number(portions), individual, { wholeRecipe });
       if (draft.items.length + items.length > 100)
         throw new Error("A meal can contain up to 100 foods.");
       setDraft((current) => ({
@@ -110,9 +114,11 @@ export function DiaryMealEditor({
         items: [...current.items, ...items],
       }));
       setError("");
+      setRecipeError("");
+      setRecipeNotice(`${recipe.title}: ${items.length} food${items.length === 1 ? '' : 's'} added below. Save the meal to record it.`);
       setSlug("");
     } catch (err) {
-      setError(err.message);
+      setRecipeError(err.message);
     }
   }
   function selectFood(nutrition) {
@@ -400,7 +406,7 @@ export function DiaryMealEditor({
                 <select
                   aria-label="Recipe"
                   value={slug}
-                  onChange={(event) => setSlug(event.target.value)}
+                  onChange={(event) => { setSlug(event.target.value); setRecipeError(""); setRecipeNotice(""); }}
                 >
                   <option value="">Choose a recipe</option>
                   {recipes.map((item) => (
@@ -411,7 +417,7 @@ export function DiaryMealEditor({
                 </select>
               </label>
               <label>
-                Recipe portions
+                {wholeRecipe ? 'Whole recipe quantity' : 'Recipe portions'}
                 <input
                   type="number"
                   min="0.01"
@@ -422,6 +428,7 @@ export function DiaryMealEditor({
                 />
               </label>
             </div>
+            {wholeRecipe && <p className="diary-hint">This recipe has no serving count. 1 adds the whole recipe; 0.5 adds half. Ingredient amounts and nutrition are copied into this meal and can be edited below.</p>}
             {recipe && !recipe.productNutrition && !recipe.nutritionFromIngredients && (
               <>
                 <p className="diary-hint">
@@ -436,7 +443,7 @@ export function DiaryMealEditor({
                   />
                   Use individual ingredients instead
                 </label>
-                {individual && (
+                {individual && !wholeRecipe && (
                   <p className="diary-hint">
                     Ingredient values must describe their full recipe
                     quantities. They are divided by the recipe’s serving count.
@@ -446,13 +453,13 @@ export function DiaryMealEditor({
                 )}
               </>
             )}
-            {recipe?.productNutrition && (
+            {recipe?.productNutrition && !wholeRecipe && (
               <p className="diary-hint">
                 Imports the saved product ingredients for this many servings.
                 Each amount is editable below.
               </p>
             )}
-            {recipe?.nutritionFromIngredients && (
+            {recipe?.nutritionFromIngredients && !wholeRecipe && (
               <p className="diary-hint">
                 Imports the saved ingredient nutrition for this many servings so known values and incomplete ingredients remain visible.
               </p>
@@ -465,6 +472,8 @@ export function DiaryMealEditor({
             >
               Add recipe to entry
             </button>
+            {recipeError && <p role="alert">{recipeError}</p>}
+            {recipeNotice && <p role="status">{recipeNotice}</p>}
           </section>
           <div className="diary-actions">
             <button

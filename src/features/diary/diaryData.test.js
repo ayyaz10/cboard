@@ -185,6 +185,36 @@ test("calculated editor ingredients automatically reach the daily log", () => {
   assert.deepEqual(totals.calories, { value: 90, known: 1, missing: 1 });
   assert.deepEqual(totals.protein, { value: 15, known: 1, missing: 1 });
 });
+test("whole recipe imports support missing servings, fractions and inventory without changing the recipe", () => {
+  const recipe = { slug: 'imported-meal', title: 'Imported meal', servings: null, nutritionFromIngredients: true,
+    ingredients: [{ id: 'chicken', name: 'Chicken', amount: 130, unit: 'g', nutrition: { calories: 156, protein: 29.3, fat: 0 } }],
+    sauces: [{ id: 'sauce', name: 'Sauce', amount: 6, unit: 'g', nutrition: { calories: 6, carbs: 1.5 } }],
+  };
+  const before = structuredClone(recipe);
+  const whole = recipeItems(recipe, 1, false, { wholeRecipe: true });
+  const half = recipeItems(recipe, 0.5, false, { wholeRecipe: true });
+  assert.equal(whole.length, 2);
+  assert.equal(whole[0].quantity, 130);
+  assert.equal(half[0].quantity, 65);
+  assert.equal(itemNutrition(half[0]).calories, 78);
+  assert.equal(itemNutrition(half[0]).fat, 0);
+  assert.equal(itemNutrition(half[0]).fiber, null);
+  assert.equal(itemNutrition(half[1]).calories, 3);
+  assert.equal(half[0].inventoryUsage[0].amount * half[0].quantity, 65);
+  assert.deepEqual(half[0].inventoryUnresolved, []);
+  assert.equal(half[0].recipeOrigin.ingredientId, 'chicken');
+  assert.deepEqual(recipe, before);
+  assert.throws(() => recipeItems(recipe), /serving count/);
+  assert.throws(() => recipeItems(recipe, 0, false, { wholeRecipe: true }), /positive/);
+});
+test("whole recipe imports scale saved product labels even without servings", () => {
+  const recipe = { slug: 'product-meal', title: 'Meal', ingredients: [{ name: 'Food', amount: 200, unit: 'g' }],
+    productNutrition: { items: [{ quantity: 200, unit: 'g', nutrition: { quantity: 100, unit: 'g', calories: 80 } }] },
+  };
+  const [item] = recipeItems(recipe, 0.5, false, { wholeRecipe: true });
+  assert.equal(item.quantity, 100);
+  assert.equal(itemNutrition(item).calories, 80);
+});
 test("individual recipe ingredients use full recipe nutrition and serving count", () => {
   const recipe = {
     title: "Eggs",
