@@ -134,3 +134,4 @@ html[data-theme="matrix"] .finance .f-chart-zoom button{border-color:var(--matri
   .f-chart-tooltip{min-width:12rem;max-width:calc(100vw - 3rem)}
   .f-target-grid{grid-template-columns:1fr}
 }
+.f-section-grid > .f-form { align-self: start; align-content: start; }
