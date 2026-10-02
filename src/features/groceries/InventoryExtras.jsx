@@ -7,7 +7,7 @@ export function RecipeReferences({ item }) {
 export function InventoryExtras({ data, change, busy, section }) {
   const [draft, setDraft] = useState({ name: '', quantity: 1, unit: 'pieces' });
   const [error, setError] = useState('');
-  const unused = data.items.filter(item => item.recipeOnly);
+  const unused = data.items.filter(item => item.recipeOnly && !item.removed);
   async function save(event) {
     event.preventDefault();
     if (!draft.name.trim()) return;
@@ -32,8 +32,8 @@ export function InventoryExtras({ data, change, busy, section }) {
         const item = data.items.find(item => item.id === itemId);
         const slug = key.split('/')[0];
         const recipe = data.items.flatMap(item => item.recipeRefs || []).find(recipe => recipe.slug === slug);
-        if (!item || !recipe) return null;
-        return <label key={key} className="g-tools">{recipe.title}: {item.name}<select disabled={busy} value={itemId} onChange={event => change(state => { state.ingredientLinks[key] = event.target.value; return state; }, 'Ingredient link saved', false)}>{data.items.filter(candidate => convert(1, item.unit, candidate.unit) != null).map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.name} ({candidate.unit})</option>)}</select></label>;
+        if (!item || item.removed || !recipe) return null;
+        return <label key={key} className="g-tools">{recipe.title}: {item.name}<select disabled={busy} value={itemId} onChange={event => change(state => { state.ingredientLinks[key] = event.target.value; return state; }, 'Ingredient link saved', false)}>{data.items.filter(candidate => !candidate.removed && convert(1, item.unit, candidate.unit) != null).map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.name} ({candidate.unit})</option>)}</select></label>;
       })}
     </section>
     <section hidden={section !== 'wishlist'}><h2>Wishlist / Future items ({data.wishlist?.length || 0})</h2>

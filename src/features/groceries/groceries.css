@@ -212,6 +212,16 @@
   text-align: center;
 }
 .g-bulk {
+  position: fixed;
+  z-index: 40;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(760px, calc(100% - 24px));
+  max-height: 40vh;
+  overflow-y: auto;
+  border: 2px solid #17251b;
+  box-shadow: 0 4px 20px #0003;
   display: flex;
   align-items: center;
   gap: 9px;
@@ -221,6 +231,8 @@
   border-radius: 12px;
   margin-top: 15px;
 }
+.groceries:has(.g-bulk) { padding-bottom: 180px; }
+.groceries:has(.g-bulk) .g-footer { display: none; }
 .g-footer {
   position: sticky;
   z-index: 25;

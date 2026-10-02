@@ -81,7 +81,7 @@ export function reconcileInventory(state, before, after) {
       const prior = applied[itemId] ? convert(applied[itemId].amount, applied[itemId].unit, item.unit) : 0;
       if (prior == null) throw new Error(`${item.name}: use the original stock unit before changing its diary entry.`);
       const delta = (now.get(itemId) || 0) - (old.get(itemId) || 0);
-      const target = next.settings.stockTrackingPaused || item.stockTrackingPaused ? prior : current.has(key) ? Math.max(0, round(prior + delta)) : 0;
+      const target = next.settings.stockTrackingPaused || item.stockTrackingPaused || item.removed ? prior : current.has(key) ? Math.max(0, round(prior + delta)) : 0;
       const change = round(target - prior);
       if (change && item.quantity != null) {
         item.quantity = round(item.quantity - change);

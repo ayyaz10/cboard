@@ -26,6 +26,7 @@ import {
   addShopping,
   purchase,
   normalizeName,
+  removeGroceryItems,
   groceryImageFor,
   setGroceryImage,
 } from "./groceryData";
@@ -333,7 +334,7 @@ export function Groceries() {
   const currency = data?.settings.currency || "GBP";
   const money = (amount) => new Intl.NumberFormat(undefined, { style: "currency", currency }).format(amount);
   const estimate = shoppingEstimate(data?.shopping || []);
-  const list = data ? (tab === "stock" ? data.items.filter(item => !item.recipeOnly) : data.shopping) : [];
+  const list = data ? (tab === "stock" ? data.items.filter(item => !item.recipeOnly && !item.removed) : data.shopping) : [];
   const filtered = list.filter(
     (i) =>
       i.name.toLowerCase().includes(query.toLowerCase()) &&
@@ -427,7 +428,7 @@ export function Groceries() {
                     <strong>
                       {label === "Shopping list"
                         ? data.shopping.length
-                        : data.items.filter((i) => !i.recipeOnly && stockStatus(i) === label)
+                        : data.items.filter((i) => !i.recipeOnly && !i.removed && stockStatus(i) === label)
                             .length}
                     </strong>
                     <span>{label}</span>
@@ -447,7 +448,7 @@ export function Groceries() {
                       setStatus("All");
                     }}
                   >
-                    {name}{key === 'unused' ? ` (${data.items.filter(item => item.recipeOnly).length})` : key === 'wishlist' ? ` (${data.wishlist?.length || 0})` : ''}
+                    {name}{key === 'unused' ? ` (${data.items.filter(item => item.recipeOnly && !item.removed).length})` : key === 'wishlist' ? ` (${data.wishlist?.length || 0})` : ''}
                   </button>
                 ))}
               </div>
@@ -531,7 +532,7 @@ export function Groceries() {
                     onClick={() =>
                       toShop(
                         data.items.filter((i) =>
-                          !i.recipeOnly && ["Low stock", "Out of stock"].includes(
+                          !i.recipeOnly && !i.removed && ["Low stock", "Out of stock"].includes(
                             stockStatus(i),
                           ),
                         ),
@@ -571,7 +572,7 @@ export function Groceries() {
               </div>
             </div>
             {selected.length > 0 && (
-              <div className="g-bulk">
+              <div className="g-bulk" role="region" aria-label="Selected grocery actions">
                 <strong>{selected.length} selected</strong>
                 {tab === "stock" ? (
                   <>
@@ -623,9 +624,7 @@ export function Groceries() {
                   onClick={async () => {
                     if (
                       await change((s) => {
-                        const key = tab === "stock" ? "items" : "shopping";
-                        s[key] = s[key].filter((i) => !selected.includes(i.id));
-                        return s;
+                        return removeGroceryItems(s, selected, tab !== "stock");
                       }, "Items removed")
                     )
                       setSelected([]);
@@ -634,9 +633,10 @@ export function Groceries() {
                   Remove
                 </button>
                 <button onClick={() => setSelected([])}>Clear</button>
+                {error && <p role="alert">{error}</p>}
               </div>
             )}
-            {tab === "stock" && data.items.some((i) => i.quantity == null) && (
+            {tab === "stock" && data.items.some((i) => !i.removed && i.quantity == null) && (
               <p className="g-hint">
                 First-time setup? Tap “Set qty” beside each item. Press Enter to
                 save. Unknown quantities aren’t counted as out of stock.
@@ -1253,9 +1253,7 @@ export function Groceries() {
                   onClick={async () => {
                     if (
                       await change((s) => {
-                        const key = modal === "edit" ? "items" : "shopping";
-                        s[key] = s[key].filter((i) => i.id !== edit.id);
-                        return s;
+                        return removeGroceryItems(s, [edit.id], modal !== "edit");
                       }, "Item removed")
                     )
                       setModal(null);

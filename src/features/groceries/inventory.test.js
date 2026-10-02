@@ -3,10 +3,43 @@ import assert from 'node:assert/strict';
 import { linkRecipeInventory, reconcileInventory } from './inventory.js';
 import { foodItem, recipeItems, validateDay } from '../diary/diaryData.js';
 import { validateRecipe } from '../recipes/recipeData.js';
+import { removeGroceryItems, addItems, purchase, normalizeGroceryState } from './groceryData.js';
 const stock = () => ({ items: [{ id: 'chicken', name: 'Chicken', quantity: 1000, unit: 'g' }], settings: {}, shopping: [] });
 const recipe = (slug = 'chicken-rice') => validateRecipe({ slug, title: slug, mealType: 'Lunch', servings: 2, ingredients: [{ name: 'Chicken', amount: 300, unit: 'g', nutrition: { calories: 330, protein: 60, salt: 1, sugars: 2 } }], steps: ['Cook'], nutritionFromIngredients: true });
 const day = items => ({ date: '2026-09-29', meals: [{ id: 'meal', meal: 'Lunch', title: 'Lunch', items }], skipped: [], complete: false });
 const quantity = state => state.items.find(item => item.id === 'chicken').quantity;
+
+test('removing tracked groceries preserves ledger IDs and stays removed after recipe reload', () => {
+  const r = recipe();
+  const first = day(recipeItems(r));
+  let state = reconcileInventory(linkRecipeInventory(stock(), [r]), null, first).state;
+  const ledger = structuredClone(state.inventoryLedger);
+  state.items.push({ id: 'extra', name: 'Other', unit: 'g', quantity: 100 });
+  removeGroceryItems(state, ['chicken', 'extra']);
+  state = linkRecipeInventory(normalizeGroceryState(JSON.parse(JSON.stringify(state))), [r], [first]);
+  assert.equal(state.items.filter(item => !item.removed).length, 0);
+  assert.deepEqual(state.inventoryLedger, ledger);
+  assert.equal(state.items.length, 2);
+  const another = day(recipeItems(r));
+  const result = reconcileInventory(state, null, another);
+  assert.deepEqual(result.adjustments, []);
+  assert.equal(result.state.items[0].removed, true);
+  assert.equal(quantity(reconcileInventory(state, first, null).state), 850);
+});
+
+test('explicit add or purchase restores removed groceries without their old stock quantity', () => {
+  const state = removeGroceryItems(stock(), ['chicken']);
+  const added = addItems(state, [{ name: 'Chicken', quantity: 50, unit: 'g' }]);
+  assert.equal(added.items[0].removed, false);
+  assert.equal(quantity(added), 50);
+  state.shopping = [{ id: 'buy', name: 'Chicken', quantity: 75, unit: 'g' }];
+  const bought = purchase(state, [{ id: 'buy', quantity: 75 }]);
+  assert.equal(bought.items[0].removed, false);
+  assert.equal(quantity(bought), 75);
+  removeGroceryItems(state, ['buy'], true);
+  assert.equal(state.shopping.length, 0);
+  assert.equal(state.items.length, 1);
+});
 
 test('recipe log, repeated save, quantity edit, reload and delete reconcile exact stock deltas', () => {
   const r = recipe(); const items = recipeItems(r); const first = validateDay(day(items), '2026-09-30');

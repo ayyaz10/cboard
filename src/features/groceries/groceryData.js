@@ -60,6 +60,15 @@ export const units = [
   "bottles",
 ];
 export const round = (n) => Math.round(n * 10000) / 10000;
+export function removeGroceryItems(state, ids, shopping = false) {
+  const selected = new Set(ids);
+  if (shopping) state.shopping = state.shopping.filter(item => !selected.has(item.id));
+  else for (const item of state.items) {
+    // Retain IDs referenced by diary snapshots and the inventory ledger.
+    if (selected.has(item.id)) item.removed = true;
+  }
+  return state;
+}
 export const normalizeName = (name) =>
   name
     .toLowerCase()
@@ -219,7 +228,7 @@ export const ingredientKey = (recipe, item, index) => `${recipe.slug}/${item.id 
 function recipeStock(recipe, ingredient, index, state) {
   const linkedId = state.ingredientLinks?.[ingredientKey(recipe, ingredient, index)];
   const linked = linkedId && state.items.find(item => item.id === linkedId);
-  return linked || state.items.find(item => normalizeName(item.name) === normalizeName(ingredient.name));
+  return (linked && !linked.removed ? linked : null) || state.items.find(item => !item.removed && normalizeName(item.name) === normalizeName(ingredient.name));
 }
 export function recipeNutrition(recipe, state, multiplier = 1) {
   const totals = Object.fromEntries(nutrients.map(([key]) => [key, { value: null, missing: [] }]));
@@ -285,6 +294,7 @@ export function addItems(state, entries, shopping = false) {
       (i) => normalizeName(i.name) === normalizeName(entry.name),
     );
     if (existing) {
+      if (existing.removed) { existing.quantity = null; existing.removed = false; }
       existing.recipeOnly = false;
       copyPrice(existing, entry);
       if (entry.nutrition != null) existing.nutrition = structuredClone(entry.nutrition);
@@ -336,6 +346,7 @@ export function purchase(state, purchases) {
       (i) => normalizeName(i.name) === normalizeName(entry.name),
     );
     if (existing) {
+      if (existing.removed) { existing.quantity = 0; existing.removed = false; }
       existing.recipeOnly = false;
       const amount = convert(quantity, entry.unit, existing.unit);
       if (
