@@ -20,9 +20,9 @@ export function buildPwa(outDir, base) {
     return readdirSync(dir, { withFileTypes: true }).flatMap(entry => entry.isDirectory() ? files(resolve(dir, entry.name)) : [resolve(dir, entry.name)]);
   }
   const assets = files(outDir).map(path => ({ path, name: relative(outDir, path).replaceAll('\\', '/') }))
-    .filter(({ name }) => /^(assets\/.*\.(js|css|png|svg|woff2?)|icons\/.*\.png|index\.html|manifest\.webmanifest|nutrition\/usda-foods\.json|recipes\/[^/]+\.json)$/.test(name))
+    .filter(({ name }) => /^(assets\/.*\.(js|css|png|svg|woff2?)|ocr\/[^/]+\.(js|gz)|icons\/.*\.png|index\.html|manifest\.webmanifest|nutrition\/usda-foods\.json|recipes\/[^/]+\.json)$/.test(name))
     .sort((a, b) => a.name.localeCompare(b.name))
-    .map(({ path, name }) => ({ url: base + name, integrity: `sha256-${digest(readFileSync(path))}`, optional: /^(nutrition|recipes)\//.test(name) }));
+    .map(({ path, name }) => ({ url: base + name, integrity: `sha256-${digest(readFileSync(path))}`, optional: /^(nutrition|recipes|ocr)\//.test(name) }));
   const source = readFileSync(new URL('../src/pwa/sw.js', import.meta.url), 'utf8');
   const version = createHash('sha256').update(JSON.stringify(assets) + source).digest('hex').slice(0, 20);
   const config = { base, version, assets };
