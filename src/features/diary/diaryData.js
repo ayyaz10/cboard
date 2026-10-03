@@ -1,3 +1,4 @@
+import { cleanLabelBasis } from '../nutrition/nutritionLabelReview.js';
 import { ingredientLabelAmount } from '../recipes/ingredientNutrition.js';
 import { convert, canonicalUnit } from '../groceries/groceryData.js';
 import {
@@ -134,6 +135,7 @@ export function validateItem(item) {
       name: text(item.source?.name || "", 500),
       code: /^\d{1,30}$/.test(item.source?.code || "") ? item.source.code : "",
       modified: item.source?.modified === true,
+      ...(cleanLabelBasis(item.source?.labelBasis) ? {labelBasis:cleanLabelBasis(item.source?.labelBasis)} : {}), 
       estimatedPortion: item.source?.estimatedPortion === true,
       portionDescription: text(item.source?.portionDescription || '', 200),
     },

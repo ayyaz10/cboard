@@ -232,7 +232,7 @@ function RecipesContent({ route, navigationPath }) {
             return !manage ? <RecipeLink key={item} to="/recipes/manage">Manage recipes</RecipeLink> : null;
           })}
         </nav>
-        {addingFood && <FoodItemEditor catalog={foodCatalog} onClose={() => setAddingFood(false)} onSave={async item => {
+        {addingFood && <FoodItemEditor initial={typeof addingFood==='object'?addingFood:null} catalog={foodCatalog} onClose={() => setAddingFood(false)} onSave={async item => {
           await saveMainFoodItems([item]);
           setRecipeNotice(`${item.name} saved to your food library. Search for it when adding a Food Diary meal.`);
         }} />}
@@ -280,7 +280,7 @@ function RecipesContent({ route, navigationPath }) {
                 }}
               />
             ) : null}
-            {!error && foods && <FoodLibrary library={ingredientLibrary} recipes={recipes} onAdd={() => setAddingFood(true)} />}
+            {!error && foods && <FoodLibrary library={ingredientLibrary} recipes={recipes} onAdd={() => setAddingFood(true)} onEdit={name=>setAddingFood(foodCatalog.find(item=>item.name.toLowerCase()===name.toLowerCase())||true)} />}
             {!error && planning && <DailyMealPlanner recipes={recipes} nutritionGoals={nutritionGoals} />}
             {!error && diary && <FoodDiary recipes={recipes} nutritionGoals={nutritionGoals} foodCatalog={foodCatalog} onFoodCatalogChange={saveMainFoodItems} onDiaryRecipeUpdated={updated => setRecipes(current => [updated, ...current.filter(item => item.slug !== updated.slug)])} />}
             {!error && (home || manage) && (

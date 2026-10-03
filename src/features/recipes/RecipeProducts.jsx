@@ -1,3 +1,4 @@
+import { NutritionLabelScan } from '../nutrition/NutritionLabelScan';
 import { useEffect, useState } from 'react';
 import { NutritionLookup } from '../groceries/NutritionLookup';
 import { saveRecipeProducts } from '../../services/recipeService';
@@ -61,13 +62,16 @@ export function RecipeProducts({ recipe, onSaved, onPreview }) {
               </details>
               <p className="text-sm">For this ingredient: {macroKeys.map((key) => `${labels[key]}: ${calculated.ingredients[index][key] == null ? 'unknown' : Number(calculated.ingredients[index][key].toFixed(2))}`).join(' · ')}</p>
             </>}
+            {open && <NutritionLabelScan disabled={busy} current={item?.nutrition} onApply={nutrition=>update(index, {
+              quantity:item?.unit===nutrition.unit?item.quantity:initialProductAmount(ingredient,nutrition.unit),unit:nutrition.unit,nutrition,
+            })}/>}
             <div className="g-actions mt-2">
               <button type="button" aria-expanded={active === index} onClick={() => setActive(active === index ? null : index)}>{active === index ? 'Close lookup' : item ? 'Change product' : 'Choose product'}</button>
               {!item && <button type="button" onClick={() => update(index, { quantity: initialProductAmount(ingredient, 'g'), unit: 'g', nutrition: { quantity: 100, unit: 'g', source: { name: ingredient.name, provider: 'Manual label' } } })}>Enter label manually</button>}
               {item && <button type="button" onClick={() => update(index, null)}>Remove product</button>}
             </div>
-            {item && <label>Label unit<select value={item.unit} onChange={(event) => update(index, { ...item, unit: event.target.value, quantity: initialProductAmount(ingredient, event.target.value), nutrition: { ...item.nutrition, unit: event.target.value, source: { ...item.nutrition.source, modified: true } } })}><option value="g">Grams (g)</option><option value="ml">Millilitres (ml)</option><option value="pieces">Pieces (label must give values per piece)</option></select></label>}
-            {open && active === index && <NutritionLookup key={index} name={ingredient.name} amountUnit={ingredient.unit} portionMode="weight" active visible onSelect={(nutrition) => {
+            {item && <label>Label unit<select value={item.unit} onChange={(event) => update(index, { ...item, unit: event.target.value, quantity: initialProductAmount(ingredient, event.target.value), nutrition: { ...item.nutrition, unit: event.target.value, source: { ...item.nutrition.source, modified: true } } })}><option value="g">Grams (g)</option><option value="ml">Millilitres (ml)</option><option value="pieces">Pieces (label must give values per piece)</option><option value="servings">Servings</option></select></label>}
+            {open && active === index && <NutritionLookup allowLabelScan={false} key={index} name={ingredient.name} amountUnit={ingredient.unit} portionMode="weight" active visible onSelect={(nutrition) => {
               const direct = initialProductAmount(ingredient, nutrition.unit);
               const count = initialProductAmount({ amount: ingredient.amount, unit: 'pieces' }, 'pieces');
               update(index, { quantity: direct !== '' ? direct : nutrition.portion && count !== '' ? nutrition.portion.grams * count : '', unit: nutrition.unit, nutrition }); setActive(null);

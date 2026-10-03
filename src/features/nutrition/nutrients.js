@@ -20,6 +20,7 @@ export const NUTRIENTS = [
   ["vitaminE", "Vitamin E", "mg", "vitamin-e", 1000],
   ["vitaminB12", "Vitamin B12", "µg", "vitamin-b12", 1000000],
   ["folate", "Folate", "µg", "folates", 1000000],
+  ["energyKJ", "Energy", "kJ", "energy", 1],
 ];
 export const nutrientKeys = NUTRIENTS.map(([key]) => key);
 export const validNutrient = (value) =>

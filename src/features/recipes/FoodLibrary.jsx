@@ -4,7 +4,7 @@ import { RecipeLink, secondaryButton } from './RecipeComponents';
 
 const formatNutrient = value => Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
-export function FoodLibrary({ library, recipes, onAdd }) {
+export function FoodLibrary({ library, recipes, onAdd, onEdit }) {
   const [query, setQuery] = useState('');
   const [source, setSource] = useState('all');
   const [view, setView] = useState('list');
@@ -44,7 +44,7 @@ export function FoodLibrary({ library, recipes, onAdd }) {
             <th scope="row"><strong>{item.name}</strong><span className="food-library-meta">{quantity != null ? `Nutrition for ${quantity} ${unit || ''}` : 'Nutrition basis not set'}</span>{item.nutritionLabel && item.amount != null && <span className="food-library-meta">Listed amount: {item.amount} {item.unit}</span>}</th>
             {NUTRIENTS.slice(0, 5).map(([key, label, nutrientUnit]) => <td key={key} data-label={label} className="food-library-number">{nutrition[key] == null ? <span className="food-library-missing">Not set</span> : <>{formatNutrient(nutrition[key])} <small>{nutrientUnit}</small></>}</td>)}
             <td data-label="Source / recipes"><div className="food-library-sources">{entry.recipeTitles.includes('Main food library') && <span className="food-library-meta">Shared food library</span>}{usedBy.map(recipe => <RecipeLink className="food-library-recipe-link" key={recipe.slug} to={`/recipes/${recipe.slug}`}>{recipe.title}</RecipeLink>)}{nutrition.source?.provider && <span className="food-library-meta">Nutrition: {nutrition.source.provider}</span>}</div></td>
-            <td data-label="Details"><details><summary aria-label={`More details for ${item.name}`}>More details</summary><div className="food-library-row-details">{item.note && <p>{item.note}</p>}{nutrition.source?.name && <p className="food-library-meta">Label: {nutrition.source.name}</p>}<dl className="food-library-nutrients">{NUTRIENTS.slice(5).map(([key, label, nutrientUnit]) => <div key={key}><dt>{label}</dt><dd>{nutrition[key] == null ? 'Not set' : `${formatNutrient(nutrition[key])} ${nutrientUnit}`}</dd></div>)}</dl></div></details></td>
+            <td data-label="Details">{entry.recipeTitles.includes('Main food library') && <button type="button" className={secondaryButton} onClick={()=>onEdit(item.name)}>Edit food</button>}<details><summary aria-label={`More details for ${item.name}`}>More details</summary><div className="food-library-row-details">{item.note && <p>{item.note}</p>}{nutrition.source?.name && <p className="food-library-meta">Label: {nutrition.source.name}</p>}<dl className="food-library-nutrients">{NUTRIENTS.slice(5).map(([key, label, nutrientUnit]) => <div key={key}><dt>{label}</dt><dd>{nutrition[key] == null ? 'Not set' : `${formatNutrient(nutrition[key])} ${nutrientUnit}`}</dd></div>)}</dl></div></details></td>
           </tr>;
         })}</tbody>
       </table>
@@ -60,7 +60,7 @@ export function FoodLibrary({ library, recipes, onAdd }) {
         <p className="text-sm mt-2">{quantity != null ? `Nutrition for ${quantity} ${unit || ''}` : 'Nutrition basis not set'}</p>
         <dl className="food-library-nutrients">{NUTRIENTS.slice(0, 5).map(([key,label,nutrientUnit]) => <div key={key}><dt>{label}</dt><dd>{nutrition[key] == null ? 'Not set' : `${formatNutrient(nutrition[key])} ${nutrientUnit}`}</dd></div>)}</dl>
         <details><summary>More nutrients</summary><dl className="food-library-nutrients">{NUTRIENTS.slice(5).map(([key,label,nutrientUnit]) => <div key={key}><dt>{label}</dt><dd>{nutrition[key] == null ? 'Not set' : `${formatNutrient(nutrition[key])} ${nutrientUnit}`}</dd></div>)}</dl></details>
-        {entry.recipeTitles.includes('Main food library') && <p className="text-sm mt-3">Saved in shared food library</p>}
+        {entry.recipeTitles.includes('Main food library') && <><p className="text-sm mt-3">Saved in shared food library</p><button type="button" className={secondaryButton} onClick={()=>onEdit(item.name)}>Edit food</button></>}
         {usedBy.length > 0 && <div className="mt-3"><h3 className="font-bold">Used in recipes</h3><div className="flex flex-wrap gap-2 mt-2">{usedBy.map(recipe => <RecipeLink key={recipe.slug} to={`/recipes/${recipe.slug}`}>{recipe.title}</RecipeLink>)}</div></div>}
       </article>;
     })}</div>}

@@ -1,3 +1,5 @@
+import { NutritionLabelScan } from '../nutrition/NutritionLabelScan';
+import { ingredientScanCurrent } from '../nutrition/nutritionScanAdapters.js';
 import { NUTRIENTS } from '../nutrition/nutrients.js';
 import { secondaryButton } from './RecipeComponents';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -208,7 +210,8 @@ function ItemEditor({ item, onChange, groups, visible, ingredientLibrary }) {
           }
         }}>Enter nutrition manually</button>
         </div>
-        {visible && lookup && <div className="max-h-[34rem] min-w-0 overflow-y-auto overscroll-contain pr-1" aria-label="Food nutrition search results"><NutritionLookup name={item.name || ''} amountUnit={item.unit} portionMode="weight" active visible onSelect={useLabel} /></div>}
+        {visible && <NutritionLabelScan current={ingredientScanCurrent(item)} onApply={useLabel}/>}
+        {visible && lookup && <div className="max-h-[34rem] min-w-0 overflow-y-auto overscroll-contain pr-1" aria-label="Food nutrition search results"><NutritionLookup allowLabelScan={false} name={item.name || ''} amountUnit={item.unit} portionMode="weight" active visible onSelect={useLabel} /></div>}
         {label && <>
           <p className="text-sm">{label.source.name || item.name} · {label.source.provider}. Label values per {label.quantity} {label.unit}.</p>
           {label.source.estimatedPortion && <p className="text-sm">Estimated USDA portion: {label.source.portionDescription}. Replace the weight below with your measured edible weight if available.</p>}
@@ -331,6 +334,8 @@ function Items({ title, items, onChange, groups, ingredientLibrary }) {
 export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary = [], imageEditor = null }) {
   recipe = prepareIngredientEditor(recipe);
   const nutritionDisplay = recipeNutritionDisplay(recipe);
+  const [recipeScanAmount,setRecipeScanAmount]=useState('');
+  const [recipeScanUnit,setRecipeScanUnit]=useState('g');
   const set = (key, value, options = {}) => {
     const next = { ...recipe, [key]: value };
     if (key === 'nutrition') next.nutritionFromIngredients = false;
@@ -396,6 +401,14 @@ export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary 
         <p className="text-sm text-black/70">
           {recipe.nutritionFromIngredients ? 'Calculated from ingredient and sauce quantities. Shows the whole recipe until a serving count is set, then per serving; alternatives are not included.' : 'Enter macros manually or use food lookup inside an ingredient to calculate from ingredients. Item nutrition describes the full amount listed for that ingredient.'}
         </p>
+        <details className="mt-3"><summary>Scan a label for recipe-level nutrition</summary>
+          <p>For a packaged meal or a label describing this recipe. For ingredients, use the scanner inside each ingredient instead. Enter how much of the labelled product is in one recipe serving.</p>
+          <div className="grid grid-cols-2 gap-2"><Field label="Labelled product per recipe serving" type="number" min="0.0001" step="any" value={recipeScanAmount} onChange={setRecipeScanAmount}/><label>Product unit<select className="field-input" value={recipeScanUnit} onChange={event=>setRecipeScanUnit(event.target.value)}>{['g','ml','pieces','servings'].map(unit=><option key={unit}>{unit}</option>)}</select></label></div>
+          <NutritionLabelScan current={{...nutritionDisplay.nutrition,quantity:Number(recipeScanAmount)||null,unit:recipeScanUnit}} onApply={label=>{
+            if(!(Number(recipeScanAmount)>0)||label.unit!==recipeScanUnit)throw new Error('Enter the product amount in one recipe serving, using the same unit as the label.');
+            set('nutrition',Object.fromEntries(NUTRIENTS.map(([key])=>[key,label[key]==null?null:label[key]*Number(recipeScanAmount)/label.quantity])));
+          }}/>
+        </details>
         <div className="mt-3"><Macros value={nutritionDisplay.nutrition} onChange={(value) => set('nutrition', value)} /></div>
         {recipe.nutritionFromIngredients && nutritionDisplay.partialKeys.length > 0 && <p className="mt-3 text-sm font-semibold">Some nutrient totals are partial because they are missing from one or more ingredients.</p>}
       </details>

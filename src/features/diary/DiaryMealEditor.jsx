@@ -1,3 +1,5 @@
+import { NutritionLabelScan } from '../nutrition/NutritionLabelScan';
+import { cleanNutrients } from '../nutrition/nutrients.js';
 import { NutritionTotals } from "./DiaryNutrition";
 import { useEffect, useId, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
@@ -122,7 +124,7 @@ export function DiaryMealEditor({
     }
   }
   function selectFood(nutrition) {
-    const item = foodItem(nutrition);
+    const item = foodItem(nutrition, nutrition.source?.provider==='Local nutrition label OCR'?'New food':undefined);
     const selectedId = lookup === "new" ? item.id : lookup;
     setDraft((current) => ({
       ...current,
@@ -133,6 +135,7 @@ export function DiaryMealEditor({
               old.id === lookup
                 ? {
                     ...item,
+                    ...(nutrition.source?.provider==='Local nutrition label OCR'?{name:old.name}:{}),
                     id: old.id,
                     ...(old.recipeOrigin ? { recipeOrigin: old.recipeOrigin } : {}),
                     quantity:
@@ -259,6 +262,12 @@ export function DiaryMealEditor({
                     {format(totals.calories)} kcal · {format(totals.protein)} g
                     protein
                   </p>
+                  <NutritionLabelScan disabled={busy} current={{...item.nutrition,quantity:item.basis,unit:item.nutritionUnit,source:item.source}} onApply={label=>changeItem(item.id, {
+                    basis:label.quantity,nutritionUnit:label.unit,nutrition:cleanNutrients(label),source:label.source,
+                    // Preserve amount eaten; require a new quantity if the units cannot be related.
+                    ...(item.unit!==label.unit && !(item.unit==='pieces' && ['g','ml'].includes(label.unit)) ? {unit:label.unit,quantity:''} : {}),
+                    ...(item.nutritionUnit!==label.unit ? {perPiece:null} : {}),
+                  })}/>
                   <details>
                     <summary>Edit label values and micronutrients</summary>
                     <div className="diary-fields">
@@ -516,6 +525,7 @@ export function DiaryMealEditor({
                 is per 100 g.
               </p>
               <NutritionLookup
+                currentNutrition={lookup!=='new'?(()=>{const item=draft.items.find(value=>value.id===lookup);return item?{...item.nutrition,quantity:item.basis,unit:item.nutritionUnit,source:item.source}:null;})():null}
                 key={lookup}
                 name={
                   lookup === "new"

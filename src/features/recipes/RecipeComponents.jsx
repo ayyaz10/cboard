@@ -1,3 +1,6 @@
+import { NutritionLabelScan } from '../nutrition/NutritionLabelScan';
+import { ingredientScanCurrent } from '../nutrition/nutritionScanAdapters.js';
+import { cleanIngredientLabel, ingredientLabelNutrition, ingredientLabelAmount } from './ingredientNutrition.js';
 import { NUTRIENTS } from '../nutrition/nutrients.js';
 import { updateIngredientField } from './ingredientNutrition.js';
 import { RecipeHealthReview } from './RecipeHealthReview';
@@ -145,6 +148,7 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
   const editableAmount = initialProductAmount({ amount: item.amount, unit: 'pieces' }, 'pieces');
   const [editing, setEditing] = useState(false);
   const [values, setValues] = useState(item.nutrition || {});
+  const [nutritionLabel,setNutritionLabel] = useState(item.nutritionLabel || null);
   const [amount, setAmount] = useState(editableAmount);
   const [unit, setUnit] = useState(item.unit);
   const [busy, setBusy] = useState(false);
@@ -153,7 +157,7 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
     setBusy(true);
     setError('');
     try {
-      const saved = await saveRecipeIngredientNutrition(recipe, index, values, { amount: Number(amount), unit });
+      const saved = await saveRecipeIngredientNutrition(recipe, index, values, { amount: Number(amount), unit, ...(nutritionLabel?{nutritionLabel}: {}) });
       onSaved?.(saved);
       setEditing(false);
     } catch (saveError) {
@@ -175,7 +179,7 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
             aria-label={`${editing ? 'Close' : 'Edit'} nutrition for ${formatIngredient(item)}`}
             aria-expanded={editing}
             title="Edit ingredient nutrition"
-            onClick={() => { setValues(item.nutrition || {}); setAmount(editableAmount); setUnit(item.unit); setError(''); setEditing((value) => !value); }}
+            onClick={() => { setValues(item.nutrition || {}); setNutritionLabel(item.nutritionLabel || null); setAmount(editableAmount); setUnit(item.unit); setError(''); setEditing((value) => !value); }}
           >
             <span>{ingredientNutritionSummary(item)}</span>
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 transition-transform group-hover:scale-110">
@@ -194,13 +198,20 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
     {editing && <fieldset disabled={busy} className="mt-3 space-y-3 border-t-2 border-black/15 pt-3">
       <legend className="sr-only">Edit nutrition for {formatIngredient(item)}</legend>
       <div className="grid grid-cols-2 gap-2"><label>Amount<input className="field-input" type="number" min="0.0001" step="any" value={amount ?? ''} onChange={event => {
-        const next = updateIngredientField({ amount, unit, nutrition: values }, 'amount', event.target.value);
+        const next = updateIngredientField({ amount, unit, nutrition: values, nutritionLabel }, 'amount', event.target.value);
         setAmount(event.target.value); setValues(next.nutrition);
-      }} /></label><label>Unit<input className="field-input" value={unit} onChange={event => { const next = updateIngredientField({ amount, unit, nutrition: values }, 'unit', event.target.value); setUnit(event.target.value); setValues(next.nutrition); }} /></label></div>
+      }} /></label><label>Unit<input className="field-input" value={unit} onChange={event => { const next = updateIngredientField({ amount, unit, nutrition: values, nutritionLabel }, 'unit', event.target.value); setUnit(event.target.value); setValues(next.nutrition); }} /></label></div>
+      <NutritionLabelScan disabled={busy} current={ingredientScanCurrent({amount,unit,nutrition:values,nutritionLabel})} onApply={label=>{
+        const next=cleanIngredientLabel(label);setNutritionLabel(next);setValues(ingredientLabelNutrition({amount:Number(amount),unit,nutritionLabel:next}));
+      }}/>
+      {nutritionLabel && <p className="text-xs">Label: per {nutritionLabel.quantity} {nutritionLabel.unit}. Values below are calculated for the recipe amount.</p>}
+      {nutritionLabel && initialProductAmount({amount,unit},nutritionLabel.unit)==='' && <label>{nutritionLabel.unit} per recipe unit<input className="field-input" type="number" min="0.0001" step="any" value={nutritionLabel.amountPerUnit??''} onChange={event=>{
+        const next={...nutritionLabel,amountPerUnit:Number(event.target.value)||null,recipeUnit:String(unit).trim().toLowerCase()};setNutritionLabel(next);setValues(ingredientLabelNutrition({amount:Number(amount),unit,nutritionLabel:next}));
+      }}/></label>}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         {ingredientNutrients.map(([key, label, unit]) => <label key={key} className="space-y-1 text-xs font-semibold">
           <span className="block">{label} ({unit})</span>
-          <input className="field-input" type="number" min="0" step="any" value={values[key] ?? ''} onChange={(event) => setValues((current) => ({ ...current, [key]: event.target.value === '' ? null : Number(event.target.value) }))} />
+          <input className="field-input" type="number" min="0" step="any" value={values[key] ?? ''} onChange={(event) => {setNutritionLabel(null);setValues((current) => ({ ...current, [key]: event.target.value === '' ? null : Number(event.target.value) }));}} />
         </label>)}
       </div>
       <p className="text-xs text-black/60">Values are for the full ingredient amount shown above.</p>

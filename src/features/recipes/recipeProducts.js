@@ -1,3 +1,4 @@
+import { cleanLabelBasis } from '../nutrition/nutritionLabelReview.js';
 import { cleanNutrients, nutrientKeys } from '../nutrition/nutrients.js';
 export const macroKeys = nutrientKeys;
 export const productIngredients = (recipe) => [...recipe.ingredients, ...(recipe.sauces || [])];
@@ -8,14 +9,14 @@ const text = (s) => typeof s === 'string' ? s.slice(0, 500) : '';
 export function normalizeProducts(value, recipe) {
   if (!value || value.basis !== productBasis(recipe) || !Array.isArray(value.items) || value.items.length !== productIngredients(recipe).length) return null;
   const items = value.items.map((item) => {
-    if (!item || !['g', 'ml', 'pieces'].includes(item.unit) || !positive(item.quantity)) return null;
+    if (!item || !['g', 'ml', 'pieces', 'servings'].includes(item.unit) || !positive(item.quantity)) return null;
     const nutrition = item.nutrition;
     if (!nutrition || nutrition.unit !== item.unit || !positive(nutrition.quantity)) return null;
     const source = nutrition.source || {};
     return { quantity: item.quantity, unit: item.unit, nutrition: {
       quantity: nutrition.quantity, unit: item.unit,
       ...cleanNutrients(nutrition),
-      source: { name: text(source.name), provider: text(source.provider), code: text(source.code), fetchedAt: text(source.fetchedAt), modified: source.modified === true, estimatedPortion: source.estimatedPortion === true, portionDescription: text(source.portionDescription) },
+      source: { ...(cleanLabelBasis(source?.labelBasis) ? {labelBasis:cleanLabelBasis(source?.labelBasis)} : {}), name: text(source.name), provider: text(source.provider), code: text(source.code), fetchedAt: text(source.fetchedAt), modified: source.modified === true, estimatedPortion: source.estimatedPortion === true, portionDescription: text(source.portionDescription) },
     } };
   });
   return { basis: value.basis, items };
@@ -38,8 +39,8 @@ export function calculateProducts(items, servings) {
 }
 
 export function initialProductAmount(ingredient, unit) {
-  const aliases = { gram: 'g', grams: 'g', kilogram: 'kg', kilograms: 'kg', milligram: 'mg', milligrams: 'mg', millilitre: 'ml', millilitres: 'ml', milliliter: 'ml', milliliters: 'ml', litre: 'l', litres: 'l', liter: 'l', liters: 'l', piece: 'pieces', whole: 'pieces', item: 'pieces', items: 'pieces', each: 'pieces', ounce: 'oz', ounces: 'oz', pound: 'lb', pounds: 'lb', lbs: 'lb' };
-  const conversions = { g: ['g', 1], kg: ['g', 1000], mg: ['g', .001], oz: ['g', 28.349523125], lb: ['g', 453.59237], ml: ['ml', 1], cl: ['ml', 10], dl: ['ml', 100], l: ['ml', 1000], pieces: ['pieces', 1] };
+  const aliases = { serving: 'servings', portion: 'servings', portions: 'servings', gram: 'g', grams: 'g', kilogram: 'kg', kilograms: 'kg', milligram: 'mg', milligrams: 'mg', millilitre: 'ml', millilitres: 'ml', milliliter: 'ml', milliliters: 'ml', litre: 'l', litres: 'l', liter: 'l', liters: 'l', piece: 'pieces', whole: 'pieces', item: 'pieces', items: 'pieces', each: 'pieces', ounce: 'oz', ounces: 'oz', pound: 'lb', pounds: 'lb', lbs: 'lb' };
+  const conversions = { g: ['g', 1], kg: ['g', 1000], mg: ['g', .001], oz: ['g', 28.349523125], lb: ['g', 453.59237], ml: ['ml', 1], cl: ['ml', 10], dl: ['ml', 100], l: ['ml', 1000], pieces: ['pieces', 1], servings: ['servings',1] };
   const rawUnit = String(ingredient.unit).toLowerCase().trim();
   const conversion = conversions[aliases[rawUnit] || rawUnit];
   let amount = ingredient.amount;

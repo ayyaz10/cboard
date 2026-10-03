@@ -1,3 +1,4 @@
+import { cleanLabelBasis } from './nutritionLabelReview.js';
 import { cleanNutrients } from './nutrients.js';
 import { ingredientLabelNutrition, ingredientRecipeTotals } from '../recipes/ingredientNutrition.js';
 
@@ -20,6 +21,7 @@ export function cleanFoodCatalogItem(value) {
       provider: String(value.source?.provider || 'Manual').slice(0, 100),
       name: String(value.source?.name || name).slice(0, 500),
       modified: true,
+      ...(cleanLabelBasis(value.source?.labelBasis) ? {labelBasis:cleanLabelBasis(value.source?.labelBasis)} : {}), 
     },
     updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : new Date().toISOString(),
   };

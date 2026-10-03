@@ -95,7 +95,7 @@ function NutritionFields({ item, onChange }) {
   const number = (value) => value === "" ? null : Number(value);
   return <details className="g-nutrition-fields" onToggle={(e) => setOpen(e.currentTarget.open)}>
     <summary>{item.nutrition ? `Nutrition saved · per ${nutrition.quantity} ${nutrition.unit}` : 'Nutrition (optional)'}</summary>
-    <NutritionLookup name={item.name} amountUnit={item.unit} visible={open} active={open && !item.nutrition} onSelect={(value) => onChange({ ...item, nutrition: value })} />
+    <NutritionLookup scanUnits={['g','ml','pieces']} currentNutrition={nutrition} name={item.name} amountUnit={item.unit} visible={open} active={open && !item.nutrition} onSelect={(value) => onChange({ ...item, nutrition: value })} />
     {nutrition.source && <p className="g-hint">{nutrition.source.modified ? "Edited after importing" : "Imported"} from {nutrition.source.provider || "Open Food Facts"}: {nutrition.source.name}. Values fill the fields below; save the item to keep them.</p>}
     <p className="g-hint">You can also enter or adjust values manually. For a serving, enter its weight, volume or number of pieces. Leave unknown values blank.</p>
     <div className="g-tools">
