@@ -15,8 +15,10 @@ export function receiptDraft(receipt) {
 // Explicit allowlist: images, raw full OCR, card details and transient UI flags never persist.
 export function serializeReceipt(draft, transaction, previous) {
   const ids = new Set();
+  const confidence = value => Object.fromEntries(['name','quantity','unitPrice','lineTotal'].filter(key=>Number.isFinite(value?.[key])).map(key=>[key,Math.max(0,Math.min(100,value[key]))]));
   return { version: 1, merchantName: redactPaymentData(transaction.title), date: transaction.date, time: draft.time || '', currency: draft.currency,
     subtotal: optionalReceiptMoney(draft.subtotal), tax: optionalReceiptMoney(draft.tax), discounts: optionalReceiptMoney(draft.discounts), total: transaction.amount,
+    itemCount: Number.isSafeInteger(draft.itemCount) ? draft.itemCount : null,
     items: draft.items.map(item => {
       const quantity = item.quantity === '' || item.quantity == null ? null : Number(item.quantity);
       if (quantity !== null && (!Number.isFinite(quantity) || quantity <= 0)) throw new Error('Item quantities must be positive, or left blank.');
@@ -27,6 +29,9 @@ export function serializeReceipt(draft, transaction, previous) {
       const itemId = old && !ids.has(old.id) ? old.id : crypto.randomUUID();
       ids.add(itemId);
       return { id: itemId, transactionId: transaction.id, name, normalizedName: normalizedName(name), rawText: redactPaymentData(item.rawText).slice(0, 1000),
+        rawName: redactPaymentData(item.rawName || item.name).slice(0,200), retailerProductCode: /^\d{5,8}$/.test(item.retailerProductCode || '') ? item.retailerProductCode : null,
+        quantityRawText: redactPaymentData(item.quantityRawText || '').slice(0,100),
+        confidence: confidence(item.confidence),
         quantity, unit: String(item.unit || '').slice(0, 30), unitPrice: optionalReceiptMoney(item.unitPrice), lineTotal: optionalReceiptMoney(item.lineTotal),
         createdAt: old?.createdAt || transaction.updatedAt, updatedAt: transaction.updatedAt };
     }) };

@@ -2,6 +2,8 @@
 
 .f-receipt{border-top:2px solid currentColor;padding-top:1rem;min-width:0}.f-receipt-image{display:block;max-width:100%;max-height:32rem;object-fit:contain;margin:1rem auto}.f-receipt-raw{white-space:pre-wrap;overflow-wrap:anywhere;max-height:20rem;overflow:auto}.f-receipt fieldset{min-width:0}.f-receipt legend{font-weight:750;padding:0 .4rem}.f-receipt ul{padding-left:1.2rem;list-style:disc}.f-receipt li+li{margin-top:.4rem}.f-receipt-saved{margin-top:.6rem;max-width:28rem;overflow-wrap:anywhere}.f-receipt-saved summary{cursor:pointer;font-weight:700}.f-receipt-saved li{margin-top:.65rem;font-size:.85rem}
 
+.f-receipt-check{border-left:3px solid currentColor;padding:.4rem .65rem;background:#fff3cf;font-size:.82rem;font-weight:700}html[data-theme="matrix"] .f-receipt-check{background:var(--matrix-surface-soft);color:var(--matrix-text)}
+
 /* Finance section navigation: wrapped tabs on wide screens, compact picker on mobile. */
 .f-tabs-desktop{flex-wrap:wrap;overflow:visible;align-items:center}
 .f-mobile-tabs{display:none}

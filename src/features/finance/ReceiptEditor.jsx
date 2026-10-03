@@ -9,7 +9,8 @@ const readMoney = value => { try { return optionalReceiptMoney(value); } catch {
 export function ReceiptEditor({ receipt, onChange, onExtract, total, currency, initialOpen, onBusy }) {
   const [file, setFile] = useState(null), [image, setImage] = useState(''), [rotation, setRotation] = useState(0);
   const [busy, setBusy] = useState(false), [progress, setProgress] = useState(''), [error, setError] = useState(''), [raw, setRaw] = useState('');
-  const [confidence, setConfidence] = useState(null);
+  const [debugData, setDebugData] = useState(null);
+  const debugEnabled = import.meta.env.DEV && new URLSearchParams(window.location.search).get('receiptDebug') === '1';
   const session = useRef(null), job = useRef(0), locked = useRef(false);
   useEffect(() => () => { job.current++; session.current?.dispose(); }, []);
   useEffect(() => {
@@ -30,17 +31,17 @@ export function ReceiptEditor({ receipt, onChange, onExtract, total, currency, i
     const current = ++job.current;
     setBusy(true); onBusy(true); setError(''); setProgress('Preparing receipt…');
     if (!session.current) session.current = createReceiptOcrSession(message => {
-      setProgress(message.status === 'recognizing text' ? `Scanning receipt… ${Math.round(message.progress * 100)}%` : 'Loading receipt scanner…');
+      setProgress(message.status === 'recognizing text' ? `Scanning receipt… pass ${message.pass || 1}, ${Math.round(message.progress * 100)}%` : 'Preparing receipt scanner…');
     });
     const timeout = setTimeout(() => {
       if (current !== job.current) return;
       cancel(); setError('Scanning took too long. Try a smaller, clearer image and check your connection for the initial scanner download.');
     }, 120000);
     try {
-      const result = await session.current.scan(file, rotation);
+      const result = await session.current.scan(file, rotation, {debug:debugEnabled});
       if (current !== job.current) return;
-      setRaw(result.text || ''); setConfidence(result.confidence);
-      const parsed = parseReceipt(result.text);
+      setRaw(result.lines?.map(line=>line.text).join('\n') || result.text || ''); setDebugData(result.debug || null);
+      const parsed = result.parsed || parseReceipt(result);
       onExtract(parsed);
       setProgress('Scan complete. Review and correct the transaction before saving.');
       if (!result.text?.trim()) setError('No text detected. Try a brighter, sharper photo, rotate the image, or enter the items manually.');
@@ -53,7 +54,7 @@ export function ReceiptEditor({ receipt, onChange, onExtract, total, currency, i
   }
   const structured = receipt && { ...receipt, items: receipt.items.map(item => ({ ...item, quantity: item.quantity === '' ? null : Number(item.quantity), unitPrice: readMoney(item.unitPrice), lineTotal: readMoney(item.lineTotal) })) };
   const warnings = structured ? receiptWarnings(structured, readMoney(total)) : [];
-  const editItem = (id, patch) => onChange({ ...receipt, items: receipt.items.map(item => item.id === id ? { ...item, ...patch } : item) });
+  const editItem = (id, patch) => onChange({ ...receipt, items: receipt.items.map(item => item.id === id ? { ...item, ...patch, confidence:{...item.confidence,...Object.fromEntries(Object.keys(patch).map(key=>[key,100]))} } : item) });
   return <details className="f-receipt" open={initialOpen || receipt ? true : undefined}>
     <summary className="font-bold cursor-pointer">Receipt scan &amp; items</summary>
     <div className="f-form mt-3">
@@ -67,8 +68,8 @@ export function ReceiptEditor({ receipt, onChange, onExtract, total, currency, i
       {progress && <p role="status">{progress}</p>}
       {busy && <button type="button" className="f-button" onClick={cancel}>Cancel scan</button>}
       {error && <p role="alert" className="f-alert">{error}</p>}
-      {confidence != null && confidence < 70 && <p className="f-alert">The image was difficult to read. Check every field against the receipt.</p>}
       {raw && <details><summary>Extracted text (temporary)</summary><pre className="f-receipt-raw">{raw}</pre></details>}
+      {debugEnabled && debugData && <details><summary>Developer OCR comparison (temporary)</summary><p>Selected: {debugData.selected}. Crop: {debugData.region?'detected':'original fallback'}; deskew: {debugData.angle || 0}°; local row alignment: {debugData.rowDeskew?.length || 0} rows.</p>{debugData.cropped&&<img className="f-receipt-image" src={debugData.cropped} alt="Cropped receipt before thermal processing"/>}{debugData.candidates.map(candidate=><details key={candidate.name}><summary>{candidate.name} · PSM {candidate.psm} · score {candidate.score.toFixed(1)} · {candidate.elapsedMs} ms</summary><img className="f-receipt-image" src={candidate.image} alt={`${candidate.name} processed OCR image`}/><pre className="f-receipt-raw">{JSON.stringify({text:candidate.text,lines:candidate.lines,parsed:candidate.parsed},null,2)}</pre></details>)}</details>}
       {!receipt && <button type="button" className="f-button" disabled={busy} onClick={() => onExtract({ merchantName:'', date:'', time:'', currency:'', subtotal:null, tax:null, discounts:null, total:null, items:[] }, false)}>Enter receipt items manually</button>}
       {receipt && <>
         <p className="f-help">Merchant, date and total use the transaction fields above. Attaching to an existing transaction keeps those values; compare them with the extracted text. Scanning again replaces the draft items.</p>
@@ -76,7 +77,10 @@ export function ReceiptEditor({ receipt, onChange, onExtract, total, currency, i
         {receipt.currency && receipt.currency !== currency && <p className="f-alert">Receipt currency differs from Finance ({currency}). Convert the amounts yourself and set the receipt currency to {currency} before saving. No automatic conversion is applied.</p>}
         <div className="f-row">{[['subtotal','Subtotal'],['tax','Tax / VAT'],['discounts','Discounts']].map(([key,label]) => <label key={key}>{label}<input inputMode="decimal" value={receipt[key] ?? ''} onChange={e => onChange({ ...receipt, [key]:e.target.value })}/></label>)}</div>
         <h3 className="font-bold">Receipt items ({receipt.items.length})</h3>
+        {receipt.confidence && Object.values(receipt.confidence).some(value=>value<70) && <p className="f-help">Check receipt fields: {Object.entries(receipt.confidence).filter(([,value])=>value<70).map(([key])=>key).join(', ')}. Other detected fields have stronger evidence.</p>}
         {receipt.items.map((item, index) => <fieldset className="f-item f-form" key={item.id}><legend>Item {index + 1}</legend>
+          {item.retailerProductCode && <p className="f-help">Product code: {item.retailerProductCode}</p>}
+          {item.confidence && Object.values(item.confidence).some(value=>value<70) && <p className="f-receipt-check">Check: {Object.entries(item.confidence).filter(([,value])=>value<70).map(([key])=>({name:'item name',quantity:'quantity',unitPrice:'unit price',lineTotal:'line total'}[key]||key)).join(', ')}.</p>}
           <label>Item name<input maxLength={200} value={item.name} onChange={e => editItem(item.id, { name:e.target.value })}/></label>
           <div className="f-row"><label>Quantity<input inputMode="decimal" placeholder="Unknown" value={item.quantity} onChange={e => editItem(item.id, { quantity:e.target.value })}/></label><label>Unit<input maxLength={30} placeholder="each, kg, g, L, ml" value={item.unit} onChange={e => editItem(item.id, { unit:e.target.value })}/></label><label>Unit price<input inputMode="decimal" value={item.unitPrice} onChange={e => editItem(item.id, { unitPrice:e.target.value })}/></label><label>Line total<input inputMode="decimal" value={item.lineTotal} onChange={e => editItem(item.id, { lineTotal:e.target.value })}/></label></div>
           {item.rawText && <p className="f-help f-receipt-raw">Read as: {item.rawText}</p>}
