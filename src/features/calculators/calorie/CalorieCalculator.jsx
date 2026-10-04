@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { NutritionLabelScan } from '../../nutrition/NutritionLabelScan';
 import { ConfirmDialog } from '../../../components/ui/ConfirmDialog';
 import { RecentResultsPanel } from '../../../components/ui/RecentResultsPanel';
 import { InputField } from '../../../components/ui/InputField';
@@ -16,6 +17,7 @@ import {
 export function CalorieCalculator() {
   const { confirm, dialog } = useConfirmDialog();
   const [formValues, setFormValues] = useState(createEmptyCalorieForm);
+  const [labelUnit, setLabelUnit] = useState('');
   const [errors, setErrors] = useState({});
   const [result, setResult] = useState(null);
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
@@ -102,6 +104,12 @@ export function CalorieCalculator() {
             </div>
           </div>
 
+          <NutritionLabelScan current={{calories:formValues.totalCalories===''?null:Number(formValues.totalCalories),quantity:Number(formValues.totalQuantity)||null,unit:labelUnit||'unspecified'}} onApply={label=>{
+            if(label.calories==null)throw new Error('Enter or select the label calories (kcal) before applying to this calculator.');
+            setFormValues({...formValues,totalQuantity:String(label.quantity),totalCalories:String(label.calories),desiredQuantity:labelUnit===label.unit?formValues.desiredQuantity:''});
+            setLabelUnit(label.unit);setResult(null);setErrors({});setHasAttemptedSubmit(false);
+          }}/>
+          {labelUnit && <p className="mt-3 text-sm font-semibold">Label imported: quantities are in {labelUnit}. Enter your desired quantity in {labelUnit}, then calculate. This calculator uses calories only.</p>}
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             {calorieFieldConfig.map((field) => (
               <div key={field.name} className={field.wide ? 'sm:col-span-2' : ''}>

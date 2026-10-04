@@ -9,6 +9,7 @@ delete fixture.productNutrition;
 const main=`
 import React,{useState} from 'react';
 import {createRoot} from 'react-dom/client';
+import {CalorieCalculator} from '/cboard/src/features/calculators/calorie/CalorieCalculator.jsx';
 import {FoodItemEditor} from '/cboard/src/features/nutrition/FoodItemEditor.jsx';
 import {RecipeFormEditor} from '/cboard/src/features/recipes/RecipeFormEditor.jsx';
 import {IngredientList} from '/cboard/src/features/recipes/RecipeComponents.jsx';
@@ -26,6 +27,7 @@ function Harness(){
  const existing={name:'Existing food',quantity:100,unit:'g',nutrition:{calories:180,protein:12,fat:6,fiber:3},source:{provider:'Manual'}};
  const [meal,setMeal]=useState({id:'meal-id',meal:'Breakfast',title:'Test meal',time:'08:00',notes:'',items:[{id:'food-id',name:'Original food',quantity:150,unit:'g',basis:100,nutritionUnit:'g',nutrition:{calories:180,protein:12,fat:6,fiber:3},source:{provider:'Manual'}}]});
  window.qaRecipe=recipe;window.qaMeal=meal;
+ if(kind==='calorie')return h(CalorieCalculator);
  if(kind==='food'||kind==='existing')return closed?h('p',null,'Saved food'):h(FoodItemEditor,{catalog:kind==='existing'?[existing]:[],initial:kind==='existing'?existing:null,onClose:()=>setClosed(true),onSave:save});
  if(kind==='recipe')return h('main',null,h(RecipeFormEditor,{recipe,onChange:setRecipe}),h('button',{onClick:()=>save(validateRecipe(recipe))},'Save test recipe'));
  if(kind==='pen')return h(IngredientList,{recipe,onRecipeUpdated:value=>{setRecipe(value);save(value);}});
@@ -42,7 +44,7 @@ createRoot(document.getElementById('root')).render(h(Harness));`;
  const context=await browser.newContext({viewport:{width:1280,height:1000}}),page=await context.newPage();
  page.setDefaultTimeout(15000);page.setDefaultNavigationTimeout(60000);const errors=[],ocrRequests=[],external=[];
  page.on('pageerror',error=>errors.push(error.message));
- page.on('request',request=>{if(request.url().includes('/ocr/'))ocrRequests.push(request.url());if(new URL(request.url()).origin!==new URL(base).origin && /supabase|generativelanguage|gemini|amazonaws/.test(request.url()))external.push(request.url());});
+ page.on('request',request=>{if(request.url().includes('/cboard/ocr/'))ocrRequests.push(request.url());if(new URL(request.url()).origin!==new URL(base).origin && /supabase|generativelanguage|gemini|amazonaws/.test(request.url()))external.push(request.url());});
  await page.route('**/src/main.jsx*',route=>route.fulfill({contentType:'application/javascript',body:"import '/cboard/src/__nutrition_qa__.jsx';"}));
  await page.route('**/src/contexts/AuthContext.jsx*',route=>route.fulfill({contentType:'application/javascript',body:'export const useAuth=()=>({user:null,isAuthenticated:false});export const AuthProvider=({children})=>children;'}));
  await page.route('**/src/services/supabaseCrud.js*',route=>route.fulfill({contentType:'application/javascript',body:`
@@ -75,6 +77,7 @@ createRoot(document.getElementById('root')).render(h(Harness));`;
  assert.equal(ocrRequests.filter(url=>url.endsWith('/worker.min.js')).length,workers);
  await page.setViewportSize({width:390,height:844});
  assert.equal(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth),true);
+ await dialog.getByText('Original image, crop and rotation',{exact:true}).click();await dialog.getByLabel('Nutrition column',{exact:true}).scrollIntoViewIfNeeded();
  await dialog.screenshot({path:process.env.TEMP+'/cboard-nutrition-review.png'});
  await dialog.getByRole('button',{name:'Apply nutrition',exact:true}).click();
  assert.equal(await dialog.getByLabel('Food name',{exact:true}).inputValue(),'Retained product name');
@@ -97,6 +100,8 @@ createRoot(document.getElementById('root')).render(h(Harness));`;
  assert.equal(saved.items[0].id,'food-id');assert.equal(saved.items[0].name,'Original food');assert.equal(saved.items[0].quantity,150);assert.equal(saved.items[0].nutrition.calories,200);
  await page.goto(base+'?case=products');await page.getByText('Choose products & calculate nutrition',{exact:true}).click();await scan(page);await page.getByRole('button',{name:'Apply nutrition',exact:true}).click();await page.getByRole('button',{name:'Save products & nutrition',exact:true}).click();await page.waitForFunction(()=>window.qaSaved);saved=await page.evaluate(()=>window.qaSaved);assert.equal(saved.productNutrition.items[0].nutrition.calories,200);assert.equal(saved.nutrition.calories,300);
  await page.goto(base+'?case=lookup');await page.getByRole('button',{name:'Scan nutrition label',exact:true}).click();await upload(page);await page.getByRole('button',{name:'Apply nutrition',exact:true}).click();assert.equal((await page.evaluate(()=>window.qaSaved)).quantity,100);
+ await page.goto(base+'?case=calorie');await scan(page);await page.getByRole('button',{name:'Apply nutrition',exact:true}).click();
+ assert.equal(await page.getByLabel('Total calories',{exact:true}).inputValue(),'200');assert.equal(await page.getByLabel('Total quantity',{exact:true}).inputValue(),'100');await page.getByLabel('Desired quantity',{exact:true}).fill('150');await page.getByRole('button',{name:'Calculate',exact:true}).click();await page.getByText('300',{exact:true}).waitFor();
  // Invalid files and cancellation are recoverable and cannot apply stale results.
  await page.goto(base+'?case=food');dialog=page.getByRole('dialog');await dialog.getByRole('button',{name:'Scan nutrition label',exact:true}).click();
  await dialog.getByLabel('Upload nutrition label',{exact:true}).setInputFiles({name:'broken.png',mimeType:'image/png',buffer:Buffer.from('invalid')});await dialog.getByRole('alert').waitFor();

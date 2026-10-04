@@ -5,6 +5,7 @@ import {applyNutritionReview, currentAtBasis} from './nutritionLabelReview.js';
 import {ingredientLabelNutrition,cleanIngredientLabel} from '../recipes/ingredientNutrition.js';
 import {cleanFoodCatalogItem} from './foodCatalog.js';
 import {validateItem} from '../diary/diaryData.js';
+import {processReceiptPixels} from '../../services/ocr/imageProcessing.js';
 
 const UK=`Nutrition Information
 Typical values per 100g
@@ -76,6 +77,9 @@ test('separate tables remain selectable and ingredients/footer are excluded',()=
  const result=parseNutritionLabel(UK+'\nIngredients: flour, water\nSalt 100g\nNutrition Information\nPer 100ml\nFat 1g\nProtein 2g');
  assert.equal(result.columns.length,2);assert.equal(value(result.columns[0],'salt'),.4);assert.equal(value(result.columns[1],'fat'),1);assert.match(result.warnings[0],/Multiple/);
 });
+test('ingredient-list quantities before a nutrition section are ignored',()=>{
+ assert.equal(parseNutritionLabel('Ingredients\nProtein 30g\nSalt 2g\nStore in a cool place').columns.length,0);
+});
 for(const basis of ['item','pack','slice','scoop','container','portion'])test(`recognizes per-${basis} basis without inventing a weight`,()=>{
  const column=first(`Per ${basis}\nCalories 100\nProtein 2g`);assert.equal(column.kind,basis);assert.equal(column.unit,'pieces');assert.equal(column.quantity,1);
 });
@@ -92,6 +96,11 @@ test('incompatible basis requires explicit clearing; clear/edit/select actions a
  assert.equal(applyNutritionReview(current,{...column,values:{protein:null}},['protein'],{clearIncompatible:true}).protein,null);
  assert.throws(()=>applyNutritionReview(current,column,[]),/Select/);
 });
+test('per-pack and per-item quantities cannot silently retain each other\'s nutrients',()=>{
+ const current={quantity:1,unit:'pieces',protein:5,fat:3,source:{labelBasis:{kind:'pack'}}};
+ const column=first('Per item\nProtein 8g');assert.equal(currentAtBasis(current,column),null);
+ assert.throws(()=>applyNutritionReview(current,column,['protein']),/different unit/);
+});
 test('150g recipe amount scales per-100g nutrition without changing the label',()=>{
  const column=first('Per 100g\nCalories 200\nProtein 20g');const label=applyNutritionReview(null,column,['calories','protein']);
  const cleaned=cleanIngredientLabel(label);const nutrition=ingredientLabelNutrition({amount:150,unit:'g',nutritionLabel:cleaned});
@@ -103,4 +112,14 @@ test('reviewed basis, serving size and energy survive existing catalog/diary/ing
  const diary=validateItem({id:'same-id',name:'Existing food',quantity:150,unit:'g',basis:40,nutritionUnit:'g',nutrition:label,source:label.source});
  for(const source of [catalog.source,diary.source,cleanIngredientLabel(label).source])assert.equal(source.labelBasis.servingQuantity,40);
  assert.equal(catalog.nutrition.energyKJ,420);assert.equal(diary.id,'same-id');
+});
+test('nutrition preprocessing preserves table geometry and falls back on a borderless screenshot',()=>{
+ const width=300,height=200,data=new Uint8ClampedArray(width*height*4).fill(255);
+ const result=processReceiptPixels({data,width,height},{layout:'nutrition'});
+ assert.equal(result.region,null);assert.equal(result.cropped.width,width);assert.equal(result.aligned,undefined);assert.equal(result.variants.adaptive.length,width*height);
+});
+test('coherent label panels can be cropped and straightened without receipt-only row stacking',()=>{
+ const width=300,height=300,data=new Uint8ClampedArray(width*height*4);
+ for(let y=0;y<height;y++)for(let x=0;x<width;x++){const i=(y*width+x)*4;const paper=x>60+y*.04&&x<230+y*.04&&y>35&&y<265;data[i]=paper?245:40;data[i+1]=paper?245:80;data[i+2]=paper?245:160;data[i+3]=255;}
+ const result=processReceiptPixels({data,width,height},{layout:'nutrition'});assert.ok(result.region);assert.ok(result.cropped.width<width);assert.equal(result.aligned,undefined);
 });

@@ -105,7 +105,7 @@ export function parseNutritionLabel(input) {
       else if (!table.rows && table.columns[0].kind==='unknown') Object.assign(table.columns[0],{label:`Per serving (${info.quantity} ${info.unit})`,kind:'serving',...info,serving:info,confirmed:true});
       continue;
     }
-    if (noise.test(line.text)) { if(table?.rows)stopped=true; continue; }
+    if (noise.test(line.text)) { stopped=true; continue; }
     if (stopped) continue;
     const name=names.map(([key,pattern])=>({key,match:line.text.match(pattern)})).find(item=>item.match);
     if(!name)continue;

@@ -1,4 +1,5 @@
 import { NutritionLabelScan } from '../nutrition/NutritionLabelScan';
+import { NUTRIENTS } from '../nutrition/nutrients.js';
 import { useEffect, useState } from 'react';
 import { NutritionLookup } from '../groceries/NutritionLookup';
 import { saveRecipeProducts } from '../../services/recipeService';
@@ -7,7 +8,7 @@ import { ingredientLabelAmount } from './ingredientNutrition.js';
 import '../groceries/groceries.css';
 import './recipeProducts.css';
 
-const labels = { calories: 'Calories (kcal)', protein: 'Protein (g)', carbs: 'Carbs (g)', fat: 'Fat (g)', fiber: 'Fibre (g)' };
+const labels = Object.fromEntries(NUTRIENTS.map(([key,label,unit])=>[key,`${label} (${unit})`]));
 export function RecipeProducts({ recipe, onSaved, onPreview }) {
   const ingredients = productIngredients(recipe);
   const [items, setItems] = useState(() => recipe.productNutrition?.items || ingredients.map((item) => item.nutritionLabel ? { quantity: ingredientLabelAmount(item) ?? '', unit: item.nutritionLabel.unit, nutrition: item.nutritionLabel } : null));
