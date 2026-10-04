@@ -44,6 +44,55 @@ function variantCanvas(pixels, width, height, angle = 0) {
   source.width=source.height=0;return canvas;
 }
 
+function recoverNutritionPunctuation(lines, image, parsed) {
+  const context=image.getContext('2d');
+  const processed=new Set();
+  for(const column of parsed.columns)for(const field of Object.values(column.nutrients)) {
+    const line=lines.find(item=>item.text===field.rawText);
+    if(!line?.words?.length || !['g','kcal','kJ','mg','ml'].includes(field.unit))continue;
+    const word=line.words.filter(item=>item.bbox.x0>(line.bbox.x0+line.bbox.x1)/2&&/^[<\dOIlS]/.test(item.text)&&field.x>=item.bbox.x0-1&&field.x<=item.bbox.x1+1).sort((a,b)=>Math.abs((a.bbox.x0+a.bbox.x1)/2-field.x)-Math.abs((b.bbox.x0+b.bbox.x1)/2-field.x))[0];
+    if(!word)continue;
+    if(processed.has(word))continue;processed.add(word);
+    const {x0,y0,x1,y1}=word.bbox,w=Math.round(x1-x0),h=Math.round(y1-y0);
+    if(w<8||h<8||w*h>25000||x0<0||y0<0||x1>image.width||y1>image.height)continue;
+    const pixels=context.getImageData(Math.floor(x0),Math.floor(y0),w,h).data;
+    const seen=new Uint8Array(w*h),components=[];
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++) {
+      const start=y*w+x,pixel=start*4,luma=.299*pixels[pixel]+.587*pixels[pixel+1]+.114*pixels[pixel+2];
+      if(seen[start]||luma>190)continue;
+      const queue=[start];seen[start]=1;let minX=x,maxX=x,minY=y,maxY=y,area=0;
+      for(let i=0;i<queue.length;i++) {
+        const at=queue[i],cx=at%w,cy=Math.floor(at/w);area++;minX=Math.min(minX,cx);maxX=Math.max(maxX,cx);minY=Math.min(minY,cy);maxY=Math.max(maxY,cy);
+        for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const ax=cx+dx,ay=cy+dy,next=ay*w+ax;if(ax<0||ax>=w||ay<0||ay>=h||seen[next])continue;const p=next*4;if(.299*pixels[p]+.587*pixels[p+1]+.114*pixels[p+2]<=190){seen[next]=1;queue.push(next);}}
+      }
+      components.push({area,x:(minX+maxX)/2,y:(minY+maxY)/2,bottom:maxY+1,width:maxX-minX+1,height:maxY-minY+1});
+    }
+    const glyphs=components.filter(item=>item.area>h*.8).sort((a,b)=>a.x-b.x);
+    const dot=components.find(item=>item.area>=2&&item.area<=h*1.3&&item.width<=h*.22&&item.height<=h*.18&&item.y>=h*.6&&glyphs.some((left,index)=>left.x<item.x&&glyphs[index+1]?.x>item.x));
+    word.pixelCheck={dot:dot?.x??null,glyphs:glyphs.map(item=>item.x),height:h};
+    let text=word.text;
+    const trailingG=text.endsWith('9')&&glyphs.length>1&&glyphs.at(-1).bottom-glyphs.slice(0,-1).reduce((max,item)=>Math.max(max,item.bottom),0)>=Math.max(2,h*.09);
+    if(trailingG)text=`${text.slice(0,-1)}g`;
+    const hasDecimal=/[.,]/.test(text);
+    if(dot&&!hasDecimal) {
+      const before=glyphs.filter(item=>item.x<dot.x).length;
+      const digits=[...text.matchAll(/[\dOIlS]/gi)];
+      if(before>0&&before<digits.length) {
+        let at=0,insert=0;
+        for(const match of digits){if(at++===before){insert=match.index;break;}}
+        text=`${text.slice(0,insert)}.${text.slice(insert)}`;
+      }
+    }
+    if(text!==word.text) {
+      line.ocrText??=line.text;
+      word.originalText=word.text;word.text=text;word.pixelEvidence={decimal:!!dot&&(!hasDecimal||/[.,]/.test(text)),unit:trailingG};
+      word.confidence=Math.max(word.confidence??0,82);
+      line.text=line.words.map(item=>item.text).join(' ');
+    }
+  }
+  return lines;
+}
+
 async function preprocess(canvas, register, layout) {
   const worker=new Worker(new URL('./preprocess.worker.js',import.meta.url),{type:'module'});
   return new Promise((resolve,reject)=>{
@@ -88,8 +137,12 @@ export function createImageOcrSession(profile, onProgress = () => {}) {
         try { processed=await preprocess(canvas,stop=>{stopPreprocess=stop;},profile.layout); } catch { if(disposed)throw new Error('Scan cancelled.'); }
         const candidates=[];
         if(profile.layout === 'nutrition') {
-          candidates.push({name:'original',psm:'6',image:canvas});
-          if(processed) for(const [name,pixels,psm] of [['contrast',processed.variants.normalized,'6'],['adaptive',processed.variants.adaptive,'11']]) {
+          const original=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height);
+          const enlarged=variantCanvas(original.data,canvas.width,canvas.height);canvases.push(enlarged);
+          // Sparse mode handles website labels and values separated by a wide
+          // gap; preserve the full image so basis headings remain available.
+          candidates.push({name:'original-upscaled',psm:'11',image:enlarged});
+          if(processed) for(const [name,pixels,psm] of [['grayscale',processed.variants.gray,'6'],['light-sharpen',processed.variants.gentle,'11']]) {
             const image=variantCanvas(pixels,processed.cropped.width,processed.cropped.height,processed.angle);canvases.push(image);candidates.push({name,psm,image});
           }
         } else if(processed){
@@ -112,9 +165,14 @@ export function createImageOcrSession(profile, onProgress = () => {}) {
             pass++;onProgress({status:'recognizing text',progress:0,pass});
             const started=performance.now();
             try{
-              await engine.setParameters({tessedit_pageseg_mode:candidate.psm});
+              await engine.setParameters({tessedit_pageseg_mode:candidate.psm,tessedit_char_whitelist:''});
               const data=(await engine.recognize(candidate.image,{}, {text:true,blocks:true})).data;
-              const lines=reconstructOcrLines(data),parsed=profile.parse({text:data.text,lines});
+              let lines=reconstructOcrLines(data,{preserveNumericPunctuation:profile.layout==='nutrition'});
+              let parsed=profile.parse({text:lines.map(line=>line.text).join('\n'),lines});
+              if(profile.layout==='nutrition'&&candidate.name==='original-upscaled'){
+                lines=recoverNutritionPunctuation(lines,candidate.image,parsed);
+                parsed=profile.parse({text:lines.map(line=>line.text).join('\n'),lines});
+              }
               const quality=profile.score(parsed,data.confidence);
               results.push({text:data.text,lines,parsed,confidence:data.confidence,...quality,name:candidate.name,psm:candidate.psm,elapsedMs:Math.round(performance.now()-started),image:debug?candidate.image.toDataURL('image/png'):undefined});
               if(profile.shouldStop?.(results))break;

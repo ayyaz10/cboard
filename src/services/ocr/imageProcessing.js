@@ -235,9 +235,16 @@ export function processReceiptPixels(image, { layout = 'receipt' } = {}) {
     region=layout === 'receipt' ? detectReceiptRegion(image,detection)||detectReceiptEdges(image) : detectReceiptRegion(image,detection,{minAspect:.4,minHeight:.3});
     if(region)cropped=warpReceipt(image,region);
   } catch { region=null;cropped=image; }
+  if (layout !== 'receipt') {
+    // Keep punctuation and anti-aliased screenshot text. Thermal contrast and
+    // thresholding remain available to receipts, but are not nutrition inputs.
+    const gray=grayscale(cropped),blurred=meanImage(gray,cropped.width,cropped.height,1);
+    const gentle=new Uint8ClampedArray(gray.length);
+    for(let i=0;i<gentle.length;i++)gentle[i]=clamp(gray[i]+.3*(gray[i]-blurred[i]),0,255);
+    return {region,cropped,variants:{gray,gentle},angle:0,detection};
+  }
   const variants=thermalVariants(cropped);
   const angle=estimateReceiptSkew(variants.adaptive,cropped.width,cropped.height);
-  if (layout !== 'receipt') return {region,cropped,variants,angle,detection};
   const binaryRgba=new Uint8ClampedArray(cropped.width*cropped.height*4);
   for(let i=0;i<variants.adaptive.length;i++){binaryRgba[i*4]=binaryRgba[i*4+1]=binaryRgba[i*4+2]=variants.adaptive[i];binaryRgba[i*4+3]=255;}
   const rows=detectTextRows(variants.adaptive,cropped.width,cropped.height);

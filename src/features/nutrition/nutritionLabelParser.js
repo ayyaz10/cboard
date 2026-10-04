@@ -54,7 +54,7 @@ function findBases(line, serving) {
 function valuesIn(line, offset) {
   const values=[];
   // A percent sign belongs to its number, never to a nutrient quantity.
-  const pattern=/(<?\s*)(-?[\dOIlS]+(?:[.,][\dOIlS]+)?)\s*(kcal|kJ|mcg|[µμu]g|mg|g|%|ml)?/gi;
+  const pattern=/(<?\s*)(-?[\dOIlS]+(?:\s*[.,]\s*[\dOIlS]+)?)\s*(kcal|kJ|mcg|[µμu]g|mg|g|%|ml)?/gi;
   for (const match of line.text.slice(offset).matchAll(pattern)) {
     const start=offset+match.index;
     const before=line.text[start+match[1].length-1],after=line.text[start+match[0].length];
@@ -62,11 +62,19 @@ function valuesIn(line, offset) {
     const raw=match[2], unit=cleanUnit(match[3] || '');
     if (unit==='%' || /%/.test(line.text.slice(start+match[0].length).match(/^\s*%/)?.[0] || '')) continue;
     if (!/\d/.test(raw) && !unit) continue;
-    const repaired=raw.replace(/[Oo]/g,'0').replace(/[Il]/g,'1').replace(/S/gi,'5').replace(',','.');
+    const repaired=raw.replace(/\s/g,'').replace(/[Oo]/g,'0').replace(/[Il]/g,'1').replace(/S/gi,'5').replace(',','.');
     const value=Number(repaired);
     if (!Number.isFinite(value) || value<0) continue;
-    const tokenWords=line.words?.filter(word=>word.bbox.x1>=(xAt(line,start)??Infinity)&&word.bbox.x0<=(xAt(line,start+match[0].length)??-Infinity)) || [];
-    values.push({value,unit,raw:match[0].trim(),x:xAt(line,start+match[1].length),confidence:Math.min(...tokenWords.map(word=>word.confidence ?? 60),line.confidence ?? 80),uncertain:raw!==repaired || match[1].includes('<'),upperBound:match[1].includes('<')});
+    let at=0;
+    const numberStart=start+match[1].length, numberEnd=numberStart+raw.length;
+    const tokenWords=(line.words||[]).filter(word=>{const begin=at;at+=word.text.length+1;return begin<numberEnd && at-1>numberStart;});
+    // Spacing around an actual punctuation token is safe to remove. A large
+    // horizontal gap may instead separate columns; never bridge that gap.
+    if (/[.,]/.test(raw) && tokenWords.some((word,i)=>i && word.bbox.x0-tokenWords[i-1].bbox.x1 > Math.max(word.bbox.y1-word.bbox.y0,tokenWords[i-1].bbox.y1-tokenWords[i-1].bbox.y0)*.8)) continue;
+    const digits=tokenWords.filter(word=>/[\dOIlS]/.test(word.text));
+    const confidence=digits.length?digits.reduce((sum,word)=>sum+(word.confidence??60)*word.text.length,0)/digits.reduce((sum,word)=>sum+word.text.length,0):line.confidence??80;
+    const repairedCharacters=/[OIlS]/i.test(raw),upperBound=match[1].includes('<');
+    values.push({value,unit,raw:match[0].trim(),x:xAt(line,numberStart),confidence,uncertain:repairedCharacters||upperBound,upperBound,repairedCharacters,decimal:/[.,]/.test(raw)});
   }
   return values;
 }
@@ -129,17 +137,39 @@ export function parseNutritionLabel(input) {
       }
       const previous=column.nutrients[field];
       const missingUnit=!value.unit && !(field==='calories' && /^calories/i.test(name.match[0]));
-      const result={field,value:amount,unit,basis:column.id,rawText:line.text,rawValue:value.raw,confidence:Math.min(value.confidence, value.uncertain||missingUnit?55:100),uncertain:value.uncertain||missingUnit,upperBound:value.upperBound,missingUnit,bbox:line.bbox||null};
+      const reasons=[...(value.repairedCharacters?['OCR confused a letter with a digit. Compare with the image.']:[]),...(value.upperBound?['The label gives an upper limit, not an exact amount.']:[]),...(missingUnit?['The unit was not read. Confirm the amount and unit.']:[]),...(value.confidence<70?['Low OCR confidence. Compare with the image.']:[])];
+      const result={field,value:amount,unit,basis:column.id,rawText:line.text,rawValue:value.raw,x:value.x,confidence:Math.min(value.confidence, value.uncertain||missingUnit?55:100),uncertain:value.uncertain||missingUnit,upperBound:value.upperBound,missingUnit,decimal:value.decimal,reasons,bbox:line.bbox||null};
       if(previous && previous.value!==amount) {previous.uncertain=true;previous.confidence=40;table.warnings.push(`Conflicting ${field} values. Check the image.`);}
       else column.nutrients[field]=result;
     }
   }
   const useful=tables.filter(value=>value.columns.some(column=>Object.keys(column.nutrients).length));
-  const columns=useful.flatMap(value=>value.columns.map(column=>({...column,tableId:value.id,warnings:[...new Set(value.warnings)]})));
+  const basisHint=lines.some(line=>/\bper\s+(?:[\dOIl]|serv|port|pack|item)|\b(?:serving|portion)\s+size/i.test(line.text));
+  const columns=useful.flatMap(value=>value.columns.map(column=>({...column,tableId:value.id,basisStatus:column.confirmed?'identified':basisHint?'unreadable':'not-found',warnings:[...new Set(value.warnings)]})));
   return {columns,lines,text:lines.map(line=>line.text).join('\n'),warnings:[...(useful.length>1?['Multiple nutrition tables found. Choose the table and basis for this food.']:[]),...(!columns.length?['No useful nutrition values found. Crop to the label, rescan, or enter values manually.']:[])]};
 }
 
 export function scoreNutritionCandidate(parsed, confidence=0) {
-  const scores=parsed.columns.map(column=>Object.values(column.nutrients).reduce((sum,field)=>sum+3+(field.confidence>=70?1:0),0)+(column.confirmed?8:0)-column.warnings.length*3);
+  const scores=parsed.columns.map(column=>Object.values(column.nutrients).reduce((sum,field)=>sum+3+field.confidence/100+(field.missingUnit?-.8:.5)-(field.uncertain?1:0),0)+(column.confirmed?8:0)-column.warnings.length*3-nutritionConsistency(column).length*6);
   return {score:Math.max(0,...scores)+confidence/20};
+}
+
+// Deliberately broad tolerances: fibre, polyols and rounding change labelled
+// energy. These are evidence of a suspect scan, never instructions to divide
+// an amount by ten or impose a food-specific maximum.
+export function nutritionConsistency(column) {
+  const n=column.nutrients,issues=[];
+  const kcal=n.calories?.value;
+  if(kcal!=null) {
+    for(const [key,factor] of [['fat',9],['protein',4],['carbs',4],['fiber',2]]) {
+      if(n[key]?.value*factor>kcal*1.7+15)issues.push({field:key,message:'This amount conflicts with the scanned calories. Compare both with the image.'});
+    }
+    if(['fat','protein','carbs'].every(key=>n[key]) && n.fat.value*9+n.protein.value*4+n.carbs.value*4>kcal*1.8+30 && !issues.length)
+      issues.push({field:'calories',message:'Calories and macronutrient amounts disagree. Compare with the image.'});
+    if(n.energyKJ && Math.abs(n.energyKJ.value/4.184-kcal)>Math.max(20,kcal*.2))
+      issues.push({field:'energyKJ',message:'The kJ and kcal values disagree. Compare with the image.'});
+  }
+  for(const [part,total] of [['sugars','carbs'],['saturatedFat','fat']])if(n[part]&&n[total]&&n[part].value>n[total].value*1.15+1)
+    issues.push({field:part,message:`This amount exceeds the scanned ${total==='carbs'?'carbohydrate':'fat'} amount. Compare with the image.`});
+  return issues;
 }

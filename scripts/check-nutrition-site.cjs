@@ -28,22 +28,23 @@ const token=Buffer.from(JSON.stringify({alg:'HS256',typ:'JWT'})).toString('base6
  await page.goto(base+'calculators/calorie');
  await page.getByRole('button',{name:'Scan nutrition label',exact:true}).waitFor();
  const image=Buffer.from(await page.evaluate(()=>{
-  const canvas=document.createElement('canvas');canvas.width=1000;canvas.height=800;const x=canvas.getContext('2d');x.fillStyle='white';x.fillRect(0,0,1000,800);x.fillStyle='black';x.font='34px Arial';
-  ['Nutrition Information','Typical values per 100g','Energy 840 kJ / 200 kcal','Fat 8 g','Carbohydrate 25 g','Fibre 3 g','Protein 20 g','Salt 0.4 g'].forEach((line,i)=>x.fillText(line,60,70+i*85));return canvas.toDataURL('image/png').split(',')[1];
+  const canvas=document.createElement('canvas');canvas.width=720;canvas.height=1600;const x=canvas.getContext('2d');x.fillStyle='white';x.fillRect(0,0,720,1600);x.fillStyle='#222';x.font='bold 20px Arial';x.fillText('Nutritional information',24,316);
+  const rows=[['Energy kJ','162.8 kJ'],['Energy kcal','38.9 kcal'],['Fat','0.5 g'],['Saturates','0 g'],['Sugars','6.1 g'],['Fibre','3.8 g'],['Protein','0.6 g'],['Salt','0 g'],['Carbohydrate','6.1 g']];
+  rows.forEach(([name,amount],i)=>{const y=365+i*78;x.fillStyle=i%2?'#fff':'#e9edf4';x.fillRect(24,y-33,672,68);x.fillStyle='#111';x.font='bold 20px Arial';x.fillText(name,40,y+8);x.font='20px Arial';x.textAlign='right';x.fillText(amount,675,y+8);x.textAlign='left';});return canvas.toDataURL('image/png').split(',')[1];
  }),'base64');
  await page.getByRole('button',{name:'Scan nutrition label',exact:true}).click();
  await page.getByLabel('Upload nutrition label',{exact:true}).setInputFiles({name:'label.png',mimeType:'image/png',buffer:image});
  await page.getByRole('button',{name:'Apply nutrition',exact:true}).waitFor({timeout:120000});
- assert.equal(await page.getByLabel('Scanned Calories (kcal)',{exact:true}).inputValue(),'200');
- assert.equal(await page.getByLabel('Scanned Protein (g)',{exact:true}).inputValue(),'20');
- assert.equal(await page.getByLabel('Scanned Energy (kJ)',{exact:true}).inputValue(),'840');
+ const amounts={energyKJ:'162.8',calories:'38.9',fat:'0.5',saturatedFat:'0',sugars:'6.1',fiber:'3.8',protein:'0.6',salt:'0',carbs:'6.1'};
+ for(const [key,amount] of Object.entries(amounts)){const label={energyKJ:'Energy (kJ)',calories:'Calories (kcal)',fat:'Fat (g)',saturatedFat:'Saturated fat (g)',sugars:'Sugars (g)',fiber:'Fibre (g)',protein:'Protein (g)',salt:'Salt (g)',carbs:'Carbs (g)'}[key];assert.equal(await page.getByLabel(`Scanned ${label}`,{exact:true}).inputValue(),amount,key);}
+ assert.equal(await page.getByLabel('Nutrition basis').inputValue(),'unknown');await page.getByLabel('Nutrition basis').selectOption('100g');
  assert.equal(await page.locator('.nscan').evaluate(el=>el.scrollWidth<=el.clientWidth),true);
  await page.getByLabel('Nutrition column',{exact:true}).scrollIntoViewIfNeeded();
  await page.screenshot({path:process.env.TEMP+'/cboard-nutrition-live.png'});
  await page.getByRole('button',{name:'Apply nutrition',exact:true}).click();
- assert.equal(await page.getByLabel('Total quantity',{exact:true}).inputValue(),'100');assert.equal(await page.getByLabel('Total calories',{exact:true}).inputValue(),'200');
+ assert.equal(await page.getByLabel('Total quantity',{exact:true}).inputValue(),'100');assert.equal(await page.getByLabel('Total calories',{exact:true}).inputValue(),'38.9');
  assert.ok(assets.some(([url])=>url.includes('worker.min.js')));assert.ok(assets.some(([url])=>url.includes('traineddata')));assert.ok(assets.every(([url,status])=>url.startsWith(new URL(base).origin)&&status===200));
  assert.deepEqual(errors,[]);
- console.log('PASS: deployed production bundle, mobile nutrition review, real local OCR assets, 200 kcal / 20g protein / 840kJ, apply-to-calculator. Auth/database isolated; no real account changed.');
+ console.log('PASS: deployed production bundle, mobile Aldi-style screenshot OCR, all nine nutrient values, basis confirmation, local OCR assets and apply-to-calculator. Auth/database isolated; no real account changed.');
  }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -116,7 +116,7 @@ test('reviewed basis, serving size and energy survive existing catalog/diary/ing
 test('nutrition preprocessing preserves table geometry and falls back on a borderless screenshot',()=>{
  const width=300,height=200,data=new Uint8ClampedArray(width*height*4).fill(255);
  const result=processReceiptPixels({data,width,height},{layout:'nutrition'});
- assert.equal(result.region,null);assert.equal(result.cropped.width,width);assert.equal(result.aligned,undefined);assert.equal(result.variants.adaptive.length,width*height);
+ assert.equal(result.region,null);assert.equal(result.cropped.width,width);assert.equal(result.aligned,undefined);assert.equal(result.variants.gray.length,width*height);assert.equal(result.variants.gentle.length,width*height);assert.equal(result.variants.adaptive,undefined);
 });
 test('coherent label panels can be cropped and straightened without receipt-only row stacking',()=>{
  const width=300,height=300,data=new Uint8ClampedArray(width*height*4);
