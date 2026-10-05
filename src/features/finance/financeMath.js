@@ -42,7 +42,7 @@ export function budgetTarget(item, income) {
 
 export function financeSummary(state, selectedMonth) {
   const allTime = selectedMonth === null;
-  const transactions = allTime ? state.transactions : state.transactions.filter((item) => inMonth(item.date, selectedMonth));
+  const transactions = (allTime ? state.transactions : state.transactions.filter((item) => inMonth(item.date, selectedMonth))).filter(item => item.allocationStatus !== 'allocated');
   const sum = (type) => transactions.filter((item) => item.type === type).reduce((total, item) => total + item.amount, 0);
   const income = sum('income');
   const expenses = sum('expense');

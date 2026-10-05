@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyDueMonthlyAllocations, applyIncomeAllocations } from './financeAllocations.js';
+import { applyDueMonthlyAllocations, applyIncomeAllocations, reconcileIncomeAllocations } from './financeAllocations.js';
 
 function state() {
   return { settings:{monthlyIncome:300000}, transactions:[], allocationRules:[], goals:[], goalContributions:[], investments:[], debts:[], debtPayments:[] };
@@ -31,8 +31,24 @@ test('goal, investment, and debt allocations update their tracked balances', () 
   assert.equal(value.goals[0].saved,50000);
   assert.equal(value.investments[0].contributed,12000);
   assert.equal(value.investments[0].currentValue,14000);
-  assert.equal(value.debts[0].remaining,0);
+  assert.equal(value.debts[0].remaining,3000);
+  assert.equal(value.transactions.find(x=>x.type==='debt').allocationStatus,'allocated');
   assert.deepEqual(value.transactions.map(x=>x.amount),[5000,2000,3000]);
+});
+
+test('income reconciliation removes only its generated allocations and can recreate edited amounts', () => {
+  const value=state();
+  value.allocationRules=[{id:'don',targetType:'donation',name:'Gift',mode:'percent',value:1000,timing:'income',active:true}];
+  const income={id:'salary',amount:22500,date:'2026-09-01'};value.transactions.push({...income,type:'income'});
+  applyIncomeAllocations(value,income);
+  const unrelated={id:'manual',type:'donation',amount:500,title:'Manual gift'};value.transactions.push(unrelated);
+  reconcileIncomeAllocations(value,income,true);
+  assert.deepEqual(value.transactions.map(x=>x.id),['salary','manual']);
+  const edited={...income,amount:30000};
+  reconcileIncomeAllocations(value,income,true);value.transactions[0]={...edited,type:'income'};applyIncomeAllocations(value,edited);
+  assert.equal(value.transactions.filter(x=>x.sourceIncomeId==='salary').length,1);
+  assert.equal(value.transactions.find(x=>x.sourceIncomeId==='salary').amount,3000);
+  assert.equal(value.transactions.some(x=>x.id==='manual'),true);
 });
 
 test('monthly rules run once on or after their selected day', () => {

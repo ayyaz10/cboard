@@ -32,6 +32,13 @@ test('transfers do not invent spending while tracked allocations reduce availabl
   for (const type of ['expense', 'donation', 'investment', 'debt', 'savings', 'budget', 'goal']) assert.equal(transactionCashEffect({ type, amount: 100 }), -100);
 });
 
+test('pending allocations do not change the actual cash timeline until payment is recorded', () => {
+  const pending={id:'a',type:'donation',amount:2250,date:'2026-09-03',allocationStatus:'allocated'};
+  assert.equal(transactionCashEffect(pending),0);
+  assert.equal(buildCashTimeline([pending],null,10000).at(-1).balance,10000);
+  assert.equal(buildCashTimeline([{...pending,allocationStatus:'paid'}],null,10000).at(-1).balance,7750);
+});
+
 test('merchant recognition is conservative and opening balances allow zero', () => {
   assert.equal(merchantDomain('Weekly shop at ALDI'), 'aldi.co.uk');
   assert.equal(merchantDomain('Local corner shop'), '');
