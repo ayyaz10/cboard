@@ -8,6 +8,8 @@ export function PwaStatus() {
   const [recovered, setRecovered] = useState(false);
   const [update, setUpdate] = useState(null);
   const [message, setMessage] = useState('');
+  const [checkForUpdates, setCheckForUpdates] = useState(null);
+  const [checking, setChecking] = useState(false);
   const lastConnection = useRef(connection);
   useEffect(() => {
     const changeConnection = next => {
@@ -26,7 +28,10 @@ export function PwaStatus() {
     window.addEventListener(CONNECTION_EVENT, cloud);
     const cleanup = registerPwa(state => {
       if (state.update) setUpdate(() => state.update);
+      if (state.check) setCheckForUpdates(() => state.check);
+      if (typeof state.checking === 'boolean') setChecking(state.checking);
       if (state.message) setMessage(state.message);
+      else if (state.checking) setMessage('');
     });
     return () => {
       cleanup();
@@ -36,6 +41,7 @@ export function PwaStatus() {
     };
   }, []);
   return <aside className="pwa-status" aria-label="App connection and updates">
+    <div className="pwa-update-check"><button type="button" disabled={!checkForUpdates || checking || connection !== 'online'} onClick={() => checkForUpdates?.()}>{checking ? 'Checking for updates…' : 'Check for updates'}</button></div>
     {connection !== 'online' && <p role="status">{connection === 'offline' ? 'You are offline.' : 'Cloud services are unreachable.'} Displayed data may be out of date. Reconnect to load or save cloud data. Changes are not queued.</p>}
     {connection === 'online' && recovered && <div><p role="status">Connection restored. You can retry loading data. Check interrupted saves before submitting again.</p><button type="button" onClick={() => setRecovered(false)}>Dismiss</button></div>}
     {update && <div><p role="status">New version available. Save your work before updating; this reloads the app.</p><button type="button" disabled={connection !== 'online'} onClick={update}>Update</button><button type="button" onClick={() => setUpdate(null)}>Later</button></div>}

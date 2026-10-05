@@ -1,6 +1,6 @@
 export function registerPwa(onState) {
   if (!import.meta.env.PROD || !('serviceWorker' in navigator) || !window.isSecureContext) return () => {};
-  let registration, disposed = false, requestedUpdate = false, reloading = false, lastCheck = 0;
+  let registration, disposed = false, requestedUpdate = false, reloading = false, lastCheck = 0, manualCheckPending = false;
   let installing;
   const offerUpdate = () => {
     if (disposed || !registration?.waiting || !navigator.serviceWorker.controller) return;
@@ -10,7 +10,10 @@ export function registerPwa(onState) {
       registration.waiting?.postMessage({ type: 'ACTIVATE_UPDATE' });
     } });
   };
-  const stateChanged = () => { if (installing?.state === 'installed') offerUpdate(); };
+  const stateChanged = () => {
+    if (installing?.state === 'installed') { manualCheckPending = false; onState({ checking: false }); offerUpdate(); }
+    if (installing?.state === 'redundant' && manualCheckPending) { manualCheckPending = false; onState({ checking: false, message: 'Could not install the update. Try again shortly.' }); }
+  };
   const updateFound = () => {
     installing?.removeEventListener('statechange', stateChanged);
     installing = registration.installing;
@@ -28,6 +31,21 @@ export function registerPwa(onState) {
     lastCheck = Date.now();
     registration.update().catch(() => {});
   };
+  const checkNow = async () => {
+    if (!navigator.onLine) { onState({ checking: false, message: 'Reconnect to check for updates.' }); return; }
+    if (!registration) { onState({ checking: false, message: 'Update service is starting. Try again in a moment.' }); return; }
+    if (registration.waiting) { offerUpdate(); return; }
+    onState({ checking: true, message: '' });
+    manualCheckPending = true;
+    try {
+      await registration.update();
+      if (registration.waiting) { manualCheckPending = false; onState({ checking: false }); offerUpdate(); }
+      else if (!registration.installing) { manualCheckPending = false; onState({ checking: false, message: 'You’re up to date.' }); }
+    } catch {
+      manualCheckPending = false;
+      onState({ checking: false, message: 'Could not check for updates. Check your connection and try again.' });
+    }
+  };
   let hadController = Boolean(navigator.serviceWorker.controller);
   const controlled = () => { if (hadController) controllerChanged(); hadController = true; };
   navigator.serviceWorker.addEventListener('controllerchange', controlled);
@@ -38,6 +56,7 @@ export function registerPwa(onState) {
     .then(value => {
       if (disposed) return;
       registration = value;
+      onState({ check: checkNow });
       offerUpdate();
       registration.addEventListener('updatefound', updateFound);
       if (registration.installing) updateFound();

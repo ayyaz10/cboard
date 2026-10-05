@@ -249,17 +249,13 @@ function Automation({data,change,confirmAction}) {
   async function remove(rule){if(!await confirmAction({title:'Delete automatic deduction?',message:`“${rule.name}” will no longer run. Deductions already recorded stay in your history.`,confirmLabel:'Delete deduction'}))return;change(s=>{s.allocationRules=s.allocationRules.filter(x=>x.id!==rule.id);return s},'Automatic deduction deleted')}
   function deductionDescription(rule){
     const timing=rule.timing==='income'?'when income is added':`monthly on day ${rule.day}`;
-    if(rule.mode!=='percent')return `${typeLabels[rule.targetType]} · ${formatMoney(rule.value,data.settings.currency)} · ${timing}`;
-    const percent=`${rule.value/100}%`;
     const applied=[...data.transactions].filter(x=>x.allocationRuleId===rule.id).sort((a,b)=>(b.createdAt||b.date||'').localeCompare(a.createdAt||a.date||''))[0];
     const source=applied?.sourceIncomeId?data.transactions.find(x=>x.id===applied.sourceIncomeId):null;
-    if(source){
-      const expected=Math.round(source.amount*Number(rule.value||0)/10000);
-      const calculation=applied.amount===expected?`${percent} of ${formatMoney(source.amount,data.settings.currency)} = ${formatMoney(applied.amount,data.settings.currency)} per deduction`:`${percent} of ${formatMoney(source.amount,data.settings.currency)} · last deduction capped at ${formatMoney(applied.amount,data.settings.currency)}`;
-      return `${typeLabels[rule.targetType]} · ${calculation} · ${timing}`;
-    }
-    if(applied)return `${typeLabels[rule.targetType]} · ${percent} of income · last deduction ${formatMoney(applied.amount,data.settings.currency)} · ${timing}`;
+    const basis=source?.amount||(applied?data.transactions.filter(x=>x.type==='income'&&inMonth(x.date,applied.date.slice(0,7))).reduce((sum,x)=>sum+x.amount,0):0);
+    if(applied&&basis)return `${typeLabels[rule.targetType]} · ${formatMoney(applied.amount,data.settings.currency)} = ${(applied.amount*100/basis).toFixed(2)}% of ${formatMoney(basis,data.settings.currency)} income · ${timing}`;
     const latestIncome=[...data.transactions].filter(x=>x.type==='income').sort((a,b)=>(b.createdAt||b.date||'').localeCompare(a.createdAt||a.date||''))[0];
+    if(rule.mode!=='percent')return `${typeLabels[rule.targetType]} · ${formatMoney(rule.value,data.settings.currency)} fixed${latestIncome?` = ${(rule.value*100/latestIncome.amount).toFixed(2)}% of latest income (${formatMoney(latestIncome.amount,data.settings.currency)})`:''} · ${timing}`;
+    const percent=`${rule.value/100}%`;
     if(latestIncome){const preview=Math.round(latestIncome.amount*Number(rule.value||0)/10000);return `${typeLabels[rule.targetType]} · ${percent} of ${formatMoney(latestIncome.amount,data.settings.currency)} = ${formatMoney(preview,data.settings.currency)} preview · ${timing}`;}
     return `${typeLabels[rule.targetType]} · ${percent} of income · ${timing}`;
   }
