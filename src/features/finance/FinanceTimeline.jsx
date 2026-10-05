@@ -18,13 +18,13 @@ function MerchantMark({ transaction, showLogos, compact = false }) {
   </span>;
 }
 
-function TimelineDot({ cx, cy, payload, visibleTypes, showLogos, openTransaction }) {
+function TimelineDot({ cx, cy, payload, visibleTypes, showLogos, selectTransaction }) {
   const transaction = payload?.transaction;
   if (!transaction || !visibleTypes.has(transaction.type)) return null;
-  return <foreignObject x={cx-17} y={cy-17} width="34" height="34" className="f-chart-dot"><button type="button" className="f-chart-dot-button" title={`Open ${transaction.title}`} aria-label={`Open ${transaction.title}`} onClick={(event)=>{event.stopPropagation();openTransaction(transaction)}}><MerchantMark transaction={transaction} showLogos={showLogos}/></button></foreignObject>;
+  return <foreignObject x={cx-17} y={cy-17} width="34" height="34" className="f-chart-dot"><button type="button" className="f-chart-dot-button" title={`Select ${transaction.title}`} aria-label={`Select ${transaction.title}`} onClick={(event)=>{event.stopPropagation();selectTransaction(transaction)}}><MerchantMark transaction={transaction} showLogos={showLogos}/></button></foreignObject>;
 }
 
-function TimelineTooltip({ active, payload, currency, showLogos, openTransaction, deleteTransaction }) {
+function TimelineTooltip({ active, payload, currency, showLogos }) {
   if (!active || !payload?.length) return null;
   const point = payload[0].payload;
   if (!point.transaction) return <div className="f-chart-tooltip"><strong>Opening balance</strong><span>{formatMoney(point.balance,currency)}</span></div>;
@@ -35,7 +35,6 @@ function TimelineTooltip({ active, payload, currency, showLogos, openTransaction
     <div className="f-between"><span>Movement</span><strong className={transaction.type==='income'?'f-positive':''}>{sign}{formatMoney(Math.abs(point.change),currency)}</strong></div>
     {transaction.allocationStatus==='allocated'&&<div className="f-between"><span>Status</span><strong>Allocated · not paid</strong></div>}
     <div className="f-between"><span>Available after</span><strong>{formatMoney(point.balance,currency)}</strong></div>
-    <div className="f-actions"><button type="button" className="f-button" onClick={()=>openTransaction(transaction)}>Open record</button><button type="button" className="f-button" onClick={()=>deleteTransaction(transaction)}>Delete</button></div>
   </div>;
 }
 
@@ -81,6 +80,7 @@ export function FinanceTimeline({ data, month, setMonth, change, transactionScop
   const openingMonth = allTime ? (data.transactions.map(item=>item.date.slice(0,7)).sort()[0] || month) : month;
   const currency = data.settings.currency;
   const [showLogos,setShowLogos] = useState(true);
+  const [selectedTransactionId,setSelectedTransactionId] = useState(null);
   const [visibleTypes,setVisibleTypes] = useState(()=>new Set(markerTypes));
   const [visibleProgress,setVisibleProgress] = useState(()=>new Set(Object.keys(progressLabels)));
   const savedOpening = data.openingBalances?.[openingMonth] || 0;
@@ -92,6 +92,8 @@ export function FinanceTimeline({ data, month, setMonth, change, transactionScop
   const wheelHandler = useRef(null);
   useEffect(()=>setOpening(moneyInput(savedOpening)),[openingMonth,savedOpening]);
   const timeline = useMemo(()=>buildCashTimeline(data.transactions,rangeMonth,savedOpening),[data.transactions,rangeMonth,savedOpening]);
+  const selectedTransaction=data.transactions.find(item=>item.id===selectedTransactionId)||null;
+  useEffect(()=>{if(selectedTransactionId&&!selectedTransaction)setSelectedTransactionId(null)},[selectedTransactionId,selectedTransaction]);
   const fullViewport = useMemo(()=>{
     const balances=timeline.map((point)=>point.balance);
     const minimum=Math.min(0,...balances);
@@ -219,13 +221,14 @@ export function FinanceTimeline({ data, month, setMonth, change, transactionScop
           <XAxis type="number" dataKey="index" domain={[viewport.x0,viewport.x1]} allowDataOverflow ticks={timeline.map((_,index)=>index)} interval="preserveStartEnd" minTickGap={22} tickFormatter={(index)=>timeline[index]?.date!==timeline[index-1]?.date?(allTime?timeline[index]?.date:timeline[index]?.date?.slice(8,10)):''} tick={{fontSize:12,fontWeight:700,fill:'currentColor'}} axisLine={{stroke:'var(--finance-chart-line,#111)'}} tickLine={false}/>
           <YAxis width={74} domain={[viewport.y0,viewport.y1]} allowDataOverflow tickFormatter={(value)=>new Intl.NumberFormat(undefined,{style:'currency',currency,notation:'compact',maximumFractionDigits:1}).format(value/100)} tick={{fontSize:11,fontWeight:700,fill:'currentColor'}} axisLine={false} tickLine={false}/>
           <ReferenceLine y={0} stroke="var(--finance-chart-line,#111)" strokeDasharray="6 4"/>
-          <Tooltip content={<TimelineTooltip currency={currency} showLogos={showLogos} openTransaction={openTransaction} deleteTransaction={deleteTransaction}/>} cursor={{stroke:'var(--finance-chart-line,#111)',strokeDasharray:'3 3'}}/>
+          <Tooltip content={<TimelineTooltip currency={currency} showLogos={showLogos}/>} cursor={{stroke:'var(--finance-chart-line,#111)',strokeDasharray:'3 3'}}/>
           <Area type="monotoneX" dataKey="balance" stroke="none" fill="url(#financeBalanceFill)" isAnimationActive={false}/>
-          <Line type="monotoneX" dataKey="balance" stroke="var(--finance-chart-line,#111)" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" dot={<TimelineDot visibleTypes={visibleTypes} showLogos={showLogos} openTransaction={openTransaction}/>} activeDot={{r:7,fill:'var(--f-green)',stroke:'var(--finance-chart-line,#111)',strokeWidth:2}} isAnimationActive={false}/>
+          <Line type="monotoneX" dataKey="balance" stroke="var(--finance-chart-line,#111)" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" dot={<TimelineDot visibleTypes={visibleTypes} showLogos={showLogos} selectTransaction={(transaction)=>setSelectedTransactionId(transaction.id)}/>} activeDot={{r:7,fill:'var(--f-green)',stroke:'var(--finance-chart-line,#111)',strokeWidth:2}} isAnimationActive={false}/>
         </ComposedChart></ResponsiveContainer>
         </div>
         </div>
       </div>}
+      {selectedTransaction&&<article className="f-chart-selected" aria-live="polite"><div className="f-between"><div><span className="f-tag">Selected transaction</span><h3>{selectedTransaction.title}</h3><p className="f-meta">{markerLabels[selectedTransaction.type]||selectedTransaction.type} &middot; {selectedTransaction.date} &middot; {formatMoney(selectedTransaction.amount,currency)}</p></div><button type="button" className="f-button" aria-label="Close selected transaction actions" onClick={()=>setSelectedTransactionId(null)}>Close</button></div><div className="f-actions mt-3"><button type="button" className="f-primary" onClick={()=>openTransaction(selectedTransaction)}>Open record</button><button type="button" className="f-button" onClick={()=>deleteTransaction(selectedTransaction)}>Delete</button></div></article>}
       <p className="f-help">{allTime?'Transaction dates run along the bottom.':'Day of month runs along the bottom.'} Zoom ranges from 25% to 500%. Recognised logos load from the merchant’s own website; failed or unknown logos automatically use a category marker. Transfers between your own accounts do not change available cash.</p>
     </section>
     <section className="mt-6" aria-labelledby="target-progress-heading"><div><h3 id="target-progress-heading" className="text-2xl font-bold">Targets and progress</h3><p className="f-help mt-1">Progress is kept separate from the cash line so percentages and money are never mixed.</p></div>
