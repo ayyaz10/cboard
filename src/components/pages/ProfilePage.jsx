@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { getProfileInitials, isValidUsername, normalizeUsername, validateAvatarFile } from '../../services/profileService';
 import { AppNavigation } from '../layout/AppNavigation';
 import { PageShell } from '../layout/PageShell';
+import { BackupRestorePanel } from './BackupRestorePanel.jsx';
 
 export function ProfilePage() {
   const { user, profile, displayName, updateProfile, changePassword, resendVerification, signOut } = useAuth();
@@ -79,5 +80,6 @@ export function ProfilePage() {
         <section className="account-card grid gap-3"><div><h2 className="text-xl font-bold">Sign out</h2><p className="mt-1 text-sm font-semibold leading-6 text-black/60">Sign out of this device. Your saved CBoard data will remain in your account.</p></div><button type="button" className="account-secondary justify-self-start" onClick={logout}>Log out</button></section>
       </div>
     </div>
+    <BackupRestorePanel />
   </section></PageShell>;
 }

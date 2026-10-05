@@ -1,5 +1,5 @@
-import { requireSupabase } from '../lib/supabaseClient';
-import { getAuthenticatedUserId } from './authSessionService';
+import { requireSupabase } from '../lib/supabaseClient.js';
+import { getAuthenticatedUserId } from './authSessionService.js';
 
 export function isUuid(value) {
   return typeof value === 'string'

@@ -46,7 +46,7 @@ writeFileSync(
   </head>
   <body>
     <script>
-      const knownRoutes = new Set(['', 'login', 'board', 'calculators', 'progress-tracker']);
+      const knownRoutes = new Set(['', 'login', 'board', 'calculators', 'progress-tracker', 'notes', 'groceries', 'weight-progress', 'finance', 'account', 'training', 'food-diary', 'recipes', 'focus-timer']);
       const parts = location.pathname.split('/').filter(Boolean);
       const base = knownRoutes.has(parts[0] || '') ? '/' : '/' + parts[0] + '/';
       const routePath = '/' + parts.slice(base === '/' ? 0 : 1).join('/');
