@@ -25,7 +25,7 @@ import {
 } from './RecipeComponents';
 import { RecipeImporter } from './RecipeImporter';
 import { FoodItemEditor } from '../nutrition/FoodItemEditor';
-import { buildIngredientLibrary } from './ingredientLibrary';
+import { buildIngredientLibrary, removeRecipeOnlyIngredients } from './ingredientLibrary';
 import { applyFoodCatalogToRecipes, catalogItemsFromRecipe, normalizeFoodName, resolveCatalogFoodForIngredient, findFoodMatches } from '../nutrition/foodCatalog.js';
 import { deleteFoodCatalogItems, getFoodCatalog, upsertFoodCatalogItems } from '../../services/foodCatalogService.js';
 import { classifyFoodDeletion, getOrphanFoodsAfterRecipesDelete } from '../nutrition/foodReferences.js';
@@ -272,6 +272,22 @@ function RecipesContent({ route, navigationPath }) {
     setRecipes(applyFoodCatalogToRecipes(latestRecipes, remainingFoods));
     notify.success(`${count} food${count === 1 ? '' : 's'} deleted`);
   }
+  async function deleteRecipeOnlyIngredients(keys) {
+    const latestRecipes = await getRecipes();
+    const result = removeRecipeOnlyIngredients(latestRecipes, keys);
+    const changed = result.recipes.filter((recipe, index) => recipe !== latestRecipes[index]);
+    if (!changed.length) throw new Error('Those ingredients changed or were already removed. Reload the food list.');
+    try {
+      const saved = [];
+      for (const recipe of changed) saved.push(await saveRecipe(recipe, recipe.image || null, { edit: true, expectedUserId: user.id }));
+      const savedBySlug = new Map(saved.map(recipe => [recipe.slug, recipe]));
+      setRecipes(result.recipes.map(recipe => savedBySlug.get(recipe.slug) || recipe));
+      notify.success(`${result.removed} recipe-only ingredient reference${result.removed === 1 ? '' : 's'} removed`);
+    } catch (error) {
+      await refresh();
+      throw error;
+    }
+  }
   async function mergeFoods({ keepId, mergeIds, nutritionSourceId }) {
     const result = await mergeFoodRecords({ keepId, mergeIds, nutritionSourceId, expectedUserId: user.id });
     const refreshedRecipes = await getRecipes();
@@ -413,7 +429,7 @@ function RecipesContent({ route, navigationPath }) {
                 }}
               />
             ) : null}
-            {!error && foods && <FoodLibrary library={ingredientLibrary} recipes={recipes} foodCatalog={foodCatalog} mealPlans={mealPlanRefs} onAdd={() => setAddingFood(true)} onEdit={id=>setAddingFood(foodCatalog.find(item=>item.id===id)||true)} onDeleteFoods={deleteFoods} onMergeFoods={mergeFoods} />}
+            {!error && foods && <FoodLibrary library={ingredientLibrary} recipes={recipes} foodCatalog={foodCatalog} mealPlans={mealPlanRefs} onAdd={() => setAddingFood(true)} onEdit={id=>setAddingFood(foodCatalog.find(item=>item.id===id)||true)} onDeleteFoods={deleteFoods} onDeleteRecipeIngredients={deleteRecipeOnlyIngredients} onMergeFoods={mergeFoods} />}
             {!error && planning && <DailyMealPlanner recipes={recipes} nutritionGoals={nutritionGoals} />}
             {!error && diary && <FoodDiary recipes={recipes} nutritionGoals={nutritionGoals} foodCatalog={foodCatalog} onFoodCatalogChange={saveMainFoodItems} onDiaryRecipeUpdated={updated => setRecipes(current => [updated, ...current.filter(item => item.slug !== updated.slug)])} />}
             {!error && (home || manage) && (

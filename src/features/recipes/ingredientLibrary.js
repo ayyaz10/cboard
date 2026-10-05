@@ -41,6 +41,35 @@ export function buildIngredientLibrary(recipes = [], foodCatalog = []) {
   return [...entries.values()].sort((a, b) => a.item.name.localeCompare(b.item.name));
 }
 
+function recipeOnlyKey(item) {
+  return [normalise(item?.name), normalise(item?.unit), String(item?.amount ?? ''), nutritionSignature(item || {})].join('|');
+}
+
+// Remove selected recipe-only rows from every recipe that references them.
+// Catalog-backed items are deliberately excluded: they use the catalog cleanup flow.
+export function removeRecipeOnlyIngredients(recipes = [], keys = []) {
+  const selected = new Set(keys);
+  const updated = [];
+  let removed = 0;
+  for (const recipe of recipes) {
+    let changed = false;
+    const filterItems = items => (items || []).filter(item => {
+      if (!item?.name || !selected.has(recipeOnlyKey(item))) return true;
+      removed += 1;
+      changed = true;
+      return false;
+    });
+    const ingredients = filterItems(recipe.ingredients);
+    const sauces = filterItems(recipe.sauces);
+    const alternatives = Object.fromEntries(Object.entries(recipe.alternatives || {}).map(([name, group]) => [name, {
+      ...group,
+      options: filterItems(group?.options),
+    }]));
+    updated.push(changed ? { ...recipe, ingredients, sauces, alternatives } : recipe);
+  }
+  return { recipes: updated, removed };
+}
+
 export function findIngredientMatches(library, query, limit = 8) {
   const needle = normalise(query);
   if (needle.length < 2) return [];

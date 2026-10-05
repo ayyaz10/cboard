@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyStoredIngredient, buildIngredientLibrary, findIngredientMatches, hasStoredNutrition } from './ingredientLibrary.js';
+import { applyStoredIngredient, buildIngredientLibrary, findIngredientMatches, hasStoredNutrition, removeRecipeOnlyIngredients } from './ingredientLibrary.js';
 
 const banana = { name: 'Medium Banana', amount: 1, unit: 'piece', note: 'Peeled', nutrition: { calories: 105 }, nutritionLabel: { quantity: 100, unit: 'g', calories: 89, source: { name: 'Bananas, raw', provider: 'USDA' } } };
 
@@ -34,4 +34,14 @@ test('recipe rows with stale food IDs still attach to the reusable item by its l
   assert.equal(entry.item.foodId, 'coriander');
   assert.equal(entry.recipeTitles.includes('Curry'), true);
   assert.equal(entry.key, 'food:coriander');
+});
+
+test('recipe-only cleanup removes matching rows across recipe sections but leaves other ingredients untouched', () => {
+  const orphan = { name: '1 tbsp coriander powder', amount: 1, unit: 'tbsp', nutrition: {} };
+  const recipe = { slug: 'curry', title: 'Curry', ingredients: [orphan, { name: 'Salt', amount: 1, unit: 'pinch', nutrition: {} }], sauces: [], alternatives: { spice: { options: [{ ...orphan }] } } };
+  const key = buildIngredientLibrary([recipe]).find(entry => entry.item.name === orphan.name).key;
+  const result = removeRecipeOnlyIngredients([recipe], [key]);
+  assert.equal(result.removed, 2);
+  assert.deepEqual(result.recipes[0].ingredients.map(item => item.name), ['Salt']);
+  assert.deepEqual(result.recipes[0].alternatives.spice.options, []);
 });
