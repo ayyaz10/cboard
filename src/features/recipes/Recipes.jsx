@@ -362,6 +362,7 @@ function RecipesContent({ route, navigationPath }) {
                         </label>
                         <p role="status" className="text-sm text-black/70">{filtered.length} recipe{filtered.length === 1 ? '' : 's'}</p>
                         <RecipeCardViewControl />
+                        {!manage && <RecipeLink to="/recipes/manage">Select &amp; delete recipes</RecipeLink>}
                       </div>
                     </div>
                     {manage && <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-black bg-white p-4" aria-label="Bulk recipe actions">
