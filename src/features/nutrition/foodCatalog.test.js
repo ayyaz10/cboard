@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyFoodCatalogToRecipes, catalogItemsFromDiaryMeal, diaryItemFromCatalog, mergeFoodCatalog } from './foodCatalog.js';
+import { applyFoodCatalogToRecipes, catalogItemFromRecipeIngredient, catalogItemsFromDiaryMeal, diaryItemFromCatalog, mergeFoodCatalog, recipeFoodName, resolveCatalogFoodForIngredient } from './foodCatalog.js';
 import { productBasis } from '../recipes/recipeProducts.js';
 
 const oats = { name: 'Oats', quantity: 100, unit: 'g', nutrition: { calories: 380, protein: 13, carbs: 68, fat: 7, fiber: 10 }, source: { provider: 'Manual' } };
@@ -60,4 +60,33 @@ test('master nutrition edits also refresh linked product nutrition without chang
   const [updated] = applyFoodCatalogToRecipes([recipe], [{ ...oats, id: 'oats-id', nutrition: { ...oats.nutrition, protein: 20 } }]);
   assert.equal(updated.productNutrition.items[0].quantity, 40);
   assert.equal(updated.nutrition.protein, 4);
+});
+
+test('recipe quantity labels resolve to the reusable food while retaining the legacy label as an alias', () => {
+  const ingredient = { name: '1 tbsp coriander powder', foodId: 'deleted-food-id', amount: 1, unit: 'tbsp', nutritionLabel: { quantity: 100, unit: 'g', calories: 300, source: { provider: 'Manual' } } };
+  assert.equal(recipeFoodName(ingredient.name), 'coriander powder');
+  const item = catalogItemFromRecipeIngredient(ingredient);
+  assert.equal(item.name, 'coriander powder');
+  assert.deepEqual(item.aliases, ['1 tbsp coriander powder']);
+  const catalog = [{ id: 'coriander', name: 'Coriander Powder', aliases: ['1 tbsp coriander powder'] }];
+  assert.equal(resolveCatalogFoodForIngredient(ingredient, catalog).id, 'coriander');
+});
+
+test('unknown stale recipe food IDs fall back only to a unique canonical or alias name', () => {
+  const ingredient = { name: '1 tbsp coriander powder', foodId: 'removed-id' };
+  const catalog = [{ id: 'coriander', name: 'Coriander Powder', aliases: ['1 tbsp coriander powder'] }];
+  assert.equal(resolveCatalogFoodForIngredient(ingredient, catalog).id, 'coriander');
+  assert.equal(resolveCatalogFoodForIngredient(ingredient, [...catalog, { id: 'other', name: '1 tbsp coriander powder' }]), null);
+});
+
+test('master edits relink stale recipe IDs, refresh nutrition and preserve recipe amounts', () => {
+  const spice = { id: 'spice', name: 'Coriander Powder', aliases: ['1 tbsp coriander powder'], quantity: 100, unit: 'g', nutrition: { calories: 300, protein: 10 } };
+  const recipe = { slug: 'curry', title: 'Curry', servings: 1, nutritionFromIngredients: true, nutrition: {}, sauces: [], alternatives: {}, ingredients: [{ name: '1 tbsp coriander powder', foodId: 'deleted-id', amount: 50, unit: 'g', nutritionLabel: { quantity: 100, unit: 'g', calories: 100, protein: 3, source: { provider: 'Manual' } } }] };
+  const updated = applyFoodCatalogToRecipes([recipe], [spice])[0];
+  assert.equal(updated.ingredients[0].foodId, 'spice');
+  assert.equal(updated.ingredients[0].amount, 50);
+  assert.equal(updated.ingredients[0].unit, 'g');
+  assert.equal(updated.ingredients[0].nutritionLabel.calories, 300);
+  assert.equal(updated.ingredients[0].nutrition.calories, 150);
+  assert.equal(updated.nutrition.calories, 150);
 });

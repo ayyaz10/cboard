@@ -26,3 +26,12 @@ test('selecting a stored ingredient copies all useful fields and preserves the c
   assert.notEqual(selected.nutrition, banana.nutrition);
   assert.equal(hasStoredNutrition(selected), true);
 });
+
+test('recipe rows with stale food IDs still attach to the reusable item by its legacy alias', () => {
+  const food = { id: 'coriander', name: 'Coriander Powder', aliases: ['1 tbsp coriander powder'], quantity: 100, unit: 'g', nutrition: { calories: 300 } };
+  const recipe = { slug: 'curry', title: 'Curry', ingredients: [{ name: '1 tbsp coriander powder', foodId: 'deleted-id', amount: 1, unit: 'tbsp' }], sauces: [], alternatives: {} };
+  const [entry] = buildIngredientLibrary([recipe], [food]);
+  assert.equal(entry.item.foodId, 'coriander');
+  assert.equal(entry.recipeTitles.includes('Curry'), true);
+  assert.equal(entry.key, 'food:coriander');
+});

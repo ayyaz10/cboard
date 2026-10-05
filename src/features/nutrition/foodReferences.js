@@ -1,4 +1,4 @@
-import { normalizeFoodName } from './foodCatalog.js';
+import { resolveCatalogFoodForIngredient } from './foodCatalog.js';
 
 function recipeFoods(recipe) {
   const alternatives = Object.values(recipe?.alternatives || {}).flatMap(group => group?.options || []);
@@ -6,21 +6,10 @@ function recipeFoods(recipe) {
 }
 
 function foodIdsForRecipe(recipe, catalog) {
-  const byName = new Map();
-  for (const food of catalog) {
-    for (const name of [food.name, ...(food.aliases || [])]) {
-      const key = normalizeFoodName(name);
-      byName.set(key, [...(byName.get(key) || []), food]);
-    }
-  }
   const ids = new Set();
   for (const item of recipeFoods(recipe)) {
-    if (item.foodId) {
-      if (catalog.some(food => food.id === item.foodId)) ids.add(item.foodId);
-      continue;
-    }
-    const matches = byName.get(normalizeFoodName(item.name)) || [];
-    if (matches.length === 1) ids.add(matches[0].id);
+    const food = resolveCatalogFoodForIngredient(item, catalog);
+    if (food) ids.add(food.id);
   }
   return ids;
 }

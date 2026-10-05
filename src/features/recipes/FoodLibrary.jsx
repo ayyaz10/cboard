@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { NUTRIENTS } from '../nutrition/nutrients.js';
 import { classifyFoodDeletion, getFoodUsage } from '../nutrition/foodReferences.js';
+import { resolveCatalogFoodForIngredient } from '../nutrition/foodCatalog.js';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog.jsx';
 import { RecipeLink, secondaryButton } from './RecipeComponents';
 import { notify } from '../../lib/notifications.js';
@@ -19,7 +20,7 @@ export function FoodLibrary({ library, recipes, foodCatalog = [], mealPlans = []
   const needle = query.trim().toLocaleLowerCase();
   const catalogById = useMemo(() => new Map(foodCatalog.map(food => [food.id, food])), [foodCatalog]);
   const enriched = useMemo(() => library.map(entry => {
-    const food = catalogById.get(entry.item.foodId) || null;
+    const food = catalogById.get(entry.item.foodId) || resolveCatalogFoodForIngredient(entry.item, foodCatalog);
     return { ...entry, food, usage: food ? getFoodUsage(food, { catalog: foodCatalog, recipes, mealPlans }) : null };
   }), [library, catalogById, foodCatalog, recipes, mealPlans]);
   const filtered = enriched.filter(entry => {

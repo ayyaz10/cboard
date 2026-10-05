@@ -1,4 +1,4 @@
-import { catalogIngredient } from '../nutrition/foodCatalog.js';
+import { catalogIngredient, resolveCatalogFoodForIngredient } from '../nutrition/foodCatalog.js';
 
 const normalise = (value) => String(value || '').trim().toLocaleLowerCase();
 
@@ -19,13 +19,15 @@ export function buildIngredientLibrary(recipes = [], foodCatalog = []) {
     entries.set(entryKey, { key: entryKey, item, recipeTitles: ['Main food library'], recipeSlugs: [] });
     catalogById.set(catalogItem.id, entryKey);
     catalogByName.set(normalise(catalogItem.name), [...(catalogByName.get(normalise(catalogItem.name)) || []), entryKey]);
+    for (const alias of catalogItem.aliases || []) catalogByName.set(normalise(alias), [...(catalogByName.get(normalise(alias)) || []), entryKey]);
   });
   recipes.forEach((recipe) => {
     const alternatives = Object.values(recipe.alternatives || {}).flatMap((group) => group.options || []);
     [...(recipe.ingredients || []), ...(recipe.sauces || []), ...alternatives].forEach((item) => {
       if (!normalise(item?.name)) return;
+      const resolvedFood = resolveCatalogFoodForIngredient(item, foodCatalog);
       const legacyMatches = catalogByName.get(normalise(item.name)) || [];
-      const masterKey = item.foodId ? catalogById.get(item.foodId) : legacyMatches.length === 1 ? legacyMatches[0] : null;
+      const masterKey = resolvedFood ? catalogById.get(resolvedFood.id) : legacyMatches.length === 1 ? legacyMatches[0] : null;
       const key = masterKey || [normalise(item.name), normalise(item.unit), String(item.amount ?? ''), nutritionSignature(item)].join('|');
       const existing = entries.get(key);
       if (existing) {

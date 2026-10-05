@@ -53,6 +53,13 @@ test('legacy name links resolve only when there is one master food with that nam
   assert.equal(getFoodUsage(duplicateNames[0], { catalog: duplicateNames, recipes: [legacy] }).canHardDelete, true);
 });
 
+test('stale recipe food IDs resolve through a unique legacy quantity-name alias', () => {
+  const spice = { id: 'spice', name: 'Coriander Powder', aliases: ['1 tbsp coriander powder'], quantity: 100, unit: 'g', nutrition: {} };
+  const recipe = { slug: 'curry', title: 'Curry', ingredients: [{ name: '1 tbsp coriander powder', foodId: 'deleted-food-id' }] };
+  assert.equal(getFoodUsage(spice, { catalog: [spice], recipes: [recipe] }).canHardDelete, false);
+  assert.deepEqual(getOrphanFoodsAfterRecipeDelete(recipe, [spice], [recipe]).map(food => food.id), ['spice']);
+});
+
 test('master nutrition edits recalculate linked recipe totals and preserve recipe quantities', () => {
   const recipe = { ...a, servings: 1, nutritionFromIngredients: true, nutrition: {}, sauces: [], alternatives: {} };
   const updated = applyFoodCatalogToRecipes([recipe], [{ ...foods[0], nutrition: { calories: 200, protein: 35 } }, foods[1]])[0];

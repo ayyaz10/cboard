@@ -5,6 +5,27 @@ import { calculateProducts } from '../recipes/recipeProducts.js';
 
 export const normalizeFoodName = value => String(value || '').trim().toLocaleLowerCase();
 
+const LEADING_RECIPE_AMOUNT = /^[\d½¼¾⅓⅔⅛⅜⅝⅞.\/]+\s*(?:tsp|teaspoons?|tbsp|tablespoons?|cups?|g|grams?|kg|kilograms?|ml|millilit(?:er|re)s?|oz|ounces?|lb|pounds?|pieces?|cloves?)\s+(.+)$/i;
+
+export function recipeFoodName(value) {
+  const name = String(value || '').trim();
+  return name.match(LEADING_RECIPE_AMOUNT)?.[1]?.trim() || name;
+}
+
+export function resolveCatalogFoodForIngredient(item, catalog = []) {
+  if (item?.foodId) {
+    const byId = catalog.find(food => food.id === item.foodId);
+    if (byId) return byId;
+  }
+  const exactName = normalizeFoodName(item?.name);
+  const exactMatches = catalog.filter(food => [food.name, ...(food.aliases || [])].some(name => normalizeFoodName(name) === exactName));
+  if (exactMatches.length === 1) return exactMatches[0];
+  if (exactMatches.length > 1) return null;
+  const canonicalName = normalizeFoodName(recipeFoodName(item?.name));
+  const matches = catalog.filter(food => [food.name, ...(food.aliases || [])].some(name => normalizeFoodName(name) === canonicalName));
+  return matches.length === 1 ? matches[0] : null;
+}
+
 function newFoodId() {
   return globalThis.crypto?.randomUUID?.() || `food-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
@@ -68,12 +89,17 @@ export function catalogItemsFromDiaryMeal(meal) {
 
 export function catalogItemFromRecipeIngredient(item) {
   const label = item?.nutritionLabel;
-  return label ? { ...(item.foodId || label.source?.foodId ? { id: item.foodId || label.source.foodId } : {}), name: item.name, quantity: label.quantity, unit: label.unit, nutrition: label, source: label.source } : null;
+  if (!label) return null;
+  const name = recipeFoodName(item.name);
+  return { ...(item.foodId || label.source?.foodId ? { id: item.foodId || label.source.foodId } : {}), name,
+    ...(normalizeFoodName(name) !== normalizeFoodName(item.name) ? { aliases: [item.name] } : {}),
+    quantity: label.quantity, unit: label.unit, nutrition: label, source: label.source };
 }
 
 export function catalogItemsFromRecipe(recipe) {
-  const ingredients = [...(recipe?.ingredients || []), ...(recipe?.sauces || [])];
-  if (recipe?.productNutrition?.items) return recipe.productNutrition.items.map((product, index) => product?.nutrition ? { ...(ingredients[index]?.foodId ? { id: ingredients[index].foodId } : {}), name: ingredients[index]?.name, quantity: product.nutrition.quantity, unit: product.nutrition.unit, nutrition: product.nutrition, source: product.nutrition.source } : null).filter(Boolean);
+  const ingredients = [...(recipe?.ingredients || []), ...(recipe?.sauces || []), ...Object.values(recipe?.alternatives || {}).flatMap(group => group?.options || [])];
+  if (recipe?.productNutrition?.items) return recipe.productNutrition.items.map((product, index) => product?.nutrition && ingredients[index]?.name
+    ? catalogItemFromRecipeIngredient({ ...ingredients[index], nutritionLabel: product.nutrition }) : null).filter(Boolean);
   return ingredients.map(catalogItemFromRecipeIngredient).filter(Boolean);
 }
 
@@ -97,18 +123,9 @@ export function ingredientFromCatalog(current, catalogItem) {
 }
 
 export function applyFoodCatalogToRecipes(recipes = [], catalog = []) {
-  const byId = new Map(catalog.map(item => [item.id, item]));
-  const byName = new Map();
-  catalog.forEach(item => {
-    for (const name of [item.name, ...(item.aliases || [])]) {
-      const key = normalizeFoodName(name);
-      byName.set(key, [...(byName.get(key) || []), item]);
-    }
-  });
   const replace = item => {
     if (item.nutritionLabel?.source?.recipeOnly) return item;
-    const matches = byName.get(normalizeFoodName(item?.name)) || [];
-    const catalogItem = item?.foodId ? byId.get(item.foodId) : (matches.length === 1 ? matches[0] : null);
+    const catalogItem = resolveCatalogFoodForIngredient(item, catalog);
     return catalogItem ? ingredientFromCatalog(item, catalogItem) : item;
   };
   return recipes.map(recipe => {
@@ -117,8 +134,7 @@ export function applyFoodCatalogToRecipes(recipes = [], catalog = []) {
       const products = recipe.productNutrition.items.map((product, index) => {
         const ingredient = [...(recipe.ingredients || []), ...(recipe.sauces || [])][index];
         if (!ingredient || ingredient.nutritionLabel?.source?.recipeOnly) return product;
-        const nameMatches = byName.get(normalizeFoodName(ingredient.name)) || [];
-        const food = ingredient.foodId ? byId.get(ingredient.foodId) : nameMatches.length === 1 ? nameMatches[0] : null;
+        const food = resolveCatalogFoodForIngredient(ingredient, catalog);
         if (!food || food.unit !== product.unit) return product;
         matched = true;
         return { ...product, nutrition: { ...food.nutrition, quantity: food.quantity, unit: food.unit, source: { ...food.source } } };

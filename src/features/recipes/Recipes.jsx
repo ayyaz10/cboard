@@ -26,7 +26,7 @@ import {
 import { RecipeImporter } from './RecipeImporter';
 import { FoodItemEditor } from '../nutrition/FoodItemEditor';
 import { buildIngredientLibrary } from './ingredientLibrary';
-import { applyFoodCatalogToRecipes, catalogItemsFromRecipe } from '../nutrition/foodCatalog.js';
+import { applyFoodCatalogToRecipes, catalogItemsFromRecipe, normalizeFoodName, resolveCatalogFoodForIngredient } from '../nutrition/foodCatalog.js';
 import { deleteFoodCatalogItems, getFoodCatalog, upsertFoodCatalogItems } from '../../services/foodCatalogService.js';
 import { classifyFoodDeletion, getOrphanFoodsAfterRecipesDelete } from '../nutrition/foodReferences.js';
 import { notify } from '../../lib/notifications.js';
@@ -82,7 +82,22 @@ function RecipesContent({ route, navigationPath }) {
     setLoading(true);
     setError('');
     try {
-      const [loadedRecipes, loadedFavourites, loadedFoodCatalog, loadedMealPlanRefs] = await Promise.all([getRecipes(), getRecipeFavourites(), getFoodCatalog(user.id), getMealPlanFoodReferences()]);
+      const [loadedRecipes, loadedFavourites, storedFoodCatalog, loadedMealPlanRefs] = await Promise.all([getRecipes(), getRecipeFavourites(), getFoodCatalog(user.id), getMealPlanFoodReferences()]);
+      const knownNames = new Set(storedFoodCatalog.flatMap(food => [food.name, ...(food.aliases || [])]).map(normalizeFoodName));
+      const backfill = loadedRecipes.flatMap(catalogItemsFromRecipe).filter(item => {
+        if (resolveCatalogFoodForIngredient(item, storedFoodCatalog)) return false;
+        const names = [item.name, ...(item.aliases || [])].map(normalizeFoodName);
+        if (names.some(name => knownNames.has(name))) return false;
+        names.forEach(name => knownNames.add(name));
+        return true;
+      }).map(item => {
+        if (item.id && !storedFoodCatalog.some(food => food.id === item.id)) {
+          const { id, ...withoutStaleId } = item;
+          return withoutStaleId;
+        }
+        return item;
+      });
+      const loadedFoodCatalog = backfill.length ? await upsertFoodCatalogItems(backfill, user.id) : storedFoodCatalog;
       setFoodCatalog(loadedFoodCatalog);
       setMealPlanRefs(loadedMealPlanRefs);
       setRecipes(applyFoodCatalogToRecipes(loadedRecipes, loadedFoodCatalog));
