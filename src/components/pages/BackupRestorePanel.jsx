@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { backupModuleRegistry } from '../../services/backupRegistry.js';
 import { backupFilename, countModuleRecords, downloadBackup, expandDependencies, makeBackup, parseBackupFile, restoreSelectedModules } from '../../services/backupService.js';
+import { notify } from '../../lib/notifications.js';
 
 const button = 'rounded-full border-2 border-black bg-white px-4 py-2 text-sm font-bold hover:bg-[#c5ff6f] disabled:cursor-wait disabled:opacity-60';
 const selected = ids => new Set(ids);
@@ -15,7 +16,6 @@ export function BackupRestorePanel() {
   const [busy, setBusy] = useState('');
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
 
   function updateIds(setter, current, id, checked, available = allIds) {
     const next = new Set(current);
@@ -24,38 +24,38 @@ export function BackupRestorePanel() {
   }
 
   async function reviewBackup(ids = [...backupIds]) {
-    setError(''); setMessage(''); setBackupPreview(null); setBusy('backup');
+    setError(''); setBackupPreview(null); setBusy('backup');
     try { setBackupPreview(await makeBackup(ids)); }
-    catch (err) { setError(err.message || 'Could not prepare the backup.'); }
+    catch (err) { setError(err.message || 'Could not prepare the backup.'); notify.error(err.message || 'Could not create backup'); }
     finally { setBusy(''); }
   }
 
   function saveBackup() {
     if (!backupPreview) return;
     downloadBackup(backupPreview);
-    setMessage(`Backup downloaded as ${backupFilename(backupPreview)}.`);
+    notify.success(`Backup created: ${backupFilename(backupPreview)}`);
     setBackupPreview(null);
   }
 
   async function selectFile(file) {
     if (!file) return;
-    setError(''); setMessage(''); setRestorePreview(null); setConfirmReplace(false); setBusy('file');
+    setError(''); setRestorePreview(null); setConfirmReplace(false); setBusy('file');
     try {
       const preview = await parseBackupFile(file);
       const ids = preview.modules.map(module => module.moduleId);
       setRestorePreview(preview);
       setRestoreIds(new Set(expandDependencies(ids, ids)));
-    } catch (err) { setError(err.message || 'This backup could not be read.'); }
+    } catch (err) { setError(err.message || 'This backup could not be read.'); notify.error(err.message || 'Could not read backup'); }
     finally { setBusy(''); }
   }
 
   async function restore() {
-    setError(''); setMessage(''); setBusy('restore');
+    setError(''); setBusy('restore');
     try {
       const result = await restoreSelectedModules({ modules: restorePreview.modules, selectedIds: [...restoreIds], onProgress: setProgress });
-      setMessage(`Restore complete. ${result.restored.map(item => `${item.displayName}: ${item.count} saved items`).join(' · ')}.`);
+      notify.success(`Restore complete: ${result.restored.map(item => `${item.displayName} ${item.count}`).join(' · ')}`);
       setRestorePreview(null); setConfirmReplace(false); setProgress('');
-    } catch (err) { setError(err.message || 'The restore could not be completed.'); }
+    } catch (err) { setError(err.message || 'The restore could not be completed.'); notify.error(err.message || 'Restore could not be completed'); }
     finally { setBusy(''); }
   }
 
@@ -67,7 +67,7 @@ export function BackupRestorePanel() {
 
   return <section className="account-card mt-5 grid gap-6" aria-labelledby="backup-title">
     <header><span className="pill">Your data</span><h2 id="backup-title" className="mt-3 text-2xl font-bold">Backup &amp; Restore</h2><p className="mt-1 max-w-2xl text-sm font-semibold leading-6 text-black/60">Create a private backup file you can keep offline or use on another device. Sign-in credentials are never included.</p></header>
-    {(error || message) && <p className={`auth-message ${error ? 'auth-error' : 'auth-success'}`} role={error ? 'alert' : 'status'}>{error || message}</p>}
+    {error && <p className="auth-message auth-error" role="alert">{error}</p>}
 
     <section className="grid gap-4" aria-labelledby="backup-heading">
       <div><h3 id="backup-heading" className="text-lg font-bold">Back up</h3><p className="text-sm font-semibold text-black/60">Choose all apps or just the data you want to keep.</p></div>

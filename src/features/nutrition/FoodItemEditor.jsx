@@ -5,6 +5,7 @@ import { cleanNutrients } from './nutrients.js';
 import { NUTRIENTS } from './nutrients.js';
 import { validateFoodItem } from '../../../supabase/functions/_shared/foodItem.js';
 import { invokeNutritionFunction } from '../../services/nutritionLookup';
+import { notify } from '../../lib/notifications.js';
 import '../groceries/groceries.css';
 
 const example = { name: "McDonald's burger", quantity: 1, unit: 'pieces', nutrition: { calories: null, protein: null, carbs: null, fat: null, fiber: null } };
@@ -16,11 +17,11 @@ export function FoodItemEditor({ catalog, onSave, onClose, initial = null }) {
   const [description, setDescription] = useState('');
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [replace, setReplace] = useState(Boolean(initial));
-  const existing = catalog.some(item => item.name.trim().toLowerCase() === draft.name.trim().toLowerCase());
+  const existing = catalog.some(item => item.id !== initial?.id && item.name.trim().toLowerCase() === draft.name.trim().toLowerCase());
   useEffect(() => { dialog.current.showModal(); }, []);
   useEffect(() => { if (dialog.current) dialog.current.scrollTop = 0; }, [mode]);
   function useFood(food, provider) {
-    setDraft({ ...validateFoodItem(food), source: { provider, ...food.source } });
+    setDraft({ ...(initial?.id ? { id: initial.id } : {}), ...validateFoodItem(food), source: { provider, ...food.source } });
     setMode('manual'); setReplace(false); setError('');
   }
   async function ai() {
@@ -29,7 +30,7 @@ export function FoodItemEditor({ catalog, onSave, onClose, initial = null }) {
     try {
       const result = await invokeNutritionFunction('parse-recipe', { mode: 'food', recipeText: description });
       useFood(result.food, 'AI assisted (unverified)');
-    } catch (err) { setError(err.message); }
+    } catch (err) { setError(err.message); notify.error(err.message || 'Could not prepare food values'); }
     finally { lock.current = false; setBusy(false); }
   }
   function parse(text) {
@@ -41,9 +42,10 @@ export function FoodItemEditor({ catalog, onSave, onClose, initial = null }) {
   async function save(event) {
     event.preventDefault();
     if (lock.current || (existing && !replace)) return;
+    if (initial && existing) { setError('Another food already has this name. Rename it to avoid ambiguity; foods are not merged automatically.'); return; }
     lock.current = true; setBusy(true); setError('');
-    try { await onSave({ ...validateFoodItem(draft), source: draft.source }); onClose(); }
-    catch (err) { setError(err.message); }
+    try { await onSave({ ...(initial?.id ? { id: initial.id } : {}), ...validateFoodItem(draft), source: draft.source }); onClose(); }
+    catch (err) { setError(err.message); notify.error(err.message || 'Could not save food item'); }
     finally { lock.current = false; setBusy(false); }
   }
   const nutrientFields = rows => <div className="g-nutrition-grid">{rows.map(([key, label, unit]) => <label key={key}>{label} ({unit})<input type="number" min="0" step="any" value={draft.nutrition[key] ?? ''} onChange={event => setDraft({ ...draft, nutrition: { ...draft.nutrition, [key]: event.target.value === '' ? null : Number(event.target.value) } })} /></label>)}</div>;
@@ -71,16 +73,16 @@ export function FoodItemEditor({ catalog, onSave, onClose, initial = null }) {
     {mode === 'lookup' && <NutritionLookup currentNutrition={{...draft.nutrition,quantity:draft.quantity,unit:draft.unit,source:draft.source}} name={draft.name} visible active onSelect={label => {
       if(label.source?.provider==='Local nutrition label OCR'){setDraft({...draft,quantity:label.quantity,unit:label.unit,nutrition:cleanNutrients(label),source:label.source});setMode('manual');return;}
       try { useFood({ name: label.source?.name || draft.name, quantity: label.quantity, unit: label.unit, nutrition: Object.fromEntries(NUTRIENTS.map(([key]) => [key, label[key] ?? null])), source: label.source }, 'Food lookup'); }
-      catch (err) { setError(err.message); }
+    catch (err) { setError(err.message); notify.error(err.message || 'Could not save food item'); }
     }} />}
     {mode === 'manual' && <form onSubmit={save}>
       <fieldset disabled={busy}>
-        <label>Food name<input readOnly={Boolean(initial)} required maxLength={300} value={draft.name} onChange={event => { setDraft({ ...draft, name: event.target.value }); setReplace(false); }} /></label>
+        <label>Food name<input required maxLength={300} value={draft.name} onChange={event => { setDraft({ ...draft, name: event.target.value }); setReplace(false); }} /></label>
         <div className="g-tools">
-          <label>Nutrition per quantity<input required type="number" min="0.0001" step="any" value={draft.quantity} onChange={event => setDraft({ ...draft, quantity: event.target.value === '' ? '' : Number(event.target.value) })} /></label>
-          <label>Food unit<select value={draft.unit} onChange={event => setDraft({ ...draft, unit: event.target.value })}>{['g', 'ml', 'pieces', 'servings'].map(unit => <option key={unit}>{unit}</option>)}</select></label>
+          <label>Reference quantity<input required type="number" min="0.0001" step="any" value={draft.quantity} onChange={event => setDraft({ ...draft, quantity: event.target.value === '' ? '' : Number(event.target.value) })} /></label>
+          <label>Reference unit<select value={draft.unit} onChange={event => setDraft({ ...draft, unit: event.target.value })}>{['g', 'ml', 'pieces', 'servings'].map(unit => <option key={unit}>{unit}</option>)}</select></label>
         </div>
-        <p>For one burger, use 1 piece and its nutrition. For a label per 100 g, use 100 g. Blank nutrients stay unknown.</p>
+        <p>Every nutrient below describes this reference amount. For a per 100 g label, use 100 g. Recipe quantities remain separate. Blank nutrients stay unknown.</p>
         {draft.source?.provider && <p>Source: {draft.source.provider}</p>}
         <NutritionLabelScan disabled={busy} current={{...draft.nutrition,quantity:draft.quantity,unit:draft.unit,source:draft.source}} onApply={label=>setDraft({...draft,quantity:label.quantity,unit:label.unit,nutrition:cleanNutrients(label),source:label.source})}/>
         {nutrientFields(NUTRIENTS.slice(0, 5))}

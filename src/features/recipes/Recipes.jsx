@@ -27,7 +27,10 @@ import { RecipeImporter } from './RecipeImporter';
 import { FoodItemEditor } from '../nutrition/FoodItemEditor';
 import { buildIngredientLibrary } from './ingredientLibrary';
 import { applyFoodCatalogToRecipes, catalogItemsFromRecipe } from '../nutrition/foodCatalog.js';
-import { getFoodCatalog, upsertFoodCatalogItems } from '../../services/foodCatalogService.js';
+import { deleteFoodCatalogItems, getFoodCatalog, upsertFoodCatalogItems } from '../../services/foodCatalogService.js';
+import { classifyFoodDeletion, getOrphanFoodsAfterRecipesDelete } from '../nutrition/foodReferences.js';
+import { notify } from '../../lib/notifications.js';
+import { getMealPlanFoodReferences } from '../../services/foodReferenceService.js';
 import { formatIngredient } from './recipeData';
 import { DailyMealPlanner } from './DailyMealPlanner';
 import { FoodDiary } from '../diary/FoodDiary';
@@ -53,9 +56,9 @@ function RecipesContent({ route, navigationPath }) {
   const nutritionGoals = useNutritionGoals();
   const [recipes, setRecipes] = useState([]);
   const [foodCatalog, setFoodCatalog] = useState([]);
+  const [mealPlanRefs, setMealPlanRefs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [recipeNotice, setRecipeNotice] = useState('');
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
   const [favourites, setFavourites] = useState(new Set());
@@ -70,6 +73,7 @@ function RecipesContent({ route, navigationPath }) {
   const [selectedRecipeSlugs, setSelectedRecipeSlugs] = useState(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [recipeCleanup, setRecipeCleanup] = useState(null);
   const [busy, setBusy] = useState(false);
   const ingredientLibrary = useMemo(() => buildIngredientLibrary(recipes, foodCatalog), [recipes, foodCatalog]);
   const dialog = useRef(null);
@@ -78,8 +82,9 @@ function RecipesContent({ route, navigationPath }) {
     setLoading(true);
     setError('');
     try {
-      const [loadedRecipes, loadedFavourites, loadedFoodCatalog] = await Promise.all([getRecipes(), getRecipeFavourites(), getFoodCatalog(user.id)]);
+      const [loadedRecipes, loadedFavourites, loadedFoodCatalog, loadedMealPlanRefs] = await Promise.all([getRecipes(), getRecipeFavourites(), getFoodCatalog(user.id), getMealPlanFoodReferences()]);
       setFoodCatalog(loadedFoodCatalog);
+      setMealPlanRefs(loadedMealPlanRefs);
       setRecipes(applyFoodCatalogToRecipes(loadedRecipes, loadedFoodCatalog));
       setFavourites(new Set(loadedFavourites));
     } catch (error) {
@@ -98,14 +103,15 @@ function RecipesContent({ route, navigationPath }) {
   function recipeUpdated(updated) {
     setRecipes(current => current.map(item => item.slug === updated.slug ? updated : item));
     const catalogItems = catalogItemsFromRecipe(updated);
-    if (catalogItems.length) saveMainFoodItems(catalogItems).catch(error => setRecipeNotice(error.message || 'Recipe saved, but the main food library could not be updated.'));
+    notify.success('Recipe updated');
+    if (catalogItems.length) saveMainFoodItems(catalogItems).catch(error => notify.error(error.message || 'Recipe saved, but the food library could not be updated.'));
   }
   useEffect(() => {
     refresh();
   }, []);
   useEffect(() => {
-    if (removing || confirmBulkDelete) dialog.current?.showModal();
-  }, [removing, confirmBulkDelete]);
+    if ((removing || confirmBulkDelete || recipeCleanup) && !dialog.current?.open) dialog.current?.showModal();
+  }, [removing, confirmBulkDelete, recipeCleanup]);
   async function toggleFavourite(item) {
     if (favouriteLocks.current.has(item.slug)) return;
     favouriteLocks.current.add(item.slug);
@@ -121,6 +127,7 @@ function RecipesContent({ route, navigationPath }) {
     } catch (error) {
       setFavourites(values => update(values, !next));
       setFavouriteError(error.message || 'Could not save your favourite. Tap the heart to try again.');
+      notify.error(error.message || 'Could not save favourite');
     } finally {
       favouriteLocks.current.delete(item.slug);
       setFavouritePending(values => update(values, false));
@@ -149,20 +156,24 @@ function RecipesContent({ route, navigationPath }) {
     recipeSection,
   );
   function startImport(initial = null, editing = false) {
-    setRecipeNotice('');
     setDraft({ initial, editing, key: crypto.randomUUID() });
     navigateTo('/recipes/import');
   }
   async function save(data, image, edit) {
-    const saved = await saveRecipe(data, image, { edit });
+    let saved;
+    try { saved = await saveRecipe(data, image, { edit }); }
+    catch (error) { notify.error(error.message || 'Could not save recipe'); throw error; }
     setRecipes((current) => [
       ...current.filter((item) => item.slug !== saved.slug),
       saved,
     ]);
     setDraft(null);
     const catalogItems = catalogItemsFromRecipe(saved);
-    if (catalogItems.length) await saveMainFoodItems(catalogItems);
-    setRecipeNotice('Recipe saved.');
+    if (catalogItems.length) {
+      try { await saveMainFoodItems(catalogItems); }
+      catch (error) { notify.error(error.message || 'Recipe saved, but food nutrition could not be updated'); }
+    }
+    notify.success(edit ? 'Recipe updated' : 'Recipe saved');
     navigateTo(`/recipes/${saved.slug}`);
   }
   async function remove() {
@@ -173,6 +184,7 @@ function RecipesContent({ route, navigationPath }) {
     const deleting = confirmBulkDelete
       ? recipes.filter(item => selectedRecipeSlugs.has(item.slug))
       : removing ? [removing] : [];
+    const orphanCandidates = getOrphanFoodsAfterRecipesDelete(deleting, foodCatalog, recipes, mealPlanRefs);
     try {
       if (confirmBulkDelete) await deleteRecipes(deleting.map(item => item.slug));
       else await deleteRecipe(removing.slug);
@@ -182,22 +194,68 @@ function RecipesContent({ route, navigationPath }) {
       setSelectedRecipeSlugs(current => new Set([...current].filter(slug => !deletedSlugs.has(slug))));
       setRemoving(null);
       setConfirmBulkDelete(false);
-      if (confirmBulkDelete) setRecipeNotice(`${deleting.length} recipe${deleting.length === 1 ? '' : 's'} deleted.`);
-      else if (!manage) {
-        setRecipeNotice(`${deleting[0]?.title || 'Recipe'} deleted.`);
+      if (orphanCandidates.length) setRecipeCleanup({ recipes: deleting, foods: orphanCandidates });
+      else notify.success(`${deleting.length} recipe${deleting.length === 1 ? '' : 's'} deleted`);
+      if (!confirmBulkDelete && !manage) {
         navigateTo('/recipes');
       }
+      return orphanCandidates.length > 0;
     } catch (error) {
       setError(error.message || 'Could not delete recipe. Please try again.');
+      notify.error(error.message || 'Could not delete recipe');
       setRemoving(null);
       setConfirmBulkDelete(false);
+      return false;
     } finally {
       deleteLock.current = false;
       setBusy(false);
     }
   }
+  async function finishRecipeCleanup(deleteUnused) {
+    if (!recipeCleanup || busy) return;
+    if (!deleteUnused) {
+      notify.success(`${recipeCleanup.recipes.length} recipe${recipeCleanup.recipes.length === 1 ? '' : 's'} deleted · ${recipeCleanup.foods.length} unused food${recipeCleanup.foods.length === 1 ? '' : 's'} kept`);
+      setRecipeCleanup(null);
+      dialog.current?.close();
+      return;
+    }
+    setBusy(true);
+    try {
+      const deletedSlugs = new Set(recipeCleanup.recipes.map(item => item.slug));
+      const remainingRecipes = (await getRecipes()).filter(item => !deletedSlugs.has(item.slug));
+      const latestMealPlanRefs = await getMealPlanFoodReferences();
+      const analysis = classifyFoodDeletion(recipeCleanup.foods.map(item => item.id), { catalog: foodCatalog, recipes: remainingRecipes, mealPlans: latestMealPlanRefs });
+      const safeIds = analysis.safe.map(item => item.food.id);
+      if (safeIds.length) {
+        await deleteFoodCatalogItems(safeIds, user.id);
+        const remainingFoods = foodCatalog.filter(item => !safeIds.includes(item.id));
+        setFoodCatalog(remainingFoods);
+        setRecipes(applyFoodCatalogToRecipes(remainingRecipes, remainingFoods));
+      }
+      notify.success(`${recipeCleanup.recipes.length} recipe${recipeCleanup.recipes.length === 1 ? '' : 's'} deleted · ${safeIds.length} unused food${safeIds.length === 1 ? '' : 's'} deleted`);
+      setRecipeCleanup(null);
+      dialog.current?.close();
+    } catch (error) {
+      notify.error(error.message || 'Recipe was deleted, but unused foods could not be cleaned up');
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function deleteFoods(ids) {
+    const [latestRecipes, latestMealPlanRefs] = await Promise.all([getRecipes(), getMealPlanFoodReferences()]);
+    const analysis = classifyFoodDeletion(ids, { catalog: foodCatalog, recipes: latestRecipes, mealPlans: latestMealPlanRefs });
+    if (analysis.inUse.length) throw new Error('One or more selected foods are now used by a recipe. Reload the food list and try again.');
+    const count = await deleteFoodCatalogItems(analysis.safe.map(item => item.food.id), user.id);
+    const removedIds = new Set(analysis.safe.map(item => item.food.id));
+    const remainingFoods = foodCatalog.filter(item => !removedIds.has(item.id));
+    setFoodCatalog(remainingFoods);
+    setRecipes(applyFoodCatalogToRecipes(latestRecipes, remainingFoods));
+    notify.success(`${count} food${count === 1 ? '' : 's'} deleted`);
+  }
   async function saveBatch(entries) {
-    const saved = await saveRecipeBatch(entries);
+    let saved;
+    try { saved = await saveRecipeBatch(entries); }
+    catch (error) { notify.error(error.message || 'Could not import recipes'); throw error; }
     setRecipes((current) => [...current, ...saved]);
     const catalogItems = saved.flatMap(catalogItemsFromRecipe);
     if (catalogItems.length) await saveMainFoodItems(catalogItems);
@@ -207,6 +265,7 @@ function RecipesContent({ route, navigationPath }) {
     setFavouritesOnly(false);
     navigateTo('/recipes');
     window.scrollTo(0, 0);
+    notify.success(`${saved.length} recipe${saved.length === 1 ? '' : 's'} imported`);
   }
   const categories = [
     ...new Set([
@@ -275,11 +334,11 @@ function RecipesContent({ route, navigationPath }) {
           })}
         </nav>
         {addingFood && <FoodItemEditor initial={typeof addingFood==='object'?addingFood:null} catalog={foodCatalog} onClose={() => setAddingFood(false)} onSave={async item => {
+          const editing = foodCatalog.some(food => food.id === item.id || food.name.trim().toLocaleLowerCase() === item.name.trim().toLocaleLowerCase());
           await saveMainFoodItems([item]);
-          setRecipeNotice(`${item.name} saved to your food library. Search for it when adding a Food Diary meal.`);
+          notify.success(editing ? 'Food updated' : 'Food added to your library');
         }} />}
         {favouriteError && <p role="alert" className="rounded-xl border-2 border-black bg-[#ffe0de] p-3 text-sm font-semibold">{favouriteError}</p>}
-        {recipeNotice && <p role="status" className="rounded-xl border-2 border-black bg-[#c5ff6f] p-3 text-sm font-semibold">{recipeNotice}</p>}
         <p role="status" className="sr-only">{favouriteNotice}</p>
         {loading ? (
           <p role="status" className="py-12 text-center font-bold">
@@ -316,13 +375,13 @@ function RecipesContent({ route, navigationPath }) {
                     ...current.filter((item) => item.slug !== created.slug),
                     created,
                   ]);
-                  setRecipeNotice(imageWarning ? `Recipe saved without an AI image: ${imageWarning}` : 'Recipe and AI image saved.');
+                  notify.success(imageWarning ? `Recipe saved without an AI image: ${imageWarning}` : 'Recipe and AI image saved.');
                   setDraft(null);
                   navigateTo(`/recipes/${created.slug}`);
                 }}
               />
             ) : null}
-            {!error && foods && <FoodLibrary library={ingredientLibrary} recipes={recipes} onAdd={() => setAddingFood(true)} onEdit={name=>setAddingFood(foodCatalog.find(item=>item.name.toLowerCase()===name.toLowerCase())||true)} />}
+            {!error && foods && <FoodLibrary library={ingredientLibrary} recipes={recipes} foodCatalog={foodCatalog} mealPlans={mealPlanRefs} onAdd={() => setAddingFood(true)} onEdit={id=>setAddingFood(foodCatalog.find(item=>item.id===id)||true)} onDeleteFoods={deleteFoods} />}
             {!error && planning && <DailyMealPlanner recipes={recipes} nutritionGoals={nutritionGoals} />}
             {!error && diary && <FoodDiary recipes={recipes} nutritionGoals={nutritionGoals} foodCatalog={foodCatalog} onFoodCatalogChange={saveMainFoodItems} onDiaryRecipeUpdated={updated => setRecipes(current => [updated, ...current.filter(item => item.slug !== updated.slug)])} />}
             {!error && (home || manage) && (
@@ -502,27 +561,28 @@ function RecipesContent({ route, navigationPath }) {
         <dialog
           ref={dialog}
           onCancel={(event) => {
-            if (busy) event.preventDefault();
+            if (busy || recipeCleanup) event.preventDefault();
             else { setRemoving(null); setConfirmBulkDelete(false); }
           }}
           onClose={() => {
-            if (!busy) { setRemoving(null); setConfirmBulkDelete(false); }
+            if (!busy) { setRemoving(null); setConfirmBulkDelete(false); setRecipeCleanup(null); }
           }}
           className="panel fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-md border-black p-6 text-black backdrop:bg-black/35"
           aria-labelledby="recipe-delete-title"
         >
           <h2 id="recipe-delete-title" className="text-2xl font-bold">
-            {confirmBulkDelete
-              ? `Delete ${deletingInDialog.length} selected recipe${deletingInDialog.length === 1 ? '' : 's'}?`
-              : `Delete “${removing?.title}”?`}
+            {recipeCleanup ? 'Recipe deleted' : confirmBulkDelete ? `Delete ${deletingInDialog.length} selected recipe${deletingInDialog.length === 1 ? '' : 's'}?` : `Delete “${removing?.title}”?`}
           </h2>
           <p className="mt-3 text-black/70">
-            {confirmBulkDelete
-              ? 'This removes the selected recipes and their saved favourites from your library.'
-              : 'This removes the recipe and its uploaded image from your library.'}
+            {recipeCleanup ? `${recipeCleanup.foods.length} reusable food${recipeCleanup.foods.length === 1 ? ' is' : 's are'} no longer used by any recipe. They will stay in your library unless you choose to delete them.` : confirmBulkDelete ? 'This removes the selected recipes and their saved favourites from your library.' : 'This removes the recipe and its uploaded image from your library.'}
           </p>
-          {confirmBulkDelete && deletingInDialog.length > 0 && <ul className="mt-3 max-h-32 list-inside list-disc overflow-auto text-sm">{deletingInDialog.slice(0, 5).map(item => <li key={item.slug}>{item.title}</li>)}{deletingInDialog.length > 5 && <li>and {deletingInDialog.length - 5} more</li>}</ul>}
+          {recipeCleanup && <ul className="mt-3 max-h-36 list-inside list-disc overflow-auto text-sm">{recipeCleanup.foods.slice(0, 8).map(item => <li key={item.id}>{item.name}</li>)}{recipeCleanup.foods.length > 8 && <li>and {recipeCleanup.foods.length - 8} more</li>}</ul>}
+          {!recipeCleanup && confirmBulkDelete && deletingInDialog.length > 0 && <ul className="mt-3 max-h-32 list-inside list-disc overflow-auto text-sm">{deletingInDialog.slice(0, 5).map(item => <li key={item.slug}>{item.title}</li>)}{deletingInDialog.length > 5 && <li>and {deletingInDialog.length - 5} more</li>}</ul>}
           <div className="mt-6 flex flex-wrap gap-3">
+            {recipeCleanup ? <>
+            <button autoFocus className={secondaryButton} disabled={busy} onClick={() => finishRecipeCleanup(false)}>Keep foods</button>
+            <button className={`${secondaryButton} border-red-800 text-red-800`} disabled={busy} onClick={() => finishRecipeCleanup(true)}>{busy ? 'Deleting…' : `Delete ${recipeCleanup.foods.length} unused food${recipeCleanup.foods.length === 1 ? '' : 's'}`}</button>
+            </> : <>
             <button
               autoFocus
               className={secondaryButton}
@@ -539,12 +599,13 @@ function RecipesContent({ route, navigationPath }) {
               className={secondaryButton}
               disabled={busy}
               onClick={async () => {
-                await remove();
-                dialog.current?.close();
+                const cleanupNeeded = await remove();
+                if (!cleanupNeeded) dialog.current?.close();
               }}
             >
               {busy ? 'Deleting…' : confirmBulkDelete ? `Delete ${deletingInDialog.length} recipes` : 'Delete'}
             </button>
+            </>}
           </div>
         </dialog>
       </section>

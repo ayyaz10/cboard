@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { loadFinance, saveFinance } from '../../services/financeService.js';
+import { notify } from '../../lib/notifications.js';
 
 export function useFinance() {
-  const [data, setData] = useState(null), [busy, setBusy] = useState(true), [error, setError] = useState(''), [notice, setNotice] = useState('');
+  const [data, setData] = useState(null), [busy, setBusy] = useState(true), [error, setError] = useState('');
   const current = useRef(null), lock = useRef(false), mounted = useRef(true);
   async function reload() {
     if (lock.current) return;
@@ -21,9 +22,9 @@ export function useFinance() {
       setData(next);
       const version = await saveFinance(next, before.version, before.userId);
       current.current = { state: next, version, userId: before.userId };
-      setNotice(message); return true;
-    } catch (saveError) { setData(before.state); setError(saveError.message || 'Could not save your change.'); return false; }
+      notify.success(message); return true;
+    } catch (saveError) { setData(before.state); setError(saveError.message || 'Could not save your change.'); notify.error(saveError.message || 'Could not save your change.'); return false; }
     finally { lock.current = false; setBusy(false); }
   }
-  return { data, busy, error, notice, setNotice, setError, reload, change };
+  return { data, busy, error, setError, reload, change };
 }

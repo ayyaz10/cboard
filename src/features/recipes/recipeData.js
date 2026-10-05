@@ -68,6 +68,7 @@ function ingredient(value, label) {
       : number(value.amount, `${label} amount`);
   const result = {
     ...(value.id ? { id: string(value.id, `${label} ID`, true, 150) } : {}),
+    ...(value.foodId ? { foodId: string(value.foodId, `${label} food ID`, true, 150) } : {}),
     name: string(value.name, `${label} name`, true, 200),
     amount,
     unit: string(value.unit, `${label} unit`, false, 80),

@@ -29,7 +29,7 @@ export function ingredientLabelNutrition(item) {
 }
 export function updateIngredientField(item, key, value) {
   const next = { ...item, [key]: value };
-  if (key === 'nutrition') delete next.nutritionLabel;
+  if (key === 'nutrition') { delete next.nutritionLabel; delete next.foodId; }
   else if (next.nutritionLabel) next.nutrition = ingredientLabelNutrition(next);
   else if (key === 'amount' || key === 'unit') {
     const before = initialProductAmount({ amount: item.amount, unit: 'pieces' }, 'pieces');

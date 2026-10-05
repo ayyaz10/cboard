@@ -20,6 +20,10 @@ import { DiaryMonthPicker } from "./DiaryMonthPicker";
 import { DiaryFoodSources } from "./DiaryFoodSources";
 import { buildSavedFoods } from '../nutrition/savedFoods.js';
 import { catalogItemsFromDiaryMeal } from "../nutrition/foodCatalog.js";
+import { notify } from '../../lib/notifications.js';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog.jsx';
+import { useConfirmDialog } from '../../hooks/useConfirmDialog.js';
+import { navigateTo } from '../../app/useRoute.js';
 import {
   MEALS,
   REQUIRED_MEALS,
@@ -42,13 +46,13 @@ const format = (n) =>
   new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(n);
 export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCatalogChange, onDiaryRecipeUpdated }) {
   const { user } = useAuth();
+  const { confirm: confirmDiscard, dialog: discardDialog } = useConfirmDialog();
   const [today, setToday] = useState(localDate);
   const [date, setDate] = useState(localDate);
   const [days, setDays] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState(null);
   const [pendingRecipe, setPendingRecipe] = useState(null);
@@ -128,17 +132,22 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
         return;
       const destination = new URL(link.href, window.location.href);
       if (destination.href === window.location.href) return;
-      if (
-        !window.confirm(
-          "Leave this diary and discard your unsaved meal or planner selection?",
-        )
-      ) {
-        event.preventDefault();
-        event.stopPropagation();
-      }
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      void confirmDiscard({ title: 'Discard unsaved changes?', message: 'Leaving now will discard your unsaved meal or planner selection.', confirmLabel: 'Discard changes' }).then(confirmed => {
+        if (!confirmed) return;
+        let path = destination.pathname;
+        const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+        if (base && base !== '.' && path.startsWith(base)) path = path.slice(base.length) || '/';
+        navigateTo(`${path}${destination.search}${destination.hash}`);
+      });
     };
     const guardSwitcher = (event) => {
-      if (!window.confirm("Leave this diary and discard your unsaved meal or planner selection?")) event.preventDefault();
+      if (event.detail?.confirmed) return;
+      event.preventDefault();
+      void confirmDiscard({ title: 'Discard unsaved changes?', message: 'Leaving now will discard your unsaved meal or planner selection.', confirmLabel: 'Discard changes' }).then(confirmed => {
+        if (confirmed) window.dispatchEvent(new CustomEvent('workspace:navigate', { cancelable: true, detail: { path: event.detail?.path, confirmed: true } }));
+      });
     };
     window.addEventListener("workspace:navigate", guardSwitcher);
     window.addEventListener("beforeunload", warn);
@@ -148,13 +157,12 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
       window.removeEventListener("beforeunload", warn);
       document.removeEventListener("click", guardLink, true);
     };
-  }, [draft, routine, pastOpen]);
+  }, [draft, routine, pastOpen, confirmDiscard]);
   async function persist(next, success) {
     if (lock.current) return false;
     lock.current = true;
     setBusy(true);
     setError("");
-    setNotice("");
     const id = generation.current;
     try {
       const saved = await saveFoodDiary(
@@ -166,11 +174,11 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
         ...previous.filter((entry) => entry.date !== saved.date),
         saved,
       ]);
-      setNotice(success);
+      notify.success(success);
       return true;
     } catch (err) {
       if (id === generation.current)
-        setError(err.message || "Could not save. Your draft is still here.");
+        { setError(err.message || "Could not save. Your draft is still here."); notify.error(err.message || 'Could not save diary entry'); }
       return false;
     } finally {
       lock.current = false;
@@ -181,7 +189,6 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
     if (validDate(next) && next <= today) {
       setDate(next);
       setError("");
-      setNotice("");
       setRemove(null);
       setRemoveDay(null);
       setPastOpen(false);
@@ -200,17 +207,16 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
     lock.current = true;
     setBusy(true);
     setError("");
-    setNotice("");
     const id = generation.current;
     try {
       await deleteFoodDiaryDay(entry, user.id);
       if (id !== generation.current) return;
       setDays((previous) => previous.filter((item) => item.date !== entry.date));
       setRemoveDay(null);
-      setNotice(`${entry.date} was removed from meal history.`);
+      notify.success(`${entry.date} was removed from meal history`);
     } catch (err) {
       if (id === generation.current)
-        setError(err.message || "Could not delete this diary day.");
+        { setError(err.message || "Could not delete this diary day."); notify.error(err.message || 'Could not delete diary day'); }
     } finally {
       lock.current = false;
       if (id === generation.current) setBusy(false);
@@ -252,7 +258,7 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
           const selected = new Set(selections.filter(row => row.selected).map(row => row.id));
           await onFoodCatalogChange(catalogItemsFromDiaryMeal({ items: meal.items.filter(item => selected.has(item.id)).map(item => ({ ...item, source: { ...item.source, modified: true } })) }));
         }
-        setNotice(`Meal saved and ${prepared.title} ${newRecipe ? 'added to Recipes' : 'updated'}.${share ? ' Shared food nutrition updated too.' : ''}`);
+        notify.success(`Meal saved and ${prepared.title} ${newRecipe ? 'added to Recipes' : 'updated'}${share ? '. Shared food nutrition updated too' : ''}`);
       } catch (err) {
         setRecipeError(`Your diary is saved. ${err.message}`);
         return;
@@ -266,7 +272,6 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
     lock.current = true;
     setBusy(true);
     setError("");
-    setNotice("");
     const id = generation.current;
     try {
       const saved = await getPreference("recipes:daily-plan:v1");
@@ -285,7 +290,7 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
           .map((entry) => entry.id),
       );
     } catch (err) {
-      if (id === generation.current) setError(err.message);
+      if (id === generation.current) { setError(err.message); notify.error(err.message || 'Could not open saved meal plan'); }
     } finally {
       lock.current = false;
       if (id === generation.current) setBusy(false);
@@ -446,11 +451,6 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
           goals={goals}
         />
       </section>
-      {notice && (
-        <p className="diary-notice" role="status">
-          {notice}
-        </p>
-      )}
       {error && (
         <div className="diary-error" role="alert">
           <p>{error}</p>
@@ -835,6 +835,7 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
         . Match preparation and check the label; vitamin and mineral coverage
         varies.
       </p>
+      <ConfirmDialog isOpen={Boolean(discardDialog)} {...discardDialog} />
     </div>
   );
 }

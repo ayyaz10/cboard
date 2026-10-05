@@ -1,50 +1,133 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { NUTRIENTS } from '../nutrition/nutrients.js';
+import { classifyFoodDeletion, getFoodUsage } from '../nutrition/foodReferences.js';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog.jsx';
 import { RecipeLink, secondaryButton } from './RecipeComponents';
+import { notify } from '../../lib/notifications.js';
 
 const formatNutrient = value => Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
-export function FoodLibrary({ library, recipes, onAdd, onEdit }) {
+export function FoodLibrary({ library, recipes, foodCatalog = [], mealPlans = [], onAdd, onEdit, onDeleteFoods }) {
   const [query, setQuery] = useState('');
   const [source, setSource] = useState('all');
   const [view, setView] = useState('list');
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [deletePlan, setDeletePlan] = useState(null);
+  const [blockedFood, setBlockedFood] = useState(null);
+  const [busy, setBusy] = useState(false);
   const needle = query.trim().toLocaleLowerCase();
-  const filtered = library.filter(entry => {
-    const shared = entry.recipeTitles.includes('Main food library');
+  const catalogById = useMemo(() => new Map(foodCatalog.map(food => [food.id, food])), [foodCatalog]);
+  const enriched = useMemo(() => library.map(entry => {
+    const food = catalogById.get(entry.item.foodId) || null;
+    return { ...entry, food, usage: food ? getFoodUsage(food, { catalog: foodCatalog, recipes, mealPlans }) : null };
+  }), [library, catalogById, foodCatalog, recipes, mealPlans]);
+  const filtered = enriched.filter(entry => {
+    const shared = Boolean(entry.food);
     const inRecipe = entry.recipeTitles.some(title => title !== 'Main food library');
-    return (source === 'all' || (source === 'shared' ? shared : inRecipe))
-      && [entry.item.name, ...entry.recipeTitles].some(value => value.toLocaleLowerCase().includes(needle));
+    const sourceMatches = source === 'all' || (source === 'shared' && shared) || (source === 'recipes' && inRecipe) || (source === 'unused' && shared && entry.usage.canHardDelete);
+    return sourceMatches && [entry.item.name, ...entry.recipeTitles].some(value => value.toLocaleLowerCase().includes(needle));
   });
+  const selectable = filtered.filter(entry => entry.food);
+  const selected = foodCatalog.filter(food => selectedIds.has(food.id));
+  function toggleSelectionMode() {
+    setSelectionMode(value => {
+      if (value) setSelectedIds(new Set());
+      return !value;
+    });
+  }
+  function selectVisible(checked) {
+    setSelectedIds(current => {
+      const visible = new Set(selectable.map(entry => entry.food.id));
+      const next = new Set([...current].filter(id => !visible.has(id)));
+      if (checked) visible.forEach(id => next.add(id));
+      return next;
+    });
+  }
+  function requestDelete(ids) {
+    const analysis = classifyFoodDeletion(ids, { catalog: foodCatalog, recipes, mealPlans });
+    if (!analysis.safe.length) {
+      const food = analysis.inUse[0]?.food;
+      if (food) {
+        setBlockedFood({ food, usage: analysis.inUse[0].usage });
+        notify.warning(`${food.name} is used by ${analysis.inUse[0].usage.recipes.length} recipe${analysis.inUse[0].usage.recipes.length === 1 ? '' : 's'} and was not deleted`);
+      }
+      return;
+    }
+    setDeletePlan({ ...analysis, requested: ids.length });
+  }
+  async function confirmDelete() {
+    if (!deletePlan || busy) return;
+    setBusy(true);
+    try {
+      await onDeleteFoods(deletePlan.safe.map(item => item.food.id));
+      const deleted = new Set(deletePlan.safe.map(item => item.food.id));
+      setSelectedIds(current => new Set([...current].filter(id => !deleted.has(id))));
+      setDeletePlan(null);
+      if (selectedIds.size === deleted.size) setSelectionMode(false);
+    } catch (error) {
+      notify.error(error.message || 'Could not delete selected foods');
+      setDeletePlan(null);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const usageLabel = entry => {
+    if (!entry.food) return `${entry.recipeTitles.length} recipe${entry.recipeTitles.length === 1 ? '' : 's'}`;
+    if (!entry.usage.referenceCount) return 'Unused';
+    return `Used in ${entry.usage.recipes.length} recipe${entry.usage.recipes.length === 1 ? '' : 's'}${entry.usage.mealPlans.length ? ` + ${entry.usage.mealPlans.length} meal plan${entry.usage.mealPlans.length === 1 ? '' : 's'}` : ''}`;
+  };
+  const recipesUsing = entry => entry.usage?.recipes || (entry.recipeSlugs || []).map(slug => recipes.find(recipe => recipe.slug === slug)).filter(Boolean).map(recipe => ({ slug: recipe.slug, title: recipe.title }));
+  const actions = entry => entry.food ? <details className="relative inline-block">
+    <summary className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full border-2 border-black bg-white hover:bg-[#c5ff6f]" aria-label={`Actions for ${entry.item.name}`} title="Food actions"><span aria-hidden="true" className="flex gap-0.5"><i className="h-1 w-1 rounded-full bg-black"/><i className="h-1 w-1 rounded-full bg-black"/><i className="h-1 w-1 rounded-full bg-black"/></span></summary>
+    <div className="absolute right-0 top-12 z-20 grid min-w-36 gap-1 rounded-xl border-2 border-black bg-white p-2 shadow-[3px_3px_0_#111]">
+      <button type="button" className="rounded-lg px-3 py-2 text-left text-sm font-bold hover:bg-[#edffd5]" onClick={event => { event.currentTarget.closest('details').open = false; onEdit(entry.food.id); }}>Edit food</button>
+      <button type="button" className="rounded-lg px-3 py-2 text-left text-sm font-bold text-red-800 hover:bg-red-50" onClick={event => { event.currentTarget.closest('details').open = false; requestDelete([entry.food.id]); }}>Delete food</button>
+    </div>
+  </details> : <span className="text-sm text-black/60">Recipe only</span>;
   return <section className="food-library" aria-labelledby="food-library-heading">
     <header className="flex flex-wrap items-center justify-between gap-3">
-      <div><h1 id="food-library-heading" className="text-3xl font-bold">All food items</h1><p>Browse saved foods and ingredients from your recipes, sauces and alternatives.</p></div>
+      <div><h1 id="food-library-heading" className="text-3xl font-bold">All food items</h1><p>Manage reusable nutrition records and see where foods are used.</p></div>
       <button type="button" className={secondaryButton} onClick={onAdd}>Add item</button>
     </header>
     <div className="food-library-filters">
-      <label>Search foods or recipes<input className="field-input" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search all food items" /></label>
-      <label>Source<select className="field-input" value={source} onChange={event => setSource(event.target.value)}><option value="all">All sources</option><option value="shared">Shared food library</option><option value="recipes">Used in recipes</option></select></label>
+      <label>Search foods or recipes<input className="field-input" type="search" value={query} onChange={event => { setQuery(event.target.value); setSelectedIds(new Set()); }} placeholder="Search all food items" /></label>
+      <label>Show<select className="field-input" value={source} onChange={event => { setSource(event.target.value); setSelectedIds(new Set()); }}><option value="all">All items</option><option value="shared">Reusable foods</option><option value="recipes">Recipe ingredients</option><option value="unused">Unused foods</option></select></label>
     </div>
     <div className="food-library-views" role="group" aria-label="Food items view">
       <button type="button" className={secondaryButton} aria-pressed={view === 'list'} onClick={() => setView('list')}>Detailed list</button>
       <button type="button" className={secondaryButton} aria-pressed={view === 'cards'} onClick={() => setView('cards')}>Cards</button>
     </div>
-    <p role="status">{filtered.length} of {library.length} food records. Different portions or nutrition records may appear separately. Shared foods include separately added items and foods saved from recipes.</p>
-    {!filtered.length && <p className="panel p-5">{library.length ? 'No matching foods. Try another search or source.' : 'No food items yet. Add an item or save a recipe to get started.'}</p>}
+    <p role="status">{filtered.length} of {library.length} items. Diary entries and grocery foods keep nutrition snapshots, so they do not block cleanup.</p>
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-black bg-white p-3">
+      <span className="text-sm text-black/70">{selectionMode ? `${selected.length} selected` : 'Select reusable foods for safe bulk cleanup.'}</span>
+      <div className="flex flex-wrap gap-2">
+        {!selectionMode && <button type="button" className={secondaryButton} onClick={toggleSelectionMode}>Select foods</button>}
+        {selectionMode && <>
+          <label className="inline-flex min-h-11 items-center gap-2 rounded-full border-2 border-black bg-white px-3 text-sm font-bold"><input type="checkbox" className="accent-lime-500" checked={selectable.length > 0 && selectable.every(entry => selectedIds.has(entry.food.id))} onChange={event => selectVisible(event.target.checked)} />Select visible</label>
+          <button type="button" className={secondaryButton} onClick={() => setSelectedIds(new Set())}>Clear</button>
+          <button type="button" className={secondaryButton} onClick={toggleSelectionMode}>Done</button>
+          <button type="button" className={`${secondaryButton} border-red-800 text-red-800`} disabled={!selected.length} onClick={() => requestDelete(selected.map(food => food.id))}>Delete selected{selected.length ? ` (${selected.length})` : ''}</button>
+        </>}
+      </div>
+    </div>
+    {!filtered.length && <p className="panel p-5">{library.length ? 'No matching foods. Try another search or filter.' : 'No food items yet. Add an item or save a recipe to get started.'}</p>}
     {view === 'list' && filtered.length > 0 && <div className="food-library-table-wrap" role="region" aria-label="Detailed food list" tabIndex="0">
       <table className="food-library-table">
         <caption>Nutrition is shown for each record's stated quantity. Missing values are marked Not set.</caption>
-        <thead><tr><th scope="col">Food / quantity</th>{NUTRIENTS.slice(0, 5).map(([key, label, unit]) => <th scope="col" key={key}>{label}<small>{unit}</small></th>)}<th scope="col">Source / recipes</th><th scope="col">Details</th></tr></thead>
+        <thead><tr>{selectionMode && <th scope="col">Select</th>}<th scope="col">Food / quantity</th>{NUTRIENTS.slice(0, 5).map(([key, label]) => <th scope="col" key={key}>{label}<small>{NUTRIENTS.find(item => item[0] === key)?.[2]}</small></th>)}<th scope="col">Usage</th><th scope="col">Actions</th></tr></thead>
         <tbody>{filtered.map(entry => {
           const item = entry.item;
           const nutrition = item.nutritionLabel || item.nutrition || {};
           const quantity = item.nutritionLabel?.quantity ?? item.amount;
           const unit = item.nutritionLabel?.unit ?? item.unit;
-          const usedBy = recipes.filter(recipe => entry.recipeTitles.includes(recipe.title));
+          const usedBy = recipesUsing(entry);
           return <tr key={entry.key}>
-            <th scope="row"><strong>{item.name}</strong><span className="food-library-meta">{quantity != null ? `Nutrition for ${quantity} ${unit || ''}` : 'Nutrition basis not set'}</span>{item.nutritionLabel && item.amount != null && <span className="food-library-meta">Listed amount: {item.amount} {item.unit}</span>}</th>
+            {selectionMode && <td data-label="Select">{entry.food && <input aria-label={`Select ${item.name}`} type="checkbox" className="h-4 w-4 accent-lime-500" checked={selectedIds.has(entry.food.id)} onChange={event => setSelectedIds(current => { const next = new Set(current); event.target.checked ? next.add(entry.food.id) : next.delete(entry.food.id); return next; })} />}</td>}
+            <th scope="row"><strong>{item.name}</strong><span className="food-library-meta">{quantity != null ? `Nutrition for ${quantity} ${unit || ''}` : 'Nutrition basis not set'}</span>{item.nutritionLabel && item.amount != null && <span className="food-library-meta">Recipe amount: {item.amount} {item.unit}</span>}</th>
             {NUTRIENTS.slice(0, 5).map(([key, label, nutrientUnit]) => <td key={key} data-label={label} className="food-library-number">{nutrition[key] == null ? <span className="food-library-missing">Not set</span> : <>{formatNutrient(nutrition[key])} <small>{nutrientUnit}</small></>}</td>)}
-            <td data-label="Source / recipes"><div className="food-library-sources">{entry.recipeTitles.includes('Main food library') && <span className="food-library-meta">Shared food library</span>}{usedBy.map(recipe => <RecipeLink className="food-library-recipe-link" key={recipe.slug} to={`/recipes/${recipe.slug}`}>{recipe.title}</RecipeLink>)}{nutrition.source?.provider && <span className="food-library-meta">Nutrition: {nutrition.source.provider}</span>}</div></td>
-            <td data-label="Details">{entry.recipeTitles.includes('Main food library') && <button type="button" className={secondaryButton} onClick={()=>onEdit(item.name)}>Edit food</button>}<details><summary aria-label={`More details for ${item.name}`}>More details</summary><div className="food-library-row-details">{item.note && <p>{item.note}</p>}{nutrition.source?.name && <p className="food-library-meta">Label: {nutrition.source.name}</p>}<dl className="food-library-nutrients">{NUTRIENTS.slice(5).map(([key, label, nutrientUnit]) => <div key={key}><dt>{label}</dt><dd>{nutrition[key] == null ? 'Not set' : `${formatNutrient(nutrition[key])} ${nutrientUnit}`}</dd></div>)}</dl></div></details></td>
+            <td data-label="Usage"><details><summary className="cursor-pointer">{usageLabel(entry)}</summary><div className="food-library-row-details">{usedBy.length ? <ul>{usedBy.map(recipe => <li key={recipe.slug}><RecipeLink className="food-library-recipe-link" to={`/recipes/${recipe.slug}`}>{recipe.title}</RecipeLink></li>)}</ul> : <p>No active recipe references.</p>}{entry.usage?.mealPlans.map(plan => <p key={plan.id} className="food-library-meta">Meal plan: {plan.name}</p>)}{(item.nutritionLabel?.source || item.nutrition?.source)?.provider && <p className="food-library-meta">Nutrition: {(item.nutritionLabel?.source || item.nutrition?.source).provider}</p>}</div></details></td>
+            <td data-label="Actions">{actions(entry)}<details className="mt-2"><summary className="cursor-pointer">More nutrients</summary><div className="food-library-row-details"><dl className="food-library-nutrients">{NUTRIENTS.slice(5).map(([key, label, nutrientUnit]) => <div key={key}><dt>{label}</dt><dd>{nutrition[key] == null ? 'Not set' : `${formatNutrient(nutrition[key])} ${nutrientUnit}`}</dd></div>)}</dl></div></details></td>
           </tr>;
         })}</tbody>
       </table>
@@ -54,15 +137,18 @@ export function FoodLibrary({ library, recipes, onAdd, onEdit }) {
       const nutrition = item.nutritionLabel || item.nutrition || {};
       const quantity = item.nutritionLabel?.quantity ?? item.amount;
       const unit = item.nutritionLabel?.unit ?? item.unit;
-      const usedBy = recipes.filter(recipe => entry.recipeTitles.includes(recipe.title));
       return <article className="panel p-5" key={entry.key}>
-        <h2 className="text-xl font-bold">{item.name}</h2>
-        <p className="text-sm mt-2">{quantity != null ? `Nutrition for ${quantity} ${unit || ''}` : 'Nutrition basis not set'}</p>
+        <div className="flex items-start justify-between gap-2"><div><h2 className="text-xl font-bold">{item.name}</h2><p className="text-sm mt-2">{quantity != null ? `Nutrition for ${quantity} ${unit || ''}` : 'Nutrition basis not set'}</p></div>{actions(entry)}</div>
+        {selectionMode && entry.food && <label className="mt-3 flex items-center gap-2"><input type="checkbox" className="accent-lime-500" checked={selectedIds.has(entry.food.id)} onChange={event => setSelectedIds(current => { const next = new Set(current); event.target.checked ? next.add(entry.food.id) : next.delete(entry.food.id); return next; })}/>Select for cleanup</label>}
+        <p className="mt-2 text-sm font-semibold">{usageLabel(entry)}</p>
         <dl className="food-library-nutrients">{NUTRIENTS.slice(0, 5).map(([key,label,nutrientUnit]) => <div key={key}><dt>{label}</dt><dd>{nutrition[key] == null ? 'Not set' : `${formatNutrient(nutrition[key])} ${nutrientUnit}`}</dd></div>)}</dl>
-        <details><summary>More nutrients</summary><dl className="food-library-nutrients">{NUTRIENTS.slice(5).map(([key,label,nutrientUnit]) => <div key={key}><dt>{label}</dt><dd>{nutrition[key] == null ? 'Not set' : `${formatNutrient(nutrition[key])} ${nutrientUnit}`}</dd></div>)}</dl></details>
-        {entry.recipeTitles.includes('Main food library') && <><p className="text-sm mt-3">Saved in shared food library</p><button type="button" className={secondaryButton} onClick={()=>onEdit(item.name)}>Edit food</button></>}
-        {usedBy.length > 0 && <div className="mt-3"><h3 className="font-bold">Used in recipes</h3><div className="flex flex-wrap gap-2 mt-2">{usedBy.map(recipe => <RecipeLink key={recipe.slug} to={`/recipes/${recipe.slug}`}>{recipe.title}</RecipeLink>)}</div></div>}
+        {recipesUsing(entry).length > 0 && <details className="mt-3"><summary>Used in {recipesUsing(entry).length} recipes</summary><div className="mt-2 flex flex-wrap gap-2">{recipesUsing(entry).map(recipe => <RecipeLink key={recipe.slug} to={`/recipes/${recipe.slug}`}>{recipe.title}</RecipeLink>)}</div></details>}
+        <details className="mt-3"><summary>More nutrients</summary><dl className="food-library-nutrients">{NUTRIENTS.slice(5).map(([key,label,nutrientUnit]) => <div key={key}><dt>{label}</dt><dd>{nutrition[key] == null ? 'Not set' : `${formatNutrient(nutrition[key])} ${nutrientUnit}`}</dd></div>)}</dl></details>
       </article>;
     })}</div>}
+    <ConfirmDialog isOpen={Boolean(deletePlan)} title={deletePlan?.safe.length === 1 ? 'Delete this food?' : `Delete ${deletePlan?.safe.length || 0} foods?`}
+      message={`${deletePlan?.safe.length || 0} unused ${deletePlan?.safe.length === 1 ? 'food is' : 'foods are'} safe to delete. ${deletePlan?.inUse.length ? `${deletePlan.inUse.length} used ${deletePlan.inUse.length === 1 ? 'food will' : 'foods will'} be kept because recipes still reference them.` : 'No active recipe references were found.'} Diary and grocery snapshots will stay unchanged.`}
+      confirmLabel={busy ? 'Deleting...' : `Delete ${deletePlan?.safe.length || 0} unused`} onCancel={() => !busy && setDeletePlan(null)} onConfirm={confirmDelete} />
+    {blockedFood && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-6" role="presentation"><section role="dialog" aria-modal="true" aria-labelledby="food-in-use-title" className="w-full max-w-md rounded-[1.75rem] border-2 border-black bg-[#fffdf8] p-5 text-black shadow-[8px_8px_0_#000]"><span className="pill">Food in use</span><h2 id="food-in-use-title" className="mt-4 text-2xl font-bold">{blockedFood.food.name} is used in {blockedFood.usage.recipes.length} recipe{blockedFood.usage.recipes.length === 1 ? '' : 's'}</h2><p className="mt-2 text-sm">Remove or replace it in these recipes before deleting the reusable food:</p><ul className="mt-3 list-inside list-disc">{blockedFood.usage.recipes.map(recipe => <li key={recipe.slug}><RecipeLink className="underline" to={`/recipes/${recipe.slug}`}>{recipe.title}</RecipeLink></li>)}</ul><button type="button" className={`${secondaryButton} mt-5`} onClick={() => setBlockedFood(null)}>Close</button></section></div>}
   </section>;
 }

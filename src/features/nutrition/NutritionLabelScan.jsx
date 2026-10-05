@@ -3,6 +3,7 @@ import { NUTRIENTS } from './nutrients.js';
 import { applyNutritionReview, currentAtBasis } from './nutritionLabelReview.js';
 import { createNutritionOcrSession } from './nutritionLabelOcr.js';
 import { validateOcrImage } from '../../services/ocr/imageOcr.js';
+import { notify } from '../../lib/notifications.js';
 import './nutritionLabelScan.css';
 
 const blankColumn=()=>({id:'manual',label:'Basis not identified',kind:'unknown',quantity:null,unit:'g',confirmed:false,nutrients:{},values:{},selected:[]});
@@ -33,8 +34,9 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
       if(run!==job.current)return;
       const next=result.parsed.columns.length?result.parsed.columns.map(reviewColumn):[blankColumn()];
       setColumns(next);setActive(next[0].id);setWarnings(result.parsed.warnings);setRaw(result.parsed.text);setClearIncompatible(false);
+      if (result.parsed.columns.length) notify.info('Nutrition label scanned. Review the values before applying.');
       if(debugEnabled)setDiagnostics({selected:result.name,candidates:result.debug?.candidates.map(({image,...candidate})=>candidate)});
-    }catch(err){if(run===job.current){setError(err.message||'Could not scan this label. Try a clearer image.');session.current?.dispose();session.current=null;}}
+    }catch(err){if(run===job.current){setError(err.message||'Could not scan this label. Try a clearer image.');notify.error(err.message||'Could not scan nutrition label');session.current?.dispose();session.current=null;}}
     finally{if(run===job.current){setBusy(false);setProgress(null);}}
   }
   function upload(file){if(!file)return;try{validateOcrImage(file);}catch(err){setError(err.message);return;}fileRef.current=file;if(urlRef.current)URL.revokeObjectURL(urlRef.current);urlRef.current=URL.createObjectURL(file);setPhoto(urlRef.current);setRotation(0);const full={left:0,top:0,right:100,bottom:100};setCrop(full);void scan(file,0,full);}

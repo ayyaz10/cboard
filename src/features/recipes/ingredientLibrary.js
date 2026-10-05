@@ -10,21 +10,29 @@ const nutritionSignature = (item) => {
 
 export function buildIngredientLibrary(recipes = [], foodCatalog = []) {
   const entries = new Map();
+  const catalogById = new Map();
+  const catalogByName = new Map();
   foodCatalog.forEach((catalogItem) => {
     const item = catalogIngredient(catalogItem);
     const key = [normalise(item.name), normalise(item.unit), String(item.amount ?? ''), nutritionSignature(item)].join('|');
-    entries.set(key, { key, item, recipeTitles: ['Main food library'] });
+    const entryKey = `food:${catalogItem.id}`;
+    entries.set(entryKey, { key: entryKey, item, recipeTitles: ['Main food library'], recipeSlugs: [] });
+    catalogById.set(catalogItem.id, entryKey);
+    catalogByName.set(normalise(catalogItem.name), [...(catalogByName.get(normalise(catalogItem.name)) || []), entryKey]);
   });
   recipes.forEach((recipe) => {
     const alternatives = Object.values(recipe.alternatives || {}).flatMap((group) => group.options || []);
     [...(recipe.ingredients || []), ...(recipe.sauces || []), ...alternatives].forEach((item) => {
       if (!normalise(item?.name)) return;
-      const key = [normalise(item.name), normalise(item.unit), String(item.amount ?? ''), nutritionSignature(item)].join('|');
+      const legacyMatches = catalogByName.get(normalise(item.name)) || [];
+      const masterKey = item.foodId ? catalogById.get(item.foodId) : legacyMatches.length === 1 ? legacyMatches[0] : null;
+      const key = masterKey || [normalise(item.name), normalise(item.unit), String(item.amount ?? ''), nutritionSignature(item)].join('|');
       const existing = entries.get(key);
       if (existing) {
         if (recipe.title && !existing.recipeTitles.includes(recipe.title)) existing.recipeTitles.push(recipe.title);
+        if (recipe.slug && !existing.recipeSlugs.includes(recipe.slug)) existing.recipeSlugs.push(recipe.slug);
       } else {
-        entries.set(key, { key, item, recipeTitles: recipe.title ? [recipe.title] : [] });
+        entries.set(key, { key, item, recipeTitles: recipe.title ? [recipe.title] : [], recipeSlugs: recipe.slug ? [recipe.slug] : [] });
       }
     });
   });
@@ -47,6 +55,7 @@ export function findIngredientMatches(library, query, limit = 8) {
 export function applyStoredIngredient(current, stored) {
   const next = {
     ...(current.id ? { id: current.id } : {}),
+    ...(stored.foodId ? { foodId: stored.foodId } : {}),
     name: stored.name,
     amount: stored.amount ?? null,
     unit: stored.unit || '',
