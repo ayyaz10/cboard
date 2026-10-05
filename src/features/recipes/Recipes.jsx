@@ -12,6 +12,7 @@ import {
   saveRecipe,
   saveRecipeBatch,
   deleteRecipe,
+  deleteRecipes,
   getRecipeFavourites,
   setRecipeFavourite,
 } from '../../services/recipeService';
@@ -66,6 +67,8 @@ function RecipesContent({ route, navigationPath }) {
   const [draft, setDraft] = useState(null);
   const [addingFood, setAddingFood] = useState(false);
   const [removing, setRemoving] = useState(null);
+  const [selectedRecipeSlugs, setSelectedRecipeSlugs] = useState(new Set());
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [busy, setBusy] = useState(false);
   const ingredientLibrary = useMemo(() => buildIngredientLibrary(recipes, foodCatalog), [recipes, foodCatalog]);
   const dialog = useRef(null);
@@ -100,8 +103,8 @@ function RecipesContent({ route, navigationPath }) {
     refresh();
   }, []);
   useEffect(() => {
-    if (removing) dialog.current?.showModal();
-  }, [removing]);
+    if (removing || confirmBulkDelete) dialog.current?.showModal();
+  }, [removing, confirmBulkDelete]);
   async function toggleFavourite(item) {
     if (favouriteLocks.current.has(item.slug)) return;
     favouriteLocks.current.add(item.slug);
@@ -166,21 +169,27 @@ function RecipesContent({ route, navigationPath }) {
     deleteLock.current = true;
     setBusy(true);
     setError('');
-    const deletedTitle = removing?.title || 'Recipe';
+    const deleting = confirmBulkDelete
+      ? recipes.filter(item => selectedRecipeSlugs.has(item.slug))
+      : removing ? [removing] : [];
     try {
-      await deleteRecipe(removing.slug);
-      setRecipes((current) =>
-        current.filter((item) => item.slug !== removing.slug),
-      );
+      if (confirmBulkDelete) await deleteRecipes(deleting.map(item => item.slug));
+      else await deleteRecipe(removing.slug);
+      const deletedSlugs = new Set(deleting.map(item => item.slug));
+      setRecipes(current => current.filter(item => !deletedSlugs.has(item.slug)));
+      setFavourites(current => { const next = new Set(current); deletedSlugs.forEach(slug => next.delete(slug)); return next; });
+      setSelectedRecipeSlugs(current => new Set([...current].filter(slug => !deletedSlugs.has(slug))));
       setRemoving(null);
-      setFavourites(current => { const next = new Set(current); next.delete(removing.slug); return next; });
-      if (!manage) {
-        setRecipeNotice(`${deletedTitle} deleted.`);
+      setConfirmBulkDelete(false);
+      if (confirmBulkDelete) setRecipeNotice(`${deleting.length} recipe${deleting.length === 1 ? '' : 's'} deleted.`);
+      else if (!manage) {
+        setRecipeNotice(`${deleting[0]?.title || 'Recipe'} deleted.`);
         navigateTo('/recipes');
       }
     } catch (error) {
       setError(error.message || 'Could not delete recipe. Please try again.');
       setRemoving(null);
+      setConfirmBulkDelete(false);
     } finally {
       deleteLock.current = false;
       setBusy(false);
@@ -221,6 +230,27 @@ function RecipesContent({ route, navigationPath }) {
         .toLowerCase()
         .includes(query),
   );
+  function setRecipeSelected(slug, checked) {
+    setError('');
+    setSelectedRecipeSlugs(current => {
+      const next = new Set(current);
+      if (checked && !next.has(slug) && next.size >= 50) { setError('You can bulk delete up to 50 recipes at a time.'); return current; }
+      if (checked) next.add(slug); else next.delete(slug);
+      return next;
+    });
+  }
+  function setVisibleSelected(checked) {
+    setError('');
+    setSelectedRecipeSlugs(current => {
+      const visibleSlugs = new Set(filtered.map(item => item.slug));
+      const next = new Set([...current].filter(slug => !visibleSlugs.has(slug)));
+      if (checked) filtered.forEach(item => next.add(item.slug));
+      if (next.size > 50) { setError('Select 50 or fewer recipes at a time. Narrow the list with search or filters, then select this page again.'); return current; }
+      return next;
+    });
+  }
+  const bulkDeleteItems = recipes.filter(item => selectedRecipeSlugs.has(item.slug));
+  const deletingInDialog = confirmBulkDelete ? bulkDeleteItems : removing ? [removing] : [];
   return (
     <PageShell>
       <section className="recipe-page-shell panel space-y-7 border-black p-5 text-black sm:p-8 lg:p-10">
@@ -334,12 +364,27 @@ function RecipesContent({ route, navigationPath }) {
                         <RecipeCardViewControl />
                       </div>
                     </div>
+                    {manage && <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-black bg-white p-4" aria-label="Bulk recipe actions">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <label className="flex items-center gap-2 text-sm font-bold">
+                          <input type="checkbox" className="h-4 w-4 accent-lime-500" checked={filtered.length > 0 && filtered.every(item => selectedRecipeSlugs.has(item.slug))} onChange={event => setVisibleSelected(event.target.checked)} aria-label={`Select all ${filtered.length} shown recipes`} />
+                          Select all shown
+                        </label>
+                        <span className="text-sm text-black/65">{bulkDeleteItems.length} selected · up to 50 at a time</span>
+                        {selectedRecipeSlugs.size > 0 && <button type="button" className={secondaryButton} onClick={() => setSelectedRecipeSlugs(new Set())}>Clear selection</button>}
+                      </div>
+                      <button type="button" className={secondaryButton} disabled={!bulkDeleteItems.length || busy} onClick={() => setConfirmBulkDelete(true)}>Delete selected recipes</button>
+                    </section>}
                     <RecipeMasonryGrid className={cardGrid}>
                       {filtered.map((item) => (
                         <div
                           key={item.slug}
                           className="flex min-w-0 flex-col gap-3"
                         >
+                          {manage && <label className="flex items-center gap-2 self-start rounded-full border-2 border-black bg-white px-3 py-2 text-sm font-bold">
+                            <input type="checkbox" className="h-4 w-4 accent-lime-500" checked={selectedRecipeSlugs.has(item.slug)} onChange={event => setRecipeSelected(item.slug, event.target.checked)} aria-label={`Select ${item.title} for bulk deletion`} />
+                            Select
+                          </label>}
                           <RecipeCard
                             recipe={item}
                             favourite={favourites.has(item.slug)}
@@ -466,20 +511,25 @@ function RecipesContent({ route, navigationPath }) {
           ref={dialog}
           onCancel={(event) => {
             if (busy) event.preventDefault();
-            else setRemoving(null);
+            else { setRemoving(null); setConfirmBulkDelete(false); }
           }}
           onClose={() => {
-            if (!busy) setRemoving(null);
+            if (!busy) { setRemoving(null); setConfirmBulkDelete(false); }
           }}
           className="panel fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-md border-black p-6 text-black backdrop:bg-black/35"
           aria-labelledby="recipe-delete-title"
         >
           <h2 id="recipe-delete-title" className="text-2xl font-bold">
-            Delete “{removing?.title}”?
+            {confirmBulkDelete
+              ? `Delete ${deletingInDialog.length} selected recipe${deletingInDialog.length === 1 ? '' : 's'}?`
+              : `Delete “${removing?.title}”?`}
           </h2>
           <p className="mt-3 text-black/70">
-            This removes the recipe and its uploaded image from your library.
+            {confirmBulkDelete
+              ? 'This removes the selected recipes and their saved favourites from your library.'
+              : 'This removes the recipe and its uploaded image from your library.'}
           </p>
+          {confirmBulkDelete && deletingInDialog.length > 0 && <ul className="mt-3 max-h-32 list-inside list-disc overflow-auto text-sm">{deletingInDialog.slice(0, 5).map(item => <li key={item.slug}>{item.title}</li>)}{deletingInDialog.length > 5 && <li>and {deletingInDialog.length - 5} more</li>}</ul>}
           <div className="mt-6 flex flex-wrap gap-3">
             <button
               autoFocus
@@ -488,6 +538,7 @@ function RecipesContent({ route, navigationPath }) {
               onClick={() => {
                 dialog.current.close();
                 setRemoving(null);
+                setConfirmBulkDelete(false);
               }}
             >
               Cancel
@@ -500,7 +551,7 @@ function RecipesContent({ route, navigationPath }) {
                 dialog.current?.close();
               }}
             >
-              {busy ? 'Deleting…' : 'Delete'}
+              {busy ? 'Deleting…' : confirmBulkDelete ? `Delete ${deletingInDialog.length} recipes` : 'Delete'}
             </button>
           </div>
         </dialog>

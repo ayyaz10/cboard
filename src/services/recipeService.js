@@ -213,12 +213,20 @@ export async function saveRecipe(recipe, image, { edit = false, expectedUserId }
 }
 
 export async function deleteRecipe(slug) {
+  return deleteRecipes([slug]);
+}
+
+export async function deleteRecipes(slugs) {
+  if (!Array.isArray(slugs) || slugs.length < 1 || slugs.length > 50
+    || slugs.some(slug => typeof slug !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug))) {
+    throw new Error('Select between 1 and 50 valid recipes to delete.');
+  }
   const { client, userId } = await getUserScopedClient();
   const result = await client
     .from('user_tool_preferences')
     .delete()
     .eq('user_id', userId)
-    .in('key', [`${PREFIX}${slug}`, `${FAVOURITE_PREFIX}${slug}`]);
+    .in('key', [...new Set(slugs)].flatMap(slug => [`${PREFIX}${slug}`, `${FAVOURITE_PREFIX}${slug}`]));
   assertSupabaseResult(result);
 }
 
