@@ -35,8 +35,20 @@ test('transfers do not invent spending while tracked allocations reduce availabl
 test('pending allocations do not change the actual cash timeline until payment is recorded', () => {
   const pending={id:'a',type:'donation',amount:2250,date:'2026-09-03',allocationStatus:'allocated'};
   assert.equal(transactionCashEffect(pending),0);
-  assert.equal(buildCashTimeline([pending],null,10000).at(-1).balance,10000);
+  const pendingTimeline=buildCashTimeline([pending],null,10000);
+  assert.equal(pendingTimeline.at(-1).balance,10000);
+  assert.equal(pendingTimeline.at(-1).transaction.id,'a');
   assert.equal(buildCashTimeline([{...pending,allocationStatus:'paid'}],null,10000).at(-1).balance,7750);
+});
+
+test('timeline keeps payment markers chronological even when linked to older income', () => {
+  const items=[
+    {id:'income',type:'income',amount:10000,date:'2026-09-01'},
+    {id:'repayment',type:'debt',amount:2000,date:'2026-09-10',allocationStatus:'paid',sourceIncomeId:'income'},
+  ];
+  const timeline=buildCashTimeline(items,null,0);
+  assert.deepEqual(timeline.slice(1).map(point=>point.transaction.id),['income','repayment']);
+  assert.deepEqual(timeline.map(point=>point.balance),[0,10000,8000]);
 });
 
 test('merchant recognition is conservative and opening balances allow zero', () => {

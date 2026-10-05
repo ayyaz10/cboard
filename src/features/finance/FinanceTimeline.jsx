@@ -3,8 +3,8 @@ import { Area, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveCont
 import { budgetTarget, formatMoney, moneyInput, monthKey, shiftMonth } from './financeMath.js';
 import { buildCashTimeline, merchantLogoUrl, parseOpeningBalance } from './financeChartData.js';
 
-const markerTypes = ['income', 'expense', 'savings', 'goal', 'investment', 'donation', 'budget', 'debt'];
-const markerLabels = { income:'Income', expense:'Spending', savings:'Savings', goal:'Goals', investment:'Investments', donation:'Donations', budget:'Budget pots', debt:'Repayments' };
+const markerTypes = ['income', 'expense', 'savings', 'goal', 'investment', 'donation', 'budget', 'debt', 'transfer'];
+const markerLabels = { income:'Income', expense:'Spending', savings:'Savings', goal:'Goals', investment:'Investments', donation:'Donations', budget:'Budget pots', debt:'Repayments', transfer:'Transfers' };
 const markerSymbols = { income:'↑', expense:'−', savings:'S', goal:'★', investment:'↗', donation:'+', budget:'B', debt:'✓', transfer:'↔' };
 const progressLabels = { savings:'Savings', goals:'Goals', investments:'Investments', donations:'Donations', budgets:'Budgets', debts:'Repayments' };
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
@@ -33,6 +33,7 @@ function TimelineTooltip({ active, payload, currency, showLogos }) {
   return <div className="f-chart-tooltip">
     <div className="f-chart-tooltip-title"><MerchantMark transaction={transaction} showLogos={showLogos} compact/><div><strong>{transaction.title}</strong><span>{markerLabels[transaction.type] || transaction.type} · {transaction.date}</span></div></div>
     <div className="f-between"><span>Movement</span><strong className={transaction.type==='income'?'f-positive':''}>{sign}{formatMoney(Math.abs(point.change),currency)}</strong></div>
+    {transaction.allocationStatus==='allocated'&&<div className="f-between"><span>Status</span><strong>Allocated · not paid</strong></div>}
     <div className="f-between"><span>Available after</span><strong>{formatMoney(point.balance,currency)}</strong></div>
   </div>;
 }
@@ -202,7 +203,7 @@ export function FinanceTimeline({ data, month, setMonth, change, transactionScop
           className={`f-chart-viewport${dragging?' is-dragging':''}`}
           tabIndex="0"
           aria-label="Pannable and zoomable money timeline"
-          onPointerDown={(event)=>{if(event.pointerType==='touch'||event.button!==0)return;event.currentTarget.setPointerCapture(event.pointerId);drag.current={x:event.clientX,y:event.clientY,viewport};setDragging(true)}}
+          onPointerDown={(event)=>{if(event.pointerType==='touch'||event.button!==0)return;event.preventDefault();event.currentTarget.setPointerCapture(event.pointerId);drag.current={x:event.clientX,y:event.clientY,viewport};setDragging(true)}}
           onPointerMove={(event)=>{if(drag.current)panFrom(drag.current,event.clientX,event.clientY)}}
           onPointerUp={(event)=>{if(drag.current){drag.current=null;setDragging(false);event.currentTarget.releasePointerCapture(event.pointerId)}}}
           onPointerCancel={()=>{drag.current=null;setDragging(false)}}

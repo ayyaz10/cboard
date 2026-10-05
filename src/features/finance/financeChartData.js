@@ -11,7 +11,7 @@ export function transactionCashEffect(transaction) {
 }
 
 export function buildCashTimeline(transactions, month, openingBalance = 0) {
-  const ordered = orderedTransactions(transactions, false).filter(item => item.allocationStatus !== 'allocated' && (month === null || inMonth(item.date, month)));
+  const ordered = orderedTransactions(transactions, false).filter(item => month === null || inMonth(item.date, month));
   let balance = Number.isSafeInteger(openingBalance) ? openingBalance : 0;
   const points = [{ index: 0, date: month === null ? (ordered[0]?.date || '') : `${month}-01`, balance, change: 0, transaction: null }];
 

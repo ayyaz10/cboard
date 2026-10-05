@@ -3,7 +3,9 @@
 export function orderedTransactions(transactions, newestFirst = true) {
   const byId = new Map(transactions.map(item => [item.id, item]));
   const position = new Map(transactions.map((item, index) => [item.id, index]));
-  const root = item => byId.get(item.sourceIncomeId) || item;
+  // Pending allocations belong with their income. A confirmed payment is a
+  // separate real event and must sort on its actual payment date.
+  const root = item => item.allocationStatus === 'paid' ? item : byId.get(item.sourceIncomeId) || item;
   const sequence = item => item.sequence ?? position.get(item.id) ?? 0;
   return [...transactions].sort((a, b) => {
     if (a.id === b.id) return 0;
