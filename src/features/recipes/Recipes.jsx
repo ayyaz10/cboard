@@ -68,6 +68,7 @@ function RecipesContent({ route, navigationPath }) {
   const [addingFood, setAddingFood] = useState(false);
   const [removing, setRemoving] = useState(null);
   const [selectedRecipeSlugs, setSelectedRecipeSlugs] = useState(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
   const [busy, setBusy] = useState(false);
   const ingredientLibrary = useMemo(() => buildIngredientLibrary(recipes, foodCatalog), [recipes, foodCatalog]);
@@ -249,6 +250,12 @@ function RecipesContent({ route, navigationPath }) {
       return next;
     });
   }
+  function toggleSelectionMode() {
+    setSelectionMode(current => {
+      if (current) setSelectedRecipeSlugs(new Set());
+      return !current;
+    });
+  }
   const bulkDeleteItems = recipes.filter(item => selectedRecipeSlugs.has(item.slug));
   const deletingInDialog = confirmBulkDelete ? bulkDeleteItems : removing ? [removing] : [];
   return (
@@ -362,19 +369,23 @@ function RecipesContent({ route, navigationPath }) {
                         </label>
                         <p role="status" className="text-sm text-black/70">{filtered.length} recipe{filtered.length === 1 ? '' : 's'}</p>
                         <RecipeCardViewControl />
-                        {!manage && <RecipeLink to="/recipes/manage">Select &amp; delete recipes</RecipeLink>}
+                        {!manage && <RecipeLink to="/recipes/manage">Manage recipes</RecipeLink>}
                       </div>
                     </div>
-                    {manage && <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-black bg-white p-4" aria-label="Bulk recipe actions">
+                    {manage && <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-black bg-white p-3" aria-label="Bulk recipe actions">
                       <div className="flex flex-wrap items-center gap-3">
-                        <label className="flex items-center gap-2 text-sm font-bold">
+                        {!selectionMode && <button type="button" className={secondaryButton} onClick={toggleSelectionMode}>Select recipes</button>}
+                        {selectionMode && <label className="flex items-center gap-2 text-sm font-bold">
                           <input type="checkbox" className="h-4 w-4 accent-lime-500" checked={filtered.length > 0 && filtered.every(item => selectedRecipeSlugs.has(item.slug))} onChange={event => setVisibleSelected(event.target.checked)} aria-label={`Select all ${filtered.length} shown recipes`} />
                           Select all shown
-                        </label>
-                        <span className="text-sm text-black/65">{bulkDeleteItems.length} selected · up to 50 at a time</span>
-                        {selectedRecipeSlugs.size > 0 && <button type="button" className={secondaryButton} onClick={() => setSelectedRecipeSlugs(new Set())}>Clear selection</button>}
+                        </label>}
+                        {selectionMode && <span className="text-sm text-black/65">{bulkDeleteItems.length} selected <span className="hidden sm:inline">· up to 50 at a time</span></span>}
+                        {selectionMode && selectedRecipeSlugs.size > 0 && <button type="button" className={secondaryButton} onClick={() => setSelectedRecipeSlugs(new Set())}>Clear</button>}
                       </div>
-                      <button type="button" className={secondaryButton} disabled={!bulkDeleteItems.length || busy} onClick={() => setConfirmBulkDelete(true)}>Delete selected recipes</button>
+                      {selectionMode && <div className="flex gap-2">
+                        <button type="button" className={secondaryButton} onClick={toggleSelectionMode}>Done</button>
+                        <button type="button" className={`${secondaryButton} border-red-800 text-red-800`} disabled={!bulkDeleteItems.length || busy} onClick={() => setConfirmBulkDelete(true)}>Delete {bulkDeleteItems.length ? `(${bulkDeleteItems.length})` : 'selected'}</button>
+                      </div>}
                     </section>}
                     <RecipeMasonryGrid className={cardGrid}>
                       {filtered.map((item) => (
@@ -382,38 +393,18 @@ function RecipesContent({ route, navigationPath }) {
                           key={item.slug}
                           className="flex min-w-0 flex-col gap-3"
                         >
-                          {manage && <label className="flex items-center gap-2 self-start rounded-full border-2 border-black bg-white px-3 py-2 text-sm font-bold">
-                            <input type="checkbox" className="h-4 w-4 accent-lime-500" checked={selectedRecipeSlugs.has(item.slug)} onChange={event => setRecipeSelected(item.slug, event.target.checked)} aria-label={`Select ${item.title} for bulk deletion`} />
-                            Select
-                          </label>}
                           <RecipeCard
                             recipe={item}
                             favourite={favourites.has(item.slug)}
                             favouritePending={favouritePending.has(item.slug)}
                             onToggleFavourite={toggleFavourite}
                             onDelete={manage ? setRemoving : undefined}
+                            onEdit={manage ? recipe => startImport(recipe, true) : undefined}
+                            onDuplicate={manage ? recipe => startImport({ ...recipe, title: `${recipe.title} (copy)` }) : undefined}
+                            bulkSelection={manage && selectionMode}
+                            selected={selectedRecipeSlugs.has(item.slug)}
+                            onToggleSelected={setRecipeSelected}
                           />
-                          {manage && (
-                            <div className="flex flex-wrap gap-2">
-                              <button
-                                className={secondaryButton}
-                                onClick={() => startImport(item, true)}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                className={secondaryButton}
-                                onClick={() =>
-                                  startImport({
-                                    ...item,
-                                    title: `${item.title} (copy)`,
-                                  })
-                                }
-                              >
-                                Duplicate
-                              </button>
-                            </div>
-                          )}
                         </div>
                       ))}
                     </RecipeMasonryGrid>

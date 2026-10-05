@@ -355,9 +355,22 @@ export function RecipePage({ recipe, preview = false, onRecipeUpdated, favourite
   );
 }
 
-export function RecipeCard({ recipe, favourite = false, favouritePending = false, onToggleFavourite, onDelete }) {
+export function RecipeCard({ recipe, favourite = false, favouritePending = false, onToggleFavourite, onDelete, onEdit, onDuplicate, bulkSelection = false, selected = false, onToggleSelected }) {
   return (
-    <article className="recipe-card recipe-clickable-card panel flex min-w-0 flex-col gap-4 border-black p-5 text-black">
+    <article className="recipe-card recipe-clickable-card panel relative flex min-w-0 flex-col gap-4 border-black p-5 text-black">
+      {(onDelete || onEdit || onDuplicate || (bulkSelection && onToggleSelected)) && <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
+        {bulkSelection && onToggleSelected && <label className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border-2 border-black bg-white" title={`Select ${recipe.title}`}>
+          <input type="checkbox" className="h-4 w-4 accent-lime-500" checked={selected} onChange={event => onToggleSelected(recipe.slug, event.target.checked)} aria-label={`Select ${recipe.title}`} />
+        </label>}
+        <details className="group relative">
+          <summary className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full border-2 border-black bg-white text-xl font-bold leading-none hover:bg-[#c5ff6f] focus-visible:outline-2 focus-visible:outline-offset-2" aria-label={`Actions for ${recipe.title}`} title="Recipe actions">⋯</summary>
+          <div className="absolute right-0 top-12 z-20 grid min-w-36 gap-1 rounded-xl border-2 border-black bg-white p-2 shadow-[3px_3px_0_#111]">
+            {onEdit && <button type="button" className="rounded-lg px-3 py-2 text-left text-sm font-bold hover:bg-[#edffd5]" onClick={event => { event.currentTarget.closest('details').open = false; onEdit(recipe); }}>Edit recipe</button>}
+            {onDuplicate && <button type="button" className="rounded-lg px-3 py-2 text-left text-sm font-bold hover:bg-[#edffd5]" onClick={event => { event.currentTarget.closest('details').open = false; onDuplicate(recipe); }}>Duplicate recipe</button>}
+            {onDelete && <button type="button" className="rounded-lg px-3 py-2 text-left text-sm font-bold text-red-800 hover:bg-red-50" onClick={event => { event.currentTarget.closest('details').open = false; onDelete(recipe); }}>Delete recipe</button>}
+          </div>
+        </details>
+      </div>}
       <RecipeImage image={recipe.image} title={recipe.title} />
       <div>
         <div className="flex items-center justify-between gap-3"><span className="pill">{recipe.mealType}</span><RecipeFavouriteButton recipe={recipe} favourite={favourite} pending={favouritePending} onToggle={onToggleFavourite}/></div>
@@ -377,16 +390,6 @@ export function RecipeCard({ recipe, favourite = false, favouritePending = false
           .filter(Boolean)
           .join(' · ')}
       </p>}
-      {onDelete && <div className="mt-auto flex flex-wrap gap-3">
-          <button
-            type="button"
-            className={secondaryButton}
-            disabled={favouritePending}
-            onClick={() => onDelete(recipe)}
-          >
-            Delete
-          </button>
-      </div>}
     </article>
   );
 }
