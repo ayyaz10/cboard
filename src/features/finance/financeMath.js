@@ -85,10 +85,13 @@ export function debtSummary(items, payments, selectedMonth) {
 
 export function nextRecurringDate(date, frequency, customMonths = 1) {
   const current = new Date(`${date}T12:00:00`);
-  if (frequency === 'weekly') current.setDate(current.getDate() + 7);
-  else if (frequency === 'fortnightly') current.setDate(current.getDate() + 14);
-  else if (frequency === 'yearly') current.setFullYear(current.getFullYear() + 1);
-  else current.setMonth(current.getMonth() + Math.max(1, Number(customMonths) || 1));
+  const cadence = String(frequency || 'monthly').trim().toLowerCase();
+  if (cadence === 'weekly' || cadence === 'week') current.setDate(current.getDate() + 7);
+  else if (cadence === 'fortnightly' || cadence === 'biweekly') current.setDate(current.getDate() + 14);
+  else if (cadence === 'yearly' || cadence === 'annual') current.setFullYear(current.getFullYear() + 1);
+  else if (cadence === 'custom') current.setMonth(current.getMonth() + Math.max(1, Number(customMonths) || 1));
+  else if (cadence === 'monthly' || cadence === 'month') current.setMonth(current.getMonth() + 1);
+  else throw new Error(`Unsupported recurring frequency: ${frequency}`);
   return current.toISOString().slice(0, 10);
 }
 

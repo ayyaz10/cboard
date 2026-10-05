@@ -72,5 +72,7 @@ test('month and recurring calculations cross year boundaries safely', () => {
   assert.equal(monthKey(new Date(2026,0,1)),'2026-01');
   assert.equal(nextRecurringDate('2026-12-15','monthly'),'2027-01-15');
   assert.equal(nextRecurringDate('2026-12-28','weekly'),'2027-01-04');
+  assert.equal(nextRecurringDate('2026-10-05','Weekly'),'2026-10-12');
+  assert.equal(nextRecurringDate('2026-10-05',' biweekly '),'2026-10-19');
   assert.equal(nextRecurringDate('2024-02-29','yearly'),'2025-03-01');
 });
