@@ -166,6 +166,7 @@ function RecipesContent({ route, navigationPath }) {
     deleteLock.current = true;
     setBusy(true);
     setError('');
+    const deletedTitle = removing?.title || 'Recipe';
     try {
       await deleteRecipe(removing.slug);
       setRecipes((current) =>
@@ -173,6 +174,10 @@ function RecipesContent({ route, navigationPath }) {
       );
       setRemoving(null);
       setFavourites(current => { const next = new Set(current); next.delete(removing.slug); return next; });
+      if (!manage) {
+        setRecipeNotice(`${deletedTitle} deleted.`);
+        navigateTo('/recipes');
+      }
     } catch (error) {
       setError(error.message || 'Could not delete recipe. Please try again.');
       setRemoving(null);
@@ -426,9 +431,12 @@ function RecipesContent({ route, navigationPath }) {
             )}
             {!error && recipe && parts.length === 2 && (
               <div className="space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
                   <RecipeLink to="/recipes">Back to recipes</RecipeLink>
-                  <button className={secondaryButton} onClick={() => startImport(recipe, true)}>Edit Recipe</button>
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" className={secondaryButton} onClick={() => startImport(recipe, true)}>Edit Recipe</button>
+                      <button type="button" className={secondaryButton} aria-label={`Delete ${recipe.title}`} onClick={() => setRemoving(recipe)}>Delete recipe</button>
+                    </div>
                 </div>
                 <RecipePage key={recipe.slug} recipe={recipe} favourite={favourites.has(recipe.slug)} favouritePending={favouritePending.has(recipe.slug)} onToggleFavourite={toggleFavourite} onRecipeUpdated={recipeUpdated} />
               </div>
