@@ -6,6 +6,7 @@ import { NUTRIENTS } from './nutrients.js';
 import { validateFoodItem } from '../../../supabase/functions/_shared/foodItem.js';
 import { invokeNutritionFunction } from '../../services/nutritionLookup';
 import { notify } from '../../lib/notifications.js';
+import { findFoodMatches } from './foodCatalog.js';
 import '../groceries/groceries.css';
 
 const example = { name: "McDonald's burger", quantity: 1, unit: 'pieces', nutrition: { calories: null, protein: null, carbs: null, fat: null, fiber: null } };
@@ -16,13 +17,14 @@ export function FoodItemEditor({ catalog, onSave, onClose, initial = null }) {
   const [json, setJson] = useState(JSON.stringify(example, null, 2));
   const [description, setDescription] = useState('');
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
-  const [replace, setReplace] = useState(Boolean(initial));
-  const existing = catalog.some(item => item.id !== initial?.id && item.name.trim().toLowerCase() === draft.name.trim().toLowerCase());
+  const [duplicateChoice, setDuplicateChoice] = useState('');
+  const matches = draft.name.trim() ? findFoodMatches(draft, catalog).filter(match => match.food.id !== initial?.id).slice(0, 3) : [];
+  const reviewMatches = matches.filter(match => match.confidence === 'review' || match.confidence === 'suggestion');
   useEffect(() => { dialog.current.showModal(); }, []);
   useEffect(() => { if (dialog.current) dialog.current.scrollTop = 0; }, [mode]);
   function useFood(food, provider) {
-    setDraft({ ...(initial?.id ? { id: initial.id } : {}), ...validateFoodItem(food), source: { provider, ...food.source } });
-    setMode('manual'); setReplace(false); setError('');
+    setDraft({ ...(initial?.id ? { id: initial.id } : {}), ...validateFoodItem(food), barcode: food.barcode || food.source?.barcode || food.source?.code || '', sku: food.sku || food.source?.sku || '', retailer: food.retailer || food.source?.retailer || '', brand: food.brand || food.source?.brand || '', source: { provider, ...food.source } });
+    setMode('manual'); setError('');
   }
   async function ai() {
     if (lock.current) return;
@@ -41,10 +43,10 @@ export function FoodItemEditor({ catalog, onSave, onClose, initial = null }) {
   }
   async function save(event) {
     event.preventDefault();
-    if (lock.current || (existing && !replace)) return;
-    if (initial && existing) { setError('Another food already has this name. Rename it to avoid ambiguity; foods are not merged automatically.'); return; }
+    if (lock.current) return;
+    if (!initial && reviewMatches.length && !duplicateChoice) { setError('Review the possible existing food, or choose Create separately.'); return; }
     lock.current = true; setBusy(true); setError('');
-    try { await onSave({ ...(initial?.id ? { id: initial.id } : {}), ...validateFoodItem(draft), source: draft.source }); onClose(); }
+    try { await onSave({ ...(initial?.id ? { id: initial.id } : {}), ...validateFoodItem(draft), barcode: draft.barcode, sku: draft.sku, retailer: draft.retailer, brand: draft.brand, source: draft.source, ...(duplicateChoice === 'separate' ? { allowDuplicate: true } : {}) }); onClose(); }
     catch (err) { setError(err.message); notify.error(err.message || 'Could not save food item'); }
     finally { lock.current = false; setBusy(false); }
   }
@@ -77,7 +79,15 @@ export function FoodItemEditor({ catalog, onSave, onClose, initial = null }) {
     }} />}
     {mode === 'manual' && <form onSubmit={save}>
       <fieldset disabled={busy}>
-        <label>Food name<input required maxLength={300} value={draft.name} onChange={event => { setDraft({ ...draft, name: event.target.value }); setReplace(false); }} /></label>
+        <label>Food name<input required maxLength={300} value={draft.name} onChange={event => { setDraft({ ...draft, name: event.target.value }); setDuplicateChoice(''); }} /></label>
+        <div className="g-tools">
+          <label>Brand (optional)<input maxLength={120} value={draft.brand || draft.source?.brand || ''} onChange={event => setDraft({ ...draft, brand: event.target.value, source: { ...draft.source, brand: event.target.value } })} /></label>
+          <label>Barcode (optional)<input inputMode="numeric" maxLength={32} value={draft.barcode || draft.source?.barcode || ''} onChange={event => setDraft({ ...draft, barcode: event.target.value, source: { ...draft.source, barcode: event.target.value } })} /></label>
+        </div>
+        <div className="g-tools">
+          <label>Retailer (optional)<input maxLength={120} value={draft.retailer || draft.source?.retailer || ''} onChange={event => setDraft({ ...draft, retailer: event.target.value, source: { ...draft.source, retailer: event.target.value } })} /></label>
+          <label>Retailer SKU (optional)<input maxLength={120} value={draft.sku || draft.source?.sku || ''} onChange={event => setDraft({ ...draft, sku: event.target.value, source: { ...draft.source, sku: event.target.value } })} /></label>
+        </div>
         <div className="g-tools">
           <label>Reference quantity<input required type="number" min="0.0001" step="any" value={draft.quantity} onChange={event => setDraft({ ...draft, quantity: event.target.value === '' ? '' : Number(event.target.value) })} /></label>
           <label>Reference unit<select value={draft.unit} onChange={event => setDraft({ ...draft, unit: event.target.value })}>{['g', 'ml', 'pieces', 'servings'].map(unit => <option key={unit}>{unit}</option>)}</select></label>
@@ -87,9 +97,16 @@ export function FoodItemEditor({ catalog, onSave, onClose, initial = null }) {
         <NutritionLabelScan disabled={busy} current={{...draft.nutrition,quantity:draft.quantity,unit:draft.unit,source:draft.source}} onApply={label=>setDraft({...draft,quantity:label.quantity,unit:label.unit,nutrition:cleanNutrients(label),source:label.source})}/>
         {nutrientFields(NUTRIENTS.slice(0, 5))}
         <details><summary>More nutrients: vitamins, minerals and other label values</summary>{nutrientFields(NUTRIENTS.slice(5))}</details>
-        {existing && <label><input type="checkbox" checked={replace} onChange={event => setReplace(event.target.checked)} /> Update the existing food with this name in the shared library</label>}
+        {!initial && reviewMatches.length > 0 && <section className="rounded-xl border-2 border-black bg-[#fff8dd] p-3" aria-label="Possible existing foods">
+          <h3 className="font-bold">Possible existing food found</h3>
+          {reviewMatches.map(match => <div key={match.food.id} className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-black/20 pt-2 text-sm"><p><strong>{match.food.name}</strong> · {match.reasons.join('; ')}</p><button type="button" onClick={async () => { try { await onSave({ ...match.food, reuseExisting: true }); notify.info('Existing food reused'); onClose(); } catch (err) { setError(err.message); } }}>Use existing</button></div>)}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" onClick={() => { setDuplicateChoice('separate'); setError(''); }}>Create separately</button>
+          </div>
+        </section>}
+        {initial && reviewMatches.length > 0 && <p role="status" className="rounded-xl border-2 border-black bg-[#fff8dd] p-3 text-sm">This edit may duplicate {reviewMatches.map(match => match.food.name).join(', ')}. Use All Food Items → Possible duplicates to review or merge them first.</p>}
       </fieldset>
-      <button type="submit" className="g-primary" disabled={busy || (existing && !replace)}>{busy ? 'Saving...' : 'Save food item'}</button>
+      <button type="submit" className="g-primary" disabled={busy}>{busy ? 'Saving...' : 'Save food item'}</button>
     </form>}
     <button type="button" disabled={busy} onClick={onClose}>Close</button>
   </dialog>;

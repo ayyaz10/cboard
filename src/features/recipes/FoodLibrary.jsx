@@ -1,14 +1,14 @@
 import { useMemo, useState } from 'react';
 import { NUTRIENTS } from '../nutrition/nutrients.js';
 import { classifyFoodDeletion, getFoodUsage } from '../nutrition/foodReferences.js';
-import { resolveCatalogFoodForIngredient } from '../nutrition/foodCatalog.js';
+import { resolveCatalogFoodForIngredient, findPossibleFoodDuplicateGroups, foodNutritionConflicts, auditFoodDuplicates } from '../nutrition/foodCatalog.js';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog.jsx';
 import { RecipeLink, secondaryButton } from './RecipeComponents';
 import { notify } from '../../lib/notifications.js';
 
 const formatNutrient = value => Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
-export function FoodLibrary({ library, recipes, foodCatalog = [], mealPlans = [], onAdd, onEdit, onDeleteFoods }) {
+export function FoodLibrary({ library, recipes, foodCatalog = [], mealPlans = [], onAdd, onEdit, onDeleteFoods, onMergeFoods }) {
   const [query, setQuery] = useState('');
   const [source, setSource] = useState('all');
   const [view, setView] = useState('list');
@@ -16,9 +16,15 @@ export function FoodLibrary({ library, recipes, foodCatalog = [], mealPlans = []
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [deletePlan, setDeletePlan] = useState(null);
   const [blockedFood, setBlockedFood] = useState(null);
+  const [mergeGroup, setMergeGroup] = useState(null);
+  const [keepId, setKeepId] = useState('');
+  const [nutritionSourceId, setNutritionSourceId] = useState('');
   const [busy, setBusy] = useState(false);
   const needle = query.trim().toLocaleLowerCase();
   const catalogById = useMemo(() => new Map(foodCatalog.map(food => [food.id, food])), [foodCatalog]);
+  const duplicateGroups = useMemo(() => findPossibleFoodDuplicateGroups(foodCatalog), [foodCatalog]);
+  const duplicateAudit = useMemo(() => auditFoodDuplicates(foodCatalog), [foodCatalog]);
+  const duplicateIds = useMemo(() => new Set(duplicateGroups.flatMap(group => group.map(food => food.id))), [duplicateGroups]);
   const enriched = useMemo(() => library.map(entry => {
     const food = catalogById.get(entry.item.foodId) || resolveCatalogFoodForIngredient(entry.item, foodCatalog);
     return { ...entry, food, usage: food ? getFoodUsage(food, { catalog: foodCatalog, recipes, mealPlans }) : null };
@@ -26,7 +32,7 @@ export function FoodLibrary({ library, recipes, foodCatalog = [], mealPlans = []
   const filtered = enriched.filter(entry => {
     const shared = Boolean(entry.food);
     const inRecipe = entry.recipeTitles.some(title => title !== 'Main food library');
-    const sourceMatches = source === 'all' || (source === 'shared' && shared) || (source === 'recipes' && inRecipe) || (source === 'unused' && shared && entry.usage.canHardDelete);
+    const sourceMatches = source === 'all' || (source === 'shared' && shared) || (source === 'recipes' && inRecipe) || (source === 'unused' && shared && entry.usage.canHardDelete) || (source === 'duplicates' && shared && duplicateIds.has(entry.food.id));
     return sourceMatches && [entry.item.name, ...entry.recipeTitles].some(value => value.toLocaleLowerCase().includes(needle));
   });
   const selectable = filtered.filter(entry => entry.food);
@@ -51,11 +57,26 @@ export function FoodLibrary({ library, recipes, foodCatalog = [], mealPlans = []
       const food = analysis.inUse[0]?.food;
       if (food) {
         setBlockedFood({ food, usage: analysis.inUse[0].usage });
-        notify.warning(`${food.name} is used by ${analysis.inUse[0].usage.recipes.length} recipe${analysis.inUse[0].usage.recipes.length === 1 ? '' : 's'} and was not deleted`);
+        const count = analysis.inUse[0].usage.recipes.length + analysis.inUse[0].usage.possibleRecipes.length;
+        notify.warning(`${food.name} is referenced by ${count} recipe${count === 1 ? '' : 's'} and was not deleted`);
       }
       return;
     }
     setDeletePlan({ ...analysis, requested: ids.length });
+  }
+  function openMerge(group) {
+    const ids = new Set(group.map(food => food.id));
+    const preferred = group.reduce((best, food) => Object.values(food.nutrition || {}).filter(Number.isFinite).length > Object.values(best.nutrition || {}).filter(Number.isFinite).length ? food : best, group[0]);
+    setMergeGroup(group); setKeepId(preferred.id); setNutritionSourceId(preferred.id);
+  }
+  async function confirmMerge() {
+    if (!mergeGroup || busy || !keepId || !nutritionSourceId) return;
+    setBusy(true);
+    try {
+      await onMergeFoods({ keepId, mergeIds: mergeGroup.filter(food => food.id !== keepId).map(food => food.id), nutritionSourceId });
+      setMergeGroup(null);
+    } catch (error) { notify.error(error.message || 'Duplicate merge failed'); }
+    finally { setBusy(false); }
   }
   async function confirmDelete() {
     if (!deletePlan || busy) return;
@@ -76,7 +97,10 @@ export function FoodLibrary({ library, recipes, foodCatalog = [], mealPlans = []
   const usageLabel = entry => {
     if (!entry.food) return `${entry.recipeTitles.length} recipe${entry.recipeTitles.length === 1 ? '' : 's'}`;
     if (!entry.usage.referenceCount) return 'Unused';
-    return `Used in ${entry.usage.recipes.length} recipe${entry.usage.recipes.length === 1 ? '' : 's'}${entry.usage.mealPlans.length ? ` + ${entry.usage.mealPlans.length} meal plan${entry.usage.mealPlans.length === 1 ? '' : 's'}` : ''}`;
+    const definite = entry.usage.recipes.length, possible = entry.usage.possibleRecipes.length;
+    const recipeLabel = definite ? `Used in ${definite} recipe${definite === 1 ? '' : 's'}` : possible ? `Possible match in ${possible} recipe${possible === 1 ? '' : 's'}` : '';
+    const planLabel = entry.usage.mealPlans.length ? `${recipeLabel ? ' + ' : ''}${entry.usage.mealPlans.length} meal plan${entry.usage.mealPlans.length === 1 ? '' : 's'}` : '';
+    return `${recipeLabel}${planLabel}`;
   };
   const recipesUsing = entry => entry.usage?.recipes || (entry.recipeSlugs || []).map(slug => recipes.find(recipe => recipe.slug === slug)).filter(Boolean).map(recipe => ({ slug: recipe.slug, title: recipe.title }));
   const actions = entry => entry.food ? <details className="relative inline-block">
@@ -93,13 +117,20 @@ export function FoodLibrary({ library, recipes, foodCatalog = [], mealPlans = []
     </header>
     <div className="food-library-filters">
       <label>Search foods or recipes<input className="field-input" type="search" value={query} onChange={event => { setQuery(event.target.value); setSelectedIds(new Set()); }} placeholder="Search all food items" /></label>
-      <label>Show<select className="field-input" value={source} onChange={event => { setSource(event.target.value); setSelectedIds(new Set()); }}><option value="all">All items</option><option value="shared">Reusable foods</option><option value="recipes">Recipe ingredients</option><option value="unused">Unused foods</option></select></label>
+      <label>Show<select className="field-input" value={source} onChange={event => { setSource(event.target.value); setSelectedIds(new Set()); }}><option value="all">All items</option><option value="shared">Reusable foods</option><option value="recipes">Recipe ingredients</option><option value="unused">Unused foods</option><option value="duplicates">Possible duplicates ({duplicateGroups.length})</option></select></label>
     </div>
     <div className="food-library-views" role="group" aria-label="Food items view">
       <button type="button" className={secondaryButton} aria-pressed={view === 'list'} onClick={() => setView('list')}>Detailed list</button>
       <button type="button" className={secondaryButton} aria-pressed={view === 'cards'} onClick={() => setView('cards')}>Cards</button>
     </div>
     <p role="status">{filtered.length} of {library.length} items. Diary entries and grocery foods keep nutrition snapshots, so they do not block cleanup.</p>
+    {source === 'duplicates' && <div className="grid gap-3" aria-label="Possible duplicate groups">
+      <p className="rounded-xl border-2 border-black bg-white p-3 text-sm">Audit of {foodCatalog.length} reusable foods: {duplicateAudit.counts.exactName} exact-name pairs, {duplicateAudit.counts.quantityOrAlias} quantity or alias pairs, {duplicateAudit.counts.fuzzySuggestion} spelling suggestions, {duplicateAudit.counts.sameBarcode} shared barcodes, {duplicateAudit.counts.sameRetailerSku} shared retailer/SKU pairs. Review each group before merging.</p>
+      {!duplicateGroups.length && <p className="rounded-xl border-2 border-black bg-white p-4">No likely duplicate food groups found.</p>}
+      {duplicateGroups.map((group, index) => <article key={group.map(food => food.id).join(':')} className="rounded-xl border-2 border-black bg-[#fff8dd] p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-bold">Possible duplicate group {index + 1}</h2><p className="text-sm">{group.map(food => food.name).join(' · ')}</p></div><button type="button" className={secondaryButton} onClick={() => openMerge(group)}>Review merge</button></div>
+      </article>)}
+    </div>}
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-black bg-white p-3">
       <span className="text-sm text-black/70">{selectionMode ? `${selected.length} selected` : 'Select reusable foods for safe bulk cleanup.'}</span>
       <div className="flex flex-wrap gap-2">
@@ -127,7 +158,7 @@ export function FoodLibrary({ library, recipes, foodCatalog = [], mealPlans = []
             {selectionMode && <td data-label="Select">{entry.food && <input aria-label={`Select ${item.name}`} type="checkbox" className="h-4 w-4 accent-lime-500" checked={selectedIds.has(entry.food.id)} onChange={event => setSelectedIds(current => { const next = new Set(current); event.target.checked ? next.add(entry.food.id) : next.delete(entry.food.id); return next; })} />}</td>}
             <th scope="row"><strong>{item.name}</strong><span className="food-library-meta">{quantity != null ? `Nutrition for ${quantity} ${unit || ''}` : 'Nutrition basis not set'}</span>{item.nutritionLabel && item.amount != null && <span className="food-library-meta">Recipe amount: {item.amount} {item.unit}</span>}</th>
             {NUTRIENTS.slice(0, 5).map(([key, label, nutrientUnit]) => <td key={key} data-label={label} className="food-library-number">{nutrition[key] == null ? <span className="food-library-missing">Not set</span> : <>{formatNutrient(nutrition[key])} <small>{nutrientUnit}</small></>}</td>)}
-            <td data-label="Usage"><details><summary className="cursor-pointer">{usageLabel(entry)}</summary><div className="food-library-row-details">{usedBy.length ? <ul>{usedBy.map(recipe => <li key={recipe.slug}><RecipeLink className="food-library-recipe-link" to={`/recipes/${recipe.slug}`}>{recipe.title}</RecipeLink></li>)}</ul> : <p>No active recipe references.</p>}{entry.usage?.mealPlans.map(plan => <p key={plan.id} className="food-library-meta">Meal plan: {plan.name}</p>)}{(item.nutritionLabel?.source || item.nutrition?.source)?.provider && <p className="food-library-meta">Nutrition: {(item.nutritionLabel?.source || item.nutrition?.source).provider}</p>}</div></details></td>
+            <td data-label="Usage"><details><summary className="cursor-pointer">{usageLabel(entry)}</summary><div className="food-library-row-details">{usedBy.length ? <ul>{usedBy.map(recipe => <li key={recipe.slug}><RecipeLink className="food-library-recipe-link" to={`/recipes/${recipe.slug}`}>{recipe.title}</RecipeLink></li>)}</ul> : null}{entry.usage?.possibleRecipes.map(recipe => <p key={recipe.slug}>Possible legacy match: <RecipeLink className="food-library-recipe-link" to={`/recipes/${recipe.slug}`}>{recipe.title}</RecipeLink></p>)}{!usedBy.length && !entry.usage?.possibleRecipes.length && <p>No active recipe references.</p>}{entry.usage?.mealPlans.map(plan => <p key={plan.id} className="food-library-meta">Meal plan: {plan.name}</p>)}{(item.nutritionLabel?.source || item.nutrition?.source)?.provider && <p className="food-library-meta">Nutrition: {(item.nutritionLabel?.source || item.nutrition?.source).provider}</p>}</div></details></td>
             <td data-label="Actions">{actions(entry)}<details className="mt-2"><summary className="cursor-pointer">More nutrients</summary><div className="food-library-row-details"><dl className="food-library-nutrients">{NUTRIENTS.slice(5).map(([key, label, nutrientUnit]) => <div key={key}><dt>{label}</dt><dd>{nutrition[key] == null ? 'Not set' : `${formatNutrient(nutrition[key])} ${nutrientUnit}`}</dd></div>)}</dl></div></details></td>
           </tr>;
         })}</tbody>
@@ -148,8 +179,29 @@ export function FoodLibrary({ library, recipes, foodCatalog = [], mealPlans = []
       </article>;
     })}</div>}
     <ConfirmDialog isOpen={Boolean(deletePlan)} title={deletePlan?.safe.length === 1 ? 'Delete this food?' : `Delete ${deletePlan?.safe.length || 0} foods?`}
-      message={`${deletePlan?.safe.length || 0} unused ${deletePlan?.safe.length === 1 ? 'food is' : 'foods are'} safe to delete. ${deletePlan?.inUse.length ? `${deletePlan.inUse.length} used ${deletePlan.inUse.length === 1 ? 'food will' : 'foods will'} be kept because recipes still reference them.` : 'No active recipe references were found.'} Diary and grocery snapshots will stay unchanged.`}
+      message={`${deletePlan?.safe.length || 0} unused ${deletePlan?.safe.length === 1 ? 'food is' : 'foods are'} safe to delete. ${deletePlan?.inUse.length ? `${deletePlan.inUse.length} used ${deletePlan.inUse.length === 1 ? 'food will' : 'foods will'} be kept because recipes or possible legacy links reference them.` : 'No active recipe references were found.'} Diary and grocery snapshots will stay unchanged.`}
       confirmLabel={busy ? 'Deleting...' : `Delete ${deletePlan?.safe.length || 0} unused`} onCancel={() => !busy && setDeletePlan(null)} onConfirm={confirmDelete} />
-    {blockedFood && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-6" role="presentation"><section role="dialog" aria-modal="true" aria-labelledby="food-in-use-title" className="w-full max-w-md rounded-[1.75rem] border-2 border-black bg-[#fffdf8] p-5 text-black shadow-[8px_8px_0_#000]"><span className="pill">Food in use</span><h2 id="food-in-use-title" className="mt-4 text-2xl font-bold">{blockedFood.food.name} is used in {blockedFood.usage.recipes.length} recipe{blockedFood.usage.recipes.length === 1 ? '' : 's'}</h2><p className="mt-2 text-sm">Remove or replace it in these recipes before deleting the reusable food:</p><ul className="mt-3 list-inside list-disc">{blockedFood.usage.recipes.map(recipe => <li key={recipe.slug}><RecipeLink className="underline" to={`/recipes/${recipe.slug}`}>{recipe.title}</RecipeLink></li>)}</ul><button type="button" className={`${secondaryButton} mt-5`} onClick={() => setBlockedFood(null)}>Close</button></section></div>}
+    {mergeGroup && <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/40 px-4 py-6" role="presentation"><section role="dialog" aria-modal="true" aria-labelledby="food-merge-title" className="my-auto w-full max-w-2xl rounded-[1.75rem] border-2 border-black bg-[#fffdf8] p-5 text-black shadow-[8px_8px_0_#000]">
+      <span className="pill">Review merge</span><h2 id="food-merge-title" className="mt-3 text-2xl font-bold">Merge {mergeGroup.length} possible duplicates?</h2>
+      <p className="mt-2">Recipe and planner links will move to the kept food. Recipe quantities and diary/grocery snapshots stay unchanged.</p>
+      <label className="mt-4 block font-semibold">Canonical food to keep<select className="field-input mt-1" value={keepId} onChange={event => { setKeepId(event.target.value); if (nutritionSourceId === keepId) setNutritionSourceId(event.target.value); }}>
+        {mergeGroup.map(food => <option value={food.id} key={food.id}>{food.name}</option>)}
+      </select></label>
+      {(() => {
+        const conflicts = foodNutritionConflicts(mergeGroup);
+        const recipeUsage = new Map(mergeGroup.flatMap(food => getFoodUsage(food, { catalog: foodCatalog, recipes, mealPlans }).recipes).map(recipe => [recipe.slug, recipe]));
+        const planUsage = new Map(mergeGroup.flatMap(food => getFoodUsage(food, { catalog: foodCatalog, recipes, mealPlans }).mealPlans).map(plan => [plan.id, plan]));
+        return <>
+          <p className="mt-3"><strong>Used by:</strong> {recipeUsage.size} recipes, {planUsage.size} meal plans</p>
+          {conflicts.length > 0 ? <>
+            <p className="mt-3 font-semibold">Nutrition differences detected: {conflicts.join(', ')}.</p>
+            <div className="food-library-table-wrap mt-2"><table className="food-library-table"><thead><tr><th>Food</th>{conflicts.slice(0, 5).map(key => <th key={key}>{key}</th>)}</tr></thead><tbody>{mergeGroup.map(food => <tr key={food.id}><th>{food.name}</th>{conflicts.slice(0, 5).map(key => <td key={key}>{food.nutrition?.[key] ?? 'Not set'}</td>)}</tr>)}</tbody></table></div>
+            <label className="mt-3 block font-semibold">Nutrition to keep<select className="field-input mt-1" value={nutritionSourceId} onChange={event => setNutritionSourceId(event.target.value)}>{mergeGroup.map(food => <option key={food.id} value={food.id}>{food.name}</option>)}</select></label>
+          </> : <p className="mt-3">No nutrition conflicts detected. Existing values will be preserved; missing values will be filled from duplicates.</p>}
+        </>;
+      })()}
+      <div className="mt-5 flex flex-wrap justify-end gap-2"><button type="button" className={secondaryButton} disabled={busy} onClick={() => setMergeGroup(null)}>Cancel</button><button type="button" className={`${secondaryButton} bg-[#c5ff6f]`} disabled={busy} onClick={confirmMerge}>{busy ? 'Merging...' : 'Merge foods'}</button></div>
+    </section></div>}
+    {blockedFood && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-6" role="presentation"><section role="dialog" aria-modal="true" aria-labelledby="food-in-use-title" className="w-full max-w-md rounded-[1.75rem] border-2 border-black bg-[#fffdf8] p-5 text-black shadow-[8px_8px_0_#000]"><span className="pill">Food in use</span><h2 id="food-in-use-title" className="mt-4 text-2xl font-bold">{blockedFood.food.name} has active or possible recipe references</h2><p className="mt-2 text-sm">Remove or replace it in these recipes before deleting the reusable food:</p><ul className="mt-3 list-inside list-disc">{[...blockedFood.usage.recipes, ...blockedFood.usage.possibleRecipes.map(recipe => ({ ...recipe, possible: true }))].map((recipe, index) => <li key={`${recipe.slug}-${index}`}>{recipe.possible ? 'Possible legacy match: ' : ''}<RecipeLink className="underline" to={`/recipes/${recipe.slug}`}>{recipe.title}</RecipeLink></li>)}</ul><button type="button" className={`${secondaryButton} mt-5`} onClick={() => setBlockedFood(null)}>Close</button></section></div>}
   </section>;
 }

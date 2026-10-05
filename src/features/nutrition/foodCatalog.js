@@ -3,27 +3,52 @@ import { cleanNutrients } from './nutrients.js';
 import { ingredientLabelNutrition, ingredientRecipeTotals } from '../recipes/ingredientNutrition.js';
 import { calculateProducts } from '../recipes/recipeProducts.js';
 
-export const normalizeFoodName = value => String(value || '').trim().toLocaleLowerCase();
+export { normalizeFoodName, normalizeFoodText, parseFoodQuantityPrefix, recipeFoodName, validFoodBarcode, scoreFoodMatch, findFoodMatches, findPossibleFoodDuplicateGroups, auditFoodDuplicates } from './foodIdentity.js';
+import { normalizeFoodName, normalizeFoodText, parseFoodQuantityPrefix, recipeFoodName, scoreFoodMatch, validFoodBarcode } from './foodIdentity.js';
 
-const LEADING_RECIPE_AMOUNT = /^[\d½¼¾⅓⅔⅛⅜⅝⅞.\/]+\s*(?:tsp|teaspoons?|tbsp|tablespoons?|cups?|g|grams?|kg|kilograms?|ml|millilit(?:er|re)s?|oz|ounces?|lb|pounds?|pieces?|cloves?)\s+(.+)$/i;
-
-export function recipeFoodName(value) {
-  const name = String(value || '').trim();
-  return name.match(LEADING_RECIPE_AMOUNT)?.[1]?.trim() || name;
+export function catalogFoodCandidatesForIngredient(item, catalog = []) {
+  if (item?.foodId) {
+    const byId = catalog.find(food => food.id === item.foodId);
+    if (byId) return [byId];
+  }
+  const exactName = normalizeFoodText(item?.name);
+  const exactMatches = catalog.filter(food => [food.name, ...(food.aliases || [])].some(name => normalizeFoodText(name) === exactName));
+  if (exactMatches.length) return exactMatches;
+  const canonicalName = normalizeFoodName(item?.name);
+  const matches = catalog.filter(food => [food.name, ...(food.aliases || [])].some(name => normalizeFoodName(name) === canonicalName));
+  return matches;
 }
 
 export function resolveCatalogFoodForIngredient(item, catalog = []) {
-  if (item?.foodId) {
-    const byId = catalog.find(food => food.id === item.foodId);
-    if (byId) return byId;
-  }
-  const exactName = normalizeFoodName(item?.name);
-  const exactMatches = catalog.filter(food => [food.name, ...(food.aliases || [])].some(name => normalizeFoodName(name) === exactName));
-  if (exactMatches.length === 1) return exactMatches[0];
-  if (exactMatches.length > 1) return null;
-  const canonicalName = normalizeFoodName(recipeFoodName(item?.name));
-  const matches = catalog.filter(food => [food.name, ...(food.aliases || [])].some(name => normalizeFoodName(name) === canonicalName));
+  const matches = catalogFoodCandidatesForIngredient(item, catalog);
   return matches.length === 1 ? matches[0] : null;
+}
+
+export function foodNutritionConflicts(foods = []) {
+  const keys = ['calories', 'protein', 'carbs', 'fat', 'fiber', 'sugars', 'saturatedFat', 'salt', 'sodium', 'potassium', 'calcium', 'iron', 'magnesium', 'zinc', 'vitaminA', 'vitaminC', 'vitaminD', 'vitaminE', 'vitaminB12', 'folate', 'energyKJ'];
+  return keys.filter(key => new Set(foods.map(food => food.nutrition?.[key]).filter(value => Number.isFinite(value))).size > 1);
+}
+
+export function mergeCanonicalFoods(foods = [], keepId, mergeIds = [], nutritionSourceId = keepId) {
+  const selectedIds = new Set([keepId, ...mergeIds]);
+  const selected = foods.filter(food => selectedIds.has(food.id));
+  const keep = selected.find(food => food.id === keepId);
+  const nutritionSource = selected.find(food => food.id === nutritionSourceId) || keep;
+  if (!keep || selected.length !== selectedIds.size || !nutritionSource) throw new Error('Choose valid foods to merge.');
+  const nutrition = { ...(keep.nutrition || {}) };
+  for (const food of selected) for (const [key, value] of Object.entries(food.nutrition || {})) if (nutrition[key] == null && value != null) nutrition[key] = value;
+  for (const [key, value] of Object.entries(nutritionSource.nutrition || {})) if (value != null) nutrition[key] = value;
+  const quantityPrefix = !keep.barcode && !keep.sku && !keep.brand ? parseFoodQuantityPrefix(keep.name) : null;
+  const canonicalName = quantityPrefix?.foodName || keep.name;
+  return cleanFoodCatalogItem({ ...keep, name: canonicalName,
+    aliases: [...new Set([...selected.flatMap(food => [food.name, ...(food.aliases || [])]), ...(keep.aliases || [])])].filter(name => normalizeFoodText(name) !== normalizeFoodText(canonicalName)),
+    nutrition,
+    barcode: keep.barcode || nutritionSource.barcode,
+    sku: keep.sku || nutritionSource.sku,
+    retailer: keep.retailer || nutritionSource.retailer,
+    brand: keep.brand || nutritionSource.brand,
+    source: { ...(nutritionSource.source || {}), ...(keep.source || {}), name: nutritionSource.source?.name || keep.source?.name || keep.name },
+  });
 }
 
 function newFoodId() {
@@ -38,7 +63,12 @@ export function cleanFoodCatalogItem(value) {
   return {
     id: typeof value?.id === 'string' && value.id.trim() ? value.id.trim().slice(0, 150) : newFoodId(),
     name,
-    aliases: Array.isArray(value?.aliases) ? [...new Set(value.aliases.filter(alias => typeof alias === 'string' && alias.trim() && normalizeFoodName(alias) !== normalizeFoodName(name)).map(alias => alias.trim().slice(0, 300)))].slice(0, 100) : [],
+    canonicalKey: normalizeFoodName(name),
+    aliases: Array.isArray(value?.aliases) ? [...new Set(value.aliases.filter(alias => typeof alias === 'string' && alias.trim() && normalizeFoodText(alias) !== normalizeFoodText(name)).map(alias => alias.trim().slice(0, 300)))].slice(0, 100) : [],
+    barcode: validFoodBarcode(value?.barcode || value?.source?.barcode || value?.source?.code) || '',
+    sku: String(value?.sku || value?.source?.sku || '').trim().slice(0, 120),
+    retailer: String(value?.retailer || value?.source?.retailer || '').trim().slice(0, 120),
+    brand: String(value?.brand || value?.source?.brand || '').trim().slice(0, 120),
     quantity,
     unit,
     nutrition: cleanNutrients(value.nutrition),
@@ -48,6 +78,10 @@ export function cleanFoodCatalogItem(value) {
       license: String(value.source?.license || '').slice(0, 100),
       provider: String(value.source?.provider || 'Manual').slice(0, 100),
       name: String(value.source?.name || name).slice(0, 500),
+      brand: String(value.source?.brand || value.brand || '').slice(0, 120),
+      retailer: String(value.source?.retailer || value.retailer || '').slice(0, 120),
+      sku: String(value.source?.sku || value.sku || '').slice(0, 120),
+      barcode: validFoodBarcode(value.barcode || value.source?.barcode || value.source?.code),
       modified: true,
       ...(cleanLabelBasis(value.source?.labelBasis) ? {labelBasis:cleanLabelBasis(value.source?.labelBasis)} : {}), 
     },
@@ -66,11 +100,28 @@ export function mergeFoodCatalog(current = [], updates = []) {
     const clean = cleanFoodCatalogItem(update);
     if (!clean) continue;
     if (!explicitId) {
-      const matching = [...items.values()].filter(item => normalizeFoodName(item.name) === normalizeFoodName(clean.name));
-      if (matching.length === 1) clean.id = matching[0].id;
+      const matching = [...items.values()].filter(item => {
+        const result = scoreFoodMatch(clean, item);
+        return result.confidence === 'certain' || result.confidence === 'high';
+      });
+      if (matching.length === 1) {
+        clean.id = matching[0].id;
+        clean.name = matching[0].name;
+      }
     }
     const previous = items.get(clean.id);
-    if (previous) clean.aliases = [...new Set([...(previous.aliases || []), ...(clean.aliases || []), ...(normalizeFoodName(previous.name) !== normalizeFoodName(clean.name) ? [previous.name] : [])])].filter(alias => normalizeFoodName(alias) !== normalizeFoodName(clean.name));
+    if (previous) {
+      if (!explicitId) {
+        clean.name = previous.name;
+        clean.nutrition = Object.fromEntries(Object.keys(previous.nutrition || {}).map(key => [key, clean.nutrition[key] ?? previous.nutrition[key] ?? null]));
+        clean.source = { ...clean.source, ...previous.source };
+        clean.barcode = previous.barcode || clean.barcode;
+        clean.sku = previous.sku || clean.sku;
+        clean.retailer = previous.retailer || clean.retailer;
+        clean.brand = previous.brand || clean.brand;
+      }
+      clean.aliases = [...new Set([...(previous.aliases || []), ...(clean.aliases || []), ...(normalizeFoodText(previous.name) !== normalizeFoodText(clean.name) ? [previous.name] : [])])].filter(alias => normalizeFoodText(alias) !== normalizeFoodText(clean.name));
+    }
     items.set(clean.id, clean);
   }
   return [...items.values()].sort((a, b) => a.name.localeCompare(b.name));
@@ -92,7 +143,7 @@ export function catalogItemFromRecipeIngredient(item) {
   if (!label) return null;
   const name = recipeFoodName(item.name);
   return { ...(item.foodId || label.source?.foodId ? { id: item.foodId || label.source.foodId } : {}), name,
-    ...(normalizeFoodName(name) !== normalizeFoodName(item.name) ? { aliases: [item.name] } : {}),
+    ...(normalizeFoodText(name) !== normalizeFoodText(item.name) ? { aliases: [item.name] } : {}),
     quantity: label.quantity, unit: label.unit, nutrition: label, source: label.source };
 }
 

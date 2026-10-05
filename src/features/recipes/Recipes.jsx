@@ -26,11 +26,12 @@ import {
 import { RecipeImporter } from './RecipeImporter';
 import { FoodItemEditor } from '../nutrition/FoodItemEditor';
 import { buildIngredientLibrary } from './ingredientLibrary';
-import { applyFoodCatalogToRecipes, catalogItemsFromRecipe, normalizeFoodName, resolveCatalogFoodForIngredient } from '../nutrition/foodCatalog.js';
+import { applyFoodCatalogToRecipes, catalogItemsFromRecipe, normalizeFoodName, resolveCatalogFoodForIngredient, findFoodMatches } from '../nutrition/foodCatalog.js';
 import { deleteFoodCatalogItems, getFoodCatalog, upsertFoodCatalogItems } from '../../services/foodCatalogService.js';
 import { classifyFoodDeletion, getOrphanFoodsAfterRecipesDelete } from '../nutrition/foodReferences.js';
 import { notify } from '../../lib/notifications.js';
 import { getMealPlanFoodReferences } from '../../services/foodReferenceService.js';
+import { mergeFoodRecords } from '../../services/foodMergeService.js';
 import { formatIngredient } from './recipeData';
 import { DailyMealPlanner } from './DailyMealPlanner';
 import { FoodDiary } from '../diary/FoodDiary';
@@ -97,7 +98,11 @@ function RecipesContent({ route, navigationPath }) {
         }
         return item;
       });
-      const loadedFoodCatalog = backfill.length ? await upsertFoodCatalogItems(backfill, user.id) : storedFoodCatalog;
+      let loadedFoodCatalog = storedFoodCatalog;
+      if (backfill.length) {
+        try { loadedFoodCatalog = await upsertFoodCatalogItems(backfill, user.id); }
+        catch (migrationError) { notify.warning(migrationError.message || 'Some recipe foods need duplicate review before they can be added to the shared library.'); }
+      }
       setFoodCatalog(loadedFoodCatalog);
       setMealPlanRefs(loadedMealPlanRefs);
       setRecipes(applyFoodCatalogToRecipes(loadedRecipes, loadedFoodCatalog));
@@ -267,13 +272,23 @@ function RecipesContent({ route, navigationPath }) {
     setRecipes(applyFoodCatalogToRecipes(latestRecipes, remainingFoods));
     notify.success(`${count} food${count === 1 ? '' : 's'} deleted`);
   }
+  async function mergeFoods({ keepId, mergeIds, nutritionSourceId }) {
+    const result = await mergeFoodRecords({ keepId, mergeIds, nutritionSourceId, expectedUserId: user.id });
+    const refreshedRecipes = await getRecipes();
+    setFoodCatalog(result.catalog);
+    setRecipes(applyFoodCatalogToRecipes(refreshedRecipes, result.catalog));
+    notify.success(`${result.mergedCount} duplicate food${result.mergedCount === 1 ? '' : 's'} merged`);
+  }
   async function saveBatch(entries) {
     let saved;
     try { saved = await saveRecipeBatch(entries); }
     catch (error) { notify.error(error.message || 'Could not import recipes'); throw error; }
     setRecipes((current) => [...current, ...saved]);
     const catalogItems = saved.flatMap(catalogItemsFromRecipe);
-    if (catalogItems.length) await saveMainFoodItems(catalogItems);
+    if (catalogItems.length) {
+      try { await saveMainFoodItems(catalogItems); }
+      catch (error) { notify.warning(error.message || 'Recipes were imported, but some foods need duplicate review.'); }
+    }
     setDraft(null);
     setSearch('');
     setCategory('All');
@@ -349,9 +364,11 @@ function RecipesContent({ route, navigationPath }) {
           })}
         </nav>
         {addingFood && <FoodItemEditor initial={typeof addingFood==='object'?addingFood:null} catalog={foodCatalog} onClose={() => setAddingFood(false)} onSave={async item => {
+          if (item.reuseExisting) { notify.info('Existing food reused'); return; }
+          const reuse = !item.id && findFoodMatches(item, foodCatalog).some(match => match.confidence === 'certain' || match.confidence === 'high');
           const editing = foodCatalog.some(food => food.id === item.id || food.name.trim().toLocaleLowerCase() === item.name.trim().toLocaleLowerCase());
           await saveMainFoodItems([item]);
-          notify.success(editing ? 'Food updated' : 'Food added to your library');
+          notify.success(reuse ? 'Existing food reused' : editing ? 'Food updated' : 'Food added to your library');
         }} />}
         {favouriteError && <p role="alert" className="rounded-xl border-2 border-black bg-[#ffe0de] p-3 text-sm font-semibold">{favouriteError}</p>}
         <p role="status" className="sr-only">{favouriteNotice}</p>
@@ -396,7 +413,7 @@ function RecipesContent({ route, navigationPath }) {
                 }}
               />
             ) : null}
-            {!error && foods && <FoodLibrary library={ingredientLibrary} recipes={recipes} foodCatalog={foodCatalog} mealPlans={mealPlanRefs} onAdd={() => setAddingFood(true)} onEdit={id=>setAddingFood(foodCatalog.find(item=>item.id===id)||true)} onDeleteFoods={deleteFoods} />}
+            {!error && foods && <FoodLibrary library={ingredientLibrary} recipes={recipes} foodCatalog={foodCatalog} mealPlans={mealPlanRefs} onAdd={() => setAddingFood(true)} onEdit={id=>setAddingFood(foodCatalog.find(item=>item.id===id)||true)} onDeleteFoods={deleteFoods} onMergeFoods={mergeFoods} />}
             {!error && planning && <DailyMealPlanner recipes={recipes} nutritionGoals={nutritionGoals} />}
             {!error && diary && <FoodDiary recipes={recipes} nutritionGoals={nutritionGoals} foodCatalog={foodCatalog} onFoodCatalogChange={saveMainFoodItems} onDiaryRecipeUpdated={updated => setRecipes(current => [updated, ...current.filter(item => item.slug !== updated.slug)])} />}
             {!error && (home || manage) && (

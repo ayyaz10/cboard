@@ -46,11 +46,13 @@ test('a historical diary snapshot does not keep the reusable master food active'
   assert.equal(historical.meals[0].items[0].nutrition.calories, 100);
 });
 
-test('legacy name links resolve only when there is one master food with that name', () => {
+test('legacy name links resolve uniquely and ambiguous duplicate names are protected from deletion', () => {
   const legacy = { slug: 'legacy', title: 'Legacy', ingredients: [{ name: 'Chicken' }] };
   assert.equal(getFoodUsage(foods[0], { catalog: foods, recipes: [legacy] }).canHardDelete, false);
   const duplicateNames = [...foods, { ...foods[0], id: 'chicken-2' }];
-  assert.equal(getFoodUsage(duplicateNames[0], { catalog: duplicateNames, recipes: [legacy] }).canHardDelete, true);
+  const ambiguousUsage = getFoodUsage(duplicateNames[0], { catalog: duplicateNames, recipes: [legacy] });
+  assert.equal(ambiguousUsage.canHardDelete, false);
+  assert.deepEqual(ambiguousUsage.possibleRecipes.map(recipe => recipe.slug), ['legacy']);
 });
 
 test('stale recipe food IDs resolve through a unique legacy quantity-name alias', () => {
