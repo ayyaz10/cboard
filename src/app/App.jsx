@@ -21,12 +21,14 @@ import { Recipes } from '../features/recipes/Recipes';
 import { Groceries } from '../features/groceries/Groceries';
 import { WeightProgress } from '../features/weightProgress/WeightProgress.jsx';
 import { FinancePage } from '../features/finance/FinancePage.jsx';
+import { ProfilePage } from '../components/pages/ProfilePage.jsx';
 const Training = lazy(() => import('../features/training/Training.jsx').then(module => ({ default: module.Training })));
 
 export default function App() {
   const { isAuthenticated, user } = useAuth();
   const route = useRoute();
-  return <><AppContent />{isAuthenticated && route !== '/' && route !== '/login' && <WorkspaceTools key={user.id} userId={user.id} route={route} />}</>;
+  const authRoutes = ['/login', '/forgot-password', '/reset-password'];
+  return <><AppContent />{isAuthenticated && route !== '/' && !authRoutes.includes(route) && <WorkspaceTools key={user.id} userId={user.id} route={route} />}</>;
 }
 
 function AppContent() {
@@ -85,8 +87,12 @@ function AppContent() {
     );
   }
 
+  if (route === '/login' || route === '/forgot-password' || route === '/reset-password') {
+    return <AuthPage key={route} route={route} returnTo="/board" />;
+  }
+
   if (!isAuthenticated) {
-    return <AuthPage />;
+    return <AuthPage key={route} route={route} returnTo={route} />;
   }
 
   if (isMigrating) {
@@ -146,6 +152,7 @@ function AppContent() {
   if (route === '/weight-progress') return <WeightProgress key={user.id} />;
 
   if (route === '/finance') return <FinancePage key={user.id} />;
+  if (route === '/account') return <ProfilePage key={user.id} />;
   if (route === '/training') return <Suspense fallback={<main className="panel m-6 p-6" role="status">Loading Training…</main>}><Training key={user.id} /></Suspense>;
 
   if (route === '/food-diary') {

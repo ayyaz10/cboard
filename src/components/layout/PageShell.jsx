@@ -3,9 +3,10 @@ import { getAppHref } from '../../app/useRoute';
 import { BrandBadge } from './BrandBadge';
 import { ThemeToggle } from './ThemeToggle';
 import { useAuth } from '../../contexts/AuthContext';
+import { getProfileInitials } from '../../services/profileService';
 
 export function PageShell({ children }) {
-  const { displayName, user, signOut } = useAuth();
+  const { displayName, user, profile, signOut } = useAuth();
 
   return (
     <main className="page-shell min-h-screen px-4 py-6 sm:px-6 lg:px-8">
@@ -16,6 +17,10 @@ export function PageShell({ children }) {
           <div className="flex flex-wrap items-center justify-end gap-3">
             {user ? (
               <>
+                <a href={getAppHref('/account')} aria-label="Open profile and account" title="Profile and account" className="account-avatar-link">
+                  <span className="account-avatar-small">{profile?.avatarUrl ? <img src={profile.avatarUrl} alt=""/> : getProfileInitials(displayName,user.email)}</span>
+                  <span className="max-w-[10rem] truncate">{displayName}</span>
+                </a>
                 <a
                   href={getAppHref('/notes')}
                   className="page-shell-quick-action rounded-full border-2 border-black bg-[#9fe3ff] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[3px_3px_0_#000] transition hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_#000]"
@@ -34,9 +39,6 @@ export function PageShell({ children }) {
 
             {user ? (
               <>
-              <span className="max-w-[16rem] truncate rounded-full border-2 border-black bg-[#fffdf8] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-black">
-                {displayName}
-              </span>
               <button
                 type="button"
                 onClick={signOut}

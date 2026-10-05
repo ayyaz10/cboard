@@ -14,6 +14,7 @@ export const primaryNavItems = [
   { path: '/focus-timer', label: 'Focus Timer' },
   { path: '/weight-progress', label: 'Weight Progress' },
   { path: '/finance', label: 'Finance' },
+  { path: '/account', label: 'Profile / Account' },
 ];
 
 const relatedCalculators = {

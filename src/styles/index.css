@@ -737,3 +737,39 @@ html[data-theme="matrix"] {
 
 .global-scroll-controls { position: sticky; bottom: max(5.5rem, env(safe-area-inset-bottom)); align-self: flex-end; display: flex; gap: .4rem; z-index: 15; padding-top: 1rem; }
 .global-scroll-controls button { min-height: 44px; padding: .55rem .8rem; border: 2px solid currentColor; border-radius: 999px; background: var(--color-surface, #fffdf8); color: #171717; box-shadow: 2px 2px 0 #171717; }
+@layer components {
+  .auth-label { @apply grid gap-2 text-sm font-bold; }
+  .auth-show-password { @apply absolute right-2 top-1/2 -translate-y-1/2 rounded-full border-2 border-black bg-white px-3 py-1.5 text-xs font-bold shadow-[2px_2px_0_#000]; }
+  .auth-primary { @apply inline-flex min-h-12 w-full items-center justify-center rounded-full border-2 border-black bg-[#c5ff6f] px-5 py-3 text-sm font-bold text-black shadow-[4px_4px_0_#000] transition hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_#000] disabled:cursor-not-allowed disabled:opacity-55; }
+  .auth-message { @apply rounded-2xl border-2 border-black px-4 py-3 text-sm font-bold; }
+  .auth-error { @apply bg-[#ffe0de] text-black; }
+  .auth-success { @apply bg-[#d9ff9f] text-black; }
+  .account-card { @apply rounded-[1.6rem] border-2 border-black bg-[#fffdf8] p-5 sm:p-6; }
+  .account-avatar { @apply grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-black bg-[#c5ff6f] text-2xl font-bold shadow-[3px_3px_0_#000]; }
+  .account-avatar img { @apply h-full w-full object-cover; }
+  .account-avatar-small { @apply grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-black bg-[#c5ff6f] text-xs font-bold; }
+  .account-avatar-small img { @apply h-full w-full object-cover; }
+  .account-avatar-link { @apply inline-flex max-w-[13rem] items-center gap-2 rounded-full border-2 border-black bg-[#fffdf8] py-1 pl-1 pr-3 text-xs font-bold text-black shadow-[2px_2px_0_#000]; }
+  .account-file { @apply text-sm file:mr-3 file:rounded-full file:border-2 file:border-black file:bg-[#c5ff6f] file:px-3 file:py-2 file:text-xs file:font-bold; }
+  .account-hint { @apply text-xs font-semibold leading-5 text-black/60; }
+  .account-readonly { @apply grid gap-1 rounded-2xl border border-black/20 bg-[#f4f0e6] p-3 text-sm; }
+  .account-readonly span { @apply text-xs font-bold uppercase tracking-[.1em] text-black/55; }
+  .account-readonly small { @apply text-xs font-semibold leading-5 text-black/60; }
+  .account-text-button { @apply text-sm font-bold underline underline-offset-4; }
+  .account-secondary { @apply rounded-full border-2 border-black bg-white px-5 py-3 text-sm font-bold shadow-[3px_3px_0_#000]; }
+}
+
+html[data-theme="matrix"] .account-card { background: var(--matrix-surface); color: var(--matrix-text); border-color: var(--matrix-border-strong); }
+html[data-theme="matrix"] .account-readonly { background: var(--matrix-surface-raised); border-color: var(--matrix-border); }
+html[data-theme="matrix"] .account-readonly span, html[data-theme="matrix"] .account-hint, html[data-theme="matrix"] .account-readonly small { color: var(--matrix-muted); }
+html[data-theme="matrix"] .account-avatar-link { background: var(--matrix-surface); color: var(--matrix-text); border-color: var(--matrix-border-strong); }
+html[data-theme="matrix"] .auth-label { color: var(--matrix-text); }
+html[data-theme="matrix"] .auth-message { border-color: var(--matrix-border-strong); }
+html[data-theme="matrix"] .auth-error { background: var(--matrix-danger-bg); color: var(--matrix-danger-text); }
+html[data-theme="matrix"] .auth-success { background: var(--matrix-surface-raised); color: var(--matrix-text); }
+@layer components {
+  .auth-title { color: #111; }
+  .auth-intro { color: rgb(0 0 0 / .65); }
+}
+html[data-theme="matrix"] .auth-screen .auth-title { color: var(--matrix-text) !important; }
+html[data-theme="matrix"] .auth-screen .auth-intro { color: var(--matrix-muted) !important; }
