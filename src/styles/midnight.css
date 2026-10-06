@@ -29,6 +29,28 @@ html[data-theme="midnight"] {
   --mid-radius-md: 5px;
   --mid-radius-lg: 7px;
   --mid-shadow: 0 1px 2px rgb(0 0 0 / .4);
+  --mid-bg: var(--color-bg);
+  --mid-surface: var(--color-surface);
+  --mid-raised: var(--color-surface-raised);
+  --mid-soft: var(--color-surface-interactive);
+  --mid-border: var(--color-border);
+  --mid-border-strong: var(--color-border-strong);
+  --mid-text: var(--color-text);
+  --mid-secondary: var(--color-text-secondary);
+  --mid-muted: var(--color-text-muted);
+  --mid-accent: var(--color-accent);
+  --mid-accent-soft: var(--color-accent-soft);
+  --mid-accent-text: var(--color-accent-contrast);
+  --mid-warning: var(--color-warning);
+  --mid-warning-soft: var(--color-warning-soft);
+  --mid-danger: var(--color-danger);
+  --mid-danger-soft: var(--color-danger-soft);
+  --mid-success: var(--color-success);
+  --mid-success-soft: var(--color-success-soft);
+  --mid-radius-sm: var(--radius-sm);
+  --mid-radius-md: var(--radius-md);
+  --mid-radius-lg: var(--radius-lg);
+  --mid-shadow: var(--shadow-sm);
 }
 
 html[data-theme="midnight"] body {

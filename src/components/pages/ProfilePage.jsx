@@ -6,6 +6,7 @@ import { AppNavigation } from '../layout/AppNavigation';
 import { PageShell } from '../layout/PageShell';
 import { BackupRestorePanel } from './BackupRestorePanel.jsx';
 import { notify } from '../../lib/notifications.js';
+import { FileUpload } from '../ui/FileUpload.jsx';
 
 export function ProfilePage() {
   const { user, profile, displayName, updateProfile, changePassword, resendVerification, signOut } = useAuth();
@@ -57,7 +58,7 @@ export function ProfilePage() {
     <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(18rem,.85fr)]">
       <form className="account-card grid gap-5" onSubmit={saveProfile}>
         <div className="flex items-center gap-4"><div className="account-avatar" aria-label={avatarUrl?'Profile picture':`Avatar initials ${initials}`}>{avatarUrl?<img src={avatarUrl} alt="Profile"/>:<span>{initials}</span>}</div><div><h2 className="text-xl font-bold">Personal details</h2><p className="text-sm font-semibold text-black/60">Your profile is private to your account.</p></div></div>
-        <label className="auth-label">Profile picture<input type="file" accept="image/jpeg,image/png,image/webp" className="field-input account-file" onChange={event=>{const file=event.target.files?.[0];if(!file)return;const message=validateAvatarFile(file);if(message){setError(message);event.target.value='';return}setError('');setAvatarFile(file);setRemoveAvatar(false)}}/><span className="account-hint">JPEG, PNG, or WEBP · up to 5 MB. Images are resized before private upload.</span></label>
+        <div className="auth-label"><span>Profile picture</span><FileUpload accept="image/jpeg,image/png,image/webp" onChange={event=>{const file=event.target.files?.[0];if(!file)return;const message=validateAvatarFile(file);if(message){setError(message);event.target.value='';return}setError('');setAvatarFile(file);setRemoveAvatar(false)}}>Choose image</FileUpload><span className="account-hint">JPEG, PNG, or WEBP · up to 5 MB. Images are resized before private upload.</span></div>
         {(profile?.avatar_path||avatarFile)&&!removeAvatar&&<button type="button" className="account-text-button justify-self-start" onClick={()=>{setAvatarFile(null);setRemoveAvatar(true)}}>Remove profile picture</button>}
         {removeAvatar&&<button type="button" className="account-text-button justify-self-start" onClick={()=>setRemoveAvatar(false)}>Keep current picture</button>}
         <label className="auth-label">Display name<input className="field-input" autoComplete="name" maxLength={80} value={name} onChange={event=>setName(event.target.value)} required/></label>

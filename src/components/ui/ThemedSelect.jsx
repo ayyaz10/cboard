@@ -65,15 +65,13 @@ export function ThemedSelect({
         aria-invalid={ariaInvalid}
         aria-describedby={ariaDescribedBy}
         onClick={() => setIsOpen((current) => !current)}
-        className={`field-input flex items-center justify-between gap-3 pr-4 text-left font-semibold disabled:cursor-not-allowed disabled:opacity-55 ${className}`}
+        className={`ui-control ui-select-trigger flex items-center justify-between gap-3 pr-4 text-left font-semibold disabled:cursor-not-allowed disabled:opacity-55 ${className}`}
       >
         <span className="min-w-0 truncate">
           {selectedOption?.label ?? placeholder}
         </span>
         <span
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-black bg-[#c5ff6f] text-sm font-bold shadow-[2px_2px_0_#000] transition ${
-            isOpen ? 'rotate-180 bg-[#9fe3ff]' : ''
-          }`}
+          className={`ui-select-arrow flex h-8 w-8 shrink-0 items-center justify-center transition ${isOpen ? 'rotate-180' : ''}`}
           aria-hidden="true"
         >
           v
@@ -84,7 +82,7 @@ export function ThemedSelect({
         <div
           role="listbox"
           aria-labelledby={id}
-          className="absolute left-0 right-0 z-40 mt-2 max-h-72 overflow-y-auto rounded-[1.35rem] border-2 border-black bg-[#fff0b8] p-2 shadow-[6px_6px_0_#000]"
+          className="ui-popover absolute left-0 right-0 z-40 mt-2 max-h-72 overflow-y-auto p-2"
         >
           {options.map((option) => {
             const isSelected = option.value === value;
@@ -96,13 +94,11 @@ export function ThemedSelect({
                 role="option"
                 aria-selected={isSelected}
                 onClick={() => selectOption(option.value)}
-                className={`mb-2 flex w-full items-center justify-between gap-3 rounded-[1rem] border-2 border-black px-4 py-3 text-left text-sm font-bold text-black transition last:mb-0 hover:-translate-y-px hover:bg-[#9fe3ff] hover:shadow-[3px_3px_0_#000] ${
-                  isSelected ? 'bg-[#c5ff6f] shadow-[3px_3px_0_#000]' : 'bg-[#fffdf8]'
-                }`}
+                className={`ui-select-option mb-2 flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-bold transition last:mb-0 ${isSelected ? 'is-selected' : ''}`}
               >
                 <span className="min-w-0 break-words">{option.label}</span>
                 {isSelected ? (
-                  <span className="rounded-full border-2 border-black bg-black px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.12em] text-white">
+                  <span className="ui-select-selected rounded-full px-2 py-0.5 text-[0.65rem] uppercase tracking-[0.12em]">
                     Set
                   </span>
                 ) : null}

@@ -22,6 +22,7 @@ import { Groceries } from '../features/groceries/Groceries';
 import { WeightProgress } from '../features/weightProgress/WeightProgress.jsx';
 import { FinancePage } from '../features/finance/FinancePage.jsx';
 import { ProfilePage } from '../components/pages/ProfilePage.jsx';
+const ThemePreview = lazy(() => import('../components/pages/ThemePreview.jsx').then(module => ({ default: module.ThemePreview })));
 const Training = lazy(() => import('../features/training/Training.jsx').then(module => ({ default: module.Training })));
 
 export default function App() {
@@ -85,6 +86,10 @@ function AppContent() {
         </section>
       </main>
     );
+  }
+
+  if (import.meta.env.DEV && route === '/design-system') {
+    return <Suspense fallback={<main className="p-6" role="status">Loading theme preview…</main>}><ThemePreview /></Suspense>;
   }
 
   if (route === '/login' || route === '/forgot-password' || route === '/reset-password') {

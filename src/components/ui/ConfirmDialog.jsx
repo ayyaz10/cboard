@@ -13,7 +13,7 @@ export function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-6"
+      className="ui-overlay fixed inset-0 z-50 flex items-center justify-center px-4 py-6"
       role="presentation"
       onMouseDown={event => { if (event.target === event.currentTarget) onCancel?.(); }}
     >
@@ -21,7 +21,7 @@ export function ConfirmDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
-        className="w-full max-w-md rounded-[1.75rem] border-2 border-black bg-[#fffdf8] p-5 text-black shadow-[8px_8px_0_#000] sm:p-6"
+        className="ui-dialog w-full max-w-md p-5 sm:p-6"
       >
         <div className="flex items-start justify-between gap-3">
           <span className="pill">Confirm</span>

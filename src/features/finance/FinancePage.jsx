@@ -52,7 +52,7 @@ function FinanceSectionNavigation({ tab, setTab, orderedTabs }) {
   const index=tabs.findIndex(([key])=>key===tab);
   const activate=(event,key)=>{if(event.button!==0||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;event.preventDefault();setTab(key)};
   return <>
-    <nav className="f-tabs f-tabs-desktop" aria-label="Finance sections">
+    <nav className="f-tabs ui-tabs f-tabs-desktop" aria-label="Finance sections">
       {orderedTabs.map(([key,label])=><a data-finance-tab={key} key={key} aria-current={tab===key?'page':undefined} href={getAppHref(`/finance?section=${key}`)} onClick={event=>activate(event,key)}>{label}</a>)}
     </nav>
     <nav className="f-mobile-tabs mobile-section-nav" aria-label="Finance section navigation">

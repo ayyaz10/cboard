@@ -1,10 +1,9 @@
-[data-sonner-toaster] { font-family: inherit !important; }
-[data-sonner-toast].cboard-toast { border: 2px solid var(--normal-border) !important; border-radius: 1rem !important; box-shadow: 4px 4px 0 rgb(0 0 0 / .82) !important; padding: .85rem 1rem !important; transition: opacity 180ms ease, transform 180ms ease !important; }
-[data-sonner-toast][data-type="success"].cboard-toast { background: var(--success-bg) !important; border-color: var(--success-border) !important; }
-[data-sonner-toast][data-type="error"].cboard-toast { background: var(--error-bg) !important; border-color: var(--error-border) !important; }
-[data-sonner-toast][data-type="warning"].cboard-toast { background: var(--warning-bg) !important; border-color: var(--warning-border) !important; }
+[data-sonner-toaster] { font-family: var(--font-family-ui) !important; --normal-bg: var(--color-surface-raised); --normal-text: var(--color-text); --normal-border: var(--color-border); --success-bg: var(--color-success-soft); --success-border: var(--color-success); --error-bg: var(--color-danger-soft); --error-border: var(--color-danger); --warning-bg: var(--color-warning-soft); --warning-border: var(--color-warning); }
+[data-sonner-toast].cboard-toast { border: var(--border-width-strong) solid var(--color-border) !important; border-radius: var(--radius-card) !important; box-shadow: var(--shadow-popover) !important; color: var(--color-text) !important; padding: .85rem 1rem !important; transition: opacity 180ms ease, transform 180ms ease !important; }
+[data-sonner-toast][data-type="success"].cboard-toast { background: var(--color-success-soft) !important; border-color: var(--color-success) !important; }
+[data-sonner-toast][data-type="error"].cboard-toast { background: var(--color-danger-soft) !important; border-color: var(--color-danger) !important; }
+[data-sonner-toast][data-type="warning"].cboard-toast { background: var(--color-warning-soft) !important; border-color: var(--color-warning) !important; }
 .cboard-toast-title { font-weight: 750 !important; }
 .cboard-toast-description { color: var(--normal-text) !important; opacity: .78 !important; }
-button[data-close-button].cboard-toast-close { border-radius: 999px !important; }
-[data-theme="matrix"] [data-sonner-toast].cboard-toast { color: #e0ffe8 !important; }
+button[data-close-button].cboard-toast-close { border-radius: var(--radius-pill) !important; }
 @media (prefers-reduced-motion: reduce) { [data-sonner-toast].cboard-toast { transition: none !important; } }

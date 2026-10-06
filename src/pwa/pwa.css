@@ -1,15 +1,14 @@
 .pwa-status:empty{display:none}
-.pwa-status{position:fixed;z-index:70;top:calc(52px + env(safe-area-inset-top));right:calc(12px + env(safe-area-inset-right));margin:0;padding:0;background:transparent;color:#111;font-size:.875rem;line-height:1.5}
-.pwa-status-toggle,.pwa-status button{border:1px solid #111;border-radius:999px;padding:.38rem .68rem;background:#fffdf8;font-weight:700;line-height:1.2;cursor:pointer}
-.pwa-status-panel{position:absolute;top:calc(100% + 8px);right:0;display:grid;gap:.6rem;width:min(19rem,calc(100vw - 1.5rem));padding:.85rem;background:#ffd166;color:#111;border:2px solid #111;border-radius:14px;box-shadow:3px 3px #111}
+.pwa-status{position:fixed;z-index:70;top:calc(52px + env(safe-area-inset-top));right:calc(12px + env(safe-area-inset-right));margin:0;padding:0;background:transparent;color:var(--color-text);font-size:.875rem;line-height:1.5}
+.pwa-status-toggle,.pwa-status button{border:var(--border-width) solid var(--color-border);border-radius:var(--radius-button);padding:.38rem .68rem;background:var(--color-surface-raised);color:var(--color-text);font-weight:700;line-height:1.2;cursor:pointer}
+.pwa-status-panel{position:absolute;top:calc(100% + 8px);right:0;display:grid;gap:.6rem;width:min(19rem,calc(100vw - 1.5rem));padding:.85rem;background:var(--color-surface-raised);color:var(--color-text);border:var(--border-width-strong) solid var(--color-border);border-radius:var(--radius-dialog);box-shadow:var(--shadow-popover)}
 .pwa-status-panel>div{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem}
 .pwa-status-panel .pwa-update-check{justify-content:space-between}
 .pwa-status-panel p{flex:1 1 100%;margin:.2rem 0}
-.pwa-status button:focus-visible{outline:3px solid #111;outline-offset:3px}
+.pwa-status button:focus-visible{outline:2px solid var(--color-focus);outline-offset:2px}
 .pwa-status button:disabled{opacity:.5}
 html[data-theme="matrix"] .pwa-status{color:var(--matrix-text)}
-html[data-theme="matrix"] .pwa-status-panel{background:var(--matrix-surface);color:var(--matrix-text);border-color:var(--matrix-border)}
-html[data-theme="matrix"] .pwa-status button{background:var(--matrix-accent);color:var(--matrix-accent-text);border-color:var(--matrix-border)}
+html[data-theme="matrix"] .pwa-status-panel{background:var(--color-surface-raised);color:var(--color-text);border-color:var(--color-border)}
 body{padding-top:env(safe-area-inset-top);padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);padding-bottom:env(safe-area-inset-bottom)}
 body,#root,.min-h-screen{min-height:100dvh}
 .workspace-tools{top:calc(8px + env(safe-area-inset-top));right:calc(12px + env(safe-area-inset-right))}

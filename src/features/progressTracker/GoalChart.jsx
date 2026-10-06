@@ -10,21 +10,25 @@ import {
   YAxis,
 } from 'recharts';
 import { useTheme } from '../../contexts/ThemeContext';
-import { getGoalType, metricColors } from './progressTrackerStorage';
+import { getGoalType } from './progressTrackerStorage';
 import {
   formatTrackerNumber,
   getBinaryEntryDelta,
   isBinaryEntryCompleted,
 } from './progressCalculations';
 
-const matrixMetricColors = {
-  lime: '#00ff41',
-  pink: '#ff7ada',
-  blue: '#65d8ff',
-  yellow: '#ffd166',
-  coral: '#ff8a70',
-  violet: '#bda6ff',
-};
+function getChartTokens(theme) {
+  const styles = getComputedStyle(document.documentElement);
+  const read = (name, fallback) => styles.getPropertyValue(name).trim() || fallback;
+  return {
+    axis: read('--chart-axis', '#45433f'), grid: read('--chart-grid', '#777'), target: read('--chart-primary', '#345d1a'),
+    cumulative: read('--chart-secondary', '#176b91'), dotFill: read('--chart-primary', '#345d1a'), stroke: read('--color-surface', '#fff'),
+    metricColors: {
+      lime: read('--chart-primary', '#345d1a'), blue: read('--chart-secondary', '#176b91'), violet: read('--chart-tertiary', '#8856a8'),
+      yellow: read('--chart-positive', '#3f8c43'), coral: read('--chart-negative', '#b42318'), pink: read('--chart-tertiary', '#8856a8'),
+    },
+  };
+}
 
 function ChartTooltip({ active, label, payload }) {
   if (!active || !payload?.length) {
@@ -133,39 +137,12 @@ function BinaryHeatmap({ goal, entries }) {
 }
 
 export function GoalChart({ goal, entries }) {
-  const { isMatrixTheme, isMidnightTheme } = useTheme();
-
+  const { theme } = useTheme();
   if (!goal) {
     return null;
   }
 
-  const chartTheme = isMidnightTheme ? {
-    axis: '#aab2bd',
-    grid: '#343a43',
-    target: '#b8ec69',
-    cumulative: '#d7dde5',
-    dotFill: '#b8ec69',
-    stroke: '#101318',
-    metricColors: { lime: '#b8ec69', blue: '#83c9ff', violet: '#c7a3ff', yellow: '#e7c36e', coral: '#f08d91', pink: '#e39acb' },
-  } : isMatrixTheme
-    ? {
-      axis: '#d9ffd9',
-      grid: '#00a812',
-      target: '#00ff41',
-      cumulative: '#d9ffd9',
-      dotFill: '#00ff41',
-      stroke: '#001606',
-      metricColors: matrixMetricColors,
-    }
-    : {
-      axis: '#000',
-      grid: '#000',
-      target: '#000',
-      cumulative: '#000',
-      dotFill: '#c5ff6f',
-      stroke: '#000',
-      metricColors,
-    };
+  const chartTheme = getChartTokens(theme);
 
   const goalType = getGoalType(goal);
   const sortedEntries = [...entries].sort(compareEntriesChronologically);

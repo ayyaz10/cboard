@@ -141,3 +141,6 @@ html[data-theme="matrix"] .finance .f-chart-zoom button{border-color:var(--matri
   .f-target-grid{grid-template-columns:1fr}
 }
 .f-section-grid > .f-form { align-self: start; align-content: start; }
+.finance .f-tabs :is(button,a){border:var(--border-width) solid var(--color-border);border-radius:var(--radius-button);background:var(--color-surface);color:var(--color-text-secondary);box-shadow:none}
+.finance .f-tabs :is(button,a):hover{background:var(--color-surface-interactive);color:var(--color-text)}
+.finance .f-tabs :is(button[aria-pressed=true],a[aria-current=page]){border-color:var(--color-accent);background:var(--color-accent-soft);color:var(--color-accent);box-shadow:none}
