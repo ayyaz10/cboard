@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { NUTRIENTS } from '../nutrition/nutrients.js';
 import { classifyFoodDeletion, getFoodUsage } from '../nutrition/foodReferences.js';
 import { resolveCatalogFoodForIngredient, findPossibleFoodDuplicateGroups, foodNutritionConflicts, auditFoodDuplicates } from '../nutrition/foodCatalog.js';
@@ -21,6 +21,20 @@ export function FoodLibrary({ library, recipes, foodCatalog = [], mealPlans = []
   const [keepId, setKeepId] = useState('');
   const [nutritionSourceId, setNutritionSourceId] = useState('');
   const [busy, setBusy] = useState(false);
+  const [openActionKey, setOpenActionKey] = useState(null);
+  useEffect(() => {
+    if (!openActionKey) return undefined;
+    const dismiss = event => {
+      if (!event.target.closest?.('[data-food-action-menu]')) setOpenActionKey(null);
+    };
+    const escape = event => { if (event.key === 'Escape') setOpenActionKey(null); };
+    document.addEventListener('pointerdown', dismiss);
+    document.addEventListener('keydown', escape);
+    return () => {
+      document.removeEventListener('pointerdown', dismiss);
+      document.removeEventListener('keydown', escape);
+    };
+  }, [openActionKey]);
   const needle = query.trim().toLocaleLowerCase();
   const catalogById = useMemo(() => new Map(foodCatalog.map(food => [food.id, food])), [foodCatalog]);
   const duplicateGroups = useMemo(() => findPossibleFoodDuplicateGroups(foodCatalog), [foodCatalog]);
@@ -105,17 +119,17 @@ export function FoodLibrary({ library, recipes, foodCatalog = [], mealPlans = []
     return `${recipeLabel}${planLabel}`;
   };
   const recipesUsing = entry => entry.usage?.recipes || (entry.recipeSlugs || []).map(slug => recipes.find(recipe => recipe.slug === slug)).filter(Boolean).map(recipe => ({ slug: recipe.slug, title: recipe.title }));
-  const actions = entry => entry.food ? <details className="relative inline-block">
-    <summary className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full border-2 border-black bg-white hover:bg-[#c5ff6f]" aria-label={`Actions for ${entry.item.name}`} title="Food actions"><span aria-hidden="true" className="flex gap-0.5"><i className="h-1 w-1 rounded-full bg-black"/><i className="h-1 w-1 rounded-full bg-black"/><i className="h-1 w-1 rounded-full bg-black"/></span></summary>
+  const actions = entry => entry.food ? <details data-food-action-menu className="relative inline-block" open={openActionKey === entry.key}>
+    <summary onClick={event => { event.preventDefault(); setOpenActionKey(current => current === entry.key ? null : entry.key); }} className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full border-2 border-black bg-white hover:bg-[#c5ff6f]" aria-label={`Actions for ${entry.item.name}`} title="Food actions"><span aria-hidden="true" className="flex gap-0.5"><i className="h-1 w-1 rounded-full bg-black"/><i className="h-1 w-1 rounded-full bg-black"/><i className="h-1 w-1 rounded-full bg-black"/></span></summary>
     <div className="absolute right-0 top-12 z-20 grid min-w-36 gap-1 rounded-xl border-2 border-black bg-white p-2 shadow-[3px_3px_0_#111]">
-      <button type="button" className="rounded-lg px-3 py-2 text-left text-sm font-bold hover:bg-[#edffd5]" onClick={event => { event.currentTarget.closest('details').open = false; onEdit(entry.food.id); }}>Edit food</button>
-      <button type="button" className="rounded-lg px-3 py-2 text-left text-sm font-bold text-red-800 hover:bg-red-50" onClick={event => { event.currentTarget.closest('details').open = false; requestDelete([entry.food.id]); }}>Delete food</button>
+      <button type="button" className="rounded-lg px-3 py-2 text-left text-sm font-bold hover:bg-[#edffd5]" onClick={() => { setOpenActionKey(null); onEdit(entry.food.id); }}>Edit food</button>
+      <button type="button" className="rounded-lg px-3 py-2 text-left text-sm font-bold text-red-800 hover:bg-red-50" onClick={() => { setOpenActionKey(null); requestDelete([entry.food.id]); }}>Delete food</button>
     </div>
-  </details> : <details className="relative inline-block">
-    <summary className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full border-2 border-black bg-white hover:bg-[#c5ff6f]" aria-label={`Actions for ${entry.item.name}`} title="Ingredient actions"><span aria-hidden="true" className="flex gap-0.5"><i className="h-1 w-1 rounded-full bg-black"/><i className="h-1 w-1 rounded-full bg-black"/><i className="h-1 w-1 rounded-full bg-black"/></span></summary>
+  </details> : <details data-food-action-menu className="relative inline-block" open={openActionKey === entry.key}>
+    <summary onClick={event => { event.preventDefault(); setOpenActionKey(current => current === entry.key ? null : entry.key); }} className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full border-2 border-black bg-white hover:bg-[#c5ff6f]" aria-label={`Actions for ${entry.item.name}`} title="Ingredient actions"><span aria-hidden="true" className="flex gap-0.5"><i className="h-1 w-1 rounded-full bg-black"/><i className="h-1 w-1 rounded-full bg-black"/><i className="h-1 w-1 rounded-full bg-black"/></span></summary>
     <div className="absolute right-0 top-12 z-20 grid min-w-48 gap-1 rounded-xl border-2 border-black bg-white p-2 shadow-[3px_3px_0_#111]">
-      <span className="px-3 py-1 text-xs text-black/60">Recipe-only ingredient</span>
-      <button type="button" className="rounded-lg px-3 py-2 text-left text-sm font-bold text-red-800 hover:bg-red-50" onClick={event => { event.currentTarget.closest('details').open = false; setRecipeIngredientDeletePlan([entry.key]); }}>Remove from {entry.recipeTitles.length} recipe{entry.recipeTitles.length === 1 ? '' : 's'}</button>
+      <span className="px-3 py-1 text-xs text-black/60">Saved in recipe, not reusable foods</span>
+      <button type="button" className="rounded-lg px-3 py-2 text-left text-sm font-bold text-red-800 hover:bg-red-50" onClick={() => { setOpenActionKey(null); setRecipeIngredientDeletePlan([entry.key]); }}>Remove from {entry.recipeTitles.length} recipe{entry.recipeTitles.length === 1 ? '' : 's'}</button>
     </div>
   </details>;
   return <section className="food-library" aria-labelledby="food-library-heading">
@@ -131,7 +145,7 @@ export function FoodLibrary({ library, recipes, foodCatalog = [], mealPlans = []
       <button type="button" className={secondaryButton} aria-pressed={view === 'list'} onClick={() => setView('list')}>Detailed list</button>
       <button type="button" className={secondaryButton} aria-pressed={view === 'cards'} onClick={() => setView('cards')}>Cards</button>
     </div>
-    <p role="status">{filtered.length} of {library.length} items. Diary entries and grocery foods keep nutrition snapshots, so they do not block cleanup.</p>
+    <p role="status">{filtered.length} of {library.length} items. “Recipe-only” means the ingredient is saved inside a recipe but has no separate reusable food record; removing it here removes it from its recipe. Diary entries and grocery foods keep nutrition snapshots, so they do not block cleanup.</p>
     {source === 'duplicates' && <div className="grid gap-3" aria-label="Possible duplicate groups">
       <p className="rounded-xl border-2 border-black bg-white p-3 text-sm">Audit of {foodCatalog.length} reusable foods: {duplicateAudit.counts.exactName} exact-name pairs, {duplicateAudit.counts.quantityOrAlias} quantity or alias pairs, {duplicateAudit.counts.fuzzySuggestion} spelling suggestions, {duplicateAudit.counts.sameBarcode} shared barcodes, {duplicateAudit.counts.sameRetailerSku} shared retailer/SKU pairs. Review each group before merging.</p>
       {!duplicateGroups.length && <p className="rounded-xl border-2 border-black bg-white p-4">No likely duplicate food groups found.</p>}
