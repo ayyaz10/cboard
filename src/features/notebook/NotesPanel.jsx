@@ -428,8 +428,8 @@ export function NotesPanel({
   }
 
   return (
-    <div className="grid items-start gap-5 xl:grid-cols-[0.78fr_1.22fr]">
-      <aside className="rounded-[1.75rem] border-2 border-black bg-[#9fe3ff] p-4 sm:p-5">
+    <div className="notes-workspace grid items-start gap-5 xl:grid-cols-[0.78fr_1.22fr]">
+      <aside className="notes-sidebar rounded-[1.75rem] border-2 border-black bg-[#9fe3ff] p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
@@ -486,6 +486,7 @@ export function NotesPanel({
                     ? 'bg-[#c5ff6f] shadow-[4px_4px_0_#000]'
                     : 'bg-[#fffdf8] hover:bg-white'
                 }`}
+                data-active={isActive ? 'true' : undefined}
               >
                 <span className="block text-xs font-bold uppercase tracking-[0.14em] text-black/55">
                   {formatDate(note.updatedAt || note.createdAt)}
@@ -507,7 +508,7 @@ export function NotesPanel({
         </div>
       </aside>
 
-      <section className="rounded-[1.75rem] border-2 border-black bg-[#fff0b8] p-4 sm:p-5">
+      <section className="notes-editor-panel rounded-[1.75rem] border-2 border-black bg-[#fff0b8] p-4 sm:p-5">
         {selectedNote ? (
           <form onSubmit={handleSave} className="grid gap-4">
             <div className="grid gap-4 md:grid-cols-[1fr_0.65fr]">

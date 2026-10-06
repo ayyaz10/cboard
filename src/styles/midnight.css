@@ -1,35 +1,41 @@
 /* CBoard Midnight: a deliberately designed near-black palette, not a color inversion. */
 html[data-theme="midnight"] {
   color-scheme: dark;
-  --mid-bg: #080a0c;
-  --mid-surface: #101317;
-  --mid-raised: #171b21;
-  --mid-soft: #1e242b;
-  --mid-border: #2c333d;
-  --mid-border-strong: #46515e;
-  --mid-text: #e7ebf0;
-  --mid-secondary: #adb5c0;
-  --mid-muted: #818b98;
-  --mid-accent: #b8ec69;
-  --mid-accent-soft: #28351e;
-  --mid-accent-text: #11170a;
-  --mid-blue: #8acdf3;
-  --mid-blue-soft: #172c37;
-  --mid-pink: #e39acb;
-  --mid-pink-soft: #321f30;
-  --mid-warning: #e7c36e;
-  --mid-warning-soft: #332d1d;
-  --mid-danger: #f08d91;
-  --mid-danger-soft: #351e22;
-  --mid-success: #8fd39a;
-  --mid-success-soft: #1c3022;
+  --mid-bg: #050505;
+  --mid-surface: #0a0a0a;
+  --mid-raised: #111111;
+  --mid-soft: #171717;
+  --mid-border: #242424;
+  --mid-border-strong: #383838;
+  --mid-text: #f0efed;
+  --mid-secondary: #b5b4b1;
+  --mid-muted: #858481;
+  --mid-accent: #f28a47;
+  --mid-accent-soft: #2b1c13;
+  --mid-accent-text: #160d07;
+  --mid-sage: #9ab19c;
+  --mid-sage-soft: #182019;
+  --mid-blue: #91a9b8;
+  --mid-blue-soft: #172027;
+  --mid-pink: #c49aa9;
+  --mid-pink-soft: #241920;
+  --mid-warning: #e1a05f;
+  --mid-warning-soft: #2c2017;
+  --mid-danger: #e4867f;
+  --mid-danger-soft: #2b1918;
+  --mid-success: #8db59a;
+  --mid-success-soft: #19221b;
+  --mid-radius-sm: 3px;
+  --mid-radius-md: 5px;
+  --mid-radius-lg: 7px;
+  --mid-shadow: 0 1px 2px rgb(0 0 0 / .4);
 }
 
 html[data-theme="midnight"] body {
   color-scheme: dark;
   background: var(--mid-bg);
   color: var(--mid-text);
-  background-image: radial-gradient(ellipse at 50% -18rem, rgb(184 236 105 / .055), transparent 45rem);
+  background-image: radial-gradient(ellipse at 50% -24rem, rgb(242 138 71 / .035), transparent 48rem);
 }
 html[data-theme="midnight"] :where(h1,h2,h3,h4,strong,b,dt,legend) { color: var(--mid-text); }
 html[data-theme="midnight"] :where(p,small,figcaption,.text-black\/60,.text-black\/65,.text-black\/70,.text-black\/55) { color: var(--mid-secondary); }
@@ -79,7 +85,7 @@ html[data-theme="midnight"] .auth-primary,
 html[data-theme="midnight"] .f-primary,
 html[data-theme="midnight"] .g-primary,
 html[data-theme="midnight"] .app-menu-toggle,
-html[data-theme="midnight"] button[class*="bg-[#c5ff6f]"] { background: var(--mid-accent) !important; color: var(--mid-accent-text) !important; border-color: var(--mid-accent) !important; }
+html[data-theme="midnight"] .primary-button { background: var(--mid-accent) !important; color: var(--mid-accent-text) !important; border-color: var(--mid-accent) !important; }
 html[data-theme="midnight"] :where(button,a,summary,input,select,textarea):focus-visible { outline: 2px solid var(--mid-accent) !important; outline-offset: 3px; }
 html[data-theme="midnight"] button:disabled { opacity: .46; }
 html[data-theme="midnight"] [aria-pressed="true"],
@@ -126,13 +132,19 @@ html[data-theme="midnight"] header a[aria-label="C Board intro"] img { filter: b
 html[data-theme="midnight"] .account-avatar { background: var(--mid-accent-soft); color: var(--mid-accent); border-color: var(--mid-border-strong); box-shadow: none; }
 
 /* Finance's scoped stylesheet uses its own palette, so map its components intentionally. */
-html[data-theme="midnight"] .finance { color: var(--mid-text); --f-blue: var(--mid-blue-soft); --f-green: var(--mid-accent-soft); --f-pink: var(--mid-pink-soft); --f-amber: var(--mid-warning-soft); --f-scroll-surface: var(--mid-surface); --f-scroll-track: var(--mid-bg); --f-scroll-thumb: #46515e; --f-scroll-thumb-hover: #697585; }
+html[data-theme="midnight"] .finance { color: var(--mid-text); --f-blue: var(--mid-blue-soft); --f-green: var(--mid-accent-soft); --f-pink: var(--mid-pink-soft); --f-amber: var(--mid-warning-soft); --f-scroll-surface: var(--mid-surface); --f-scroll-track: var(--mid-bg); --f-scroll-thumb: #46515e; --f-scroll-thumb-hover: #697585; --finance-chart-line: #c9c7c3; --finance-chart-grid: rgb(255 255 255 / .1); }
 html[data-theme="midnight"] .finance :is(.f-card,.f-stat,.f-item,.f-dialog,.f-kbd,.f-table td) { background: var(--mid-surface) !important; color: var(--mid-text) !important; border-color: var(--mid-border) !important; }
+html[data-theme="midnight"] .finance :is(.f-target-card,.f-chart-shell,.f-chart-toolbar,.f-chart-selected,.f-chart-tooltip,.f-merchant-mark,.f-report-feature,.f-converter-result,.f-conversion-preview,.f-cashflow-result,.f-cashflow-shortfall) { background: var(--mid-surface) !important; color: var(--mid-text) !important; border-color: var(--mid-border) !important; box-shadow: none !important; }
+html[data-theme="midnight"] .finance .f-chart-shell { background: var(--mid-bg) !important; }
+html[data-theme="midnight"] .finance .f-cashflow-shortfall { background: var(--mid-danger-soft) !important; color: #ffd7d8 !important; border-color: #75403c !important; }
+html[data-theme="midnight"] .finance :is(.f-receipt-check,.f-alert) { background: var(--mid-warning-soft) !important; color: #f1c99f !important; border-color: #6b482c !important; }
+html[data-theme="midnight"] .finance .f-chart-selected { border-radius: var(--mid-radius-md) !important; }
+html[data-theme="midnight"] .finance .f-target-card { border-radius: var(--mid-radius-md) !important; }
 html[data-theme="midnight"] .finance .f-stat[data-tone="green"], html[data-theme="midnight"] .finance .f-cashflow-result { background: var(--mid-accent-soft) !important; }
 html[data-theme="midnight"] .finance .f-stat[data-tone="blue"] { background: var(--mid-blue-soft) !important; }
 html[data-theme="midnight"] .finance .f-stat[data-tone="pink"] { background: var(--mid-pink-soft) !important; }
 html[data-theme="midnight"] .finance .f-stat[data-tone="amber"] { background: var(--mid-warning-soft) !important; }
-html[data-theme="midnight"] .finance :is(.f-button,.f-icon,.f-tabs button,.f-mobile-tabs>button) { background: var(--mid-raised); color: var(--mid-text); border-color: var(--mid-border-strong); box-shadow: none; }
+html[data-theme="midnight"] .finance :is(.f-button,.f-icon,.f-tabs button,.f-mobile-tabs>button,.f-chart-zoom button) { background: var(--mid-raised) !important; color: var(--mid-text) !important; border-color: var(--mid-border-strong) !important; box-shadow: none !important; }
 html[data-theme="midnight"] .finance :is(.f-primary,.f-mobile-tab-picker select) { background: var(--mid-accent); color: var(--mid-accent-text); border-color: var(--mid-accent); box-shadow: none; }
 html[data-theme="midnight"] .finance :is(.f-form input,.f-form select,.f-form textarea,.f-input,.f-mobile-tab-picker select) { background-color: #0b0e12; color: var(--mid-text); border-color: var(--mid-border-strong); }
 html[data-theme="midnight"] .finance .f-header p,
@@ -196,3 +208,198 @@ html[data-theme="midnight"] [data-sonner-toast][data-type="warning"].cboard-toas
   html[data-theme="midnight"] body,
   html[data-theme="midnight"] :where(button,a,.panel,.f-card,.g-row) { transition-property: color, background-color, border-color, box-shadow, transform; transition-duration: 150ms; }
 }
+
+/* Midnight design system refinement: editorial, neutral-first surfaces with a warm accent. */
+html[data-theme="midnight"] {
+  --mid-card-radius: var(--mid-radius-md);
+  --mid-panel-radius: var(--mid-radius-md);
+  --mid-control-radius: var(--mid-radius-sm);
+  --mid-card-shadow: var(--mid-shadow);
+}
+
+html[data-theme="midnight"] :is(.panel,.brand-badge,.account-card,.finance .f-card,.finance .f-dialog,.groceries .g-card,.groceries .g-dialog,.diary-panel,.diary-editor,.diary-streak,.diary-source-card,.nutrition-targets,[role="dialog"],dialog) {
+  border-radius: var(--mid-panel-radius) !important;
+  box-shadow: var(--mid-card-shadow) !important;
+}
+html[data-theme="midnight"] button:not(.pill),
+html[data-theme="midnight"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+html[data-theme="midnight"] select,
+html[data-theme="midnight"] textarea,
+html[data-theme="midnight"] .field-input { border-radius: var(--mid-control-radius) !important; }
+html[data-theme="midnight"] [class*="rounded-[2rem]"],
+html[data-theme="midnight"] [class*="rounded-[1.9rem]"],
+html[data-theme="midnight"] [class*="rounded-[1.5rem]"],
+html[data-theme="midnight"] [class*="rounded-[1.4rem]"],
+html[data-theme="midnight"] [class*="rounded-[1.35rem]"],
+html[data-theme="midnight"] [class*="rounded-[1.2rem]"],
+html[data-theme="midnight"] [class*="rounded-3xl"],
+html[data-theme="midnight"] [class*="rounded-2xl"],
+html[data-theme="midnight"] [class*="rounded-xl"] { border-radius: var(--mid-radius-md) !important; }
+html[data-theme="midnight"] :is(.pill,.diary-source-count,.diary-report-tabs,.diary-view-tabs) { border-radius: 999px !important; }
+html[data-theme="midnight"] [class*="shadow-["],
+html[data-theme="midnight"] [class*="shadow-"] { box-shadow: var(--mid-shadow) !important; }
+
+/* Replace embedded light-mode Tailwind surfaces across pages and reusable controls. */
+html[data-theme="midnight"] [class*="bg-[#fff"],
+html[data-theme="midnight"] [class*="bg-[#f8f3ea"],
+html[data-theme="midnight"] [class*="bg-[#f4f9e9"],
+html[data-theme="midnight"] [class*="bg-[#f4f5ec"],
+html[data-theme="midnight"] [class*="bg-[#f3f6ec"] {
+  background-color: var(--mid-surface) !important;
+  color: var(--mid-text) !important;
+}
+html[data-theme="midnight"] [class*="bg-[#e5f5dc"],
+html[data-theme="midnight"] [class*="bg-[#e5f1e1"],
+html[data-theme="midnight"] [class*="bg-[#cfe8cb"],
+html[data-theme="midnight"] [class*="bg-[#d9ff9f"],
+html[data-theme="midnight"] [class*="bg-[#edffd5"],
+html[data-theme="midnight"] [class*="bg-[#ecf5df"] {
+  background-color: var(--mid-sage-soft) !important;
+  color: var(--mid-text) !important;
+}
+html[data-theme="midnight"] [class*="bg-[#c5ff6f"],
+html[data-theme="midnight"] [class*="bg-[#adf04d"] {
+  background-color: var(--mid-accent-soft) !important;
+  color: var(--mid-text) !important;
+}
+html[data-theme="midnight"] [class*="border-black"],
+html[data-theme="midnight"] [class*="border-white"] { border-color: var(--mid-border-strong) !important; }
+html[data-theme="midnight"] [class*="text-black"] { color: var(--mid-text) !important; }
+html[data-theme="midnight"] [class*="text-black/"] { color: var(--mid-secondary) !important; }
+html[data-theme="midnight"] [class*="text-white/"] { color: var(--mid-secondary) !important; }
+html[data-theme="midnight"] :is(button,a,summary):hover { border-color: #6d4933; }
+html[data-theme="midnight"] :is(button,a,summary):focus-visible { outline-color: var(--mid-accent) !important; }
+
+/* The dashboard uses a dark, numbered workspace grid instead of legacy color slabs. */
+html[data-theme="midnight"] .board-card,
+html[data-theme="midnight"] .theme-color-card {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--mid-border-strong) !important;
+  border-left: 2px solid var(--mid-accent) !important;
+  border-radius: var(--mid-card-radius) !important;
+  background: linear-gradient(110deg, rgb(242 138 71 / .055), transparent 38%), var(--mid-surface) !important;
+  color: var(--mid-text) !important;
+  box-shadow: var(--mid-card-shadow) !important;
+  text-decoration: none;
+}
+html[data-theme="midnight"] .board-card:hover,
+html[data-theme="midnight"] .theme-color-card:hover { transform: translateY(-2px); border-color: #6d4933 !important; border-left-color: var(--mid-accent) !important; background-color: var(--mid-raised) !important; }
+html[data-theme="midnight"] .board-card > div > div > p,
+html[data-theme="midnight"] .board-card > p:first-of-type { color: var(--mid-secondary) !important; }
+html[data-theme="midnight"] .board-card h2,
+html[data-theme="midnight"] .board-card > div > span { color: var(--mid-text) !important; }
+html[data-theme="midnight"] .board-card span.rounded-full { border: 1px solid var(--mid-border-strong) !important; background: var(--mid-raised) !important; color: var(--mid-accent) !important; }
+html[data-theme="midnight"] .board-card span.text-2xl { color: var(--mid-accent) !important; }
+html[data-theme="midnight"] .page-shell-quick-action { background: var(--mid-raised) !important; color: var(--mid-text) !important; border-color: var(--mid-border-strong) !important; box-shadow: none !important; }
+
+/* Food diary: reports, day sections, calendar, suggestions, and history share dark surfaces. */
+html[data-theme="midnight"] .food-diary { --diary-accent: var(--mid-accent); color: var(--mid-text); }
+html[data-theme="midnight"] .food-diary :is(.diary-panel,.diary-editor,.diary-source-card,.diary-history-item,.diary-food,.diary-add-recipe,.diary-lookup,.diary-notice,.diary-delete,.diary-weekly-summary,.diary-report-tabs,.diary-view-tabs,.diary-copy-option,.diary-food-suggestions,.diary-calendar-popover,.diary-recipe-confirm .diary-actions,.diary-food-amount,.diary-food-macro-summary) {
+  background: var(--mid-surface) !important;
+  color: var(--mid-text) !important;
+  border-color: var(--mid-border) !important;
+  box-shadow: none !important;
+}
+html[data-theme="midnight"] .food-diary :is(.diary-streak,.diary-sources-intro) { background: var(--mid-sage-soft) !important; color: var(--mid-text) !important; border-color: var(--mid-border-strong) !important; }
+html[data-theme="midnight"] .food-diary :is(.diary-sources-intro p,.diary-source-total small,.diary-source-card header > div:first-child > span,.diary-copy-option small,.diary-copy-option .diary-copy-foods,.diary-calorie-ring span,.diary-food-suggestions small,.diary-ingredient-list,.diary-ingredients summary span,.diary-food-macro-summary,.diary-food-amount) { color: var(--mid-secondary) !important; }
+html[data-theme="midnight"] .food-diary :is(.diary-source-count,.diary-view-tabs button[aria-selected="true"],.diary-report-tabs button[aria-selected="true"],.diary-copy-option:hover,.diary-food-suggestions button:hover,.diary-food-suggestions button.is-active) { background: var(--mid-accent-soft) !important; color: var(--mid-text) !important; border-color: #704326 !important; }
+html[data-theme="midnight"] .food-diary :is(.diary-find-food-button,.diary-manual-food-button,.diary-primary) { background: var(--mid-accent) !important; color: var(--mid-accent-text) !important; border-color: var(--mid-accent) !important; box-shadow: none !important; }
+html[data-theme="midnight"] .food-diary :is(.diary-source-warning,.diary-partial-nutrition) { background: var(--mid-warning-soft) !important; color: #f1c99f !important; border-color: #6b482c !important; }
+html[data-theme="midnight"] .food-diary :is(.diary-source-track,.diary-week-track) { background: var(--mid-soft) !important; }
+html[data-theme="midnight"] .diary-week-track > span { background: var(--mid-sage) !important; }
+html[data-theme="midnight"] .diary-week-track > span.is-over { background: var(--mid-danger) !important; }
+html[data-theme="midnight"] .diary-week-track b { color: var(--mid-text) !important; }
+html[data-theme="midnight"] .diary-calorie-ring { background: conic-gradient(var(--mid-accent) var(--diary-report-progress), var(--mid-soft) 0) !important; }
+html[data-theme="midnight"] .diary-calorie-ring > div { background: var(--mid-raised) !important; color: var(--mid-text) !important; }
+html[data-theme="midnight"] .diary-calendar-popover { background: var(--mid-raised) !important; color: var(--mid-text) !important; border-color: var(--mid-border-strong) !important; box-shadow: 0 8px 20px rgb(0 0 0 / .4) !important; }
+html[data-theme="midnight"] .diary-calendar-popover .rdp-root { --rdp-accent-color: var(--mid-accent); --rdp-accent-background-color: var(--mid-accent-soft); }
+html[data-theme="midnight"] .food-diary :is(.diary-cal-bubble-low,.diary-month-low) { background: var(--mid-surface) !important; color: var(--mid-text) !important; }
+html[data-theme="midnight"] .food-diary :is(.diary-cal-bubble-building,.diary-cal-bubble-near,.diary-month-building,.diary-month-near) { background: var(--mid-success-soft) !important; color: #c2d9c6 !important; }
+html[data-theme="midnight"] .food-diary :is(.diary-cal-bubble-over,.diary-cal-bubble-high,.diary-month-over,.diary-month-high) { background: var(--mid-warning-soft) !important; color: #f1c99f !important; }
+html[data-theme="midnight"] .food-diary :is(.diary-datebar,.diary-report-summary,.diary-history,.diary-micros,.diary-entry,.diary-guide-content) { border-color: var(--mid-border) !important; }
+
+/* Tables and floating global tools use the same quiet border and surface language. */
+html[data-theme="midnight"] :is(table,.food-library-table-wrap,.finance .f-table,.diary-history-item) { background: var(--mid-surface) !important; border-color: var(--mid-border) !important; border-radius: var(--mid-radius-md) !important; }
+html[data-theme="midnight"] :is(th,.finance .f-table th) { background: var(--mid-raised) !important; color: var(--mid-secondary) !important; border-color: var(--mid-border) !important; }
+html[data-theme="midnight"] :is(td,th) { border-color: var(--mid-border) !important; }
+html[data-theme="midnight"] tbody tr:nth-child(even) { background: rgb(255 255 255 / .018); }
+html[data-theme="midnight"] tbody tr:hover { background: rgb(242 138 71 / .045) !important; }
+html[data-theme="midnight"] .global-scroll-controls button,
+html[data-theme="midnight"] .workspace-tools button,
+html[data-theme="midnight"] .reminder-toggle {
+  min-height: 36px;
+  border: 1px solid var(--mid-border-strong) !important;
+  border-radius: var(--mid-control-radius) !important;
+  background: var(--mid-raised) !important;
+  color: var(--mid-text) !important;
+  box-shadow: var(--mid-card-shadow) !important;
+}
+html[data-theme="midnight"] .reminder-toggle { border-left: 2px solid var(--mid-accent) !important; }
+html[data-theme="midnight"] .reminder-widget,
+html[data-theme="midnight"] .workspace-note {
+  background: var(--mid-raised) !important;
+  color: var(--mid-text) !important;
+  border: 1px solid var(--mid-border-strong) !important;
+  border-radius: var(--mid-panel-radius) !important;
+  box-shadow: 0 12px 32px rgb(0 0 0 / .5) !important;
+}
+html[data-theme="midnight"] .reminder-widget :is(input,textarea,select) { background: var(--mid-bg) !important; color: var(--mid-text) !important; }
+html[data-theme="midnight"] .app-navigation-list > a[aria-current="page"],
+html[data-theme="midnight"] .app-navigation-related > a[aria-current="page"] { position: relative; background: var(--mid-raised) !important; color: var(--mid-text) !important; border-color: var(--mid-border-strong) !important; }
+html[data-theme="midnight"] .app-navigation-list > a[aria-current="page"]::before { content: ""; position: absolute; inset: 5px auto 5px 0; width: 2px; background: var(--mid-accent); }
+
+/* Toasts and modal layers remain dark even when source components specify inline light colors. */
+html[data-theme="midnight"] :is(dialog,[role="dialog"],[role="menu"],[role="listbox"],[data-radix-popper-content-wrapper] > *,[data-sonner-toast]) {
+  background-color: var(--mid-raised) !important;
+  color: var(--mid-text) !important;
+  border-color: var(--mid-border-strong) !important;
+  border-radius: var(--mid-panel-radius) !important;
+}
+html[data-theme="midnight"] :is(.finance .f-primary,.groceries .g-primary,.auth-primary,.diary-primary) { background: var(--mid-accent) !important; color: var(--mid-accent-text) !important; border-color: var(--mid-accent) !important; }
+html[data-theme="midnight"] .tracker-stat-card { background: var(--mid-surface) !important; border-color: var(--mid-border) !important; }
+html[data-theme="midnight"] .tracker-stat-card :is(strong,span) { color: var(--mid-text) !important; }
+html[data-theme="midnight"] .training {
+  --tr-surface: var(--mid-surface);
+  --tr-text: var(--mid-text);
+  --tr-border: var(--mid-border-strong);
+  --tr-muted: var(--mid-secondary);
+  --tr-accent: var(--mid-accent);
+}
+html[data-theme="midnight"] .training .tr-hero { background: var(--mid-raised) !important; border-left: 2px solid var(--mid-accent); }
+html[data-theme="midnight"] .training :is(.tr-card,.tr-button,.tr-tabs button,.tr-field input,.tr-field select,.tr-field textarea) { border-radius: var(--mid-radius-md) !important; box-shadow: none !important; }
+html[data-theme="midnight"] .training .tr-primary,
+html[data-theme="midnight"] .training :is(button[aria-pressed="true"],button[aria-current]) { background: var(--mid-accent) !important; color: var(--mid-accent-text) !important; border-color: var(--mid-accent) !important; }
+html[data-theme="midnight"] .training :is(input[type="range"],input[type="checkbox"]) { accent-color: var(--mid-accent); }
+html[data-theme="midnight"] .app-navigation-list > a,
+html[data-theme="midnight"] .app-navigation-related > a,
+html[data-theme="midnight"] .recipe-shortcuts > a,
+html[data-theme="midnight"] .recipe-shortcuts > button {
+  border-radius: var(--mid-control-radius) !important;
+  border: 1px solid var(--mid-border) !important;
+  background: var(--mid-raised) !important;
+  color: var(--mid-secondary) !important;
+  box-shadow: none !important;
+  text-decoration: none;
+}
+html[data-theme="midnight"] .app-navigation-list > a:hover,
+html[data-theme="midnight"] .app-navigation-related > a:hover,
+html[data-theme="midnight"] .recipe-shortcuts > a:hover,
+html[data-theme="midnight"] .recipe-shortcuts > button:hover { background: var(--mid-soft) !important; color: var(--mid-text) !important; border-color: var(--mid-border-strong) !important; }
+html[data-theme="midnight"] .app-navigation-list > a[aria-current="page"] { color: var(--mid-text) !important; border-left: 2px solid var(--mid-accent) !important; }
+html[data-theme="midnight"] .theme-toggle { border-radius: var(--mid-radius-md) !important; background: var(--mid-surface) !important; box-shadow: none !important; }
+html[data-theme="midnight"] .theme-select { background: var(--mid-raised) !important; color: var(--mid-accent) !important; border: 1px solid #6d4933 !important; }
+html[data-theme="midnight"] .account-avatar-link { background: var(--mid-surface) !important; color: var(--mid-text) !important; border-color: var(--mid-border-strong) !important; box-shadow: none !important; }
+html[data-theme="midnight"] .account-avatar-small { background: var(--mid-accent-soft) !important; color: var(--mid-accent) !important; border-color: var(--mid-border-strong) !important; }
+html[data-theme="midnight"] .primary-button,
+html[data-theme="midnight"] .recipe-shortcuts > button.primary-button,
+html[data-theme="midnight"] .notes-editor-panel button[type="submit"] { background: var(--mid-accent) !important; color: var(--mid-accent-text) !important; border-color: var(--mid-accent) !important; }
+html[data-theme="midnight"] .notes-sidebar { background: var(--mid-surface) !important; border-color: var(--mid-border-strong) !important; }
+html[data-theme="midnight"] .notes-editor-panel { background: var(--mid-surface) !important; border-color: var(--mid-border-strong) !important; }
+html[data-theme="midnight"] .notes-sidebar [data-active="true"] { background: var(--mid-accent-soft) !important; color: var(--mid-text) !important; border-color: #704326 !important; box-shadow: none !important; }
+html[data-theme="midnight"] .notes-sidebar [data-active="true"] :is(span,strong,p) { color: var(--mid-text) !important; }
+html[data-theme="midnight"] .workspace-tools button { padding: 6px 10px; font-size: .75rem; }
+html[data-theme="midnight"] progress { accent-color: var(--mid-accent); }
+html[data-theme="midnight"] progress::-webkit-progress-bar { background: var(--mid-soft); }
+html[data-theme="midnight"] progress::-webkit-progress-value { background: var(--mid-accent); }
+html[data-theme="midnight"] progress::-moz-progress-bar { background: var(--mid-accent); }
