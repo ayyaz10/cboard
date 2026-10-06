@@ -20,5 +20,5 @@ body,#root,.min-h-screen{min-height:100dvh}
 .reminder-toggle{margin-bottom:env(safe-area-inset-bottom)}
 .workspace-note{max-height:calc(100dvh - 70px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}
 .workspace-switcher{margin-top:12dvh}
-@media(max-width:47.99rem){.workspace-tools{top:calc(16px + env(safe-area-inset-top));left:calc(12px + env(safe-area-inset-left));right:auto}.pwa-status{top:calc(16px + env(safe-area-inset-top));right:calc(12px + env(safe-area-inset-right))}}
+@media(max-width:47.99rem){.workspace-tools{top:calc(16px + env(safe-area-inset-top));left:calc(12px + env(safe-area-inset-left));right:auto}.pwa-status{top:calc(4.5rem + env(safe-area-inset-top));right:calc(12px + env(safe-area-inset-right))}}
 @media(display-mode:standalone){html{overscroll-behavior-y:none}}
