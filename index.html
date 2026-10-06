@@ -4,6 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#f4f0e6" />
+    <script>
+      try {
+        const theme = localStorage.getItem('cboard-theme');
+        if (['original', 'matrix', 'midnight'].includes(theme)) document.documentElement.dataset.theme = theme;
+        const color = theme === 'midnight' ? '#080a0c' : theme === 'matrix' ? '#000000' : '#f4f0e6';
+        document.querySelector('meta[name="theme-color"]').content = color;
+      } catch {}
+    </script>
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="CBoard" />

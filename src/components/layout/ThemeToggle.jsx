@@ -16,6 +16,7 @@ export function ThemeToggle() {
       >
         <option value="original">Original</option>
         <option value="matrix">Matrix</option>
+        <option value="midnight">Midnight</option>
       </select>
     </label>
   );

@@ -1,0 +1,198 @@
+/* CBoard Midnight: a deliberately designed near-black palette, not a color inversion. */
+html[data-theme="midnight"] {
+  color-scheme: dark;
+  --mid-bg: #080a0c;
+  --mid-surface: #101317;
+  --mid-raised: #171b21;
+  --mid-soft: #1e242b;
+  --mid-border: #2c333d;
+  --mid-border-strong: #46515e;
+  --mid-text: #e7ebf0;
+  --mid-secondary: #adb5c0;
+  --mid-muted: #818b98;
+  --mid-accent: #b8ec69;
+  --mid-accent-soft: #28351e;
+  --mid-accent-text: #11170a;
+  --mid-blue: #8acdf3;
+  --mid-blue-soft: #172c37;
+  --mid-pink: #e39acb;
+  --mid-pink-soft: #321f30;
+  --mid-warning: #e7c36e;
+  --mid-warning-soft: #332d1d;
+  --mid-danger: #f08d91;
+  --mid-danger-soft: #351e22;
+  --mid-success: #8fd39a;
+  --mid-success-soft: #1c3022;
+}
+
+html[data-theme="midnight"] body {
+  color-scheme: dark;
+  background: var(--mid-bg);
+  color: var(--mid-text);
+  background-image: radial-gradient(ellipse at 50% -18rem, rgb(184 236 105 / .055), transparent 45rem);
+}
+html[data-theme="midnight"] :where(h1,h2,h3,h4,strong,b,dt,legend) { color: var(--mid-text); }
+html[data-theme="midnight"] :where(p,small,figcaption,.text-black\/60,.text-black\/65,.text-black\/70,.text-black\/55) { color: var(--mid-secondary); }
+html[data-theme="midnight"] a { color: inherit; }
+html[data-theme="midnight"] a:hover { color: var(--mid-accent); }
+html[data-theme="midnight"] ::selection { background: var(--mid-accent); color: var(--mid-accent-text); }
+
+/* Surface mapping: light-theme utility colors become intentional elevation levels. */
+html[data-theme="midnight"] [class*="bg-[#f4f0e6]"],
+html[data-theme="midnight"] [class*="bg-[#f4f5ec]"],
+html[data-theme="midnight"] [class*="bg-[#f3f6ec]"] { background-color: var(--mid-bg) !important; }
+html[data-theme="midnight"] .panel,
+html[data-theme="midnight"] .brand-badge,
+html[data-theme="midnight"] .account-card,
+html[data-theme="midnight"] [class*="bg-[#f8f3ea]"],
+html[data-theme="midnight"] [class*="bg-[#fffdf8]"],
+html[data-theme="midnight"] [class*="bg-white"],
+html[data-theme="midnight"] [class*="bg-[#f4f9e9]"] { background-color: var(--mid-surface) !important; color: var(--mid-text) !important; }
+html[data-theme="midnight"] [class*="bg-[#f4f0e6]"] { color: var(--mid-text) !important; }
+html[data-theme="midnight"] [class*="bg-[#fff0b8]"],
+html[data-theme="midnight"] [class*="bg-[#fff8dd]"],
+html[data-theme="midnight"] [class*="bg-[#ffd166]"] { background-color: var(--mid-warning-soft) !important; color: var(--mid-text) !important; }
+html[data-theme="midnight"] [class*="bg-[#ffe0de]"],
+html[data-theme="midnight"] [class*="bg-[#fff0f0]"] { background-color: var(--mid-danger-soft) !important; color: #ffd7d8 !important; }
+html[data-theme="midnight"] [class*="bg-[#d9ff9f]"],
+html[data-theme="midnight"] [class*="bg-[#edffd5]"],
+html[data-theme="midnight"] [class*="bg-[#ecf5df]"],
+html[data-theme="midnight"] [class*="bg-[#c5ff6f]"] { background-color: var(--mid-accent-soft) !important; color: var(--mid-text) !important; }
+html[data-theme="midnight"] [class*="bg-[#9fe3ff]"] { background-color: var(--mid-blue-soft) !important; color: #c9eaff !important; }
+html[data-theme="midnight"] [class*="bg-[#ff90e8]"] { background-color: var(--mid-pink-soft) !important; color: #f5c9e8 !important; }
+html[data-theme="midnight"] [class*="bg-black"] { background-color: #070809 !important; }
+
+/* Compact, quiet edges replace the original high-contrast outlines and block shadows. */
+html[data-theme="midnight"] [class*="border-black"],
+html[data-theme="midnight"] [class*="border-white"],
+html[data-theme="midnight"] .panel,
+html[data-theme="midnight"] .brand-badge { border-color: var(--mid-border) !important; }
+html[data-theme="midnight"] [class*="shadow-"] { box-shadow: 0 8px 24px rgb(0 0 0 / .24) !important; }
+html[data-theme="midnight"] [class*="text-black"] { color: var(--mid-text) !important; }
+html[data-theme="midnight"] [class*="text-black/"] { color: var(--mid-secondary) !important; }
+html[data-theme="midnight"] [class*="text-white"] { color: var(--mid-text) !important; }
+html[data-theme="midnight"] [class*="text-white/"] { color: var(--mid-secondary) !important; }
+html[data-theme="midnight"] .pill { background: var(--mid-accent-soft) !important; color: var(--mid-accent) !important; border-color: rgb(184 236 105 / .28) !important; }
+html[data-theme="midnight"] .theme-toggle { background: var(--mid-surface) !important; border-color: var(--mid-border) !important; color: var(--mid-text) !important; }
+html[data-theme="midnight"] .theme-select,
+html[data-theme="midnight"] .auth-primary,
+html[data-theme="midnight"] .f-primary,
+html[data-theme="midnight"] .g-primary,
+html[data-theme="midnight"] .app-menu-toggle,
+html[data-theme="midnight"] button[class*="bg-[#c5ff6f]"] { background: var(--mid-accent) !important; color: var(--mid-accent-text) !important; border-color: var(--mid-accent) !important; }
+html[data-theme="midnight"] :where(button,a,summary,input,select,textarea):focus-visible { outline: 2px solid var(--mid-accent) !important; outline-offset: 3px; }
+html[data-theme="midnight"] button:disabled { opacity: .46; }
+html[data-theme="midnight"] [aria-pressed="true"],
+html[data-theme="midnight"] [aria-current="page"] { background-color: var(--mid-accent-soft) !important; color: var(--mid-accent) !important; border-color: rgb(184 236 105 / .48) !important; }
+
+/* Forms, native popups and data-heavy components. */
+html[data-theme="midnight"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+html[data-theme="midnight"] textarea,
+html[data-theme="midnight"] select,
+html[data-theme="midnight"] .field-input { background-color: #0b0e12 !important; color: var(--mid-text) !important; border-color: var(--mid-border-strong) !important; caret-color: var(--mid-accent); }
+html[data-theme="midnight"] input::placeholder,
+html[data-theme="midnight"] textarea::placeholder { color: var(--mid-muted) !important; opacity: 1; }
+html[data-theme="midnight"] select option { background: var(--mid-raised); color: var(--mid-text); }
+html[data-theme="midnight"] input[type="checkbox"],
+html[data-theme="midnight"] input[type="radio"] { accent-color: var(--mid-accent); }
+html[data-theme="midnight"] input[type="date"] { color-scheme: dark; }
+html[data-theme="midnight"] input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(.82); }
+html[data-theme="midnight"] dialog,
+html[data-theme="midnight"] [role="dialog"] { background: var(--mid-raised); color: var(--mid-text); border-color: var(--mid-border-strong); box-shadow: 0 20px 70px rgb(0 0 0 / .56) !important; }
+html[data-theme="midnight"] dialog::backdrop { background: rgb(0 0 0 / .72); }
+html[data-theme="midnight"] table { color: var(--mid-text); }
+html[data-theme="midnight"] th { color: var(--mid-secondary); }
+html[data-theme="midnight"] td { border-color: var(--mid-border) !important; }
+html[data-theme="midnight"] tr:hover td { background-color: #171c22; }
+html[data-theme="midnight"] hr { border-color: var(--mid-border); }
+html[data-theme="midnight"] ::-webkit-scrollbar { width: 10px; height: 10px; }
+html[data-theme="midnight"] ::-webkit-scrollbar-track { background: var(--mid-bg); }
+html[data-theme="midnight"] ::-webkit-scrollbar-thumb { background: #343b45; border: 2px solid var(--mid-bg); border-radius: 999px; }
+html[data-theme="midnight"] ::-webkit-scrollbar-thumb:hover { background: #566170; }
+html[data-theme="midnight"] { scrollbar-color: #343b45 var(--mid-bg); }
+
+/* Shared navigation and identity. User photographs and food images are untouched. */
+html[data-theme="midnight"] .app-navigation { background: var(--mid-surface); border-color: var(--mid-border); color: var(--mid-text); }
+html[data-theme="midnight"] .app-navigation-content,
+html[data-theme="midnight"] .mobile-section-nav { background: rgb(16 19 23 / .98); border-color: var(--mid-border); color: var(--mid-text); }
+html[data-theme="midnight"] .app-menu-backdrop { background: rgb(0 0 0 / .72); }
+html[data-theme="midnight"] .account-readonly,
+html[data-theme="midnight"] .mobile-section-nav > *,
+html[data-theme="midnight"] .app-navigation-list > a,
+html[data-theme="midnight"] .app-navigation-related > a { background-color: var(--mid-raised); color: var(--mid-text); border-color: var(--mid-border); }
+html[data-theme="midnight"] .global-scroll-controls button { background: var(--mid-raised); color: var(--mid-text); border-color: var(--mid-border-strong); box-shadow: 0 6px 18px rgb(0 0 0 / .38); }
+html[data-theme="midnight"] .brand-badge img,
+html[data-theme="midnight"] header a[aria-label="C Board intro"] img { filter: brightness(0) invert(1); }
+html[data-theme="midnight"] .account-avatar { background: var(--mid-accent-soft); color: var(--mid-accent); border-color: var(--mid-border-strong); box-shadow: none; }
+
+/* Finance's scoped stylesheet uses its own palette, so map its components intentionally. */
+html[data-theme="midnight"] .finance { color: var(--mid-text); --f-blue: var(--mid-blue-soft); --f-green: var(--mid-accent-soft); --f-pink: var(--mid-pink-soft); --f-amber: var(--mid-warning-soft); --f-scroll-surface: var(--mid-surface); --f-scroll-track: var(--mid-bg); --f-scroll-thumb: #46515e; --f-scroll-thumb-hover: #697585; }
+html[data-theme="midnight"] .finance :is(.f-card,.f-stat,.f-item,.f-dialog,.f-kbd,.f-table td) { background: var(--mid-surface) !important; color: var(--mid-text) !important; border-color: var(--mid-border) !important; }
+html[data-theme="midnight"] .finance .f-stat[data-tone="green"], html[data-theme="midnight"] .finance .f-cashflow-result { background: var(--mid-accent-soft) !important; }
+html[data-theme="midnight"] .finance .f-stat[data-tone="blue"] { background: var(--mid-blue-soft) !important; }
+html[data-theme="midnight"] .finance .f-stat[data-tone="pink"] { background: var(--mid-pink-soft) !important; }
+html[data-theme="midnight"] .finance .f-stat[data-tone="amber"] { background: var(--mid-warning-soft) !important; }
+html[data-theme="midnight"] .finance :is(.f-button,.f-icon,.f-tabs button,.f-mobile-tabs>button) { background: var(--mid-raised); color: var(--mid-text); border-color: var(--mid-border-strong); box-shadow: none; }
+html[data-theme="midnight"] .finance :is(.f-primary,.f-mobile-tab-picker select) { background: var(--mid-accent); color: var(--mid-accent-text); border-color: var(--mid-accent); box-shadow: none; }
+html[data-theme="midnight"] .finance :is(.f-form input,.f-form select,.f-form textarea,.f-input,.f-mobile-tab-picker select) { background-color: #0b0e12; color: var(--mid-text); border-color: var(--mid-border-strong); }
+html[data-theme="midnight"] .finance .f-header p,
+html[data-theme="midnight"] .finance .f-meta,
+html[data-theme="midnight"] .finance .f-help,
+html[data-theme="midnight"] .finance .f-empty,
+html[data-theme="midnight"] .finance .f-stat span,
+html[data-theme="midnight"] .finance .f-table th { color: var(--mid-secondary); }
+html[data-theme="midnight"] .finance .f-progress { background: var(--mid-soft); border-color: var(--mid-border-strong); }
+html[data-theme="midnight"] .finance .f-positive { color: var(--mid-success); }
+html[data-theme="midnight"] .finance .f-negative { color: var(--mid-danger); }
+html[data-theme="midnight"] .finance .f-dialog::backdrop { background: rgb(0 0 0 / .74); }
+
+/* Groceries, Recipes, diary and OCR use scoped light styles outside Tailwind. */
+html[data-theme="midnight"] .groceries { color: var(--mid-text); --g-green: var(--mid-accent); --g-border: var(--mid-border); }
+html[data-theme="midnight"] .groceries p,
+html[data-theme="midnight"] .groceries .g-stats span,
+html[data-theme="midnight"] .groceries .g-group h2 small { color: var(--mid-secondary); }
+html[data-theme="midnight"] .groceries :is(button,.g-hint,.g-thumb,.g-stats button,.g-row,.g-card,.g-dialog,.g-list > *, .food-library-table-wrap) { background-color: var(--mid-surface) !important; color: var(--mid-text) !important; border-color: var(--mid-border) !important; }
+html[data-theme="midnight"] .groceries button:hover { background: var(--mid-soft) !important; }
+html[data-theme="midnight"] .groceries .g-primary { background: var(--mid-accent) !important; color: var(--mid-accent-text) !important; border-color: var(--mid-accent) !important; }
+html[data-theme="midnight"] .groceries .g-tabs button[aria-pressed="true"] { background: var(--mid-accent-soft) !important; color: var(--mid-accent) !important; }
+html[data-theme="midnight"] .groceries :is(input:not([type="checkbox"]),select,textarea) { background: #0b0e12 !important; border-color: var(--mid-border-strong) !important; color: var(--mid-text) !important; }
+html[data-theme="midnight"] .groceries :focus-visible { outline-color: var(--mid-accent); }
+html[data-theme="midnight"] .note-editor:empty::before { color: var(--mid-muted); }
+html[data-theme="midnight"] .note-editor blockquote { background: var(--mid-warning-soft); border-color: var(--mid-warning); }
+html[data-theme="midnight"] .note-editor pre { background: #070809; border-color: var(--mid-border); color: var(--mid-text); }
+html[data-theme="midnight"] .note-editor :is(img,video,.note-media-block) { background: var(--mid-surface); border-color: var(--mid-border); }
+html[data-theme="midnight"] .auth-screen .auth-title { color: var(--mid-text) !important; }
+html[data-theme="midnight"] .auth-screen .auth-intro { color: var(--mid-secondary) !important; }
+html[data-theme="midnight"] .auth-screen .auth-message { background: var(--mid-raised); color: var(--mid-text); border-color: var(--mid-border); }
+html[data-theme="midnight"] .auth-screen .auth-error { background: var(--mid-danger-soft); color: #ffd7d8; }
+html[data-theme="midnight"] .auth-screen .auth-success { background: var(--mid-success-soft); color: #c4efcb; }
+html[data-theme="midnight"] .auth-show-password,
+html[data-theme="midnight"] .account-secondary { background: var(--mid-raised); color: var(--mid-text); border-color: var(--mid-border-strong); box-shadow: none; }
+html[data-theme="midnight"] .nutrition-targets { background: var(--mid-surface) !important; color: var(--mid-text) !important; border-color: var(--mid-border-strong) !important; box-shadow: 0 12px 30px rgb(0 0 0 / .2); }
+html[data-theme="midnight"] .nutrition-targets :is(h2,p,label,span) { color: var(--mid-text); }
+html[data-theme="midnight"] .nutrition-targets :is(button,a) { background: var(--mid-raised); color: var(--mid-text); border-color: var(--mid-border-strong); }
+html[data-theme="midnight"] .nutrition-targets :is(button[type="submit"],.nutrition-targets-heading-actions a) { background: var(--mid-accent); color: var(--mid-accent-text); border-color: var(--mid-accent); }
+
+/* Charts: keep semantic series colors, tune labels, grids, axes and tooltip surfaces. */
+html[data-theme="midnight"] .recharts-cartesian-grid line,
+html[data-theme="midnight"] .recharts-cartesian-axis-line,
+html[data-theme="midnight"] .recharts-reference-line line { stroke: var(--mid-border-strong) !important; }
+html[data-theme="midnight"] .recharts-cartesian-axis-tick-value,
+html[data-theme="midnight"] .recharts-label,
+html[data-theme="midnight"] .recharts-legend-item-text { fill: var(--mid-secondary) !important; color: var(--mid-secondary) !important; }
+html[data-theme="midnight"] .recharts-tooltip-wrapper .recharts-default-tooltip { background: var(--mid-raised) !important; border: 1px solid var(--mid-border-strong) !important; color: var(--mid-text) !important; box-shadow: 0 12px 30px rgb(0 0 0 / .45); }
+html[data-theme="midnight"] .recharts-default-tooltip .recharts-tooltip-label,
+html[data-theme="midnight"] .recharts-default-tooltip .recharts-tooltip-item { color: var(--mid-text) !important; }
+html[data-theme="midnight"] .tracker-stat-card { color: var(--mid-text); box-shadow: inset 0 0 0 1px var(--mid-border) !important; }
+html[data-theme="midnight"] .tracker-stat-card span { background: var(--mid-raised); border-color: var(--mid-border); color: var(--mid-text); }
+
+/* Toasts keep status hues restrained and readable. */
+html[data-theme="midnight"] [data-sonner-toast].cboard-toast { background: #171b21 !important; color: var(--mid-text) !important; border-color: var(--mid-border-strong) !important; box-shadow: 0 10px 28px rgb(0 0 0 / .38) !important; }
+html[data-theme="midnight"] [data-sonner-toast][data-type="success"].cboard-toast { background: var(--mid-success-soft) !important; border-color: #477b50 !important; }
+html[data-theme="midnight"] [data-sonner-toast][data-type="error"].cboard-toast { background: var(--mid-danger-soft) !important; border-color: #9e555d !important; }
+html[data-theme="midnight"] [data-sonner-toast][data-type="warning"].cboard-toast { background: var(--mid-warning-soft) !important; border-color: #887447 !important; }
+
+@media (prefers-reduced-motion: no-preference) {
+  html[data-theme="midnight"] body,
+  html[data-theme="midnight"] :where(button,a,.panel,.f-card,.g-row) { transition-property: color, background-color, border-color, box-shadow, transform; transition-duration: 150ms; }
+}

@@ -1,16 +1,14 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { resolveStoredTheme } from './themePreferences.js';
 
 const ThemeContext = createContext(null);
 const THEME_STORAGE_KEY = 'cboard-theme';
-const appThemes = ['original', 'matrix'];
-
 function getStoredTheme() {
   if (typeof window === 'undefined') {
     return 'original';
   }
 
-  const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
-  return appThemes.includes(storedTheme) ? storedTheme : 'original';
+  return resolveStoredTheme(window.localStorage.getItem(THEME_STORAGE_KEY));
 }
 
 function applyTheme(theme) {
@@ -20,6 +18,9 @@ function applyTheme(theme) {
 
   document.documentElement.dataset.theme = theme;
   document.documentElement.classList.toggle('theme-matrix', theme === 'matrix');
+  document.documentElement.classList.toggle('theme-midnight', theme === 'midnight');
+  const themeColor = document.querySelector('meta[name="theme-color"]');
+  if (themeColor) themeColor.content = theme === 'midnight' ? '#080a0c' : theme === 'matrix' ? '#000000' : '#f4f0e6';
 }
 
 export function ThemeProvider({ children }) {
@@ -34,10 +35,9 @@ export function ThemeProvider({ children }) {
     theme,
     setTheme,
     isMatrixTheme: theme === 'matrix',
+    isMidnightTheme: theme === 'midnight',
     toggleTheme: () => {
-      setTheme((currentTheme) =>
-        currentTheme === 'matrix' ? 'original' : 'matrix',
-      );
+      setTheme(currentTheme => currentTheme === 'original' ? 'matrix' : currentTheme === 'matrix' ? 'midnight' : 'original');
     },
   }), [theme]);
 

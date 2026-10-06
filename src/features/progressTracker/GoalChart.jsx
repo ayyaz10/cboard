@@ -133,13 +133,21 @@ function BinaryHeatmap({ goal, entries }) {
 }
 
 export function GoalChart({ goal, entries }) {
-  const { isMatrixTheme } = useTheme();
+  const { isMatrixTheme, isMidnightTheme } = useTheme();
 
   if (!goal) {
     return null;
   }
 
-  const chartTheme = isMatrixTheme
+  const chartTheme = isMidnightTheme ? {
+    axis: '#aab2bd',
+    grid: '#343a43',
+    target: '#b8ec69',
+    cumulative: '#d7dde5',
+    dotFill: '#b8ec69',
+    stroke: '#101318',
+    metricColors: { lime: '#b8ec69', blue: '#83c9ff', violet: '#c7a3ff', yellow: '#e7c36e', coral: '#f08d91', pink: '#e39acb' },
+  } : isMatrixTheme
     ? {
       axis: '#d9ffd9',
       grid: '#00a812',
