@@ -68,7 +68,7 @@ function notifyUser(title, body) {
   }
 }
 
-function FocusCompleteModal({ isOpen, session, onStartBreak, onSkipBreak, onFinishSession }) {
+function FocusCompleteModal({ isOpen, session, onStartBreak, onSkipBreak, onFinishSession, onClose }) {
   if (!isOpen || !session) {
     return null;
   }
@@ -77,6 +77,7 @@ function FocusCompleteModal({ isOpen, session, onStartBreak, onSkipBreak, onFini
     <div
       className="fixed inset-0 z-40 flex items-center justify-center bg-black/35 px-4 py-6"
       role="presentation"
+      onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}
     >
       <section
         role="dialog"
@@ -84,7 +85,7 @@ function FocusCompleteModal({ isOpen, session, onStartBreak, onSkipBreak, onFini
         aria-labelledby="focus-complete-title"
         className="w-full max-w-lg rounded-[1.75rem] border-2 border-black bg-[#fffdf8] p-5 text-black shadow-[8px_8px_0_#000] sm:p-6"
       >
-        <span className="pill">Focus complete</span>
+        <div className="flex items-start justify-between gap-3"><span className="pill">Focus complete</span><button type="button" aria-label="Close popup" onClick={onClose} className="inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-black bg-white text-xl font-bold leading-none shadow-[3px_3px_0_#000] hover:bg-[#c5ff6f]">×</button></div>
         <h2
           id="focus-complete-title"
           className="mt-5 text-3xl font-bold tracking-[-0.05em] text-black"
@@ -688,6 +689,7 @@ export function FocusTimerPage() {
         onStartBreak={handleStartBreak}
         onSkipBreak={handleSkipBreak}
         onFinishSession={handleFinishSession}
+        onClose={() => setShowFocusCompleteModal(false)}
       />
       <ReflectionModal
         isOpen={Boolean(reflectionSession)}

@@ -97,8 +97,8 @@ export function WorkspaceTools({ route, userId }) {
         <p role="status">{message}</p>
       </form>}
     </div>
-    <dialog ref={dialog} className="workspace-switcher" aria-labelledby="switcher-title">
-      <div className="workspace-switcher-heading"><strong id="switcher-title">Open an app</strong><button type="button" onClick={() => dialog.current.close()}>Close</button></div>
+    <dialog ref={dialog} className="workspace-switcher" aria-labelledby="switcher-title" onClick={event => { if (event.target === dialog.current) dialog.current.close(); }}>
+      <div className="workspace-switcher-heading"><strong id="switcher-title">Open an app</strong><button type="button" aria-label="Close popup" onClick={() => dialog.current.close()}>×</button></div>
       <input ref={input} aria-label="Search apps" role="combobox" aria-expanded="true" aria-controls="app-results" aria-activedescendant={matches[active] ? `app-result-${active}` : undefined} autoComplete="off" value={query} onChange={event => { setQuery(event.target.value); setActive(0); }} onKeyDown={event => {
         if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setActive(index => matches.length ? (index + (event.key === 'ArrowDown' ? 1 : matches.length - 1)) % matches.length : 0); }
         if (event.key === 'Enter' && matches[active]) { event.preventDefault(); choose(matches[active]); }

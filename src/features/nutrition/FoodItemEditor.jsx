@@ -51,8 +51,8 @@ export function FoodItemEditor({ catalog, onSave, onClose, initial = null }) {
     finally { lock.current = false; setBusy(false); }
   }
   const nutrientFields = rows => <div className="g-nutrition-grid">{rows.map(([key, label, unit]) => <label key={key}>{label} ({unit})<input type="number" min="0" step="any" value={draft.nutrition[key] ?? ''} onChange={event => setDraft({ ...draft, nutrition: { ...draft.nutrition, [key]: event.target.value === '' ? null : Number(event.target.value) } })} /></label>)}</div>;
-  return <dialog ref={dialog} className="g-dialog groceries" aria-labelledby="food-item-title" onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}>
-    <h2 id="food-item-title">{initial ? 'Edit food item' : 'Add food item'}</h2>
+  return <dialog ref={dialog} className="g-dialog groceries" aria-labelledby="food-item-title" onCancel={event => { event.preventDefault(); if (!busy) onClose(); }} onClick={event => { if (event.target === dialog.current && !busy) onClose(); }}>
+    <div className="g-between"><h2 id="food-item-title">{initial ? 'Edit food item' : 'Add food item'}</h2><button type="button" aria-label="Close popup" disabled={busy} onClick={onClose}>×</button></div>
     <p>Save a single food to your shared library. Search for it later in Food Diary, Recipes or Groceries. No recipe is created.</p>
     <div className="g-actions">{[['manual', 'Manual'], ['ai', 'AI text'], ['json', 'JSON'], ['lookup', 'Open Food Facts / barcode']].map(([key, label]) => <button type="button" key={key} disabled={busy} aria-pressed={mode === key} onClick={() => { setMode(key); setError(''); }}>{label}</button>)}</div>
     {error && <p role="alert">{error}</p>}
@@ -108,6 +108,6 @@ export function FoodItemEditor({ catalog, onSave, onClose, initial = null }) {
       </fieldset>
       <button type="submit" className="g-primary" disabled={busy}>{busy ? 'Saving...' : 'Save food item'}</button>
     </form>}
-    <button type="button" disabled={busy} onClick={onClose}>Close</button>
+    <button type="button" disabled={busy} onClick={onClose}>Cancel</button>
   </dialog>;
 }

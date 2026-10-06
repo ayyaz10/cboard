@@ -35,8 +35,8 @@ const nonNegativeMoney = value => /^0+(?:\.0{0,2})?$/.test(String(value).trim())
 function Dialog({ title, close, children }) {
   const ref = useRef(null);
   useEffect(() => { ref.current?.showModal(); }, []);
-  return <dialog ref={ref} className="f-dialog" onCancel={close} onClose={close} aria-labelledby="f-dialog-title">
-    <div className="f-between"><h2 id="f-dialog-title">{title}</h2><button className={btn} type="button" onClick={close} aria-label="Close dialog">Close</button></div>
+  return <dialog ref={ref} className="f-dialog" onCancel={close} onClose={close} onClick={event => { if (event.target === ref.current) close(); }} aria-labelledby="f-dialog-title">
+    <div className="f-between"><h2 id="f-dialog-title">{title}</h2><button className={btn} type="button" onClick={close} aria-label="Close dialog">×</button></div>
     {children}
   </dialog>;
 }

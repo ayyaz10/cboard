@@ -608,6 +608,7 @@ function RecipesContent({ route, navigationPath }) {
         {!importing && <button type="button" className="recipe-mobile-add" onClick={() => startImport()}>＋ Add recipe</button>}
         <dialog
           ref={dialog}
+          onClick={event => { if (event.target === dialog.current && !busy) { dialog.current.close(); setRemoving(null); setConfirmBulkDelete(false); } }}
           onCancel={(event) => {
             if (busy || recipeCleanup) event.preventDefault();
             else { setRemoving(null); setConfirmBulkDelete(false); }
@@ -618,6 +619,7 @@ function RecipesContent({ route, navigationPath }) {
           className="panel fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-md border-black p-6 text-black backdrop:bg-black/35"
           aria-labelledby="recipe-delete-title"
         >
+          <button type="button" aria-label="Close popup" disabled={busy} onClick={() => { dialog.current?.close(); setRemoving(null); setConfirmBulkDelete(false); }} className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-black bg-white text-xl font-bold leading-none shadow-[3px_3px_0_#000] hover:bg-[#c5ff6f]">×</button>
           <h2 id="recipe-delete-title" className="text-2xl font-bold">
             {recipeCleanup ? 'Recipe deleted' : confirmBulkDelete ? `Delete ${deletingInDialog.length} selected recipe${deletingInDialog.length === 1 ? '' : 's'}?` : `Delete “${removing?.title}”?`}
           </h2>

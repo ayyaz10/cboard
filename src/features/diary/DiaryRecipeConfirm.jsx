@@ -12,8 +12,8 @@ export function DiaryRecipeConfirm({ meal, initial, recipes, busy, error, diaryS
   const [servings, setServings] = useState(1);
   const [steps, setSteps] = useState('');
   useEffect(() => { dialog.current.showModal(); }, []);
-  return <dialog ref={dialog} className="g-dialog groceries diary-recipe-confirm" onCancel={event => { event.preventDefault(); if (!busy) onClose(); }}>
-    <h2>Save this meal to Recipes?</h2>
+  return <dialog ref={dialog} className="g-dialog groceries diary-recipe-confirm" onCancel={event => { event.preventDefault(); if (!busy) onClose(); }} onClick={event => { if (event.target === dialog.current && !busy) onClose(); }}>
+    <div className="g-between"><h2>Save this meal to Recipes?</h2><button type="button" aria-label="Close popup" disabled={busy} onClick={onClose}>×</button></div>
     <p>Your diary can be saved on its own. To change a recipe, choose it below and select the foods to add or update.</p>
     {diarySaved && <p role="status">Your diary meal is saved.{recipeSaved ? ' The recipe is also saved.' : ''}</p>}
     {error && <p role="alert">{error}</p>}

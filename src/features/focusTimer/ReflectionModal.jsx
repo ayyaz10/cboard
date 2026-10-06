@@ -57,6 +57,7 @@ export function ReflectionModal({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-6"
       role="presentation"
+      onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}
     >
       <form
         onSubmit={handleSubmit}
@@ -73,7 +74,7 @@ export function ReflectionModal({
             aria-label="Close reflection"
             className="inline-flex h-8 w-8 items-center justify-center rounded-full border-2 border-black bg-white text-lg font-bold leading-none text-black shadow-[3px_3px_0_#000]"
           >
-            x
+            ×
           </button>
         </div>
 

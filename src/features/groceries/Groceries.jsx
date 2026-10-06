@@ -138,10 +138,10 @@ function Modal({ title, close, children, error }) {
     ref.current.showModal();
   }, []);
   return (
-    <dialog className="g-dialog groceries" ref={ref} onCancel={close}>
+    <dialog className="g-dialog groceries" ref={ref} onCancel={event => { event.preventDefault(); close(); }} onClick={event => { if (event.target === ref.current) close(); }}>
       <div className="g-between">
         <h2>{title}</h2>
-        <button aria-label="Close dialog" onClick={close}>
+        <button type="button" aria-label="Close popup" onClick={close}>
           ✕
         </button>
       </div>
