@@ -17,7 +17,7 @@ body:has(.workspace-tools) .page-shell { padding-top: 60px; }
 @media (max-width: 47.99rem) {
   .workspace-tools { left: 12px; right: auto; top: 16px; }
   .workspace-note { left: 0; right: auto; }
-  body:has(.workspace-tools) .page-shell { padding-top: 80px; }
+  body:has(.workspace-tools) .page-shell { padding-top: calc(7rem + env(safe-area-inset-top)); }
 }
 html[data-theme="matrix"] .workspace-tools, html[data-theme="matrix"] .workspace-switcher { color: var(--matrix-text); }
 html[data-theme="matrix"] .workspace-note, html[data-theme="matrix"] .workspace-switcher, html[data-theme="matrix"] .workspace-tools button, html[data-theme="matrix"] .workspace-switcher button { background: var(--matrix-surface-raised); }

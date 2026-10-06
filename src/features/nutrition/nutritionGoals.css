@@ -91,7 +91,10 @@ html[data-theme=matrix] .macro-target-result[data-valid=false] { border-color: #
 html[data-theme=matrix] .macro-target-help { color: var(--matrix-muted); }
 
 @media (max-width: 720px) {
-  .macro-target-grid, .macro-custom-grid { grid-template-columns: 1fr; }
+  .nutrition-basics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .macro-target-grid, .macro-custom-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .nutrition-targets { padding: 16px; }
   .macro-preset-field { width: 100%; }
+  .macro-target-item { padding: 10px; }
+  .macro-target-item-heading { flex-wrap: wrap; }
 }

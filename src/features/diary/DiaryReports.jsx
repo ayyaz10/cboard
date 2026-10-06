@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import {
+  diaryTotals,
   dailyCalorieReport,
   shiftDate,
   weeklyCalorieReport,
@@ -26,6 +27,10 @@ export function DiaryReports({ days, date, today, goals, disabled, onSelectDate 
   const daily = useMemo(
     () => dailyCalorieReport(selectedDay, target),
     [selectedDay, target],
+  );
+  const selectedTotals = useMemo(
+    () => diaryTotals(selectedDay?.meals || []),
+    [selectedDay],
   );
   const weekly = useMemo(
     () => weeklyCalorieReport(days, date, target),
@@ -85,6 +90,39 @@ export function DiaryReports({ days, date, today, goals, disabled, onSelectDate 
               <div><dt>Daily calorie target</dt><dd>{daily.target == null ? "Not set" : number(daily.target)}</dd></div>
               <div className="diary-report-balance"><dt>Calories {daily.balance != null && daily.balance < 0 ? "over" : "remaining"}</dt><dd>{daily.balance == null ? "—" : number(Math.abs(daily.balance))}</dd></div>
             </dl>
+          </div>
+          <div className="diary-report-nutrients" aria-label="Daily macro and fibre progress">
+            {[
+              ["protein", "Protein", "g"],
+              ["carbs", "Carbohydrates", "g"],
+              ["fat", "Fat", "g"],
+              ["fiber", "Fibre", "g"],
+            ].map(([key, label, unit]) => {
+              const total = selectedTotals[key];
+              const nutrientTarget = goals?.[key];
+              const hasValue = total.known > 0;
+              const percent = nutrientTarget > 0 && hasValue
+                ? Math.min(100, (total.value / nutrientTarget) * 100)
+                : 0;
+              return (
+                <article className="diary-report-nutrient" data-nutrient={key} key={key}>
+                  <div className="diary-report-nutrient-heading">
+                    <strong>{label}</strong>
+                    {nutrientTarget > 0 && <span>{Math.round(percent)}%</span>}
+                  </div>
+                  <p>{hasValue ? number(total.value) : "—"}<small> {unit}</small></p>
+                  {nutrientTarget > 0 ? <>
+                    <div className="diary-report-nutrient-track" role="progressbar" aria-label={`${label} daily target`} aria-valuemin="0" aria-valuemax={nutrientTarget} aria-valuenow={hasValue ? Math.min(total.value, nutrientTarget) : 0}>
+                      <span style={{ width: `${percent}%` }} />
+                    </div>
+                    <small className="diary-report-nutrient-caption">
+                      {hasValue ? `${number(Math.max(0, nutrientTarget - total.value))} ${unit} left` : `Target ${number(nutrientTarget)} ${unit}`}
+                      {total.missing > 0 ? " · partial data" : ""}
+                    </small>
+                  </> : <small className="diary-report-nutrient-caption">{hasValue ? "Logged today" : "No data yet"}</small>}
+                </article>
+              );
+            })}
           </div>
           {daily.missing > 0 && <p className="diary-hint">This is a known subtotal. {daily.missing} food {daily.missing === 1 ? "item has" : "items have"} missing calorie data.</p>}
           {daily.target == null && <p className="diary-hint">Set a daily calorie target above to see remaining and over-budget values.</p>}

@@ -569,6 +569,33 @@
   font-weight: 700;
   color: rgb(0 0 0 / 0.62);
 }
+.diary-report-nutrients {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: .75rem;
+  margin-top: 1.25rem;
+}
+.diary-report-nutrient {
+  --nutrient-accent: var(--diary-accent, #54822b);
+  min-width: 0;
+  padding: .9rem;
+  border: 1px solid var(--g-border);
+  border-top: 3px solid var(--nutrient-accent);
+  border-radius: 1rem;
+  background: var(--g-surface, #fffdf8);
+}
+.diary-report-nutrient[data-nutrient=protein] { --nutrient-accent: #65a84a; }
+.diary-report-nutrient[data-nutrient=carbs] { --nutrient-accent: #428faf; }
+.diary-report-nutrient[data-nutrient=fat] { --nutrient-accent: #c58a2e; }
+.diary-report-nutrient[data-nutrient=fiber] { --nutrient-accent: #8c6bb1; }
+.diary-report-nutrient-heading { display: flex; align-items: center; justify-content: space-between; gap: .4rem; }
+.diary-report-nutrient-heading strong { font-size: .88rem; }
+.diary-report-nutrient-heading > span { color: var(--nutrient-accent); font-size: .75rem; font-weight: 800; }
+.diary-report-nutrient > p { margin: .7rem 0 .55rem; font-size: 1.55rem; font-weight: 800; line-height: 1.1; }
+.diary-report-nutrient > p small { font-size: .78rem; font-weight: 600; }
+.diary-report-nutrient-track { height: .48rem; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--nutrient-accent) 16%, transparent); }
+.diary-report-nutrient-track > span { display: block; height: 100%; border-radius: inherit; background: var(--nutrient-accent); transition: width .2s ease; }
+.diary-report-nutrient-caption { display: block; min-height: 1.1em; margin-top: .45rem; color: var(--g-muted, #666); font-size: .7rem; }
 .diary-report-summary {
   display: grid;
   gap: 0.75rem;
@@ -585,6 +612,11 @@
 }
 .diary-report-balance dd {
   color: var(--diary-accent);
+}
+@media (max-width: 720px) {
+  .diary-report-nutrients { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; }
+  .diary-report-nutrient { padding: .75rem; }
+  .diary-report-nutrient > p { font-size: 1.35rem; }
 }
 .diary-weekly-chart {
   display: grid;

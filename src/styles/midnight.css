@@ -206,6 +206,22 @@ html[data-theme="midnight"] .nutrition-targets { background: var(--mid-surface) 
 html[data-theme="midnight"] .nutrition-targets :is(h2,p,label,span) { color: var(--mid-text); }
 html[data-theme="midnight"] .nutrition-targets :is(button,a) { background: var(--mid-raised); color: var(--mid-text); border-color: var(--mid-border-strong); }
 html[data-theme="midnight"] .nutrition-targets :is(button[type="submit"],.nutrition-targets-heading-actions a) { background: var(--mid-accent); color: var(--mid-accent-text); border-color: var(--mid-accent); }
+/* Keep target cards readable when the surrounding section switches to Midnight. */
+html[data-theme="midnight"] .nutrition-targets .macro-target-card,
+html[data-theme="midnight"] .nutrition-targets .macro-custom-panel,
+html[data-theme="midnight"] .nutrition-targets .macro-target-result { background: var(--mid-raised) !important; color: var(--mid-text) !important; border-color: var(--mid-border-strong) !important; }
+html[data-theme="midnight"] .nutrition-targets .macro-target-card :is(h3,p,span,strong,dt,dd,label) { color: var(--mid-text); }
+html[data-theme="midnight"] .nutrition-targets .macro-target-card .macro-target-help,
+html[data-theme="midnight"] .nutrition-targets .macro-target-card .macro-target-kicker,
+html[data-theme="midnight"] .nutrition-targets .macro-target-card dt { color: var(--mid-secondary) !important; }
+html[data-theme="midnight"] .nutrition-targets .macro-target-item { background: #17191d !important; color: var(--mid-text) !important; border-color: var(--mid-border-strong) !important; box-shadow: none !important; }
+html[data-theme="midnight"] .nutrition-targets .macro-target-item[data-macro="protein"] { border-top: 3px solid #83bd70 !important; }
+html[data-theme="midnight"] .nutrition-targets .macro-target-item[data-macro="carbs"] { border-top: 3px solid #73b9d6 !important; }
+html[data-theme="midnight"] .nutrition-targets .macro-target-item[data-macro="fat"] { border-top: 3px solid #e4b65c !important; }
+html[data-theme="midnight"] .nutrition-targets .macro-target-item-heading button,
+html[data-theme="midnight"] .nutrition-targets .macro-mode-label { background: #22262c !important; color: var(--mid-text) !important; border-color: var(--mid-border-strong) !important; }
+html[data-theme="midnight"] .nutrition-targets .macro-target-item-heading button[aria-pressed="true"] { background: var(--mid-accent) !important; color: var(--mid-accent-text) !important; }
+html[data-theme="midnight"] .nutrition-targets .macro-grams-field input { background: #0a0c0f !important; color: var(--mid-text) !important; border-color: var(--mid-border-strong) !important; }
 
 /* Charts: keep semantic series colors, tune labels, grids, axes and tooltip surfaces. */
 html[data-theme="midnight"] .recharts-cartesian-grid line,
@@ -326,6 +342,8 @@ html[data-theme="midnight"] .food-diary :is(.diary-sources-intro p,.diary-source
 html[data-theme="midnight"] .food-diary :is(.diary-source-count,.diary-view-tabs button[aria-selected="true"],.diary-report-tabs button[aria-selected="true"],.diary-copy-option:hover,.diary-food-suggestions button:hover,.diary-food-suggestions button.is-active) { background: var(--mid-accent-soft) !important; color: var(--mid-text) !important; border-color: #704326 !important; }
 html[data-theme="midnight"] .food-diary :is(.diary-find-food-button,.diary-manual-food-button,.diary-primary) { background: var(--mid-accent) !important; color: var(--mid-accent-text) !important; border-color: var(--mid-accent) !important; box-shadow: none !important; }
 html[data-theme="midnight"] .food-diary :is(.diary-source-warning,.diary-partial-nutrition) { background: var(--mid-warning-soft) !important; color: #f1c99f !important; border-color: #6b482c !important; }
+html[data-theme="midnight"] .food-diary .diary-report-nutrient { background: var(--mid-raised) !important; color: var(--mid-text) !important; border-color: var(--mid-border) !important; border-top-color: var(--nutrient-accent) !important; }
+html[data-theme="midnight"] .food-diary .diary-report-nutrient-caption { color: var(--mid-secondary) !important; }
 html[data-theme="midnight"] .food-diary :is(.diary-source-track,.diary-week-track) { background: var(--mid-soft) !important; }
 html[data-theme="midnight"] .diary-week-track > span { background: var(--mid-sage) !important; }
 html[data-theme="midnight"] .diary-week-track > span.is-over { background: var(--mid-danger) !important; }
