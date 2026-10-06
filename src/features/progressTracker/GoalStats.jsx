@@ -19,42 +19,30 @@ function ProgressBar({ percentage }) {
   const width = Number.isFinite(percentage) ? Math.min(100, Math.max(0, percentage)) : 0;
 
   return (
-    <div className="mt-4 h-4 overflow-hidden rounded-full border-2 border-white bg-white/15">
-      <div
-        className="h-full rounded-full bg-[#c5ff6f]"
-        style={{ width: `${width}%` }}
-      />
+    <div className="ui-progress-track mt-4 h-4">
+      <div className="ui-progress-fill" style={{ width: `${width}%` }} />
     </div>
   );
 }
 
 function StatGrid({ stats }) {
-  const colorKeyByHex = {
-    '#c5ff6f': 'lime',
-    '#9fe3ff': 'cyan',
-    '#ff90e8': 'pink',
-    '#ffd166': 'amber',
-    '#fffdf8': 'paper',
-  };
-
   return (
     <div className="mt-5 grid grid-cols-[repeat(auto-fit,minmax(13.5rem,1fr))] gap-3">
       {stats.map((stat) => {
-        const colorKey = stat.colorKey || colorKeyByHex[stat.color] || 'paper';
+        const colorKey = stat.colorKey || 'neutral';
 
         return (
           <article
             key={stat.label}
-            className="tracker-stat-card flex min-h-36 flex-col justify-between rounded-[1.35rem] border-2 border-black p-4"
+            className="ui-card tracker-stat-card flex min-h-36 flex-col justify-between p-4"
             data-stat-color={colorKey}
-            style={{ backgroundColor: `var(--tracker-stat-${colorKey}, ${stat.color})` }}
           >
             <div className="flex items-start justify-between gap-2">
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-black/55">
                 {stat.label}
               </p>
               {stat.unit ? (
-                <span className="shrink-0 rounded-full border-2 border-black bg-white px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.1em] text-black">
+                <span className="ui-badge shrink-0 px-2.5 py-0.5 text-[10px] uppercase tracking-[0.1em]">
                   {stat.unit}
                 </span>
               ) : null}
@@ -76,8 +64,8 @@ function StatGrid({ stats }) {
 
 function TargetSummary({ label, heading, detail, percentage, deadline }) {
   return (
-    <article className="mt-5 rounded-[1.5rem] border-2 border-black bg-black p-5 text-white">
-      <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/55">
+    <article className="ui-card tracker-target-summary mt-5 p-5">
+      <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
         {label}
       </p>
       <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
@@ -85,18 +73,18 @@ function TargetSummary({ label, heading, detail, percentage, deadline }) {
           <p className="text-4xl font-bold tracking-[-0.05em]">
             {heading}
           </p>
-          <p className="mt-2 text-sm font-bold uppercase tracking-[0.14em] text-white/70">
+          <p className="mt-2 text-sm font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
             {detail}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           {Number.isFinite(percentage) ? (
-            <span className="rounded-full border-2 border-white bg-[#c5ff6f] px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-black">
+            <span className="ui-badge ui-badge--success text-xs uppercase tracking-[0.14em]">
               {percentage}% complete
             </span>
           ) : null}
           {deadline ? (
-            <span className="rounded-full border-2 border-white bg-[#ffd166] px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-black">
+            <span className="ui-badge ui-badge--warning text-xs uppercase tracking-[0.14em]">
               Due {deadline}
             </span>
           ) : null}
@@ -148,35 +136,35 @@ function buildPerformanceDashboard(goal, entries) {
         value: formatTrackerNumber(stats.latestValue),
         unit,
         detail: stats.latestEntry ? stats.latestEntry.date : stats.mainMetric?.name || 'No entries',
-        color: '#c5ff6f',
+        colorKey: 'accent',
       },
       {
         label: 'Best',
         value: formatTrackerNumber(stats.bestValue),
         unit,
         detail: Number.isFinite(stats.startValue) ? 'Closest logged value to target' : stats.mainMetric?.name || 'Primary metric',
-        color: '#9fe3ff',
+        colorKey: 'info',
       },
       {
         label: 'Average',
         value: formatTrackerNumber(stats.averageValue),
         unit,
         detail: stats.valueCount ? `${stats.valueCount} logged value${stats.valueCount === 1 ? '' : 's'}` : 'No data yet',
-        color: '#ff90e8',
+        colorKey: 'success',
       },
       {
         label: 'Trend',
         value: formatSignedNumber(stats.trendValue),
         unit,
         detail: trendDetail,
-        color: '#ffd166',
+        colorKey: 'warning',
       },
       {
         label: 'Streak',
         value: `${stats.streak}`,
         unit: 'days',
         detail: `day${stats.streak === 1 ? '' : 's'} with entries`,
-        color: '#fffdf8',
+        colorKey: 'neutral',
       },
     ],
   };
@@ -207,34 +195,34 @@ function buildAccumulativeDashboard(goal, entries) {
         value: formatTrackerNumber(stats.totalValue),
         unit,
         detail: unit || 'Cumulative amount',
-        color: '#c5ff6f',
+        colorKey: 'accent',
       },
       {
         label: 'Target',
         value: formatTrackerNumber(goal.targetValue),
         unit,
         detail: unit || 'Completion target',
-        color: '#9fe3ff',
+        colorKey: 'info',
       },
       {
         label: 'Remaining',
         value: formatTrackerNumber(stats.remainingValue),
         unit,
         detail: unit || 'Left to complete',
-        color: '#ff90e8',
+        colorKey: 'success',
       },
       {
         label: 'Progress',
         value: Number.isFinite(stats.progressPercentage) ? `${stats.progressPercentage}%` : '--',
         detail: 'Based on cumulative total',
-        color: '#ffd166',
+        colorKey: 'warning',
       },
       {
         label: 'Streak',
         value: `${stats.streak}`,
         unit: 'days',
         detail: `day${stats.streak === 1 ? '' : 's'} with activity`,
-        color: '#fffdf8',
+        colorKey: 'neutral',
       },
     ],
   };
@@ -267,35 +255,35 @@ function buildBinaryDashboard(goal, entries) {
         value: formatTrackerNumber(stats.totalScore),
         unit,
         detail: `net ${formatSignedNumber(stats.scoreDelta)} from entries`,
-        color: '#c5ff6f',
+        colorKey: 'accent',
       },
       {
         label: 'Target',
         value: formatTrackerNumber(goal.targetValue),
         unit,
         detail: unit || 'Binary target',
-        color: '#9fe3ff',
+        colorKey: 'info',
       },
       {
         label: 'Remaining',
         value: formatTrackerNumber(stats.remainingValue),
         unit,
         detail: unit || 'Left to complete',
-        color: '#ff90e8',
+        colorKey: 'success',
       },
       {
         label: 'Streak',
         value: `${stats.streak}`,
         unit: 'days',
         detail: `completed day${stats.streak === 1 ? '' : 's'} in a row`,
-        color: '#ffd166',
+        colorKey: 'warning',
       },
       {
         label: 'Completion',
         value: stats.completionRate === null ? '--' : `${stats.completionRate}%`,
         unit: 'rate',
         detail: `${stats.totalEntries} logged day${stats.totalEntries === 1 ? '' : 's'}`,
-        color: '#fffdf8',
+        colorKey: 'neutral',
       },
     ],
   };
@@ -304,7 +292,7 @@ function buildBinaryDashboard(goal, entries) {
 export function GoalStats({ goal, entries }) {
   if (!goal) {
     return (
-      <section className="rounded-[1.75rem] border-2 border-black bg-[#fffdf8] p-5 sm:p-6">
+      <section className="ui-panel p-5 sm:p-6">
         <span className="pill">Dashboard</span>
         <h2 className="mt-4 text-3xl font-bold tracking-[-0.05em] text-black">
           Select or create a goal
@@ -325,7 +313,7 @@ export function GoalStats({ goal, entries }) {
       : buildPerformanceDashboard(goal, entries);
 
   return (
-    <section className="rounded-[1.75rem] border-2 border-black bg-[#fffdf8] p-5 sm:p-6">
+    <section className="ui-panel p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
@@ -335,7 +323,7 @@ export function GoalStats({ goal, entries }) {
             {goal.title}
           </h2>
         </div>
-        <span className="rounded-full border-2 border-black bg-[#c5ff6f] px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-black">
+        <span className="ui-badge ui-badge--accent text-xs uppercase tracking-[0.14em]">
           {goalBehaviorTypes[goalType].shortLabel}
         </span>
       </div>

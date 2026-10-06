@@ -564,17 +564,6 @@ html[data-theme="matrix"] {
     color: var(--matrix-muted) !important;
   }
 
-  html[data-theme="matrix"] .tracker-stat-card {
-    color: var(--matrix-text) !important;
-    box-shadow: inset 0 0 0 1px rgba(0, 255, 65, 0.22) !important;
-  }
-
-  html[data-theme="matrix"] .tracker-stat-card span {
-    background-color: var(--matrix-bg) !important;
-    border-color: var(--matrix-border-strong) !important;
-    color: var(--matrix-text) !important;
-  }
-
   html[data-theme="matrix"] .metric-color-pill,
   html[data-theme="matrix"] .entry-choice-card,
   html[data-theme="matrix"] .binary-heatmap-cell {

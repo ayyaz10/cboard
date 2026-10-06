@@ -10,6 +10,23 @@
   .ui-button--lg { min-height:var(--control-height-lg); padding:.85rem 1.25rem; }
   .ui-card { border:var(--border-width-strong) solid var(--color-border); border-radius:var(--radius-card); background:var(--color-surface); color:var(--color-text); box-shadow:var(--shadow-card); }
   .ui-panel { border:var(--border-width-strong) solid var(--color-border); border-radius:var(--radius-panel); background:var(--color-surface); color:var(--color-text); }
+  .tracker-goal-list { background:var(--color-surface-interactive); }
+  .tracker-goal-card { cursor:pointer; box-shadow:var(--shadow-sm); }
+  .tracker-goal-card:hover,.tracker-goal-card:focus-visible,.tracker-goal-card.is-drop-target { transform:translateY(-2px); box-shadow:var(--shadow-card); }
+  .tracker-goal-card:focus-visible { outline:2px solid var(--color-focus); outline-offset:2px; }
+  .tracker-goal-card.is-selected,.tracker-goal-card.is-drop-target { border-color:var(--color-accent); background:var(--color-accent-soft); }
+  .tracker-goal-card.is-dragging { opacity:.6; transform:translate(4px,4px); box-shadow:none; }
+  .tracker-goal-drag.is-dragging { background:var(--color-text); color:var(--color-text-inverse); }
+  .tracker-goal-drag:not(.is-dragging) { background:var(--color-surface-raised); }
+  .tracker-goal-card .ui-button:not(.ui-button--primary) { background:var(--color-surface-raised); color:var(--color-text); }
+  .tracker-target-summary { background:var(--color-surface-interactive); }
+  .tracker-stat-card[data-stat-color="accent"] { background:var(--color-accent-soft); }
+  .tracker-stat-card[data-stat-color="info"] { background:var(--color-info-soft); }
+  .tracker-stat-card[data-stat-color="success"] { background:var(--color-success-soft); }
+  .tracker-stat-card[data-stat-color="warning"] { background:var(--color-warning-soft); }
+  .tracker-stat-card[data-stat-color="neutral"] { background:var(--color-surface-interactive); }
+  .ui-progress-track { height:.5rem; overflow:hidden; border:var(--border-width) solid var(--color-border); border-radius:var(--radius-pill); background:var(--color-surface-raised); }
+  .ui-progress-fill { height:100%; border-radius:inherit; background:var(--color-accent); transition:width .2s ease; }
   .ui-badge { display:inline-flex; align-items:center; border:var(--border-width) solid var(--color-border); border-radius:var(--radius-pill); padding:.2rem .55rem; background:var(--color-surface-interactive); color:var(--color-text-secondary); font-size:var(--font-size-meta); font-weight:var(--font-weight-label); }
   .ui-badge--accent { background:var(--color-accent-soft); color:var(--color-accent); border-color:var(--color-accent); }
   .ui-badge--success { background:var(--color-success-soft); color:var(--color-success); border-color:var(--color-success); }

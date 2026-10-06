@@ -60,8 +60,8 @@ function ProgressStrip({ percentage }) {
   const width = Number.isFinite(percentage) ? Math.min(100, Math.max(0, percentage)) : 0;
 
   return (
-    <div className="h-2 overflow-hidden rounded-full border-2 border-black bg-white">
-      <div className="h-full bg-[#c5ff6f]" style={{ width: `${width}%` }} />
+    <div className="ui-progress-track">
+      <div className="ui-progress-fill" style={{ width: `${width}%` }} />
     </div>
   );
 }
@@ -125,7 +125,7 @@ export function GoalList({
   }
 
   return (
-    <section className="rounded-[1.75rem] border-2 border-black bg-[#fff0b8] p-5 sm:p-6">
+    <section className="ui-panel tracker-goal-list p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
@@ -135,13 +135,13 @@ export function GoalList({
             Tracker list
           </h2>
         </div>
-        <span className="rounded-full border-2 border-black bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-black">
+        <span className="ui-badge">
           {goals.length}
         </span>
       </div>
 
       {goals.length === 0 ? (
-        <div className="mt-5 rounded-[1.35rem] border-2 border-black bg-white px-4 py-5 text-sm font-bold leading-6 text-black/70">
+        <div className="ui-card mt-5 px-4 py-5 text-sm font-bold leading-6">
           No goals yet. Create one to unlock the dashboard.
         </div>
       ) : (
@@ -192,20 +192,17 @@ export function GoalList({
                   setDraggedGoalId('');
                   setDragOverGoalId('');
                 }}
-                className={`group relative rounded-[1.35rem] border-2 border-black p-4 outline-none transition hover:-translate-y-1 hover:shadow-[6px_6px_0_#000] focus-visible:-translate-y-1 focus-visible:shadow-[6px_6px_0_#000] focus-visible:ring-2 focus-visible:ring-black ${
-                  isSelected ? 'bg-[#ff90e8]' : 'bg-[#fffdf8]'
+                aria-pressed={isSelected}
+                className={`ui-card tracker-goal-card group relative p-4 outline-none transition ${
+                  isSelected ? 'is-selected' : ''
                 } ${
-                  isDragging
-                    ? 'translate-x-1 translate-y-1 opacity-60 shadow-none'
-                    : ''
+                  isDragging ? 'is-dragging' : ''
                 } ${
-                  isDropTarget
-                    ? '-translate-y-1 bg-[#c5ff6f] shadow-[6px_6px_0_#000] ring-4 ring-[#9fe3ff]'
-                    : ''
+                  isDropTarget ? 'is-drop-target' : ''
                 }`}
               >
                 {isDropTarget ? (
-                  <span className="pointer-events-none absolute -top-3 left-5 rounded-full border-2 border-black bg-white px-3 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] text-black shadow-[2px_2px_0_#000]">
+                  <span className="ui-badge pointer-events-none absolute -top-3 left-5 text-[0.65rem] font-bold uppercase tracking-[0.14em] shadow-[var(--shadow-sm)]">
                     Drop here
                   </span>
                 ) : null}
@@ -222,8 +219,8 @@ export function GoalList({
                       event.dataTransfer.setData('text/plain', goal.id);
                       event.dataTransfer.effectAllowed = 'move';
                     }}
-                    className={`mt-1 shrink-0 cursor-grab rounded-full border-2 border-black px-2 py-1 text-xs font-bold uppercase tracking-[0.08em] text-black transition active:cursor-grabbing ${
-                      isDragging ? 'bg-black text-white' : 'bg-white group-hover:bg-[#9fe3ff]'
+                    className={`ui-badge tracker-goal-drag mt-1 shrink-0 cursor-grab px-2 py-1 text-xs font-bold uppercase tracking-[0.08em] transition active:cursor-grabbing ${
+                      isDragging ? 'is-dragging' : ''
                     }`}
                     title="Drag to reorder"
                   >
@@ -246,22 +243,22 @@ export function GoalList({
                           event.stopPropagation();
                           onEditGoal(goal);
                         }}
-                        className="shrink-0 rounded-full border-2 border-black bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-black transition hover:bg-[#9fe3ff]"
+                        className="ui-button ui-button--sm shrink-0 text-xs uppercase tracking-[0.12em]"
                       >
                         Edit
                       </button>
                     </div>
 
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <span className="rounded-full border-2 border-black bg-[#c5ff6f] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-black">
+                      <span className="ui-badge ui-badge--accent text-xs uppercase tracking-[0.12em]">
                         {summary.current}
                       </span>
                       {summary.target ? (
-                        <span className="rounded-full border-2 border-black bg-[#ffd166] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-black">
+                        <span className="ui-badge ui-badge--warning text-xs uppercase tracking-[0.12em]">
                           {summary.target}
                         </span>
                       ) : goalType !== 'binary' ? (
-                        <span className="rounded-full border-2 border-black bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-black">
+                        <span className="ui-badge text-xs uppercase tracking-[0.12em]">
                           {formatGoalTarget(goal)}
                         </span>
                       ) : null}
@@ -283,7 +280,7 @@ export function GoalList({
                               event.stopPropagation();
                               onLogGoal(goal.id);
                             }}
-                            className="rounded-full border-2 border-black bg-black px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-white shadow-[2px_2px_0_#c5ff6f] transition hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0_#c5ff6f]"
+                            className="ui-button ui-button--primary ui-button--sm text-xs uppercase tracking-[0.12em]"
                           >
                             Add log
                           </button>

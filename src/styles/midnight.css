@@ -217,8 +217,6 @@ html[data-theme="midnight"] .recharts-legend-item-text { fill: var(--mid-seconda
 html[data-theme="midnight"] .recharts-tooltip-wrapper .recharts-default-tooltip { background: var(--mid-raised) !important; border: 1px solid var(--mid-border-strong) !important; color: var(--mid-text) !important; box-shadow: 0 12px 30px rgb(0 0 0 / .45); }
 html[data-theme="midnight"] .recharts-default-tooltip .recharts-tooltip-label,
 html[data-theme="midnight"] .recharts-default-tooltip .recharts-tooltip-item { color: var(--mid-text) !important; }
-html[data-theme="midnight"] .tracker-stat-card { color: var(--mid-text); box-shadow: inset 0 0 0 1px var(--mid-border) !important; }
-html[data-theme="midnight"] .tracker-stat-card span { background: var(--mid-raised); border-color: var(--mid-border); color: var(--mid-text); }
 
 /* Toasts keep status hues restrained and readable. */
 html[data-theme="midnight"] [data-sonner-toast].cboard-toast { background: #171b21 !important; color: var(--mid-text) !important; border-color: var(--mid-border-strong) !important; box-shadow: 0 10px 28px rgb(0 0 0 / .38) !important; }
@@ -379,8 +377,6 @@ html[data-theme="midnight"] :is(dialog,[role="dialog"],[role="menu"],[role="list
   border-radius: var(--mid-panel-radius) !important;
 }
 html[data-theme="midnight"] :is(.finance .f-primary,.groceries .g-primary,.auth-primary,.diary-primary) { background: var(--mid-accent) !important; color: var(--mid-accent-text) !important; border-color: var(--mid-accent) !important; }
-html[data-theme="midnight"] .tracker-stat-card { background: var(--mid-surface) !important; border-color: var(--mid-border) !important; }
-html[data-theme="midnight"] .tracker-stat-card :is(strong,span) { color: var(--mid-text) !important; }
 html[data-theme="midnight"] .training {
   --tr-surface: var(--mid-surface);
   --tr-text: var(--mid-text);
