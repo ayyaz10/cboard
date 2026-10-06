@@ -228,7 +228,7 @@ export function GoalChart({ goal, entries }) {
                   <CartesianGrid
                     stroke={chartTheme.grid}
                     strokeDasharray="4 6"
-                    strokeOpacity={isMatrixTheme ? 0.35 : 0.15}
+                    strokeOpacity={0.2}
                   />
                   <XAxis
                     dataKey="chartKey"
@@ -254,7 +254,7 @@ export function GoalChart({ goal, entries }) {
                   <ReferenceLine
                     y={0}
                     stroke={chartTheme.axis}
-                    strokeOpacity={isMatrixTheme ? 0.7 : 0.35}
+                    strokeOpacity={0.4}
                     strokeWidth={2}
                   />
                   {Number.isFinite(goal.targetValue) ? (
@@ -314,7 +314,7 @@ export function GoalChart({ goal, entries }) {
                 <CartesianGrid
                   stroke={chartTheme.grid}
                   strokeDasharray="4 6"
-                  strokeOpacity={isMatrixTheme ? 0.35 : 0.15}
+                  strokeOpacity={0.2}
                 />
                 <XAxis
                   dataKey="chartKey"
@@ -340,7 +340,7 @@ export function GoalChart({ goal, entries }) {
                 <ReferenceLine
                   y={0}
                   stroke={chartTheme.axis}
-                  strokeOpacity={isMatrixTheme ? 0.7 : 0.35}
+                  strokeOpacity={0.4}
                   strokeWidth={2}
                 />
                 {Number.isFinite(goal.targetValue) ? (
@@ -390,7 +390,7 @@ export function GoalChart({ goal, entries }) {
                 <CartesianGrid
                   stroke={chartTheme.grid}
                   strokeDasharray="4 6"
-                  strokeOpacity={isMatrixTheme ? 0.35 : 0.15}
+                  strokeOpacity={0.2}
                 />
                 <XAxis
                   dataKey="chartKey"
