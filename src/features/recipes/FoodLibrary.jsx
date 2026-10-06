@@ -111,10 +111,13 @@ export function FoodLibrary({ library, recipes, foodCatalog = [], mealPlans = []
     }
   }
   const usageLabel = entry => {
-    if (!entry.food) return `${entry.recipeTitles.length} recipe${entry.recipeTitles.length === 1 ? '' : 's'}`;
-    if (!entry.usage.referenceCount) return 'Unused';
+    if (!entry.food) return `In ${entry.recipeTitles.length} saved recipe${entry.recipeTitles.length === 1 ? '' : 's'}`;
+    if (!entry.usage.recipes.length && !entry.usage.possibleRecipes.length) {
+      const plans = entry.usage.mealPlans.length;
+      return plans ? `No active recipe · ${plans} meal plan${plans === 1 ? '' : 's'}` : 'No active recipe references';
+    }
     const definite = entry.usage.recipes.length, possible = entry.usage.possibleRecipes.length;
-    const recipeLabel = definite ? `Used in ${definite} recipe${definite === 1 ? '' : 's'}` : possible ? `Possible match in ${possible} recipe${possible === 1 ? '' : 's'}` : '';
+    const recipeLabel = definite ? `In ${definite} saved recipe${definite === 1 ? '' : 's'}` : possible ? `Possible match in ${possible} recipe${possible === 1 ? '' : 's'}` : '';
     const planLabel = entry.usage.mealPlans.length ? `${recipeLabel ? ' + ' : ''}${entry.usage.mealPlans.length} meal plan${entry.usage.mealPlans.length === 1 ? '' : 's'}` : '';
     return `${recipeLabel}${planLabel}`;
   };
@@ -145,7 +148,7 @@ export function FoodLibrary({ library, recipes, foodCatalog = [], mealPlans = []
       <button type="button" className={secondaryButton} aria-pressed={view === 'list'} onClick={() => setView('list')}>Detailed list</button>
       <button type="button" className={secondaryButton} aria-pressed={view === 'cards'} onClick={() => setView('cards')}>Cards</button>
     </div>
-    <p role="status">{filtered.length} of {library.length} items. “Recipe-only” means the ingredient is saved inside a recipe but has no separate reusable food record; removing it here removes it from its recipe. Diary entries and grocery foods keep nutrition snapshots, so they do not block cleanup.</p>
+    <p role="status">{filtered.length} of {library.length} items. Usage shows recipes that still exist. “No active recipe references” means no current recipe uses that reusable food; select it and choose Delete foods to remove it. Deleted recipes aren’t kept in history, so CBoard can’t identify which deleted recipe used an item. “Recipe-only” means an ingredient is saved inside a recipe without a separate reusable food record. Diary and grocery nutrition snapshots don’t block cleanup.</p>
     {source === 'duplicates' && <div className="grid gap-3" aria-label="Possible duplicate groups">
       <p className="rounded-xl border-2 border-black bg-white p-3 text-sm">Audit of {foodCatalog.length} reusable foods: {duplicateAudit.counts.exactName} exact-name pairs, {duplicateAudit.counts.quantityOrAlias} quantity or alias pairs, {duplicateAudit.counts.fuzzySuggestion} spelling suggestions, {duplicateAudit.counts.sameBarcode} shared barcodes, {duplicateAudit.counts.sameRetailerSku} shared retailer/SKU pairs. Review each group before merging.</p>
       {!duplicateGroups.length && <p className="rounded-xl border-2 border-black bg-white p-4">No likely duplicate food groups found.</p>}
