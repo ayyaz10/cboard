@@ -14,9 +14,8 @@ function PresetButton({ children, isActive, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full border-2 border-black px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-black transition ${
-        isActive ? 'bg-[#c5ff6f] shadow-[3px_3px_0_#000]' : 'bg-white hover:bg-[#fffdf8]'
-      }`}
+      aria-pressed={isActive}
+      className={`ui-button ui-button--sm text-xs uppercase tracking-[0.12em] ${isActive ? 'is-active' : ''}`}
     >
       {children}
     </button>
@@ -103,25 +102,25 @@ export function FocusSessionForm({ onCreateSession, isSaving = false }) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-[1.75rem] border-2 border-black bg-[#c5ff6f] p-5 shadow-[5px_5px_0_#000] sm:p-6"
+      className="ui-panel p-5 sm:p-6"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
             Focus Timer
           </p>
-          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-black">
+          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-[var(--color-text)]">
             Start a focus session
           </h2>
         </div>
-        <span className="rounded-full border-2 border-black bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-black">
+        <span className="ui-badge text-xs uppercase tracking-[0.14em]">
           Timestamped
         </span>
       </div>
 
       <div className="mt-5 grid gap-4 md:grid-cols-2">
         <label className="block md:col-span-2">
-          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
             Title
           </span>
           <input
@@ -133,7 +132,7 @@ export function FocusSessionForm({ onCreateSession, isSaving = false }) {
         </label>
 
         <label className="block">
-          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
             Focus duration
           </span>
           <input
@@ -158,7 +157,7 @@ export function FocusSessionForm({ onCreateSession, isSaving = false }) {
         </label>
 
         <label className="block">
-          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
             Break duration
           </span>
           <input
@@ -183,7 +182,7 @@ export function FocusSessionForm({ onCreateSession, isSaving = false }) {
         </label>
 
         <label className="block md:col-span-2">
-          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
             Task details / notebook
           </span>
           <textarea
@@ -195,7 +194,7 @@ export function FocusSessionForm({ onCreateSession, isSaving = false }) {
         </label>
 
         <label className="block md:col-span-2">
-          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
             Before-start intention
           </span>
           <textarea
@@ -207,12 +206,12 @@ export function FocusSessionForm({ onCreateSession, isSaving = false }) {
         </label>
       </div>
 
-      <div className="mt-5 rounded-[1.35rem] border-2 border-black bg-[#f8f3ea] p-4">
+      <div className="ui-card mt-5 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
             Break checklist
           </p>
-          <span className="rounded-full border-2 border-black bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-black">
+          <span className="ui-badge text-xs uppercase tracking-[0.12em]">
             {breakTasks.length} tasks
           </span>
         </div>
@@ -221,13 +220,13 @@ export function FocusSessionForm({ onCreateSession, isSaving = false }) {
           {breakTasks.map((task, index) => (
             <div
               key={`${task}-${index}`}
-              className="flex items-center justify-between gap-3 rounded-[1rem] border-2 border-black bg-white px-3 py-2"
+              className="ui-card flex items-center justify-between gap-3 px-3 py-2"
             >
-              <span className="text-sm font-bold text-black">{task}</span>
+              <span className="text-sm font-bold text-[var(--color-text)]">{task}</span>
               <button
                 type="button"
                 onClick={() => removeBreakTask(index)}
-                className="rounded-full border-2 border-black bg-[#ffe0de] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-black"
+                className="ui-button ui-button--danger ui-button--sm text-xs uppercase tracking-[0.12em]"
               >
                 Remove
               </button>
@@ -245,7 +244,7 @@ export function FocusSessionForm({ onCreateSession, isSaving = false }) {
           <button
             type="button"
             onClick={addBreakTask}
-            className="rounded-full border-2 border-black bg-[#9fe3ff] px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[3px_3px_0_#000]"
+            className="ui-button ui-button--sm text-xs uppercase tracking-[0.12em]"
           >
             Add task
           </button>
@@ -253,7 +252,7 @@ export function FocusSessionForm({ onCreateSession, isSaving = false }) {
       </div>
 
       {error ? (
-        <p className="mt-4 rounded-[1rem] border-2 border-black bg-[#ffe0de] px-4 py-3 text-sm font-bold text-black">
+        <p className="ui-badge ui-badge--danger mt-4 block rounded-[var(--radius-md)] px-4 py-3 text-sm">
           {error}
         </p>
       ) : null}
@@ -261,7 +260,7 @@ export function FocusSessionForm({ onCreateSession, isSaving = false }) {
       <button
         type="submit"
         disabled={isSaving}
-        className="mt-6 inline-flex w-full items-center justify-center rounded-full border-2 border-black bg-black px-5 py-3.5 text-sm font-bold uppercase tracking-[0.12em] text-white shadow-[4px_4px_0_#fff] transition hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_#fff] disabled:cursor-not-allowed disabled:opacity-45"
+        className="ui-button ui-button--primary mt-6 w-full uppercase tracking-[0.12em]"
       >
         {isSaving ? 'Starting...' : 'Start focus'}
       </button>

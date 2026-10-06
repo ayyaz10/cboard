@@ -75,7 +75,7 @@ function FocusCompleteModal({ isOpen, session, onStartBreak, onSkipBreak, onFini
 
   return (
     <div
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black/35 px-4 py-6"
+      className="ui-overlay fixed inset-0 z-40 flex items-center justify-center px-4 py-6"
       role="presentation"
       onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}
     >
@@ -83,16 +83,16 @@ function FocusCompleteModal({ isOpen, session, onStartBreak, onSkipBreak, onFini
         role="dialog"
         aria-modal="true"
         aria-labelledby="focus-complete-title"
-        className="w-full max-w-lg rounded-[1.75rem] border-2 border-black bg-[#fffdf8] p-5 text-black shadow-[8px_8px_0_#000] sm:p-6"
+        className="ui-dialog w-full max-w-lg p-5 sm:p-6"
       >
-        <div className="flex items-start justify-between gap-3"><span className="pill">Focus complete</span><button type="button" aria-label="Close popup" onClick={onClose} className="inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-black bg-white text-xl font-bold leading-none shadow-[3px_3px_0_#000] hover:bg-[#c5ff6f]">×</button></div>
+        <div className="flex items-start justify-between gap-3"><span className="ui-eyebrow">Focus complete</span><button type="button" aria-label="Close popup" onClick={onClose} className="ui-button ui-button--sm h-9 w-9 p-0 text-xl leading-none">×</button></div>
         <h2
           id="focus-complete-title"
-          className="mt-5 text-3xl font-bold tracking-[-0.05em] text-black"
+          className="mt-5 text-3xl font-bold tracking-[-0.05em] text-[var(--color-text)]"
         >
           Focus session complete
         </h2>
-        <p className="mt-3 text-sm font-semibold leading-6 text-black/70">
+        <p className="mt-3 text-sm font-semibold leading-6 text-[var(--color-text-secondary)]">
           {session.title} is ready to close out or move into a break.
         </p>
         <div className="mt-6 grid gap-3 sm:grid-cols-3">
@@ -100,21 +100,21 @@ function FocusCompleteModal({ isOpen, session, onStartBreak, onSkipBreak, onFini
             type="button"
             onClick={onStartBreak}
             disabled={session.breakMinutes <= 0}
-            className="rounded-full border-2 border-black bg-[#c5ff6f] px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[4px_4px_0_#000] disabled:cursor-not-allowed disabled:opacity-45"
+            className="ui-button ui-button--primary ui-button--sm uppercase tracking-[0.12em]"
           >
             Start Break
           </button>
           <button
             type="button"
             onClick={onSkipBreak}
-            className="rounded-full border-2 border-black bg-[#ffd166] px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[4px_4px_0_#000]"
+            className="ui-button ui-button--sm uppercase tracking-[0.12em]"
           >
             Skip Break
           </button>
           <button
             type="button"
             onClick={onFinishSession}
-            className="rounded-full border-2 border-black bg-white px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[4px_4px_0_#000]"
+            className="ui-button ui-button--sm uppercase tracking-[0.12em]"
           >
             Finish Session
           </button>
@@ -147,38 +147,38 @@ function ActiveTimer({
   const taskCount = breakTasks.filter((task) => task.isCompleted).length;
 
   return (
-    <section className="rounded-[1.75rem] border-2 border-black bg-black p-5 text-white shadow-[6px_6px_0_#000] sm:p-6">
+    <section className="ui-panel focus-active-session p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/55">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
             {isBreak ? 'Break mode' : 'Focus mode'}
           </p>
-          <h2 className="mt-2 text-3xl font-bold tracking-[-0.05em] text-white sm:text-4xl">
+          <h2 className="mt-2 text-3xl font-bold tracking-[-0.05em] sm:text-4xl">
             {session.title}
           </h2>
         </div>
-        <span className="rounded-full border-2 border-white bg-[#c5ff6f] px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-black">
+        <span className="ui-badge ui-badge--accent text-xs uppercase tracking-[0.14em]">
           {isPaused ? 'Paused' : 'Running'}
         </span>
       </div>
 
-      <p className="mt-6 text-7xl font-bold tracking-[-0.05em] text-white sm:text-8xl">
+      <p className="mt-6 text-7xl font-bold tracking-[-0.05em] sm:text-8xl">
         {formatTimer(remainingSeconds)}
       </p>
 
       {session.intention && !isBreak ? (
-        <p className="mt-4 rounded-[1rem] border-2 border-white/65 bg-white/10 px-4 py-3 text-sm font-semibold leading-6 text-white/75">
+        <p className="ui-card mt-4 px-4 py-3 text-sm font-semibold leading-6">
           {session.intention}
         </p>
       ) : null}
 
       {isBreak ? (
-        <div className="mt-5 rounded-[1.35rem] border-2 border-white bg-[#f8f3ea] p-4 text-black">
+        <div className="ui-card mt-5 p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
               Break checklist
             </p>
-            <span className="rounded-full border-2 border-black bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-black">
+            <span className="ui-badge text-xs uppercase tracking-[0.12em]">
               {taskCount}/{breakTasks.length}
             </span>
           </div>
@@ -191,7 +191,7 @@ function ActiveTimer({
           <button
             type="button"
             onClick={onResume}
-            className="rounded-full border-2 border-white bg-[#c5ff6f] px-5 py-3 text-sm font-bold uppercase tracking-[0.12em] text-black shadow-[4px_4px_0_#fff]"
+            className="ui-button ui-button--primary uppercase tracking-[0.12em]"
           >
             Resume
           </button>
@@ -199,7 +199,7 @@ function ActiveTimer({
           <button
             type="button"
             onClick={onPause}
-            className="rounded-full border-2 border-white bg-[#ffd166] px-5 py-3 text-sm font-bold uppercase tracking-[0.12em] text-black shadow-[4px_4px_0_#fff]"
+            className="ui-button uppercase tracking-[0.12em]"
           >
             Pause
           </button>
@@ -208,7 +208,7 @@ function ActiveTimer({
           <button
             type="button"
             onClick={onCompleteFocus}
-            className="rounded-full border-2 border-white bg-[#c5ff6f] px-5 py-3 text-sm font-bold uppercase tracking-[0.12em] text-black shadow-[4px_4px_0_#fff]"
+            className="ui-button ui-button--primary uppercase tracking-[0.12em]"
           >
             Complete focus
           </button>
@@ -217,14 +217,14 @@ function ActiveTimer({
             <button
               type="button"
               onClick={onCompleteBreak}
-              className="rounded-full border-2 border-white bg-[#c5ff6f] px-5 py-3 text-sm font-bold uppercase tracking-[0.12em] text-black shadow-[4px_4px_0_#fff]"
+              className="ui-button ui-button--primary uppercase tracking-[0.12em]"
             >
               Complete break
             </button>
             <button
               type="button"
               onClick={onSkipBreak}
-              className="rounded-full border-2 border-white bg-white px-5 py-3 text-sm font-bold uppercase tracking-[0.12em] text-black shadow-[4px_4px_0_#fff]"
+              className="ui-button uppercase tracking-[0.12em]"
             >
               Skip break
             </button>
@@ -233,7 +233,7 @@ function ActiveTimer({
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-full border-2 border-white bg-[#ffe0de] px-5 py-3 text-sm font-bold uppercase tracking-[0.12em] text-black shadow-[4px_4px_0_#fff]"
+          className="ui-button ui-button--danger uppercase tracking-[0.12em]"
         >
           Cancel
         </button>
@@ -616,31 +616,31 @@ export function FocusTimerPage() {
 
   return (
     <PageShell>
-      <section className="panel p-6 sm:p-8 lg:p-10">
+      <section className="ui-panel p-6 sm:p-8 lg:p-10">
         <AppNavigation activePath="/focus-timer" />
 
         <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
           <span className="pill">Focus sessions</span>
         </div>
 
-        <h1 className="mt-6 max-w-3xl text-4xl font-bold tracking-[-0.05em] text-black sm:text-5xl lg:text-6xl">
+        <h1 className="mt-6 max-w-3xl text-4xl font-bold tracking-[-0.05em] text-[var(--color-text)] sm:text-5xl lg:text-6xl">
           Focus Timer
         </h1>
 
-        <p className="mt-3 max-w-2xl text-base font-medium leading-7 text-black/70 sm:text-lg">
+        <p className="mt-3 max-w-2xl text-base font-medium leading-7 text-[var(--color-text-secondary)] sm:text-lg">
           Make time to focus, take a break, and set reminders for the things you don’t want to forget.
         </p>
 
         <RemindersPanel />
 
         {error ? (
-          <p className="mt-5 rounded-[1rem] border-2 border-black bg-[#ffe0de] px-4 py-3 text-sm font-bold text-black">
+          <p className="ui-badge ui-badge--danger mt-5 block rounded-[var(--radius-md)] px-4 py-3 text-sm">
             {error}
           </p>
         ) : null}
 
         {isLoading ? (
-          <div className="mt-8 rounded-[1.75rem] border-2 border-black bg-[#fffdf8] p-6 text-lg font-bold text-black">
+          <div className="ui-card mt-8 p-6 text-lg font-bold">
             Loading focus sessions...
           </div>
         ) : (

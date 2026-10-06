@@ -55,7 +55,7 @@ export function ReflectionModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 px-4 py-6"
+      className="ui-overlay fixed inset-0 z-50 flex items-center justify-center px-4 py-6"
       role="presentation"
       onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}
     >
@@ -64,7 +64,7 @@ export function ReflectionModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="reflection-title"
-        className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[1.75rem] border-2 border-black bg-[#fffdf8] p-5 text-black shadow-[8px_8px_0_#000] sm:p-6"
+        className="ui-dialog max-h-[92vh] w-full max-w-2xl overflow-y-auto p-5 sm:p-6"
       >
         <div className="flex flex-wrap items-center justify-between gap-3">
           <span className="pill">Reflection</span>
@@ -72,7 +72,7 @@ export function ReflectionModal({
             type="button"
             onClick={onClose}
             aria-label="Close reflection"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-full border-2 border-black bg-white text-lg font-bold leading-none text-black shadow-[3px_3px_0_#000]"
+            className="ui-button ui-button--sm h-8 w-8 p-0 text-lg leading-none"
           >
             ×
           </button>
@@ -80,14 +80,14 @@ export function ReflectionModal({
 
         <h2
           id="reflection-title"
-          className="mt-5 text-3xl font-bold tracking-[-0.05em] text-black"
+          className="mt-5 text-3xl font-bold tracking-[-0.05em] text-[var(--color-text)]"
         >
           Session reflection
         </h2>
 
         <div className="mt-5 grid gap-4">
           <div>
-            <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+            <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
               Did you complete your intention?
             </span>
             <div className="grid gap-2 sm:grid-cols-3">
@@ -100,9 +100,8 @@ export function ReflectionModal({
                   key={value}
                   type="button"
                   onClick={() => setReflectionResult(value)}
-                  className={`rounded-full border-2 border-black px-4 py-3 text-sm font-bold uppercase tracking-[0.12em] text-black ${
-                    reflectionResult === value ? 'bg-[#c5ff6f] shadow-[3px_3px_0_#000]' : 'bg-white'
-                  }`}
+                  aria-pressed={reflectionResult === value}
+                  className="ui-button ui-button--sm uppercase tracking-[0.12em]"
                 >
                   {label}
                 </button>
@@ -112,7 +111,7 @@ export function ReflectionModal({
 
           <div className="grid gap-4 md:grid-cols-2">
             <label>
-              <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+              <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
                 Distraction level
               </span>
               <input
@@ -127,7 +126,7 @@ export function ReflectionModal({
             </label>
 
             <label>
-              <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+              <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
                 Mood / energy level
               </span>
               <input
@@ -143,7 +142,7 @@ export function ReflectionModal({
           </div>
 
           <label>
-            <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+            <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
               Session note
             </span>
             <textarea
@@ -156,7 +155,7 @@ export function ReflectionModal({
         </div>
 
         {error ? (
-          <p className="mt-4 rounded-[1rem] border-2 border-black bg-[#ffe0de] px-4 py-3 text-sm font-bold text-black">
+          <p className="ui-badge ui-badge--danger mt-4 block rounded-[var(--radius-md)] px-4 py-3 text-sm">
             {error}
           </p>
         ) : null}
@@ -165,14 +164,14 @@ export function ReflectionModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full border-2 border-black bg-white px-5 py-3 text-sm font-bold uppercase tracking-[0.12em] text-black shadow-[4px_4px_0_#000]"
+            className="ui-button uppercase tracking-[0.12em]"
           >
             Later
           </button>
           <button
             type="submit"
             disabled={isSaving}
-            className="rounded-full border-2 border-black bg-[#c5ff6f] px-5 py-3 text-sm font-bold uppercase tracking-[0.12em] text-black shadow-[4px_4px_0_#000] disabled:cursor-not-allowed disabled:opacity-55"
+            className="ui-button ui-button--primary uppercase tracking-[0.12em]"
           >
             {isSaving ? 'Saving...' : 'Save reflection'}
           </button>

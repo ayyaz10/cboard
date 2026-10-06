@@ -218,18 +218,18 @@ function ReminderStore({ userId, children }) {
     <ReminderContext.Provider value={{ reminders, history, now, addReminder, dismiss, cancel, snooze, prepareSound, playSound, storageError }}>
       {children}
       {userId && liveTimerCount > 0 && liveDockVisible && !widgetOpen && (
-        <aside aria-label="Live timers" className="fixed right-3 top-20 z-[60] w-[min(20rem,calc(100vw-1.5rem))] rounded-2xl border-2 border-black bg-[#c5ff6f] p-3 text-black shadow-[5px_5px_0_#000] sm:right-4 sm:top-3">
+        <aside aria-label="Live timers" className="ui-popover fixed right-3 top-20 z-[60] w-[min(20rem,calc(100vw-1.5rem))] p-3 sm:right-4 sm:top-3">
           <div className="flex items-center justify-between gap-3 px-1">
             <div className="flex items-center gap-2">
               <span aria-hidden="true" className="relative flex h-3 w-3">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-black opacity-30" />
-                <span className="relative inline-flex h-3 w-3 rounded-full bg-black" />
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--color-accent)] opacity-30" />
+                <span className="relative inline-flex h-3 w-3 rounded-full bg-[var(--color-accent)]" />
               </span>
               <p className="text-xs font-black uppercase tracking-[0.16em]">Live timers</p>
             </div>
             <div className="flex items-center gap-2">
-              <span className="rounded-full border-2 border-black bg-white px-2 py-0.5 text-xs font-black">{liveTimerCount}</span>
-              <button type="button" onClick={() => setLiveDockVisible(false)} aria-label="Hide live timers" title="Hide live timers" className="grid h-8 w-8 place-items-center rounded-full border-2 border-black bg-white transition hover:-translate-y-px">
+              <span className="ui-badge">{liveTimerCount}</span>
+              <button type="button" onClick={() => setLiveDockVisible(false)} aria-label="Hide live timers" title="Hide live timers" className="ui-button ui-button--sm h-8 w-8 p-0">
                 <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 3l18 18" />
                   <path d="M10.6 10.7a2 2 0 0 0 2.7 2.7" />
@@ -241,10 +241,10 @@ function ReminderStore({ userId, children }) {
 
           <div className="mt-2 grid gap-2">
             {liveFocusSession && (
-              <button type="button" onClick={() => navigateTo('/focus-timer')} className="flex w-full items-center justify-between gap-3 rounded-xl border-2 border-black bg-white px-3 py-2 text-left transition hover:-translate-y-px" aria-label={`Open ${focusIsBreak ? 'break' : 'focus'} timer for ${liveFocusSession.title}`}>
+              <button type="button" onClick={() => navigateTo('/focus-timer')} className="ui-button ui-button--sm w-full justify-between text-left" aria-label={`Open ${focusIsBreak ? 'break' : 'focus'} timer for ${liveFocusSession.title}`}>
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-black">{liveFocusSession.title}</span>
-                  <span className="block text-[0.68rem] font-bold uppercase tracking-[0.12em] text-black/60">
+                  <span className="block text-[0.68rem] font-bold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
                     {focusRemaining === 0 && !focusIsPaused ? `${focusIsBreak ? 'Break' : 'Focus'} finished` : `${focusIsPaused ? 'Paused ' : ''}${focusIsBreak ? 'break' : 'focus'}`}
                   </span>
                 </span>
@@ -253,10 +253,10 @@ function ReminderStore({ userId, children }) {
             )}
 
             {liveReminders.slice(0, liveFocusSession ? 1 : 2).map((item) => (
-              <button type="button" key={item.id} onClick={() => setWidgetOpen(true)} className={`flex w-full items-center justify-between gap-3 rounded-xl border-2 border-black px-3 py-2 text-left transition hover:-translate-y-px ${item.status === 'ringing' ? 'bg-[#ffd166]' : 'bg-white'}`} aria-label={`Open reminder ${item.title}`}>
+              <button type="button" key={item.id} onClick={() => setWidgetOpen(true)} className={`ui-button ui-button--sm w-full justify-between text-left ${item.status === 'ringing' ? 'ui-button--warning' : ''}`} aria-label={`Open reminder ${item.title}`}>
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-black">{item.title}</span>
-                  <span className="block text-[0.68rem] font-bold uppercase tracking-[0.12em] text-black/60">{item.status === 'ringing' ? 'Due now' : item.repeatMs > 0 ? 'Repeating reminder' : 'Reminder'}</span>
+                  <span className="block text-[0.68rem] font-bold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">{item.status === 'ringing' ? 'Due now' : item.repeatMs > 0 ? 'Repeating reminder' : 'Reminder'}</span>
                 </span>
                 <span role="timer" aria-live="off" className="shrink-0 font-mono text-xl font-black tabular-nums">{item.status === 'ringing' ? 'DUE' : reminderCountdown(item.dueAt, now)}</span>
               </button>
@@ -271,53 +271,53 @@ function ReminderStore({ userId, children }) {
         </aside>
       )}
       {widgetOpen && (
-        <aside id="reminder-widget" aria-label="Reminders" className="reminder-widget fixed right-4 left-4 z-50 overflow-y-auto rounded-2xl border-2 border-black bg-[#ffd166] p-5 text-black shadow-[5px_5px_0_#000] sm:left-auto sm:w-96">
+        <aside id="reminder-widget" aria-label="Reminders" className="ui-dialog reminder-widget fixed right-4 left-4 z-50 overflow-y-auto p-5 sm:left-auto sm:w-96">
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-lg font-bold">Reminders</p>
               {ringing.length > 0 ? (
                 <p role="alert" className="mt-1 text-sm font-bold">{ringing.length === 1 ? 'Your reminder is ready' : `${ringing.length} reminders are ready`}</p>
               ) : (
-                <p className="mt-1 text-sm font-semibold text-black/70">Nothing is due right now.</p>
+                <p className="mt-1 text-sm font-semibold text-[var(--color-text-secondary)]">Nothing is due right now.</p>
               )}
             </div>
-            <button type="button" onClick={() => setWidgetOpen(false)} aria-label="Close reminders" className="grid h-10 w-10 shrink-0 place-items-center rounded-full border-2 border-black bg-white transition hover:-translate-y-px">
+            <button type="button" onClick={() => setWidgetOpen(false)} aria-label="Close reminders" className="ui-button ui-button--sm h-10 w-10 shrink-0 p-0">
               <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                 <path d="M6 6l12 12M18 6 6 18" />
               </svg>
             </button>
           </div>
           {ringing.map((item) => (
-            <div key={item.id} className="mt-4 border-t border-black/20 pt-3">
+            <div key={item.id} className="mt-4 border-t border-[var(--color-border)] pt-3">
               <p className="break-words text-lg font-bold">{item.title}</p>
               {item.repeatMs > 0 && <p className="mt-1 text-xs font-semibold">Repeats every {formatReminderInterval(item.repeatMs)}. Dismiss keeps it running; snooze restarts the interval after 5 minutes.</p>}
               <div className="mt-3 flex flex-wrap gap-2">
-                <button type="button" onClick={() => finishAlert(snooze, item.id)} aria-label={`Snooze ${item.title} for 5 minutes`} className="rounded-full border-2 border-black bg-white px-4 py-2 text-sm font-bold">Snooze 5 min</button>
-                <button type="button" onClick={() => finishAlert(dismiss, item.id)} aria-label={`Dismiss ${item.title}`} className="rounded-full border-2 border-black bg-black px-4 py-2 text-sm font-bold text-white">Dismiss</button>
-                {item.repeatMs > 0 && <button type="button" onClick={() => finishAlert(cancel, item.id)} aria-label={`Stop repeating ${item.title}`} className="rounded-full border-2 border-black bg-white px-4 py-2 text-sm font-bold">Stop repeating</button>}
-                <button type="button" onClick={() => openReminder(item.repeatMs > 0)} className="rounded-full border-2 border-black bg-white px-4 py-2 text-sm font-bold">Open {item.repeatMs > 0 ? 'Repeat' : 'Just once'}</button>
+                <button type="button" onClick={() => finishAlert(snooze, item.id)} aria-label={`Snooze ${item.title} for 5 minutes`} className="ui-button ui-button--sm">Snooze 5 min</button>
+                <button type="button" onClick={() => finishAlert(dismiss, item.id)} aria-label={`Dismiss ${item.title}`} className="ui-button ui-button--danger ui-button--sm">Dismiss</button>
+                {item.repeatMs > 0 && <button type="button" onClick={() => finishAlert(cancel, item.id)} aria-label={`Stop repeating ${item.title}`} className="ui-button ui-button--sm">Stop repeating</button>}
+                <button type="button" onClick={() => openReminder(item.repeatMs > 0)} className="ui-button ui-button--sm">Open {item.repeatMs > 0 ? 'Repeat' : 'Just once'}</button>
               </div>
             </div>
           ))}
-          <section aria-label="Start another preset" className="mt-4 border-t-2 border-black pt-4">
+          <section aria-label="Start another preset" className="mt-4 border-t-2 border-[var(--color-border)] pt-4">
             <label htmlFor="alarm-preset-select" className="text-sm font-bold">Start another preset</label>
             {availablePresets.length > 0 ? <>
-              <select id="alarm-preset-select" value={selectedPreset?.id || ''} onChange={(event) => setSelectedPresetId(event.target.value)} className="mt-2 w-full rounded-xl border-2 border-black bg-white px-3 py-2 text-sm font-bold">
+              <select id="alarm-preset-select" value={selectedPreset?.id || ''} onChange={(event) => setSelectedPresetId(event.target.value)} className="ui-control mt-2">
                 {availablePresets.map((preset) => <option key={preset.id} value={preset.id}>{preset.title} · {preset.repeats ? 'Repeat every' : 'Once after'} {formatReminderInterval(preset.duration)}</option>)}
               </select>
               <button type="button" onClick={() => {
                 if (!selectedPreset) return;
                 addReminder(selectedPreset.title, selectedPreset.duration, selectedPreset.repeats);
                 setSelectedPresetId('');
-              }} className="mt-2 rounded-full border-2 border-black bg-[#c5ff6f] px-4 py-2 text-sm font-bold">Turn on selected preset</button>
-            </> : <p className="mt-2 text-xs font-semibold text-black/65">No other saved presets are available.</p>}
+              }} className="ui-button ui-button--primary ui-button--sm mt-2">Turn on selected preset</button>
+            </> : <p className="mt-2 text-xs font-semibold text-[var(--color-text-secondary)]">No other saved presets are available.</p>}
           </section>
-          <button type="button" onClick={() => openReminder(false)} className="mt-4 w-full rounded-full border-2 border-black bg-white px-4 py-2 text-sm font-bold">Open reminder settings</button>
+          <button type="button" onClick={() => openReminder(false)} className="ui-button ui-button--sm mt-4 w-full">Open reminder settings</button>
         </aside>
       )}
       <button
         type="button"
-        className={`reminder-toggle fixed right-4 z-50 flex min-h-12 items-center gap-2 rounded-full border-2 border-black px-4 py-3 font-bold text-black shadow-[4px_4px_0_#000] transition hover:-translate-y-px ${ringing.length > 0 ? 'bg-[#ffd166]' : 'bg-[#c5ff6f]'}`}
+        className={`ui-button reminder-toggle fixed right-4 z-50 min-h-12 gap-2 px-4 py-3 font-bold ${ringing.length > 0 ? 'ui-button--warning' : 'ui-button--primary'}`}
         aria-expanded={widgetOpen}
         aria-controls="reminder-widget"
         onClick={() => {

@@ -4,7 +4,10 @@
   .ui-button:disabled { opacity:.5; cursor:not-allowed; }
   .ui-button--primary { background:var(--color-accent); border-color:var(--color-accent); color:var(--color-accent-contrast); }
   .ui-button--primary:hover:not(:disabled) { background:var(--color-accent-hover); }
+  .ui-button--warning { background:var(--color-warning-soft); border-color:var(--color-warning); color:var(--color-warning); }
+  .ui-button--success { background:var(--color-success-soft); border-color:var(--color-success); color:var(--color-success); }
   .ui-button--danger { background:var(--color-danger-soft); border-color:var(--color-danger); color:var(--color-danger); }
+  .ui-button[aria-pressed="true"] { background:var(--color-accent-soft); border-color:var(--color-accent); color:var(--color-accent); }
   .ui-button--ghost { border-color:transparent; background:transparent; }
   .ui-button--sm { min-height:var(--control-height-sm); padding:.4rem .7rem; font-size:var(--font-size-meta); }
   .ui-button--lg { min-height:var(--control-height-lg); padding:.85rem 1.25rem; }

@@ -355,8 +355,6 @@ html[data-theme="midnight"] .reminder-toggle {
   color: var(--mid-text) !important;
   box-shadow: var(--mid-card-shadow) !important;
 }
-html[data-theme="midnight"] .reminder-toggle { border-left: 2px solid var(--mid-accent) !important; }
-html[data-theme="midnight"] .reminder-widget,
 html[data-theme="midnight"] .workspace-note {
   background: var(--mid-raised) !important;
   color: var(--mid-text) !important;
@@ -364,7 +362,6 @@ html[data-theme="midnight"] .workspace-note {
   border-radius: var(--mid-panel-radius) !important;
   box-shadow: 0 12px 32px rgb(0 0 0 / .5) !important;
 }
-html[data-theme="midnight"] .reminder-widget :is(input,textarea,select) { background: var(--mid-bg) !important; color: var(--mid-text) !important; }
 html[data-theme="midnight"] .app-navigation-list > a[aria-current="page"],
 html[data-theme="midnight"] .app-navigation-related > a[aria-current="page"] { position: relative; background: var(--mid-raised) !important; color: var(--mid-text) !important; border-color: var(--mid-border-strong) !important; }
 html[data-theme="midnight"] .app-navigation-list > a[aria-current="page"]::before { content: ""; position: absolute; inset: 5px auto 5px 0; width: 2px; background: var(--mid-accent); }

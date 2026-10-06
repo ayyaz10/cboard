@@ -4,7 +4,7 @@ import { useReminders } from './ReminderProvider.jsx';
 import { formatReminderInterval } from './reminderHelpers.js';
 import { readReminderPresets } from './reminderPresetData.js';
 
-const buttonClass = 'rounded-full border-2 border-black bg-white px-4 py-2 text-sm font-bold text-black hover:bg-[#c5ff6f]';
+const buttonClass = 'ui-button ui-button--sm';
 
 export function ReminderPresets(props) {
   const { user } = useAuth();
@@ -65,30 +65,30 @@ function PresetList({ userId, title, duration, repeats, onEdit }) {
   }
 
   return (
-    <section aria-labelledby="reminder-presets-heading" className="mt-6 border-t border-black/15 pt-5">
+    <section aria-labelledby="reminder-presets-heading" className="mt-6 border-t border-[var(--color-border)] pt-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 id="reminder-presets-heading" className="text-xl font-bold">Saved presets</h3>
-        <button type="button" onClick={save} className={`${buttonClass} !bg-[#c5ff6f]`}>{editingId ? 'Save preset changes' : 'Save current settings as preset'}</button>
+        <button type="button" onClick={save} className="ui-button ui-button--primary">{editingId ? 'Save preset changes' : 'Save current settings as preset'}</button>
       </div>
-      <p className="mt-2 text-xs leading-5 text-black/60">Save the title, duration, and Just once or Repeat setting from the form above. Start a saved preset whenever you need it. Presets are saved on this browser.</p>
-      {editingId && <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl bg-[#ffd166] p-3 text-sm font-semibold">
+      <p className="mt-2 text-xs leading-5 text-[var(--color-text-muted)]">Save the title, duration, and Just once or Repeat setting from the form above. Start a saved preset whenever you need it. Presets are saved on this browser.</p>
+      {editingId && <div className="ui-badge ui-badge--warning mt-3 flex flex-wrap items-center gap-3 p-3 text-sm">
         <p>Edit the form above, then choose Save preset changes.</p>
         <button type="button" onClick={() => { setEditingId(null); setMessage('Preset editing cancelled.'); setError(''); }} className={buttonClass}>Cancel editing</button>
       </div>}
-      {error && <p role="alert" className="mt-3 text-sm font-bold text-red-700">{error}</p>}
+      {error && <p role="alert" className="ui-badge ui-badge--danger mt-3 text-sm">{error}</p>}
       <p role="status" className="mt-2 text-sm font-semibold">{message}</p>
-      {presets.length === 0 ? <p className="mt-3 rounded-xl border-2 border-dashed border-black/20 p-4 text-sm text-black/60">No saved presets yet. Try “Drink water” every 45 minutes or “Check the oven” after 30 minutes.</p> : (
+      {presets.length === 0 ? <p className="ui-card mt-3 border-dashed p-4 text-sm text-[var(--color-text-muted)]">No saved presets yet. Try “Drink water” every 45 minutes or “Check the oven” after 30 minutes.</p> : (
         <ul className="mt-4 grid gap-3 sm:grid-cols-2">
           {presets.map((preset) => (
-            <li key={preset.id} className="rounded-xl border-2 border-black/20 bg-white p-4">
+            <li key={preset.id} className="ui-card p-4">
               <p className="break-words font-bold">{preset.title}</p>
-              <p className="mt-1 text-xs font-semibold text-black/70">{preset.repeats ? 'Repeating · Every' : 'Just once · After'} {formatReminderInterval(preset.duration)}</p>
+              <p className="mt-1 text-xs font-semibold text-[var(--color-text-secondary)]">{preset.repeats ? 'Repeating · Every' : 'Just once · After'} {formatReminderInterval(preset.duration)}</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <button type="button" aria-label={`Start preset ${preset.title}`} onClick={() => {
                   addReminder(preset.title, preset.duration, preset.repeats);
                   setMessage(`Started ${preset.title}${preset.repeats ? ', repeating every' : ', due after'} ${formatReminderInterval(preset.duration)}.`);
                   setError('');
-                }} className={`${buttonClass} !bg-[#c5ff6f]`}>Start</button>
+                }} className="ui-button ui-button--primary ui-button--sm">Start</button>
                 <button type="button" aria-label={`Edit preset ${preset.title}`} onClick={() => { setEditingId(preset.id); setError(''); setMessage(''); onEdit(preset); }} className={buttonClass}>Edit</button>
                 <button type="button" aria-label={`Delete preset ${preset.title}`} onClick={() => remove(preset)} className={buttonClass}>Delete</button>
               </div>
