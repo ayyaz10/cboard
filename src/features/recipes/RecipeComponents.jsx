@@ -147,6 +147,7 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
   item = prepareIngredientEditor(recipe).ingredients[index] || item;
   const editableAmount = initialProductAmount({ amount: item.amount, unit: 'pieces' }, 'pieces');
   const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(item.name);
   const [values, setValues] = useState(item.nutrition || {});
   const [nutritionLabel,setNutritionLabel] = useState(item.nutritionLabel || null);
   const [amount, setAmount] = useState(editableAmount);
@@ -157,7 +158,7 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
     setBusy(true);
     setError('');
     try {
-      const saved = await saveRecipeIngredientNutrition(recipe, index, values, { amount: Number(amount), unit, ...(nutritionLabel?{nutritionLabel}: {}) });
+      const saved = await saveRecipeIngredientNutrition(recipe, index, values, { name, amount: Number(amount), unit, ...(nutritionLabel?{nutritionLabel}: {}) });
       onSaved?.(saved);
       setEditing(false);
     } catch (saveError) {
@@ -176,10 +177,10 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
           <button
             type="button"
             className="group mt-0.5 flex min-h-9 max-w-full items-center gap-1.5 text-left text-xs leading-5 text-black/65 transition hover:text-black focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2"
-            aria-label={`${editing ? 'Close' : 'Edit'} nutrition for ${formatIngredient(item)}`}
+            aria-label={`${editing ? 'Close' : 'Edit'} ingredient ${formatIngredient(item)}`}
             aria-expanded={editing}
-            title="Edit ingredient nutrition"
-            onClick={() => { setValues(item.nutrition || {}); setNutritionLabel(item.nutritionLabel || null); setAmount(editableAmount); setUnit(item.unit); setError(''); setEditing((value) => !value); }}
+            title="Edit ingredient name and nutrition"
+            onClick={() => { setName(item.name); setValues(item.nutrition || {}); setNutritionLabel(item.nutritionLabel || null); setAmount(editableAmount); setUnit(item.unit); setError(''); setEditing((value) => !value); }}
           >
             <span>{ingredientNutritionSummary(item)}</span>
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 transition-transform group-hover:scale-110">
@@ -196,7 +197,8 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
       ))}
     </div>
     {editing && <fieldset disabled={busy} className="mt-3 space-y-3 border-t-2 border-black/15 pt-3">
-      <legend className="sr-only">Edit nutrition for {formatIngredient(item)}</legend>
+      <legend className="sr-only">Edit ingredient name and nutrition for {formatIngredient(item)}</legend>
+      <label>Food / ingredient name<input className="field-input" type="text" maxLength={200} required value={name} onChange={event => setName(event.target.value)} placeholder="Enter food name" /></label>
       <div className="grid grid-cols-2 gap-2"><label>Amount<input className="field-input" type="number" min="0.0001" step="any" value={amount ?? ''} onChange={event => {
         const next = updateIngredientField({ amount, unit, nutrition: values, nutritionLabel }, 'amount', event.target.value);
         setAmount(event.target.value); setValues(next.nutrition);
@@ -217,7 +219,7 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
       <p className="text-xs text-black/60">Values are for the full ingredient amount shown above.</p>
       {error && <p role="alert" className="text-sm font-semibold">{error}</p>}
       <div className="flex flex-wrap gap-2">
-        <button type="button" className={secondaryButton} disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save nutrition'}</button>
+        <button type="button" className={secondaryButton} disabled={busy || !name.trim()} onClick={save}>{busy ? 'Saving…' : 'Save changes'}</button>
         <button type="button" className={secondaryButton} disabled={busy} onClick={() => { setError(''); setEditing(false); }}>Cancel</button>
       </div>
     </fieldset>}
@@ -245,7 +247,7 @@ export function IngredientList({ recipe, preview = false, onRecipeUpdated }) {
       <div className="flex items-end justify-between gap-3">
         <h2 className="text-2xl font-bold">Ingredients</h2>
         <span className="text-right text-sm text-black/60">
-          {recipe.ingredients.length} items{!preview && <> · Tap macros to edit</>}
+          {recipe.ingredients.length} items{!preview && <> · Tap the pencil to edit names or nutrition</>}
         </span>
       </div>
       {columns ? <div className="mt-3 grid items-start gap-2 md:grid-cols-2">

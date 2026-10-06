@@ -24,7 +24,9 @@ export async function saveRecipeIngredientNutrition(recipe, ingredientIndex, nut
   const ingredients = stored.ingredients.map((item, index) => {
     if (index !== ingredientIndex) return item;
     const { nutritionLabel, ...manualItem } = item;
-    return { ...manualItem, ...quantity, nutrition };
+    const name = typeof quantity.name === 'string' ? quantity.name.trim() : item.name;
+    if (!name || name.length > 200) throw new Error('Enter an ingredient name of 1 to 200 characters.');
+    return { ...manualItem, ...quantity, name, nutrition };
   });
   if (quantity.amount != null && !(quantity.amount > 0)) throw new Error("Enter a positive ingredient amount.");
   const draft = { ...stored, ingredients, nutritionFromIngredients: true };
