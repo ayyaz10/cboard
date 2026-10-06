@@ -100,7 +100,7 @@ html[data-theme="midnight"] [class*="text-black"] { color: var(--mid-text) !impo
 html[data-theme="midnight"] [class*="text-black/"] { color: var(--mid-secondary) !important; }
 html[data-theme="midnight"] [class*="text-white"] { color: var(--mid-text) !important; }
 html[data-theme="midnight"] [class*="text-white/"] { color: var(--mid-secondary) !important; }
-html[data-theme="midnight"] .pill { background: var(--mid-accent-soft) !important; color: var(--mid-accent) !important; border-color: rgb(184 236 105 / .28) !important; }
+html[data-theme="midnight"] .pill { background: var(--mid-accent-soft) !important; color: var(--mid-accent) !important; border-color: color-mix(in srgb, var(--color-accent) 28%, transparent) !important; }
 html[data-theme="midnight"] .theme-toggle { background: var(--mid-surface) !important; border-color: var(--mid-border) !important; color: var(--mid-text) !important; }
 html[data-theme="midnight"] .theme-select,
 html[data-theme="midnight"] .auth-primary,
@@ -111,7 +111,7 @@ html[data-theme="midnight"] .primary-button { background: var(--mid-accent) !imp
 html[data-theme="midnight"] :where(button,a,summary,input,select,textarea):focus-visible { outline: 2px solid var(--mid-accent) !important; outline-offset: 3px; }
 html[data-theme="midnight"] button:disabled { opacity: .46; }
 html[data-theme="midnight"] [aria-pressed="true"],
-html[data-theme="midnight"] [aria-current="page"] { background-color: var(--mid-accent-soft) !important; color: var(--mid-accent) !important; border-color: rgb(184 236 105 / .48) !important; }
+html[data-theme="midnight"] [aria-current="page"] { background-color: var(--mid-accent-soft) !important; color: var(--mid-accent) !important; border-color: color-mix(in srgb, var(--color-accent) 48%, transparent) !important; }
 
 /* Forms, native popups and data-heavy components. */
 html[data-theme="midnight"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
