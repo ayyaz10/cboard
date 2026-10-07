@@ -306,3 +306,10 @@ entrypoint = "./functions/parse-finance/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/estimate-recipe-fibre/index.ts"
+
+[functions.banking]
+enabled = true
+# Enable Banking's redirect callback has no Supabase JWT; action requests verify
+# the caller with auth.getUser inside the handler.
+verify_jwt = false
+entrypoint = "./functions/banking/index.ts"

@@ -5,6 +5,10 @@ import { markGoalCompletion } from './financeReports.js';
 
 export const allocationTargets = ['savings', 'budget', 'goal', 'investment', 'debt', 'donation'];
 
+export function eligibleBookedBankIncome(state) {
+  return state.transactions.filter(item => item.source === 'bank' && item.type === 'income' && item.providerStatus === 'BOOK' && !item.bankIncomeAllocationsApplied);
+}
+
 function amountFor(rule, income) {
   return rule.mode === 'percent' ? Math.round(income * Number(rule.value || 0) / 10000) : Number(rule.value || 0);
 }
@@ -79,7 +83,7 @@ export function applyIncomeAllocations(state, incomeTransaction) {
 export function applyDueMonthlyAllocations(state, date) {
   const month = monthKey(date);
   const day = Number(date.slice(8, 10));
-  const income = state.transactions.filter(x => x.type === 'income' && inMonth(x.date, month)).reduce((sum, x) => sum + x.amount, 0) || state.settings.monthlyIncome;
+  const income = state.transactions.filter(x => x.type === 'income' && inMonth(x.date, month) && (!x.source || x.providerStatus === 'BOOK')).reduce((sum, x) => sum + x.amount, 0) || state.settings.monthlyIncome;
   for (const rule of (state.allocationRules || []).filter(x => x.active && x.timing === 'monthly' && day >= Number(x.day || 1))) {
     if (!state.transactions.some(x => x.allocationRuleId === rule.id && inMonth(x.date, month))) applyAllocation(state, rule, income, date);
   }

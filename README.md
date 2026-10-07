@@ -6,6 +6,8 @@ C Board is a clean, responsive control board built with React/Vite. It collects 
 
 - `Training` — calisthenics, strength, skills and recovery tracking. See [setup, storage and verification](./TRAINING.md), including the required Supabase migration.
 
+- `Finance` — personal finance tools with optional read-only bank sync through Enable Banking. See [Enable Banking setup and deployment](./docs/enable-banking.md) for Sandbox and restricted Production configuration.
+
 - `Calculator Tools`
   - Percentage Calculator
   - Calorie Calculator

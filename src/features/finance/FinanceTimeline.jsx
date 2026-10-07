@@ -50,15 +50,16 @@ function TargetCard({ item, currency }) {
 
 function buildTargetCards(data, month) {
   const currency = data.settings.currency;
-  const monthly = data.transactions.filter((item) => (month===null || item.date.startsWith(month)));
+  const transactions = data.transactions.filter(item => !item.source || item.providerStatus === 'BOOK');
+  const monthly = transactions.filter((item) => (month===null || item.date.startsWith(month)));
   const cards = [];
-  const saved = data.transactions.filter((item)=>item.type==='savings').reduce((sum,item)=>sum+item.amount,0);
+  const saved = transactions.filter((item)=>item.type==='savings').reduce((sum,item)=>sum+item.amount,0);
   cards.push({group:'savings',title:'Total savings moved',value:saved,target:0,caption:'All recorded savings allocations.'});
   for (const goal of data.goals) cards.push({group:'goals',title:goal.title,value:goal.saved,target:goal.target,caption:goal.status==='completed'?'Target reached.':`${formatMoney(Math.max(0,goal.target-goal.saved),currency)} left.`});
   for (const investment of data.investments) cards.push({group:'investments',title:investment.name,value:investment.currentValue,target:investment.target||0,caption:`${formatMoney(investment.contributed,currency)} contributed · ${formatMoney(investment.currentValue-investment.contributed,currency)} gain/loss.`});
   const donationCategories = new Set(data.categories.filter((item)=>item.type==='donation').map((item)=>item.id));
   const scopedBudgets = (month===null?Object.keys(data.budgets):[month]).flatMap(key=>{
-    const monthIncome=data.transactions.filter(item=>item.type==='income'&&item.date.startsWith(key)).reduce((sum,item)=>sum+item.amount,0);
+    const monthIncome=transactions.filter(item=>item.type==='income'&&item.date.startsWith(key)).reduce((sum,item)=>sum+item.amount,0);
     return (data.budgets[key]||[]).map(item=>({...item,month:key,target:budgetTarget(item,monthIncome||data.settings.monthlyIncome)}));
   });
   const donationTargets = scopedBudgets.filter((item)=>donationCategories.has(item.categoryId)).reduce((sum,item)=>sum+item.target,0);
@@ -76,8 +77,9 @@ function buildTargetCards(data, month) {
 
 export function FinanceTimeline({ data, month, setMonth, change, transactionScope, setTransactionScope, openTransaction, deleteTransaction }) {
   const allTime = transactionScope === 'all';
+  const transactions = useMemo(() => data.transactions.filter(item => !item.source || item.providerStatus === 'BOOK'), [data.transactions]);
   const rangeMonth = allTime ? null : month;
-  const openingMonth = allTime ? (data.transactions.map(item=>item.date.slice(0,7)).sort()[0] || month) : month;
+  const openingMonth = allTime ? (transactions.map(item=>item.date.slice(0,7)).sort()[0] || month) : month;
   const currency = data.settings.currency;
   const [showLogos,setShowLogos] = useState(true);
   const [selectedTransactionId,setSelectedTransactionId] = useState(null);
@@ -91,8 +93,8 @@ export function FinanceTimeline({ data, month, setMonth, change, transactionScop
   const pinch = useRef(null);
   const wheelHandler = useRef(null);
   useEffect(()=>setOpening(moneyInput(savedOpening)),[openingMonth,savedOpening]);
-  const timeline = useMemo(()=>buildCashTimeline(data.transactions,rangeMonth,savedOpening),[data.transactions,rangeMonth,savedOpening]);
-  const selectedTransaction=data.transactions.find(item=>item.id===selectedTransactionId)||null;
+  const timeline = useMemo(()=>buildCashTimeline(transactions,rangeMonth,savedOpening),[transactions,rangeMonth,savedOpening]);
+  const selectedTransaction=transactions.find(item=>item.id===selectedTransactionId)||null;
   useEffect(()=>{if(selectedTransactionId&&!selectedTransaction)setSelectedTransactionId(null)},[selectedTransactionId,selectedTransaction]);
   const fullViewport = useMemo(()=>{
     const balances=timeline.map((point)=>point.balance);
