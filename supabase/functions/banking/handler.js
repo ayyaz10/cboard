@@ -142,7 +142,7 @@ export function createBankingHandler({ createClient, env = key => Deno.env.get(k
   return async request => {
     const origin = request.headers.get('origin');
     const allowedOrigin = env('APP_ORIGIN');
-    const cors = { 'access-control-allow-headers': 'authorization, apikey, content-type', 'access-control-allow-methods': 'POST, GET, OPTIONS', ...(allowedOrigin && origin === allowedOrigin ? { 'access-control-allow-origin': origin, vary: 'Origin' } : {}) };
+    const cors = { 'access-control-allow-headers': 'authorization, apikey, content-type, x-client-info', 'access-control-allow-methods': 'POST, GET, OPTIONS', ...(allowedOrigin && origin === allowedOrigin ? { 'access-control-allow-origin': origin, vary: 'Origin' } : {}) };
     if (request.method === 'OPTIONS') return new Response('ok', { headers: cors });
 
     const url = new URL(request.url);
