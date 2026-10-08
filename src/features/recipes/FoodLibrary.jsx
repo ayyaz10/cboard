@@ -126,13 +126,13 @@ export function FoodLibrary({ library, recipes, foodCatalog = [], mealPlans = []
     <summary onClick={event => { event.preventDefault(); setOpenActionKey(current => current === entry.key ? null : entry.key); }} className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full border-2 border-black bg-white hover:bg-[#c5ff6f]" aria-label={`Actions for ${entry.item.name}`} title="Food actions"><span aria-hidden="true" className="flex gap-0.5"><i className="h-1 w-1 rounded-full bg-black"/><i className="h-1 w-1 rounded-full bg-black"/><i className="h-1 w-1 rounded-full bg-black"/></span></summary>
     <div className="absolute right-0 top-12 z-20 grid min-w-36 gap-1 rounded-xl border-2 border-black bg-white p-2 shadow-[3px_3px_0_#111]">
       <button type="button" className="rounded-lg px-3 py-2 text-left text-sm font-bold hover:bg-[#edffd5]" onClick={() => { setOpenActionKey(null); onEdit(entry.food.id); }}>Edit food</button>
-      <button type="button" className="rounded-lg px-3 py-2 text-left text-sm font-bold text-red-800 hover:bg-red-50" onClick={() => { setOpenActionKey(null); requestDelete([entry.food.id]); }}>Delete food</button>
+      <button type="button" className="danger-action rounded-lg px-3 py-2 text-left text-sm font-bold" onClick={() => { setOpenActionKey(null); requestDelete([entry.food.id]); }}>Delete food</button>
     </div>
   </details> : <details data-food-action-menu className="relative inline-block" open={openActionKey === entry.key}>
     <summary onClick={event => { event.preventDefault(); setOpenActionKey(current => current === entry.key ? null : entry.key); }} className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full border-2 border-black bg-white hover:bg-[#c5ff6f]" aria-label={`Actions for ${entry.item.name}`} title="Ingredient actions"><span aria-hidden="true" className="flex gap-0.5"><i className="h-1 w-1 rounded-full bg-black"/><i className="h-1 w-1 rounded-full bg-black"/><i className="h-1 w-1 rounded-full bg-black"/></span></summary>
     <div className="absolute right-0 top-12 z-20 grid min-w-48 gap-1 rounded-xl border-2 border-black bg-white p-2 shadow-[3px_3px_0_#111]">
       <span className="px-3 py-1 text-xs text-black/60">Saved in recipe, not reusable foods</span>
-      <button type="button" className="rounded-lg px-3 py-2 text-left text-sm font-bold text-red-800 hover:bg-red-50" onClick={() => { setOpenActionKey(null); setRecipeIngredientDeletePlan([entry.key]); }}>Remove from {entry.recipeTitles.length} recipe{entry.recipeTitles.length === 1 ? '' : 's'}</button>
+      <button type="button" className="danger-action rounded-lg px-3 py-2 text-left text-sm font-bold" onClick={() => { setOpenActionKey(null); setRecipeIngredientDeletePlan([entry.key]); }}>Remove from {entry.recipeTitles.length} recipe{entry.recipeTitles.length === 1 ? '' : 's'}</button>
     </div>
   </details>;
   return <section className="food-library" aria-labelledby="food-library-heading">
@@ -164,8 +164,8 @@ export function FoodLibrary({ library, recipes, foodCatalog = [], mealPlans = []
           <label className="inline-flex min-h-11 items-center gap-2 rounded-full border-2 border-black bg-white px-3 text-sm font-bold"><input type="checkbox" className="accent-lime-500" checked={selectable.length > 0 && selectable.every(entry => selectedIds.has(entry.food?.id || entry.key))} onChange={event => selectVisible(event.target.checked)} />Select visible</label>
           <button type="button" className={secondaryButton} onClick={() => setSelectedIds(new Set())}>Clear</button>
           <button type="button" className={secondaryButton} onClick={toggleSelectionMode}>Done</button>
-          {selected.length > 0 && <button type="button" className={`${secondaryButton} border-red-800 text-red-800`} onClick={() => requestDelete(selected.map(food => food.id))}>Delete foods ({selected.length})</button>}
-          {selectedRecipeOnly.length > 0 && <button type="button" className={`${secondaryButton} border-red-800 text-red-800`} onClick={() => setRecipeIngredientDeletePlan(selectedRecipeOnly)}>Remove recipe ingredients ({selectedRecipeOnly.length})</button>}
+          {selected.length > 0 && <button type="button" className={`${secondaryButton} danger-action`} onClick={() => requestDelete(selected.map(food => food.id))}>Delete foods ({selected.length})</button>}
+          {selectedRecipeOnly.length > 0 && <button type="button" className={`${secondaryButton} danger-action`} onClick={() => setRecipeIngredientDeletePlan(selectedRecipeOnly)}>Remove recipe ingredients ({selectedRecipeOnly.length})</button>}
         </>}
       </div>
     </div>

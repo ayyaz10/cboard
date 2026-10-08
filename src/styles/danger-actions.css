@@ -1,0 +1,16 @@
+/* Keep destructive actions visibly separate from routine controls in every theme. */
+.danger-action,
+button[aria-label^="Delete" i],
+button[aria-label^="Remove" i],
+button[aria-label^="Discard" i] {
+  border-color: var(--color-danger) !important;
+  background: var(--color-danger-soft) !important;
+  color: var(--color-danger) !important;
+}
+
+.danger-action:hover:not(:disabled),
+button[aria-label^="Delete" i]:hover:not(:disabled),
+button[aria-label^="Remove" i]:hover:not(:disabled),
+button[aria-label^="Discard" i]:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-danger-soft) 70%, var(--color-danger)) !important;
+}

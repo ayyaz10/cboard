@@ -620,6 +620,7 @@ export function Groceries() {
                   </button>
                 )}
                 <button
+                  className="danger-action"
                   disabled={busy}
                   onClick={async () => {
                     if (
@@ -1249,6 +1250,7 @@ export function Groceries() {
                 </button>
                 <button
                   type="button"
+                  className="danger-action"
                   disabled={busy}
                   onClick={async () => {
                     if (

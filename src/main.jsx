@@ -7,6 +7,7 @@ import { ReminderProvider } from './features/focusTimer/ReminderProvider';
 import './styles/index.css';
 import './styles/design-tokens.css';
 import './styles/shared-ui.css';
+import './styles/danger-actions.css';
 import './styles/midnight.css';
 import { PwaStatus } from './pwa/PwaStatus';
 import { AppNotifications } from './components/ui/AppNotifications';

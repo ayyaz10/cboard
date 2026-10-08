@@ -103,7 +103,7 @@ export function EntryList({ goal, entries, onEditEntry, onDeleteEntry }) {
                   <button
                     type="button"
                     onClick={() => onDeleteEntry(entry.id)}
-                    className="rounded-full border-2 border-black bg-[#ffe0de] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-black transition hover:bg-[#ffb4ad]"
+                    className="danger-action rounded-full border-2 border-black px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] transition"
                   >
                     Delete
                   </button>

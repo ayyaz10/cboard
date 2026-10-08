@@ -46,7 +46,7 @@ export function GoalDetailsPanel({
         <button
           type="button"
           onClick={() => onDeleteGoal(goal.id)}
-          className="rounded-full border-2 border-black bg-[#ffe0de] px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[3px_3px_0_#000] transition hover:bg-[#ffb4ad]"
+          className="danger-action rounded-full border-2 border-black px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] shadow-[3px_3px_0_#000] transition"
         >
           Delete goal
         </button>

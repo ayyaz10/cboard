@@ -102,7 +102,7 @@ export function WeightProgress() {
             <label>Body photo (optional)<input type="file" accept="image/jpeg,image/png,image/webp" onChange={e=>{upload(e.target.files?.[0]);e.target.value=''}}/></label>
             <p className="weight-help">JPG, PNG or WebP, up to 5 MB. Photos are private to your account and are not sent to AI.</p>
             {photo?<img className="weight-preview" src={photo} alt="New progress photo preview"/>:form.photo_path?<Photo path={form.photo_path} date={form.date} userId={data.userId}/>:null}
-            {(photo||form.photo_path)&&<button type="button" onClick={()=>{setPhoto(null);setForm({...form,photo_path:null})}}>Remove photo</button>}
+            {(photo||form.photo_path)&&<button type="button" className="danger-action" onClick={()=>{setPhoto(null);setForm({...form,photo_path:null})}}>Remove photo</button>}
             <div className="weight-actions"><button className="weight-primary" type="submit">{busy?'Saving...':editing?'Save changes':'Save weigh-in'}</button>{editing&&<button type="button" onClick={reset}>Cancel edit</button>}</div>
           </fieldset>
           {reading&&<p role="status">Preparing photo...</p>}
@@ -132,8 +132,8 @@ export function WeightProgress() {
       </dialog>
       <section className="weight-card"><div className="weight-card-heading"><div><span className="weight-eyebrow">Entries</span><h2>Weigh-in history</h2></div><span className="weight-count">{entries.length} total</span></div>{!entries.length?<p className="weight-muted">No weigh-ins yet. Start with today's weight, or add an earlier date.</p>:<div className="weight-history">{entries.map(entry=><article key={entry.id}>
         <div><strong>{format(entry.weight_kg)}</strong><p>{entry.date}{entry.photo_path?' / Photo attached':''}</p>{entry.note&&<p className="weight-note">{entry.note}</p>}</div>
-        <div className="weight-actions"><button disabled={busy||reading} onClick={()=>{imageJob.current++;setPhoto(null);setEditing(entry);setForm({date:entry.date,weight:String(displayWeight(entry.weight_kg,unit)),note:entry.note,photo_path:entry.photo_path});setError('');formRef.current?.scrollIntoView({behavior:'smooth',block:'start'})}}>Edit{entry.photo_path?' / view photo':''}</button><button disabled={busy} onClick={()=>setConfirm(entry.id)}>Delete</button></div>
-        {confirm===entry.id&&<div className="weight-alert">Delete this weigh-in{entry.photo_path?' and its photo':''}? <button disabled={busy} onClick={()=>remove(entry)}>Delete permanently</button><button disabled={busy} onClick={()=>setConfirm(null)}>Cancel</button></div>}
+        <div className="weight-actions"><button disabled={busy||reading} onClick={()=>{imageJob.current++;setPhoto(null);setEditing(entry);setForm({date:entry.date,weight:String(displayWeight(entry.weight_kg,unit)),note:entry.note,photo_path:entry.photo_path});setError('');formRef.current?.scrollIntoView({behavior:'smooth',block:'start'})}}>Edit{entry.photo_path?' / view photo':''}</button><button className="danger-action" disabled={busy} onClick={()=>setConfirm(entry.id)}>Delete</button></div>
+        {confirm===entry.id&&<div className="weight-alert">Delete this weigh-in{entry.photo_path?' and its photo':''}? <button className="danger-action" disabled={busy} onClick={()=>remove(entry)}>Delete permanently</button><button disabled={busy} onClick={()=>setConfirm(null)}>Cancel</button></div>}
       </article>)}</div>}</section>
     </>}
   </section></PageShell>;

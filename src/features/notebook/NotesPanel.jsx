@@ -612,7 +612,7 @@ export function NotesPanel({
               <button
                 type="button"
                 onClick={handleDelete}
-                className="rounded-full border-2 border-black bg-[#ffe0de] px-5 py-3 text-sm font-bold uppercase tracking-[0.12em] text-black shadow-[4px_4px_0_#000]"
+                className="danger-action rounded-full border-2 border-black bg-[#ffe0de] px-5 py-3 text-sm font-bold uppercase tracking-[0.12em] text-black shadow-[4px_4px_0_#000]"
               >
                 {selectedNote.isDraft ? 'Discard' : 'Delete'}
               </button>

@@ -84,7 +84,7 @@ export function ReceiptEditor({ receipt, onChange, onExtract, total, currency, i
           <label>Item name<input maxLength={200} value={item.name} onChange={e => editItem(item.id, { name:e.target.value })}/></label>
           <div className="f-row"><label>Quantity<input inputMode="decimal" placeholder="Unknown" value={item.quantity} onChange={e => editItem(item.id, { quantity:e.target.value })}/></label><label>Unit<input maxLength={30} placeholder="each, kg, g, L, ml" value={item.unit} onChange={e => editItem(item.id, { unit:e.target.value })}/></label><label>Unit price<input inputMode="decimal" value={item.unitPrice} onChange={e => editItem(item.id, { unitPrice:e.target.value })}/></label><label>Line total<input inputMode="decimal" value={item.lineTotal} onChange={e => editItem(item.id, { lineTotal:e.target.value })}/></label></div>
           {item.rawText && <p className="f-help f-receipt-raw">Read as: {item.rawText}</p>}
-          <button type="button" className="f-button" onClick={() => onChange({ ...receipt, items:receipt.items.filter(other => other.id !== item.id) })}>Remove item {index + 1}</button>
+          <button type="button" className="f-button danger-action" onClick={() => onChange({ ...receipt, items:receipt.items.filter(other => other.id !== item.id) })}>Remove item {index + 1}</button>
         </fieldset>)}
         <button type="button" className="f-button" onClick={() => onChange({ ...receipt, items:[...receipt.items, { id:crypto.randomUUID(), name:'', rawText:'', quantity:'', unit:'', unitPrice:'', lineTotal:'' }] })}>Add receipt item</button>
         <p className="font-bold">Item sum: {formatMoney(structured.items.reduce((sum, item) => sum + (item.lineTotal || 0), 0), currency)}</p>

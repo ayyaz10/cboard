@@ -69,7 +69,7 @@ export function RecipeProducts({ recipe, onSaved, onPreview }) {
             <div className="g-actions mt-2">
               <button type="button" aria-expanded={active === index} onClick={() => setActive(active === index ? null : index)}>{active === index ? 'Close lookup' : item ? 'Change product' : 'Choose product'}</button>
               {!item && <button type="button" onClick={() => update(index, { quantity: initialProductAmount(ingredient, 'g'), unit: 'g', nutrition: { quantity: 100, unit: 'g', source: { name: ingredient.name, provider: 'Manual label' } } })}>Enter label manually</button>}
-              {item && <button type="button" onClick={() => update(index, null)}>Remove product</button>}
+              {item && <button type="button" className="danger-action" onClick={() => update(index, null)}>Remove product</button>}
             </div>
             {item && <label>Label unit<select value={item.unit} onChange={(event) => update(index, { ...item, unit: event.target.value, quantity: initialProductAmount(ingredient, event.target.value), nutrition: { ...item.nutrition, unit: event.target.value, source: { ...item.nutrition.source, modified: true } } })}><option value="g">Grams (g)</option><option value="ml">Millilitres (ml)</option><option value="pieces">Pieces (label must give values per piece)</option><option value="servings">Servings</option></select></label>}
             {open && active === index && <NutritionLookup allowLabelScan={false} key={index} name={ingredient.name} amountUnit={ingredient.unit} portionMode="weight" active visible onSelect={(nutrition) => {

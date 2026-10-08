@@ -491,7 +491,7 @@ function RecipesContent({ route, navigationPath }) {
                       </div>
                       {selectionMode && <div className="flex gap-2">
                         <button type="button" className={secondaryButton} onClick={toggleSelectionMode}>Done</button>
-                        <button type="button" className={`${secondaryButton} border-red-800 text-red-800`} disabled={!bulkDeleteItems.length || busy} onClick={() => setConfirmBulkDelete(true)}>Delete {bulkDeleteItems.length ? `(${bulkDeleteItems.length})` : 'selected'}</button>
+                        <button type="button" className={`${secondaryButton} danger-action`} disabled={!bulkDeleteItems.length || busy} onClick={() => setConfirmBulkDelete(true)}>Delete {bulkDeleteItems.length ? `(${bulkDeleteItems.length})` : 'selected'}</button>
                       </div>}
                     </section>}
                     <RecipeMasonryGrid className={cardGrid}>
@@ -579,7 +579,7 @@ function RecipesContent({ route, navigationPath }) {
                   <RecipeLink to="/recipes">Back to recipes</RecipeLink>
                     <div className="flex flex-wrap gap-2">
                       <button type="button" className={secondaryButton} onClick={() => startImport(recipe, true)}>Edit Recipe</button>
-                      <button type="button" className={secondaryButton} aria-label={`Delete ${recipe.title}`} onClick={() => setRemoving(recipe)}>Delete recipe</button>
+                      <button type="button" className={`${secondaryButton} danger-action`} aria-label={`Delete ${recipe.title}`} onClick={() => setRemoving(recipe)}>Delete recipe</button>
                     </div>
                 </div>
                 <RecipePage key={recipe.slug} recipe={recipe} favourite={favourites.has(recipe.slug)} favouritePending={favouritePending.has(recipe.slug)} onToggleFavourite={toggleFavourite} onRecipeUpdated={recipeUpdated} />
@@ -631,7 +631,7 @@ function RecipesContent({ route, navigationPath }) {
           <div className="mt-6 flex flex-wrap gap-3">
             {recipeCleanup ? <>
             <button autoFocus className={secondaryButton} disabled={busy} onClick={() => finishRecipeCleanup(false)}>Keep foods</button>
-            <button className={`${secondaryButton} border-red-800 text-red-800`} disabled={busy} onClick={() => finishRecipeCleanup(true)}>{busy ? 'Deleting…' : `Delete ${recipeCleanup.foods.length} unused food${recipeCleanup.foods.length === 1 ? '' : 's'}`}</button>
+            <button className={`${secondaryButton} danger-action`} disabled={busy} onClick={() => finishRecipeCleanup(true)}>{busy ? 'Deleting…' : `Delete ${recipeCleanup.foods.length} unused food${recipeCleanup.foods.length === 1 ? '' : 's'}`}</button>
             </> : <>
             <button
               autoFocus

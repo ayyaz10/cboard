@@ -638,6 +638,7 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
                   <NutritionTotals meals={[meal]} compact />
                   <div className="diary-actions">
                     <button
+                      className="danger-action"
                       disabled={disabled}
                       aria-label={`Edit ${meal.title}`}
                       onClick={() => {
@@ -664,6 +665,7 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
                       <p>Remove this meal from {date}?</p>
                       <div className="diary-actions">
                         <button
+                          className="danger-action"
                           disabled={disabled}
                           onClick={async () => {
                             if (
@@ -778,7 +780,7 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
                     }}>
                       Add meal
                     </button>
-                    <button type="button" disabled={disabled} onClick={() => setRemoveDay(entry.date)}>
+                    <button type="button" className="danger-action" disabled={disabled} onClick={() => setRemoveDay(entry.date)}>
                       Delete day
                     </button>
                   </div>
@@ -786,7 +788,7 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
                     <div className="diary-delete" role="group" aria-label={`Confirm deletion of ${entry.date}`}>
                       <p>Delete every meal saved for {entry.date}? This cannot be undone.</p>
                       <div className="diary-actions">
-                        <button type="button" disabled={busy} onClick={() => deleteDay(entry)}>Confirm delete day</button>
+                        <button type="button" className="danger-action" disabled={busy} onClick={() => deleteDay(entry)}>Confirm delete day</button>
                         <button type="button" disabled={busy} onClick={() => setRemoveDay(null)}>Keep this day</button>
                       </div>
                     </div>
