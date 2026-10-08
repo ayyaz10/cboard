@@ -39,7 +39,17 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
     }catch(err){if(run===job.current){setError(err.message||'Could not scan this label. Try a clearer image.');notify.error(err.message||'Could not scan nutrition label');session.current?.dispose();session.current=null;}}
     finally{if(run===job.current){setBusy(false);setProgress(null);}}
   }
-  function upload(file){if(!file)return;try{validateOcrImage(file);}catch(err){setError(err.message);return;}fileRef.current=file;if(urlRef.current)URL.revokeObjectURL(urlRef.current);urlRef.current=URL.createObjectURL(file);setPhoto(urlRef.current);setRotation(0);const full={left:0,top:0,right:100,bottom:100};setCrop(full);void scan(file,0,full);}
+  function upload(file){if(!file)return;try{validateOcrImage(file);}catch(err){setError(err.message);return;}setError('');fileRef.current=file;if(urlRef.current)URL.revokeObjectURL(urlRef.current);urlRef.current=URL.createObjectURL(file);setPhoto(urlRef.current);setRotation(0);const full={left:0,top:0,right:100,bottom:100};setCrop(full);void scan(file,0,full);}
+  function pasteImage(event){
+    if(busy||disabled)return;
+    const items=Array.from(event.clipboardData?.items||[]);
+    const item=items.find(value=>value.kind==='file'&&value.type.startsWith('image/'));
+    const file=item?.getAsFile()||Array.from(event.clipboardData?.files||[]).find(value=>value.type.startsWith('image/'));
+    if(!file)return;
+    event.preventDefault();
+    const image=file instanceof File?file:new File([file],`pasted-nutrition-label.${file.type==='image/png'?'png':file.type==='image/webp'?'webp':'jpg'}`,{type:file.type});
+    upload(image);
+  }
   function update(patch){setColumns(previous=>previous.map(value=>value.id===active?{...value,...patch}:value));setError('');}
   function field(key,label,unit){const found=column.nutrients[key];return <div className="nscan-field" key={key}>
     <label className="nscan-check"><input type="checkbox" checked={column.selected.includes(key)} onChange={event=>update({selected:event.target.checked?[...column.selected,key]:column.selected.filter(value=>value!==key)})}/><span>{label} ({unit})</span></label>
@@ -54,6 +64,10 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
       <div className="nscan-actions">
         <label>Upload nutrition label<input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy||disabled} onChange={event=>{upload(event.target.files?.[0]);event.target.value='';}}/></label>
         <label>Take nutrition photo<input type="file" capture="environment" accept="image/jpeg,image/png,image/webp" disabled={busy||disabled} onChange={event=>{upload(event.target.files?.[0]);event.target.value='';}}/></label>
+      </div>
+      <div className={`nscan-paste${busy||disabled?' is-disabled':''}`} tabIndex={busy||disabled?-1:0} role="group" aria-label="Paste nutrition label image" onPaste={pasteImage}>
+        <strong>Paste nutrition label image</strong>
+        <span>Click here, then paste an image with Ctrl+V or ⌘V</span>
       </div>
       {photo&&<details><summary>Original image, crop and rotation</summary><img src={photo} alt="Nutrition label to review"/>
         <p>Crop bounds are percentages of the original image. Keep every heading for the columns you want to read.</p>
