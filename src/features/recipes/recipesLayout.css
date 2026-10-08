@@ -228,6 +228,7 @@ html[data-theme='matrix'] .recipe-page-shell > .recipe-shortcuts {
   }
 }
 .food-library{display:grid;gap:1.25rem}
+.food-library-selection-bar.is-sticky{position:sticky;top:max(.5rem,env(safe-area-inset-top));z-index:30;isolation:isolate;border-color:var(--color-border,#111);background-color:var(--color-surface-raised,#fffdf8);box-shadow:var(--shadow-popover,0 8px 24px rgb(0 0 0 / .18))}
 .food-library-filters{display:grid;grid-template-columns:2fr 1fr;gap:1rem}
 .food-library-filters label{display:grid;gap:.5rem;font-weight:700}
 .food-library-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,290px),1fr));gap:1rem}

@@ -156,7 +156,7 @@ export function FoodLibrary({ library, recipes, foodCatalog = [], mealPlans = []
         <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-bold">Possible duplicate group {index + 1}</h2><p className="text-sm">{group.map(food => food.name).join(' · ')}</p></div><button type="button" className={secondaryButton} onClick={() => openMerge(group)}>Review merge</button></div>
       </article>)}
     </div>}
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-black bg-white p-3">
+    <div className={`food-library-selection-bar flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-black bg-white p-3${selectionMode ? ' is-sticky' : ''}`}>
       <span className="text-sm text-black/70">{selectionMode ? `${selectedIds.size} selected` : 'Select reusable foods or recipe-only ingredients for cleanup.'}</span>
       <div className="flex flex-wrap gap-2">
         {!selectionMode && <button type="button" className={secondaryButton} onClick={toggleSelectionMode}>Select foods</button>}
