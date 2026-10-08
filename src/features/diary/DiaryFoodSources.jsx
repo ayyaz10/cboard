@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { itemNutrition, nutrientContributions } from './diaryData.js';
 import { nutrientEnergy } from './nutrientEnergy.js';
 import { simulateDiaryChanges, simulationKey } from './diarySimulation.js';
@@ -24,6 +24,19 @@ const EDITOR_NUTRIENTS = [
   ['fat', 'Fat', 'g'],
   ['fiber', 'Fibre', 'g'],
 ];
+const SOURCE_VISIBILITY_STORAGE_KEY = 'cboard:food-diary:source-visibility:v1';
+function defaultSourceVisibility() {
+  return Object.fromEntries(SOURCE_CARDS.map(([key]) => [key, true]));
+}
+function readSourceVisibility() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SOURCE_VISIBILITY_STORAGE_KEY) || 'null');
+    if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
+      return Object.fromEntries(SOURCE_CARDS.map(([key]) => [key, typeof saved[key] === 'boolean' ? saved[key] : true]));
+    }
+  } catch { /* Use the default card set when browser storage is unavailable. */ }
+  return defaultSourceVisibility();
+}
 const format = value => new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(value);
 const calorieLabel = value => value.caloriesKnown ? `${format(value.calories)} kcal${value.caloriesMissing ? ' (known subtotal)' : ''}` : 'Calories unknown';
 const dateLabel = (date, today) => date === today ? 'today' : new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`));
@@ -41,6 +54,7 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
   const [overrides, setOverrides] = useState({});
   const [expandedFood, setExpandedFood] = useState('');
   const [amountDrafts, setAmountDrafts] = useState({});
+  const [visibleSources, setVisibleSources] = useState(readSourceVisibility);
   const [confirmApply, setConfirmApply] = useState(false);
   const [applyError, setApplyError] = useState('');
   const contributions = useMemo(() => nutrientContributions(meals), [meals]);
@@ -75,6 +89,15 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
   const changed = Object.values(overrides).some(Boolean) && simulation.changes.length > 0;
   const currentTotals = simulation.currentTotals;
   const simulatedTotals = simulation.simulatedTotals;
+
+  useEffect(() => {
+    try { localStorage.setItem(SOURCE_VISIBILITY_STORAGE_KEY, JSON.stringify(visibleSources)); }
+    catch { /* Card visibility still works for this visit when storage is unavailable. */ }
+  }, [visibleSources]);
+
+  function toggleSource(key) {
+    setVisibleSources(previous => ({ ...previous, [key]: !previous[key] }));
+  }
 
   function applyAmount(entry, number) {
     const quantity = mode === 'percent' ? entry.quantity * number / 100 : number;
@@ -162,8 +185,16 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
         <div className="diary-simulation-footer"><span>{changed ? `${simulation.changes.length} changed ${simulation.changes.length === 1 ? 'entry' : 'entries'} · preview only` : 'No changes to apply'}</span><Button variant="primary" disabled={!changed || disabled} onClick={() => setConfirmApply(true)}>Review &amp; apply</Button></div>
       </Panel>}
 
-      <div className="diary-source-grid">
-        {SOURCE_CARDS.map(([key, label, description, colorToken, unit]) => {
+      <div className="diary-source-visibility">
+        <div className="diary-source-visibility-heading"><strong>Food source cards</strong><span>Choose which nutrients to show</span></div>
+        <div className="diary-source-visibility-controls" role="group" aria-label="Show or hide nutrient cards">
+          {SOURCE_CARDS.map(([key, label]) => <Button key={key} size="sm" className="diary-source-visibility-toggle" aria-pressed={visibleSources[key]} onClick={() => toggleSource(key)}><span aria-hidden="true">{visibleSources[key] ? '✓' : '+'}</span>{label}</Button>)}
+          {SOURCE_CARDS.some(([key]) => !visibleSources[key]) && <Button size="sm" variant="ghost" onClick={() => setVisibleSources(defaultSourceVisibility())}>Show all</Button>}
+        </div>
+      </div>
+
+      {SOURCE_CARDS.some(([key]) => visibleSources[key]) ? <div className="diary-source-grid">
+        {SOURCE_CARDS.filter(([key]) => visibleSources[key]).map(([key, label, description, colorToken, unit]) => {
           const nutrient = adjusting ? simulation.contributions[key] : contributions[key];
           const calorieContributions = adjusting ? simulation.contributions.calories : contributions.calories;
           const energy = nutrientEnergy(key, nutrient, calorieContributions);
@@ -181,7 +212,7 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
             {key !== 'calories' && nutrient.caloriesMissing > 0 && <p className="diary-source-warning">Calories are missing for {nutrient.caloriesMissing} contributing food {nutrient.caloriesMissing === 1 ? 'entry' : 'entries'}.</p>}
           </article>;
         })}
-      </div>
+      </div> : <p className="diary-source-hidden-empty">All nutrient cards are hidden. Choose a nutrient above to show it again.</p>}
     </>}
     {foodCount > 0 && <p className="diary-source-none">Nutrient energy is approximate and may not add up to label calories because of fibre definitions, sugar alcohols and rounding. <a href="https://www.legislation.gov.uk/eur/2011/1169/annex/XIV" target="_blank" rel="noreferrer">Energy conversion factors</a>.</p>}
 
