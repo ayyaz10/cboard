@@ -364,7 +364,6 @@ html[data-theme="midnight"] :is(td,th) { border-color: var(--mid-border) !import
 html[data-theme="midnight"] tbody tr:nth-child(even) { background: rgb(255 255 255 / .018); }
 html[data-theme="midnight"] tbody tr:hover { background: rgb(242 138 71 / .045) !important; }
 html[data-theme="midnight"] .global-scroll-controls button,
-html[data-theme="midnight"] .workspace-tools button,
 html[data-theme="midnight"] .reminder-toggle {
   min-height: 36px;
   border: 1px solid var(--mid-border-strong) !important;
@@ -373,23 +372,16 @@ html[data-theme="midnight"] .reminder-toggle {
   color: var(--mid-text) !important;
   box-shadow: var(--mid-card-shadow) !important;
 }
-html[data-theme="midnight"] .workspace-note {
-  background: var(--mid-raised) !important;
-  color: var(--mid-text) !important;
-  border: 1px solid var(--mid-border-strong) !important;
-  border-radius: var(--mid-panel-radius) !important;
-  box-shadow: 0 12px 32px rgb(0 0 0 / .5) !important;
-}
 html[data-theme="midnight"] .app-navigation-list > a[aria-current="page"],
 html[data-theme="midnight"] .app-navigation-related > a[aria-current="page"] { position: relative; background: var(--mid-raised) !important; color: var(--mid-text) !important; border-color: var(--mid-border-strong) !important; }
 html[data-theme="midnight"] .app-navigation-list > a[aria-current="page"]::before { content: ""; position: absolute; inset: 5px auto 5px 0; width: 2px; background: var(--mid-accent); }
 
 /* Toasts and modal layers remain dark even when source components specify inline light colors. */
-html[data-theme="midnight"] :is(dialog,[role="dialog"],[role="menu"],[role="listbox"],[data-radix-popper-content-wrapper] > *,[data-sonner-toast]) {
-  background-color: var(--mid-raised) !important;
-  color: var(--mid-text) !important;
-  border-color: var(--mid-border-strong) !important;
-  border-radius: var(--mid-panel-radius) !important;
+html[data-theme="midnight"] :is([role="menu"],[role="listbox"],[data-radix-popper-content-wrapper] > *,[data-sonner-toast]) {
+  background-color: var(--color-surface-raised) !important;
+  color: var(--color-text) !important;
+  border-color: var(--color-border) !important;
+  border-radius: var(--radius-dialog) !important;
 }
 html[data-theme="midnight"] :is(.finance .f-primary,.groceries .g-primary,.auth-primary,.diary-primary) { background: var(--mid-accent) !important; color: var(--mid-accent-text) !important; border-color: var(--mid-accent) !important; }
 html[data-theme="midnight"] .training {
@@ -431,7 +423,6 @@ html[data-theme="midnight"] .notes-sidebar { background: var(--mid-surface) !imp
 html[data-theme="midnight"] .notes-editor-panel { background: var(--mid-surface) !important; border-color: var(--mid-border-strong) !important; }
 html[data-theme="midnight"] .notes-sidebar [data-active="true"] { background: var(--mid-accent-soft) !important; color: var(--mid-text) !important; border-color: #704326 !important; box-shadow: none !important; }
 html[data-theme="midnight"] .notes-sidebar [data-active="true"] :is(span,strong,p) { color: var(--mid-text) !important; }
-html[data-theme="midnight"] .workspace-tools button { padding: 6px 10px; font-size: .75rem; }
 html[data-theme="midnight"] progress { accent-color: var(--mid-accent); }
 html[data-theme="midnight"] progress::-webkit-progress-bar { background: var(--mid-soft); }
 html[data-theme="midnight"] progress::-webkit-progress-value { background: var(--mid-accent); }

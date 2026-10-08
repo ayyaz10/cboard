@@ -240,7 +240,7 @@ export function diaryTotals(meals) {
 }
 
 export function nutrientContributions(meals, keys = ["calories", "protein", "carbs", "fat", "fiber"]) {
-  const items = meals.flatMap((meal) => meal.items || []);
+  const items = meals.flatMap((meal) => (meal.items || []).map(item => ({ ...item, mealId: meal.id, mealTitle: meal.title || meal.meal })));
   return Object.fromEntries(keys.map((key) => {
     const foods = new Map();
     let missing = 0;
@@ -256,8 +256,9 @@ export function nutrientContributions(meals, keys = ["calories", "protein", "car
       if (value <= 0) continue;
       const name = String(item.name || "Food").trim() || "Food";
       const identity = name.toLocaleLowerCase();
-      const current = foods.get(identity) || { name, value: 0, calories: 0, caloriesKnown: 0, caloriesMissing: 0 };
+      const current = foods.get(identity) || { name, value: 0, calories: 0, caloriesKnown: 0, caloriesMissing: 0, entries: [] };
       current.value += value;
+      current.entries.push({ id: item.id, mealId: item.mealId, meal: item.mealTitle, quantity: item.quantity, unit: item.unit });
       if (nutrition.calories == null) current.caloriesMissing += 1;
       else {
         current.calories += nutrition.calories;
