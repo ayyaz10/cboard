@@ -22,6 +22,7 @@ The bank picker obtains the current Enable Banking list using country `GB`, PSU 
 | `ENABLE_BANKING_REDIRECT_URI` | `https://<project-ref>.supabase.co/functions/v1/banking/callback` |
 | `APP_ORIGIN` | CBoard HTTPS origin (no path) |
 | `APP_BASE_PATH` | Vite app base path; this repository uses `/cboard/` |
+| `BANKING_ALLOWED_USER_EMAIL` | Email address of the single CBoard account allowed to use bank connections |
 
 The Enable Banking API host stays `https://api.enablebanking.com` in both environments; the registered application and its credentials determine Sandbox or Production. Supabase's standard `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are also required at runtime.
 
@@ -54,3 +55,5 @@ Sandbox and Production applications are separate; a Sandbox application cannot b
 5. Connect NatWest from CBoard and verify the account, balances, recent transactions, status fields, and repeat sync. Do not treat Sandbox evidence as proof of NatWest Production behavior.
 
 Restricted mode is for internal evaluation on whitelisted accounts. Public multi-user production use requires the separate Enable Banking agreements/activation applicable to that use.
+
+This CBoard deployment is configured for the operator's personal use only. The banking Edge Function checks the signed-in email against `BANKING_ALLOWED_USER_EMAIL` and rejects every other account before handling bank requests. Keep this secret set to the operator's own CBoard sign-in email.

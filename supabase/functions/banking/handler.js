@@ -160,6 +160,11 @@ export function createBankingHandler({ createClient, env = key => Deno.env.get(k
       userClient = createClient(env('SUPABASE_URL'), env('SUPABASE_ANON_KEY'), { global: { headers: { Authorization: `Bearer ${bearer}` } }, auth: { persistSession: false } });
       const { data: { user }, error: userError } = await userClient.auth.getUser();
       if (userError || !user) return response(401, { error: 'Sign in to use bank connections.' }, cors);
+      const allowedEmail = env('BANKING_ALLOWED_USER_EMAIL')?.trim().toLowerCase();
+      if (!allowedEmail) return response(503, { error: 'Bank connections are not enabled for the account owner yet.' }, cors);
+      if (user.email?.trim().toLowerCase() !== allowedEmail) {
+        return response(403, { error: 'Bank connections are enabled only for the account owner.' }, cors);
+      }
       admin = createClient(env('SUPABASE_URL'), env('SUPABASE_SERVICE_ROLE_KEY'), { auth: { persistSession: false } });
       const config = configuration(env);
       switch (body.action) {

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Privacy Notice — CBoard Finance</title>
+  <style>
+    :root{color-scheme:light dark;font:16px/1.65 system-ui,sans-serif}body{max-width:760px;margin:0 auto;padding:32px 20px 64px;background:#101010;color:#eee}a{color:#ff9451}h1,h2{line-height:1.2}h1{font-size:2rem}h2{margin-top:2rem;font-size:1.25rem}p,li{max-width:72ch}.notice{border:1px solid #454545;border-radius:10px;padding:20px;margin:24px 0}.meta{color:#bbb;font-size:.92rem}
+  </style>
+</head>
+<body>
+  <main>
+    <p><a href="./index.html">CBoard</a></p>
+    <h1>CBoard Finance Privacy Notice</h1>
+    <p class="meta">Effective date: 8 October 2026</p>
+    <p>This notice covers CBoard Finance’s Enable Banking connection. That connection is enabled for Ayyaz Ahmed’s own personal bank account and is not offered to other CBoard users. It explains what information is handled when the account holder chooses to connect and synchronise an account.</p>
+
+    <section class="notice">
+      <h2>Who is responsible</h2>
+      <p>CBoard Finance is operated by Ayyaz Ahmed, using the name CBoard. For privacy questions or a request about bank data, email <a href="mailto:ayyazahmad009@gmail.com">ayyazahmad009@gmail.com</a>.</p>
+    </section>
+
+    <h2>Information handled</h2>
+    <p>If the account holder connects a bank, CBoard processes the bank name, account name and type, currency, a masked account identifier, balances, transaction details, connection status, and consent expiry. CBoard also processes the signed-in account identifier and email needed to associate the connection with the correct CBoard account. The bank password and one-time passcode are entered in the bank or Enable Banking authorisation flow and are not stored by CBoard.</p>
+
+    <h2>Purposes and lawful bases</h2>
+    <p>The information is used to authenticate the account holder, create and manage the bank connection they request, display account information, synchronise transactions, prevent duplicate imports, secure the service, and respond to support or deletion requests. The intended UK GDPR bases are taking steps to provide the requested service, legitimate interests in operating and securing the service, and legal obligation where applicable. The account holder’s bank authorisation is also required for access to account information.</p>
+
+    <h2>How the connection works</h2>
+    <p>Enable Banking provides the bank connection and authorisation flow. CBoard’s server-side Supabase functions communicate with Enable Banking and store the connection and imported account, balance, and transaction records in the CBoard Supabase project. Bank data is restricted to the signed-in account that owns it. The feature is read-only: it does not initiate payments or move money.</p>
+
+    <h2>Providers and transfers</h2>
+    <p>Supabase provides authentication, database, file storage, and server-side functions. Enable Banking provides the open banking connection. GitHub Pages hosts the CBoard web app. These providers may process technical information and, where needed to provide their services, the information described above. Their own privacy notices and service terms also apply. Processing locations and any international transfer safeguards depend on the provider configuration and applicable provider terms; contact us for details relevant to this connection.</p>
+
+    <h2>Retention and deletion</h2>
+    <p>Connection and imported bank information is kept while the account holder uses the feature. Disconnecting asks Enable Banking to close the session and stops further synchronisation, but does not delete information already imported. To request deletion of the connection and imported bank data, email <a href="mailto:ayyazahmad009@gmail.com">ayyazahmad009@gmail.com</a> from the CBoard account email. We may verify the request. We will respond without undue delay and within one month where data protection law requires. Copies may remain in provider-managed backups until removed through the provider’s ordinary backup cycle, and information may be retained where law requires it.</p>
+
+    <h2>Your rights</h2>
+    <p>Subject to applicable law, the account holder may request access, correction, deletion, restriction, or portability of personal information, withdraw consent where processing relies on consent, and object to processing based on legitimate interests. Contact <a href="mailto:ayyazahmad009@gmail.com">ayyazahmad009@gmail.com</a>. You can complain to the UK Information Commissioner’s Office at <a href="https://ico.org.uk/make-a-complaint/">ico.org.uk</a>.</p>
+
+    <h2>Security and updates</h2>
+    <p>The Enable Banking signing key is held in server-side configuration, and the bank integration uses authenticated server-side functions. No online service can guarantee absolute security. We may update this notice if the connection or its data handling changes; the effective date above will be revised.</p>
+
+    <p><a href="./terms.html">CBoard Finance Terms of Use</a></p>
+  </main>
+</body>
+</html>
