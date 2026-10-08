@@ -38,10 +38,11 @@ test('recipe rows with stale food IDs still attach to the reusable item by its l
 
 test('recipe-only cleanup removes matching rows across recipe sections but leaves other ingredients untouched', () => {
   const orphan = { name: '1 tbsp coriander powder', amount: 1, unit: 'tbsp', nutrition: {} };
-  const recipe = { slug: 'curry', title: 'Curry', ingredients: [orphan, { name: 'Salt', amount: 1, unit: 'pinch', nutrition: {} }], sauces: [], alternatives: { spice: { options: [{ ...orphan }] } } };
+  const recipe = { slug: 'curry', title: 'Curry', ingredients: [orphan, { name: 'Salt', amount: 1, unit: 'pinch', nutrition: {}, alternativeGroup: 'spice' }], sauces: [], alternatives: { spice: { options: [{ ...orphan }] } } };
   const key = buildIngredientLibrary([recipe]).find(entry => entry.item.name === orphan.name).key;
   const result = removeRecipeOnlyIngredients([recipe], [key]);
   assert.equal(result.removed, 2);
   assert.deepEqual(result.recipes[0].ingredients.map(item => item.name), ['Salt']);
-  assert.deepEqual(result.recipes[0].alternatives.spice.options, []);
+  assert.deepEqual(result.recipes[0].alternatives, {});
+  assert.equal(result.recipes[0].ingredients[0].alternativeGroup, undefined);
 });

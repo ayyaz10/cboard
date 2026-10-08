@@ -59,12 +59,21 @@ export function removeRecipeOnlyIngredients(recipes = [], keys = []) {
       changed = true;
       return false;
     });
-    const ingredients = filterItems(recipe.ingredients);
-    const sauces = filterItems(recipe.sauces);
-    const alternatives = Object.fromEntries(Object.entries(recipe.alternatives || {}).map(([name, group]) => [name, {
-      ...group,
-      options: filterItems(group?.options),
-    }]));
+    let ingredients = filterItems(recipe.ingredients);
+    let sauces = filterItems(recipe.sauces);
+    const alternatives = Object.fromEntries(Object.entries(recipe.alternatives || {}).flatMap(([name, group]) => {
+      const options = filterItems(group?.options);
+      return options.length ? [[name, { ...group, options }]] : [];
+    }));
+    const alternativeGroups = new Set(Object.keys(alternatives));
+    const clearRemovedAlternativeGroup = item => {
+      if (!item.alternativeGroup || alternativeGroups.has(item.alternativeGroup)) return item;
+      const { alternativeGroup, ...rest } = item;
+      changed = true;
+      return rest;
+    };
+    ingredients = ingredients.map(clearRemovedAlternativeGroup);
+    sauces = sauces.map(clearRemovedAlternativeGroup);
     updated.push(changed ? { ...recipe, ingredients, sauces, alternatives } : recipe);
   }
   return { recipes: updated, removed };
