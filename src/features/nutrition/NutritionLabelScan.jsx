@@ -11,17 +11,24 @@ const reviewColumn=column=>({...column,values:Object.fromEntries(Object.entries(
 const display=value=>value==null?'Unknown':new Intl.NumberFormat(undefined,{maximumFractionDigits:4}).format(value);
 
 export function NutritionLabelScan({current=null,onApply,disabled=false,initialOpen=false,basisUnits=['g','ml','pieces','servings']}) {
-  const id=useId(),session=useRef(null),job=useRef(0),fileRef=useRef(null),urlRef=useRef(null);
+  const id=useId(),session=useRef(null),job=useRef(0),fileRef=useRef(null),urlRef=useRef(null),imageDialog=useRef(null);
   const [open,setOpen]=useState(initialOpen),[photo,setPhoto]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  const [showImage,setShowImage]=useState(false);
   const [progress,setProgress]=useState(null),[rotation,setRotation]=useState(0),[crop,setCrop]=useState({left:0,top:0,right:100,bottom:100});
   const [columns,setColumns]=useState([]),[active,setActive]=useState(''),[warnings,setWarnings]=useState([]),[raw,setRaw]=useState('');
   const [clearIncompatible,setClearIncompatible]=useState(false);
   const [diagnostics,setDiagnostics]=useState(null);
+  useEffect(()=>{
+    const dialog=imageDialog.current;
+    if(!dialog)return;
+    if(showImage&&!dialog.open)dialog.showModal();
+    else if(!showImage&&dialog.open)dialog.close();
+  },[showImage]);
   const debugEnabled=import.meta.env.DEV&&new URLSearchParams(window.location.search).has('nutritionOcrDebug');
   const column=columns.find(value=>value.id===active);
   const converted=column?currentAtBasis(current,column):null;
   function stop(){job.current++;session.current?.dispose();session.current=null;setBusy(false);setProgress(null);}
-  function discard(){stop();setOpen(false);setColumns([]);setRaw('');setDiagnostics(null);setError('');fileRef.current=null;if(urlRef.current)URL.revokeObjectURL(urlRef.current);urlRef.current=null;setPhoto('');}
+  function discard(){stop();setOpen(false);setShowImage(false);setColumns([]);setRaw('');setDiagnostics(null);setError('');fileRef.current=null;if(urlRef.current)URL.revokeObjectURL(urlRef.current);urlRef.current=null;setPhoto('');}
   useEffect(()=>()=>{job.current++;session.current?.dispose();if(urlRef.current)URL.revokeObjectURL(urlRef.current);},[]);
   async function scan(file=fileRef.current,nextRotation=rotation,nextCrop=crop) {
     if(!file)return;
@@ -69,17 +76,27 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
         <strong>Paste nutrition label image</strong>
         <span>Click here, then paste an image with Ctrl+V or ⌘V</span>
       </div>
-      {photo&&<details><summary>Original image, crop and rotation</summary><img src={photo} alt="Nutrition label to review"/>
+      {photo&&<>
+        <button type="button" className="nscan-thumbnail" onClick={()=>setShowImage(true)} aria-label="Open nutrition label image full size">
+          <img src={photo} alt=""/><span>View nutrition image</span>
+        </button>
+        <dialog ref={imageDialog} className="nscan-image-dialog" aria-label="Nutrition label image" onClose={()=>setShowImage(false)} onClick={event=>{if(event.target===event.currentTarget)setShowImage(false);}}>
+          <div className="nscan-image-dialog__content">
+            <button type="button" className="nscan-image-dialog__close" onClick={()=>setShowImage(false)}>Close image</button>
+            <img src={photo} alt="Full-size nutrition label image"/>
+          </div>
+        </dialog>
+        <details><summary>Crop and rotation tools</summary>
         <p>Crop bounds are percentages of the original image. Keep every heading for the columns you want to read.</p>
         <div className="nscan-grid">{['left','top','right','bottom'].map(edge=><label key={edge}>Crop {edge} (%)<input type="number" min="0" max="100" disabled={busy} value={crop[edge]} onChange={event=>setCrop({...crop,[edge]:Number(event.target.value)})}/></label>)}
         <label>Scan rotation<select value={rotation} disabled={busy} onChange={event=>setRotation(Number(event.target.value))}>{[0,90,180,270].map(value=><option key={value} value={value}>{value}°</option>)}</select></label></div>
         <button type="button" disabled={busy||disabled} onClick={()=>scan()}>Rescan label</button>
-      </details>}
+        </details>
+      </>}
       {busy&&<div role="status"><p>{progress?.status}{progress?.pass?` · pass ${progress.pass}`:''}</p><progress max="1" value={progress?.progress||0}/><button type="button" onClick={stop}>Cancel scan</button></div>}
       {error&&<p role="alert" className="nscan-warning">{error}</p>}
       {warnings.map(message=><p className="nscan-warning" key={message}>{message}</p>)}
       {column&&!busy&&<div>
-        {photo&&<details className="nscan-image-review"><summary>View nutrition image</summary><img src={photo} alt="Original nutrition image for comparison"/></details>}
         <label>Nutrition column<select aria-label="Nutrition column" value={active} onChange={event=>{setActive(event.target.value);setClearIncompatible(false);}}>{columns.map(value=><option key={value.id} value={value.id}>{columns.some(other=>other.tableId!==value.tableId)?`${value.tableId}: `:''}{value.label}</option>)}</select></label>
         {!column.confirmed&&<p className="nscan-warning">{column.basisStatus==='unreadable'?'A basis heading may be present, but it could not be read reliably. Check the full image or rescan with the heading included.':'No basis heading was detected in this image. It may be outside the screenshot or unreadable. Check the source and choose the basis below; none has been assumed.'}</p>}
         {column.warnings?.map(message=><p key={message} className="nscan-warning">{message}</p>)}
