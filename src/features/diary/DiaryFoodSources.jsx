@@ -55,6 +55,7 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
   const [expandedFood, setExpandedFood] = useState('');
   const [selectedNutrient, setSelectedNutrient] = useState('calories');
   const [amountDrafts, setAmountDrafts] = useState({});
+  const [customPercentDraft, setCustomPercentDraft] = useState(null);
   const [visibleSources, setVisibleSources] = useState(readSourceVisibility);
   const [confirmApply, setConfirmApply] = useState(false);
   const [applyError, setApplyError] = useState('');
@@ -71,6 +72,12 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
     return [...grouped.values()];
   }, [meals]);
   const selectedFood = groups.find(food => food.key === expandedFood);
+  const selectedPercentValues = selectedFood?.entries
+    .filter(entry => Number.isFinite(entry.quantity) && entry.quantity > 0)
+    .map(entry => (overrides[entry.key]?.quantity ?? entry.quantity) / entry.quantity * 100) || [];
+  const selectedPercent = selectedPercentValues.length && selectedPercentValues.every(value => Math.abs(value - selectedPercentValues[0]) < .05)
+    ? Math.round(selectedPercentValues[0] * 10) / 10
+    : null;
   const selectedFoodImpact = selectedFood ? EDITOR_NUTRIENTS.map(([key, label, unit]) => {
     let current = 0;
     let preview = 0;
@@ -128,6 +135,7 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
   function chooseMode(nextMode) {
     setMode(nextMode);
     setAmountDrafts({});
+    setCustomPercentDraft(null);
   }
   function usePercentPreset(percent) {
     if (!selectedFood) return;
@@ -140,9 +148,19 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
     }
     setOverrides(nextOverrides);
     setAmountDrafts({});
+    setCustomPercentDraft(null);
+  }
+  function changeCustomPercent(value) {
+    setCustomPercentDraft(value);
+    const normalized = value.replace(',', '.');
+    if (!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(normalized)) return;
+    const percent = Number(normalized);
+    if (!Number.isFinite(percent) || percent < 0 || percent > 1000000) return;
+    usePercentPreset(percent);
+    setCustomPercentDraft(value);
   }
   function closeAdjustments() {
-    setAdjusting(false); setOverrides({}); setAmountDrafts({}); setExpandedFood(''); setConfirmApply(false); setApplyError('');
+    setAdjusting(false); setOverrides({}); setAmountDrafts({}); setCustomPercentDraft(null); setExpandedFood(''); setConfirmApply(false); setApplyError('');
   }
   async function applyChanges() {
     if (!changed || disabled) return;
@@ -208,7 +226,7 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
             {nutrient.foods.length ? <ol className="diary-source-list">{nutrient.foods.map(food => {
               const group = groups.find(item => item.key === sourceKey(food.name));
               const adjusted = group?.entries.some(entry => overrides[entry.key]?.quantity != null && overrides[entry.key].quantity !== entry.quantity);
-              return <li key={food.name.toLocaleLowerCase()}><div className="diary-source-row"><strong>{food.name}{key !== 'calories' && <small className="diary-source-food-calories"> · {calorieLabel(food)}</small>}{adjusted && <Badge variant="accent">Adjusted</Badge>}</strong><span><b>{format(food.value)} {unit}</b> · {format(food.percentage)}%</span></div><div className="diary-source-track" aria-hidden="true"><span style={{ width: `${food.percentage}%` }} /></div>{adjusting && group && <Button size="sm" className="diary-source-adjust" aria-haspopup="dialog" onClick={() => { setExpandedFood(group.key); setSelectedNutrient(key); setAmountDrafts({}); }}>{group.entries.some(entry => overrides[entry.key]?.quantity != null) ? 'Adjust again' : 'Adjust'}</Button>}</li>;
+              return <li key={food.name.toLocaleLowerCase()}><div className="diary-source-row"><strong>{food.name}{key !== 'calories' && <small className="diary-source-food-calories"> · {calorieLabel(food)}</small>}{adjusted && <Badge variant="accent">Adjusted</Badge>}</strong><span><b>{format(food.value)} {unit}</b> · {format(food.percentage)}%</span></div><div className="diary-source-track" aria-hidden="true"><span style={{ width: `${food.percentage}%` }} /></div>{adjusting && group && <Button size="sm" className="diary-source-adjust" aria-haspopup="dialog" onClick={() => { setExpandedFood(group.key); setSelectedNutrient(key); setAmountDrafts({}); setCustomPercentDraft(null); }}>{group.entries.some(entry => overrides[entry.key]?.quantity != null) ? 'Adjust again' : 'Adjust'}</Button>}</li>;
             })}</ol> : <p className="diary-source-none">No recorded {label.toLocaleLowerCase()} from this day&apos;s foods.</p>}
             {nutrient.missing > 0 && <p className="diary-source-warning">{nutrient.missing} food {nutrient.missing === 1 ? 'is' : 'items are'} missing {label.toLocaleLowerCase()} data, so this breakdown is partial.</p>}
             {key !== 'calories' && nutrient.caloriesMissing > 0 && <p className="diary-source-warning">Calories are missing for {nutrient.caloriesMissing} contributing food {nutrient.caloriesMissing === 1 ? 'entry' : 'entries'}.</p>}
@@ -249,19 +267,22 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
             {selectedFoodImpact.some(item => item.currentMissing || item.previewMissing) && <small className="diary-simulation-impact-note">Partial values use the nutrition data available for these entries.</small>}
           </section>
           <div className="diary-simulation-mode" role="group" aria-label="Adjustment mode"><Button size="sm" aria-pressed={mode === 'percent'} onClick={() => chooseMode('percent')}>% of logged</Button><Button size="sm" aria-pressed={mode === 'exact'} onClick={() => chooseMode('exact')}>Exact amount</Button></div>
-          {mode === 'percent' && <div className="diary-simulation-presets" role="group" aria-label="Quick percentage amounts">{[50, 75, 100, 125, 150].map(percent => <Button key={percent} size="sm" aria-pressed={selectedFood.entries.every(entry => !Number.isFinite(entry.quantity) || entry.quantity <= 0 || Math.abs((overrides[entry.key]?.quantity ?? entry.quantity) / entry.quantity * 100 - percent) < .05)} onClick={() => usePercentPreset(percent)}>{percent}%</Button>)}</div>}
+          {mode === 'percent' && <div className="diary-simulation-scale">
+            <div className="diary-simulation-presets" role="group" aria-label="Quick percentage amounts">{[50, 75, 100, 125, 150].map(percent => <Button key={percent} size="sm" aria-pressed={selectedPercent != null && Math.abs(selectedPercent - percent) < .05} onClick={() => usePercentPreset(percent)}>{percent}%</Button>)}</div>
+            <label className="diary-simulation-custom-percent">Custom percent<input className="ui-control" type="text" inputMode="decimal" autoComplete="off" aria-label={`Custom percent of logged amount for ${selectedFood.name}`} value={customPercentDraft ?? (selectedPercent == null ? '' : String(selectedPercent))} onChange={event => changeCustomPercent(event.target.value)} onBlur={() => setCustomPercentDraft(null)} /><span aria-hidden="true">%</span></label>
+          </div>}
           <div className="diary-simulation-entry-list">{selectedFood.entries.map(entry => {
             const override = overrides[entry.key]?.quantity;
             const originalAmountKnown = Number.isFinite(entry.quantity) && entry.quantity > 0;
             const simulatedAmount = override ?? entry.quantity;
-            const inputValue = amountDrafts[entry.key] ?? (originalAmountKnown ? String(mode === 'percent' ? Math.round(simulatedAmount / entry.quantity * 1000) / 10 : simulatedAmount) : '');
+            const inputValue = mode === 'percent' ? (originalAmountKnown ? String(Number(simulatedAmount.toFixed(6))) : '') : (amountDrafts[entry.key] ?? (originalAmountKnown ? String(simulatedAmount) : ''));
             return <div className="diary-simulation-entry" key={entry.key}>
               <div><strong>{entry.mealTitle}</strong><span>Logged: {originalAmountKnown ? `${format(entry.quantity)} ${entry.unit}` : 'Amount unknown'}</span><small>{originalAmountKnown ? `Preview: ${format(simulatedAmount)} ${entry.unit}` : 'A safe amount cannot be reconstructed, so this entry cannot be adjusted.'}</small></div>
-              <label>{mode === 'percent' ? 'Percent of logged amount' : `Amount (${entry.unit})`}<input className="ui-control" type="text" inputMode="decimal" autoComplete="off" spellCheck="false" aria-label={`${mode === 'percent' ? 'Percent of logged amount' : `Amount in ${entry.unit}`} for ${entry.mealTitle}`} disabled={!originalAmountKnown || disabled} value={inputValue} onChange={event => setAmount(entry, event.target.value)} onBlur={() => setAmountDrafts(previous => { const next = { ...previous }; delete next[entry.key]; return next; })} /></label>
+              <label>{mode === 'percent' ? `Simulated amount (${entry.unit})` : `Amount (${entry.unit})`}<input className="ui-control" type="text" inputMode="decimal" autoComplete="off" spellCheck="false" aria-label={`${mode === 'percent' ? `Simulated amount in ${entry.unit}` : `Amount in ${entry.unit}`} for ${entry.mealTitle}`} disabled={!originalAmountKnown || disabled} readOnly={mode === 'percent'} value={inputValue} onChange={event => { if (mode === 'exact') setAmount(entry, event.target.value); }} onBlur={() => setAmountDrafts(previous => { const next = { ...previous }; delete next[entry.key]; return next; })} /></label>
               {overrides[entry.key] && <Button size="sm" onClick={() => resetEntry(entry.key)}>Reset</Button>}
             </div>;
           })}</div>
-          <p>Clear the field to restore the logged amount; enter 0 to simulate removing it. Amounts use each entry&apos;s current unit.</p>
+          <p>{mode === 'percent' ? 'Choose a preset or enter any percentage. Each row shows the resulting amount in that entry’s unit.' : 'Clear the field to restore the logged amount; enter 0 to simulate removing it. Amounts use each entry’s current unit.'}</p>
         </div>}
     </Dialog>
 
