@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { nutrientContributions } from './diaryData.js';
+import { itemNutrition, nutrientContributions } from './diaryData.js';
 import { nutrientEnergy } from './nutrientEnergy.js';
 import { simulateDiaryChanges, simulationKey } from './diarySimulation.js';
 import { NUTRIENTS } from '../nutrition/nutrients.js';
@@ -17,6 +17,13 @@ const SOURCE_CARDS = [
   ['fiber', 'Fibre', 'Digestion & fullness', '--chart-axis', 'g'],
 ];
 const TARGET_KEYS = ['calories', 'protein', 'carbs', 'fat', 'fiber'];
+const EDITOR_NUTRIENTS = [
+  ['calories', 'Calories', 'kcal'],
+  ['protein', 'Protein', 'g'],
+  ['carbs', 'Carbs', 'g'],
+  ['fat', 'Fat', 'g'],
+  ['fiber', 'Fibre', 'g'],
+];
 const format = value => new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(value);
 const calorieLabel = value => value.caloriesKnown ? `${format(value.calories)} kcal${value.caloriesMissing ? ' (known subtotal)' : ''}` : 'Calories unknown';
 const dateLabel = (date, today) => date === today ? 'today' : new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`));
@@ -49,6 +56,22 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
     return [...grouped.values()];
   }, [meals]);
   const selectedFood = groups.find(food => food.key === expandedFood);
+  const selectedFoodImpact = selectedFood ? EDITOR_NUTRIENTS.map(([key, label, unit]) => {
+    let current = 0;
+    let preview = 0;
+    let currentMissing = 0;
+    let previewMissing = 0;
+    for (const entry of selectedFood.entries) {
+      const currentValue = itemNutrition(entry)[key];
+      if (currentValue == null) currentMissing += 1;
+      else current += currentValue;
+      const quantity = overrides[entry.key]?.quantity ?? entry.quantity;
+      const previewValue = quantity <= 0 ? 0 : itemNutrition({ ...entry, quantity })[key];
+      if (previewValue == null) previewMissing += 1;
+      else preview += previewValue;
+    }
+    return { key, label, unit, current, preview, currentMissing, previewMissing };
+  }) : [];
   const changed = Object.values(overrides).some(Boolean) && simulation.changes.length > 0;
   const currentTotals = simulation.currentTotals;
   const simulatedTotals = simulation.simulatedTotals;
@@ -165,6 +188,19 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
     <Dialog open={Boolean(selectedFood)} onClose={() => setExpandedFood('')} labelledBy="diary-simulation-editor-title" className="diary-simulation-editor-dialog">
       {selectedFood && <div className="diary-simulation-editor" aria-label={`Adjust ${selectedFood.name}`}>
           <div className="diary-simulation-editor-heading"><div><span>Adjusting</span><strong id="diary-simulation-editor-title">{selectedFood.name}</strong></div><Button size="sm" variant="ghost" onClick={() => setExpandedFood('')}>Close</Button></div>
+          <section className="diary-simulation-food-impact" aria-label={`Nutrition impact for ${selectedFood.name}`}>
+            <div className="diary-simulation-impact-heading"><strong>Nutrition impact</strong><span>Across {selectedFood.entries.length} logged {selectedFood.entries.length === 1 ? 'entry' : 'entries'}</span></div>
+            <div className="diary-simulation-impact-grid">{selectedFoodImpact.map(({ key, label, unit, current, preview, currentMissing, previewMissing }) => {
+              const currentText = currentMissing === selectedFood.entries.length ? 'Unknown' : `${format(current)} ${unit}${currentMissing ? '*' : ''}`;
+              const previewText = previewMissing === selectedFood.entries.length ? 'Unknown' : `${format(preview)} ${unit}${previewMissing ? '*' : ''}`;
+              const difference = preview - current;
+              const changeText = currentMissing === selectedFood.entries.length && previewMissing === selectedFood.entries.length
+                ? 'No nutrition data'
+                : `${difference > 0 ? '+' : ''}${format(difference)} ${unit}${currentMissing || previewMissing ? ' · partial' : ''}`;
+              return <div className="diary-simulation-impact-item" key={key}><span>{label}</span><strong>{currentText} <span aria-hidden="true">→</span> {previewText}</strong><small>{changeText}</small></div>;
+            })}</div>
+            {selectedFoodImpact.some(item => item.currentMissing || item.previewMissing) && <small className="diary-simulation-impact-note">Partial values use the nutrition data available for these entries.</small>}
+          </section>
           <div className="diary-simulation-mode" role="group" aria-label="Adjustment mode"><Button size="sm" aria-pressed={mode === 'percent'} onClick={() => chooseMode('percent')}>% of logged</Button><Button size="sm" aria-pressed={mode === 'exact'} onClick={() => chooseMode('exact')}>Exact amount</Button></div>
           {mode === 'percent' && <div className="diary-simulation-presets" role="group" aria-label="Quick percentage amounts">{[50, 75, 100, 125, 150].map(percent => <Button key={percent} size="sm" aria-pressed={selectedFood.entries.every(entry => !Number.isFinite(entry.quantity) || entry.quantity <= 0 || Math.abs((overrides[entry.key]?.quantity ?? entry.quantity) / entry.quantity * 100 - percent) < .05)} onClick={() => usePercentPreset(percent)}>{percent}%</Button>)}</div>}
           <div className="diary-simulation-entry-list">{selectedFood.entries.map(entry => {

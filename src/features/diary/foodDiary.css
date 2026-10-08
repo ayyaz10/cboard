@@ -95,12 +95,25 @@
 .diary-simulation-target { display:grid; grid-template-columns:auto 1fr; gap:.35rem .6rem; align-items:center; font-size:var(--font-size-meta); }
 .diary-simulation-target>span:last-of-type { text-align:right; color:var(--color-text-secondary); }
 .diary-simulation-target .ui-progress-track { grid-column:1/-1; }
-.diary-simulation-editor-dialog { width:min(42rem,calc(100vw - 2rem)); max-height:min(86vh,48rem); overflow:auto; padding:0; }
-.diary-simulation-editor { display:grid; gap:.75rem; min-width:0; padding:var(--space-5); }
+.diary-simulation-editor-dialog { width:min(48rem,calc(100vw - 2rem)); max-height:min(88dvh,52rem); overflow:auto; padding:0; }
+.diary-simulation-editor { display:grid; gap:1rem; min-width:0; padding:clamp(1rem,3vw,1.5rem); }
 .diary-simulation-editor-heading { display:flex; align-items:center; justify-content:space-between; gap:.6rem; }
-.diary-simulation-editor-heading>div { display:grid; gap:.2rem; }
+.diary-simulation-editor-heading>div { display:grid; gap:.3rem; min-width:0; }
+.diary-simulation-editor-heading strong { font-size:var(--font-size-section-title); line-height:1.3; overflow-wrap:anywhere; }
 .diary-simulation-editor-heading span { color:var(--color-text-muted); font-size:var(--font-size-meta); }
-.diary-simulation-mode { display:flex; gap:.45rem; flex-wrap:wrap; }
+.diary-simulation-mode { display:inline-flex; justify-self:start; gap:.35rem; flex-wrap:wrap; padding:.25rem; border:var(--border-width) solid var(--color-border); border-radius:var(--radius-button); background:var(--color-surface-interactive); }
+.diary-simulation-mode .ui-button { box-shadow:none; }
+.diary-simulation-mode .ui-button[aria-pressed="true"] { border-color:var(--color-accent); background:var(--color-accent-soft); color:var(--color-accent-text); }
+.diary-simulation-food-impact { display:grid; gap:.6rem; padding:.8rem; border:var(--border-width) solid var(--color-border); border-radius:var(--radius-card); background:var(--color-surface-interactive); }
+.diary-simulation-impact-heading { display:flex; align-items:baseline; justify-content:space-between; gap:.5rem; }
+.diary-simulation-impact-heading span,.diary-simulation-impact-note { color:var(--color-text-secondary); font-size:var(--font-size-meta); }
+.diary-simulation-impact-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:.45rem; }
+.diary-simulation-impact-item { display:grid; align-content:start; gap:.22rem; min-width:0; padding:.55rem; border:var(--border-width) solid var(--color-border); border-radius:var(--radius-sm); background:var(--color-surface); }
+.diary-simulation-impact-item>span { color:var(--color-text-secondary); font-size:var(--font-size-meta); }
+.diary-simulation-impact-item>strong { font-size:var(--font-size-small); overflow-wrap:anywhere; }
+.diary-simulation-impact-item>strong span { color:var(--color-text-muted); }
+.diary-simulation-impact-item>small { color:var(--color-text-secondary); font-size:var(--font-size-meta); overflow-wrap:anywhere; }
+.diary-simulation-impact-note { margin:0; }
 .diary-simulation-presets { display:flex; gap:.4rem; flex-wrap:wrap; }
 .diary-simulation-entry-list { display:grid; gap:.6rem; }
 .diary-simulation-entry { display:grid; grid-template-columns:minmax(0,1fr) minmax(9rem,.8fr) auto; align-items:center; gap:.75rem; padding:.65rem; border:var(--border-width) solid var(--color-border); border-radius:var(--radius-sm); background:var(--color-surface); }
@@ -284,6 +297,9 @@
   .diary-simulation-heading { align-items:flex-start; }
   .diary-simulation-heading h3 { display:block; margin:.25rem 0 0; }
   .diary-simulation-editor { padding:var(--space-4); }
+  .diary-simulation-impact-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .diary-simulation-impact-item:last-child { grid-column:1/-1; }
+  .diary-simulation-impact-heading { align-items:flex-start; flex-direction:column; }
   .diary-simulation-entry { grid-template-columns:minmax(0,1fr) auto; }
   .diary-simulation-entry>label { grid-column:1/-1; }
   .diary-simulation-table,.diary-simulation-table tbody { display:block; }
