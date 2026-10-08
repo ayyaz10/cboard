@@ -171,7 +171,14 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
       else setApplyError('Could not apply these changes. Your diary is unchanged; try again.');
     } catch (error) { setApplyError(error.message || 'Could not save these diary changes.'); }
   }
-  function openAdjustments() { setAdjusting(true); setOverrides({}); setAmountDrafts({}); setExpandedFood(''); setApplyError(''); }
+  function openAdjustments(key) { setAdjusting(true); setSelectedNutrient(key); setOverrides({}); setAmountDrafts({}); setCustomPercentDraft(null); setExpandedFood(''); setApplyError(''); }
+  function selectAdjustmentNutrient(key) {
+    if (!adjusting) { openAdjustments(key); return; }
+    setSelectedNutrient(key);
+    setExpandedFood('');
+    setAmountDrafts({});
+    setCustomPercentDraft(null);
+  }
 
   return <section className="diary-sources" aria-labelledby="food-sources-heading">
     <div className="diary-sources-intro">
@@ -180,7 +187,7 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
         <h2 id="food-sources-heading">What your food is giving you</h2>
         <p>Each food-row percentage is that food&apos;s share of the nutrient you logged for {dateLabel(date, today)}. Calories beside food names are for the whole logged portion. Each macro card also estimates calories from that nutrient. The “foods listed” totals overlap across cards—do not add them together.</p>
       </div>
-      <div className="diary-sources-actions"><Badge>{foodCount} food {foodCount === 1 ? 'entry' : 'entries'}</Badge>{foodCount > 0 && !adjusting && <Button size="sm" disabled={disabled} onClick={openAdjustments}>What-if</Button>}</div>
+      <div className="diary-sources-actions"><Badge>{foodCount} food {foodCount === 1 ? 'entry' : 'entries'}</Badge></div>
     </div>
 
     {!foodCount ? <Panel className="diary-sources-empty"><strong>No foods logged for this day yet.</strong><p>Open the Day log tab and add a meal to see where your calories, macros and fibre come from.</p></Panel> : <>
@@ -219,14 +226,14 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
           const calorieContributions = adjusting ? simulation.contributions.calories : contributions.calories;
           const energy = nutrientEnergy(key, nutrient, calorieContributions);
           const target = goals?.[key]; const targetPercent = target > 0 ? (nutrient.total / target) * 100 : null;
-          return <article className={`diary-source-card${selectedFood && key === selectedNutrient ? ' is-editing' : ''}`} key={key} style={{ '--source-color': `var(${colorToken})` }}>
-            <header><div><span>{description}</span><h3>{label}</h3></div><div className="diary-source-total"><strong>{format(nutrient.total)} {unit}</strong>{target > 0 && <small>{format(targetPercent)}% of {format(target)} {unit} target</small>}</div></header>
+          return <article className={`diary-source-card${adjusting && key === selectedNutrient ? ' is-editing' : ''}`} key={key} style={{ '--source-color': `var(${colorToken})` }}>
+            <header><div><span>{description}</span><h3>{label}</h3></div><div className="diary-source-card-controls"><div className="diary-source-total"><strong>{format(nutrient.total)} {unit}</strong>{target > 0 && <small>{format(targetPercent)}% of {format(target)} {unit} target</small>}</div><Button size="sm" aria-pressed={adjusting && key === selectedNutrient} disabled={disabled} onClick={() => selectAdjustmentNutrient(key)}>{adjusting && key === selectedNutrient ? 'Adjusting' : 'Adjust'}</Button></div></header>
             {energy && <div className="diary-source-energy"><strong>Estimated calories from {label.toLocaleLowerCase()}</strong><span>{energy.calories == null ? 'Unknown' : <>{format(nutrient.total)} g × {energy.factor} kcal/g = <b>{format(energy.calories)} kcal</b></>}</span>{energy.percentage != null && <small>About {format(energy.percentage)}% of {format(calorieContributions.total)} logged kcal{energy.partial ? ' (partial data)' : ''}</small>}{key === 'carbs' && <small>Uses carbs × 4. If your food record includes fibre in carbs, this estimate overlaps with fibre calories.</small>}{key === 'fiber' && <small>Uses an average of 2 kcal/g for fibre; actual energy varies.</small>}</div>}
             {key !== 'calories' && nutrient.foods.length > 0 && <p className="diary-source-calories"><span>Calories from foods listed</span><strong>{calorieLabel(nutrient)}</strong></p>}
             {nutrient.foods.length ? <ol className="diary-source-list">{nutrient.foods.map(food => {
               const group = groups.find(item => item.key === sourceKey(food.name));
               const adjusted = group?.entries.some(entry => overrides[entry.key]?.quantity != null && overrides[entry.key].quantity !== entry.quantity);
-              return <li key={food.name.toLocaleLowerCase()}><div className="diary-source-row"><strong>{food.name}{key !== 'calories' && <small className="diary-source-food-calories"> · {calorieLabel(food)}</small>}{adjusted && <Badge variant="accent">Adjusted</Badge>}</strong><span><b>{format(food.value)} {unit}</b> · {format(food.percentage)}%</span></div><div className="diary-source-track" aria-hidden="true"><span style={{ width: `${food.percentage}%` }} /></div>{adjusting && group && <Button size="sm" className="diary-source-adjust" aria-haspopup="dialog" onClick={() => { setExpandedFood(group.key); setSelectedNutrient(key); setAmountDrafts({}); setCustomPercentDraft(null); }}>{group.entries.some(entry => overrides[entry.key]?.quantity != null) ? 'Adjust again' : 'Adjust'}</Button>}</li>;
+              return <li key={food.name.toLocaleLowerCase()}><div className="diary-source-row"><strong>{food.name}{key !== 'calories' && <small className="diary-source-food-calories"> · {calorieLabel(food)}</small>}{adjusted && <Badge variant="accent">Adjusted</Badge>}</strong><span><b>{format(food.value)} {unit}</b> · {format(food.percentage)}%</span></div><div className="diary-source-track" aria-hidden="true"><span style={{ width: `${food.percentage}%` }} /></div>{adjusting && key === selectedNutrient && group && <Button size="sm" className="diary-source-adjust" aria-haspopup="dialog" onClick={() => { setExpandedFood(group.key); setAmountDrafts({}); setCustomPercentDraft(null); }}>{group.entries.some(entry => overrides[entry.key]?.quantity != null) ? 'Adjust again' : 'Adjust'}</Button>}</li>;
             })}</ol> : <p className="diary-source-none">No recorded {label.toLocaleLowerCase()} from this day&apos;s foods.</p>}
             {nutrient.missing > 0 && <p className="diary-source-warning">{nutrient.missing} food {nutrient.missing === 1 ? 'is' : 'items are'} missing {label.toLocaleLowerCase()} data, so this breakdown is partial.</p>}
             {key !== 'calories' && nutrient.caloriesMissing > 0 && <p className="diary-source-warning">Calories are missing for {nutrient.caloriesMissing} contributing food {nutrient.caloriesMissing === 1 ? 'entry' : 'entries'}.</p>}

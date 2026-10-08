@@ -197,6 +197,13 @@
   justify-content: space-between;
   gap: 1rem;
 }
+.diary-source-card-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  min-width: 0;
+}
 .diary-source-card header > div:first-child > span {
   color: rgb(0 0 0 / 0.58);
   font-size: 0.72rem;
@@ -304,6 +311,9 @@
 }
 @media (max-width: 38rem) {
   .diary-section-heading { display: grid; }
+  .diary-source-card > header { align-items: center; flex-wrap: wrap; }
+  .diary-source-card-controls { width: 100%; justify-content: space-between; }
+  .diary-source-total { justify-items: start; text-align: left; }
   .diary-add-methods > button { flex: 1 1 12rem; }
   .diary-editor-footer { bottom: 0.25rem; }
   .diary-editor-footer > button { flex: 1 1 8rem; }
