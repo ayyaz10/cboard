@@ -189,8 +189,9 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
       <div className="diary-source-visibility">
         <div className="diary-source-visibility-heading"><strong>Food source cards</strong><span>Choose which nutrients to show</span></div>
         <div className="diary-source-visibility-controls" role="group" aria-label="Show or hide nutrient cards">
-          {SOURCE_CARDS.map(([key, label]) => <Button key={key} size="sm" className="diary-source-visibility-toggle" aria-pressed={visibleSources[key]} onClick={() => toggleSource(key)}><span aria-hidden="true">{visibleSources[key] ? '✓' : '+'}</span>{label}</Button>)}
+          {SOURCE_CARDS.map(([key, label]) => <Button key={key} size="sm" className="diary-source-visibility-toggle" aria-label={`${visibleSources[key] ? 'Hide' : 'Show'} ${label} card`} aria-pressed={visibleSources[key]} onClick={() => toggleSource(key)}><span aria-hidden="true">{visibleSources[key] ? '✓' : '+'}</span>{visibleSources[key] ? `Hide ${label}` : `Show ${label}`}</Button>)}
           {SOURCE_CARDS.some(([key]) => !visibleSources[key]) && <Button size="sm" variant="ghost" onClick={() => setVisibleSources(defaultSourceVisibility())}>Show all</Button>}
+          {SOURCE_CARDS.some(([key]) => visibleSources[key]) && <Button size="sm" variant="ghost" onClick={() => setVisibleSources(Object.fromEntries(SOURCE_CARDS.map(([key]) => [key, false])))}>Hide all</Button>}
         </div>
       </div>
 
