@@ -79,6 +79,8 @@ export function DiaryMealEditor({
   foodLibrary = [],
 }) {
   const [draft, setDraft] = useState(() => structuredClone(initial));
+  const [notesOpen, setNotesOpen] = useState(() => Boolean(initial.notes));
+  const [recipeOpen, setRecipeOpen] = useState(false);
   const [slug, setSlug] = useState("");
   const [portions, setPortions] = useState(1);
   const [individual, setIndividual] = useState(false);
@@ -119,6 +121,7 @@ export function DiaryMealEditor({
       setRecipeError("");
       setRecipeNotice(`${recipe.title}: ${items.length} food${items.length === 1 ? '' : 's'} added below. Save the meal to record it.`);
       setSlug("");
+      setRecipeOpen(false);
     } catch (err) {
       setRecipeError(err.message);
     }
@@ -371,7 +374,7 @@ export function DiaryMealEditor({
     <section className="diary-editor" aria-label="Meal entry editor">
       <h2>{initial.items.length ? "Edit meal entry" : "Log a meal"}</h2>
       <p>
-        Adjust this meal freely. When you save, you can choose whether to update a recipe too. Other diary days stay unchanged.
+        Add foods and adjust portions. Changes apply to this day; updating a saved recipe is optional after saving.
       </p>
       <form
         onSubmit={(event) => {
@@ -396,7 +399,7 @@ export function DiaryMealEditor({
               </select>
             </label>
             <label>
-              Entry name
+              Meal name
               <input
                 required
                 maxLength={160}
@@ -407,108 +410,112 @@ export function DiaryMealEditor({
               />
             </label>
           </div>
-          <section className="diary-add-recipe">
-            <h3>Add a saved recipe</h3>
-            <div className="diary-fields">
-              <label>
-                Recipe
-                <select
-                  aria-label="Recipe"
-                  value={slug}
-                  onChange={(event) => { setSlug(event.target.value); setRecipeError(""); setRecipeNotice(""); }}
-                >
-                  <option value="">Choose a recipe</option>
-                  {recipes.map((item) => (
-                    <option key={item.slug} value={item.slug}>
-                      {item.title}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                {wholeRecipe ? 'Whole recipe quantity' : 'Recipe portions'}
-                <input
-                  type="number"
-                  min="0.01"
-                  max="100"
-                  step="any"
-                  value={portions}
-                  onChange={(event) => setPortions(number(event.target.value))}
-                />
-              </label>
-            </div>
-            {wholeRecipe && <p className="diary-hint">This recipe has no serving count. 1 adds the whole recipe; 0.5 adds half. Ingredient amounts and nutrition are copied into this meal and can be edited below.</p>}
-            {recipe && !recipe.productNutrition && !recipe.nutritionFromIngredients && (
-              <>
-                <p className="diary-hint">
-                  One portion uses the recipe’s listed macros. Check whether
-                  your imported recipe lists one serving or a whole batch.
-                </p>
-                <label className="diary-check">
-                  <input
-                    type="checkbox"
-                    checked={individual}
-                    onChange={(event) => setIndividual(event.target.checked)}
-                  />
-                  Use individual ingredients instead
+          {recipes.length > 0 && <details className="diary-add-recipe-disclosure" open={recipeOpen} onToggle={(event) => setRecipeOpen(event.currentTarget.open)}>
+            <summary>Add from a saved recipe</summary>
+            <section className="diary-add-recipe">
+              <div className="diary-fields">
+                <label>
+                  Recipe
+                  <select
+                    aria-label="Recipe"
+                    value={slug}
+                    onChange={(event) => { setSlug(event.target.value); setRecipeError(""); setRecipeNotice(""); }}
+                  >
+                    <option value="">Choose a recipe</option>
+                    {recipes.map((item) => (
+                      <option key={item.slug} value={item.slug}>
+                        {item.title}
+                      </option>
+                    ))}
+                  </select>
                 </label>
-                {individual && !wholeRecipe && (
+                <label>
+                  {wholeRecipe ? 'Whole recipe quantity' : 'Recipe portions'}
+                  <input
+                    type="number"
+                    min="0.01"
+                    max="100"
+                    step="any"
+                    value={portions}
+                    onChange={(event) => setPortions(number(event.target.value))}
+                  />
+                </label>
+              </div>
+              {wholeRecipe && <p className="diary-hint">This recipe has no serving count. 1 adds the whole recipe; 0.5 adds half. Ingredient amounts and nutrition are copied into this meal and can be edited below.</p>}
+              {recipe && !recipe.productNutrition && !recipe.nutritionFromIngredients && (
+                <>
                   <p className="diary-hint">
-                    Ingredient values must describe their full recipe
-                    quantities. They are divided by the recipe’s serving count.
-                    Missing values stay unknown; you can replace ingredients
-                    using food lookup.
+                    One portion uses the recipe’s listed macros. Check whether
+                    your imported recipe lists one serving or a whole batch.
                   </p>
-                )}
-              </>
-            )}
-            {recipe?.productNutrition && !wholeRecipe && (
-              <p className="diary-hint">
-                Imports the saved product ingredients for this many servings.
-                Each amount is editable below.
-              </p>
-            )}
-            {recipe?.nutritionFromIngredients && !wholeRecipe && (
-              <p className="diary-hint">
-                Imports the saved ingredient nutrition for this many servings so known values and incomplete ingredients remain visible.
-              </p>
-            )}
-            <button
-              type="button"
-              className="diary-find-food-button"
-              disabled={!recipe || draft.items.length >= 100}
-              onClick={addRecipe}
-            >
-              Add recipe to entry
-            </button>
-            {recipeError && <p role="alert">{recipeError}</p>}
-            {recipeNotice && <p role="status">{recipeNotice}</p>}
+                  <label className="diary-check">
+                    <input
+                      type="checkbox"
+                      checked={individual}
+                      onChange={(event) => setIndividual(event.target.checked)}
+                    />
+                    Use individual ingredients instead
+                  </label>
+                  {individual && !wholeRecipe && (
+                    <p className="diary-hint">
+                      Ingredient values must describe their full recipe
+                      quantities. They are divided by the recipe’s serving count.
+                      Missing values stay unknown; you can replace ingredients
+                      using food lookup.
+                    </p>
+                  )}
+                </>
+              )}
+              {recipe?.productNutrition && !wholeRecipe && (
+                <p className="diary-hint">
+                  Imports the saved product ingredients for this many servings.
+                  Each amount is editable below.
+                </p>
+              )}
+              {recipe?.nutritionFromIngredients && !wholeRecipe && (
+                <p className="diary-hint">
+                  Imports the saved ingredient nutrition for this many servings so known values and incomplete ingredients remain visible.
+                </p>
+              )}
+              <button
+                type="button"
+                className="diary-find-food-button"
+                disabled={!recipe || draft.items.length >= 100}
+                onClick={addRecipe}
+              >
+                Add recipe
+              </button>
+              {recipeError && <p role="alert">{recipeError}</p>}
+              {recipeNotice && <p role="status">{recipeNotice}</p>}
+            </section>
+          </details>}
+          <section className="diary-add-food" aria-label="Add foods to this meal">
+            <div className="diary-section-heading"><h3>Add food</h3><span>Search or scan a barcode, or enter food details yourself.</span></div>
+            <div className="diary-actions diary-add-methods">
+              <button
+                type="button"
+                className="diary-find-food-button"
+                disabled={draft.items.length >= 100}
+                onClick={() => setLookup(lookup === "new" ? null : "new")}
+              >
+                Find food or scan barcode
+              </button>
+              <button
+                type="button"
+                className="diary-manual-food-button"
+                disabled={draft.items.length >= 100 || Boolean(manualId)}
+                onClick={() => {
+                  const item = { ...foodItem({ quantity: 100, unit: "g" }), name: '' };
+                  setManualId(item.id);
+                  setDraft({ ...draft, items: [...draft.items, item] });
+                  setOpenFood(item.id);
+                }}
+              >
+                Enter manually
+              </button>
+            </div>
           </section>
-          <div className="diary-actions">
-            <button
-              type="button"
-              className="diary-manual-food-button"
-              disabled={draft.items.length >= 100}
-              onClick={() => setLookup(lookup === "new" ? null : "new")}
-            >
-              Find food or scan barcode
-            </button>
-          </div>
           {manualId && renderFood(draft.items.find(item => item.id === manualId), 0)}
-          <div className="diary-actions">
-            <button
-              type="button"
-              disabled={draft.items.length >= 100 || Boolean(manualId)}
-              onClick={() => {
-                const item = { ...foodItem({ quantity: 100, unit: "g" }), name: '' };
-                setManualId(item.id);
-                setDraft({ ...draft, items: [...draft.items, item] });
-                setOpenFood(item.id);
-              }}
-            >
-              Enter food manually
-            </button>
-          </div>
           {lookup && (
             <section className="diary-lookup" aria-label="Find food">
               <div className="diary-actions">
@@ -541,37 +548,38 @@ export function DiaryMealEditor({
           <div className="diary-foods">
             {draft.items.filter(item => item.id !== manualId).map(renderFood)}
           </div>
-          <section aria-label="Draft meal nutrition">
-            <h3>This meal</h3>
+          <section className="diary-meal-totals" aria-label="Draft meal nutrition">
+            <h3>Meal total</h3>
             <NutritionTotals meals={[draft]} />
             <p className="diary-hint">
               Updates as you change foods and amounts. Save the entry to update
               your daily totals.
             </p>
           </section>
-          <label>
-            Meal notes
-            <textarea
-              maxLength={2000}
-              rows={2}
-              value={draft.notes}
-              onChange={(event) =>
-                setDraft({ ...draft, notes: event.target.value })
-              }
-              placeholder="Optional: preparation, appetite, or anything to remember"
-            />
-          </label>
+          <details className="diary-meal-notes" open={notesOpen} onToggle={(event) => setNotesOpen(event.currentTarget.open)}>
+            <summary>{draft.notes ? "Meal notes" : "Add a note (optional)"}</summary>
+            <label>
+              Meal notes
+              <textarea
+                maxLength={2000}
+                rows={2}
+                value={draft.notes}
+                onChange={(event) =>
+                  setDraft({ ...draft, notes: event.target.value })
+                }
+                placeholder="Preparation, appetite, or anything to remember"
+              />
+            </label>
+          </details>
           <div className="diary-actions diary-editor-footer">
             <button
               className="diary-primary"
               type="submit"
               disabled={!draft.items.length}
             >
-              {busy ? "Saving…" : "Save meal entry"}
+              {busy ? "Saving…" : "Save meal"}
             </button>
-            <button type="button" onClick={onCancel}>
-              Cancel editing
-            </button>
+            <button type="button" onClick={onCancel}>Cancel</button>
           </div>
           {error && <p role="alert">{error}</p>}
         </fieldset>
