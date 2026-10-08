@@ -131,11 +131,12 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
       <div className="diary-source-grid">
         {SOURCE_CARDS.map(([key, label, description, colorToken, unit]) => {
           const nutrient = adjusting ? simulation.contributions[key] : contributions[key];
-          const energy = nutrientEnergy(key, nutrient, adjusting ? simulation.contributions.calories : contributions.calories);
+          const calorieContributions = adjusting ? simulation.contributions.calories : contributions.calories;
+          const energy = nutrientEnergy(key, nutrient, calorieContributions);
           const target = goals?.[key]; const targetPercent = target > 0 ? (nutrient.total / target) * 100 : null;
           return <article className="diary-source-card" key={key} style={{ '--source-color': `var(${colorToken})` }}>
             <header><div><span>{description}</span><h3>{label}</h3></div><div className="diary-source-total"><strong>{format(nutrient.total)} {unit}</strong>{target > 0 && <small>{format(targetPercent)}% of {format(target)} {unit} target</small>}</div></header>
-            {energy && <div className="diary-source-energy"><strong>Estimated calories from {label.toLocaleLowerCase()}</strong><span>{energy.calories == null ? 'Unknown' : <>{format(nutrient.total)} g × {energy.factor} kcal/g = <b>{format(energy.calories)} kcal</b></>}</span>{energy.percentage != null && <small>About {format(energy.percentage)}% of {format((adjusting ? simulatedTotals.calories : contributions.calories).value)} logged kcal{energy.partial ? ' (partial data)' : ''}</small>}{key === 'carbs' && <small>Uses carbs × 4. If your food record includes fibre in carbs, this estimate overlaps with fibre calories.</small>}{key === 'fiber' && <small>Uses an average of 2 kcal/g for fibre; actual energy varies.</small>}</div>}
+            {energy && <div className="diary-source-energy"><strong>Estimated calories from {label.toLocaleLowerCase()}</strong><span>{energy.calories == null ? 'Unknown' : <>{format(nutrient.total)} g × {energy.factor} kcal/g = <b>{format(energy.calories)} kcal</b></>}</span>{energy.percentage != null && <small>About {format(energy.percentage)}% of {format(calorieContributions.total)} logged kcal{energy.partial ? ' (partial data)' : ''}</small>}{key === 'carbs' && <small>Uses carbs × 4. If your food record includes fibre in carbs, this estimate overlaps with fibre calories.</small>}{key === 'fiber' && <small>Uses an average of 2 kcal/g for fibre; actual energy varies.</small>}</div>}
             {key !== 'calories' && nutrient.foods.length > 0 && <p className="diary-source-calories"><span>Calories from foods listed</span><strong>{calorieLabel(nutrient)}</strong></p>}
             {nutrient.foods.length ? <ol className="diary-source-list">{nutrient.foods.map(food => {
               const group = groups.find(item => item.key === sourceKey(food.name));
