@@ -127,11 +127,6 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
     setVisibleSources(previous => ({ ...previous, [key]: !previous[key] }));
   }
 
-  function setAllSources(visible) {
-    captureSourcePositions();
-    setVisibleSources(Object.fromEntries(SOURCE_CARDS.map(([key]) => [key, visible])));
-  }
-
   function applyAmount(entry, number) {
     const quantity = mode === 'percent' ? entry.quantity * number / 100 : number;
     if (!Number.isFinite(quantity) || quantity > 1000000) return;
@@ -236,27 +231,16 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
         <div className="diary-simulation-footer"><span>{changed ? `${simulation.changes.length} changed ${simulation.changes.length === 1 ? 'entry' : 'entries'} · preview only` : 'No changes to apply'}</span><Button variant="primary" disabled={!changed || disabled} onClick={() => setConfirmApply(true)}>Review &amp; apply</Button></div>
       </Panel>}
 
-      <div className="diary-source-visibility">
-        <div className="diary-source-visibility-heading"><strong>Nutrient cards</strong><span>Show or hide cards individually</span></div>
-        <div className="diary-source-visibility-controls" role="group" aria-label="Show or hide all nutrient cards">
-          {SOURCE_CARDS.some(([key]) => !visibleSources[key]) && <Button size="sm" variant="ghost" onClick={() => setAllSources(true)}>Show all</Button>}
-          {SOURCE_CARDS.some(([key]) => visibleSources[key]) && <Button size="sm" variant="ghost" onClick={() => setAllSources(false)}>Hide all</Button>}
-        </div>
-      </div>
-
-      {SOURCE_CARDS.some(([key]) => !visibleSources[key]) && <div className="diary-source-hidden-controls" role="group" aria-label="Show hidden nutrient cards">
-        <span>Hidden:</span>
-        {SOURCE_CARDS.filter(([key]) => !visibleSources[key]).map(([key, label]) => <Button key={key} size="sm" className="diary-source-action diary-source-action--show" aria-label={`Show ${label} card`} onClick={() => toggleSource(key)}>Show {label}</Button>)}
-      </div>}
-
       <div className="diary-source-grid">
-        {SOURCE_CARDS.filter(([key]) => visibleSources[key]).map(([key, label, description, colorToken, unit]) => {
+        {SOURCE_CARDS.map(([key, label, description, colorToken, unit]) => {
           const nutrient = adjusting ? simulation.contributions[key] : contributions[key];
           const calorieContributions = adjusting ? simulation.contributions.calories : contributions.calories;
           const energy = nutrientEnergy(key, nutrient, calorieContributions);
           const target = goals?.[key]; const targetPercent = target > 0 ? (nutrient.total / target) * 100 : null;
-          return <article data-source-motion={key} className={`diary-source-card${adjusting && key === selectedNutrient ? ' is-editing' : ''}`} key={key} style={{ '--source-color': `var(${colorToken})` }}>
-            <header><div><span>{description}</span><h3>{label}</h3></div><div className="diary-source-card-controls"><div className="diary-source-total"><strong>{format(nutrient.total)} {unit}</strong>{target > 0 && <small>{format(targetPercent)}% of {format(target)} {unit} target</small>}</div><div className="diary-source-card-actions"><Button size="sm" className="diary-source-action diary-source-action--hide" aria-label={`Hide ${label} card`} aria-pressed={true} onClick={() => toggleSource(key)}>Hide</Button><Button size="sm" className="diary-source-action diary-source-action--adjust" aria-pressed={adjusting && key === selectedNutrient} disabled={disabled} onClick={() => selectAdjustmentNutrient(key)}>{adjusting && key === selectedNutrient ? 'Adjusting' : 'Adjust'}</Button></div></div></header>
+          const detailsId = `diary-source-body-${key}`;
+          return <article data-source-motion={key} className={`diary-source-card${adjusting && key === selectedNutrient ? ' is-editing' : ''}${visibleSources[key] ? '' : ' is-collapsed'}`} key={key} style={{ '--source-color': `var(${colorToken})` }}>
+            <header className="diary-source-card-heading"><div className="diary-source-card-title"><span>{description}</span><h3>{label}</h3></div><div className="diary-source-card-controls"><div className="diary-source-total"><strong>{format(nutrient.total)} {unit}</strong>{target > 0 && <small>{format(targetPercent)}% of {format(target)} {unit} target</small>}</div><div className="diary-source-card-actions"><Button size="sm" className={`diary-source-action ${visibleSources[key] ? 'diary-source-action--hide' : 'diary-source-action--show'}`} aria-label={`${visibleSources[key] ? 'Hide' : 'Show'} ${label} details`} aria-controls={detailsId} aria-expanded={visibleSources[key]} onClick={() => toggleSource(key)}>{visibleSources[key] ? 'Hide' : 'Show'}</Button><Button size="sm" className="diary-source-action diary-source-action--adjust" aria-pressed={adjusting && key === selectedNutrient} disabled={disabled} onClick={() => { if (!visibleSources[key]) toggleSource(key); selectAdjustmentNutrient(key); }}>{adjusting && key === selectedNutrient ? 'Adjusting' : 'Adjust'}</Button></div></div></header>
+            <div id={detailsId} className={`diary-source-body-shell${visibleSources[key] ? ' is-open' : ''}`} aria-hidden={!visibleSources[key]} inert={!visibleSources[key]}><div className="diary-source-card-body">
             {energy && <div className="diary-source-energy"><strong>Estimated calories from {label.toLocaleLowerCase()}</strong><span>{energy.calories == null ? 'Unknown' : <>{format(nutrient.total)} g × {energy.factor} kcal/g = <b>{format(energy.calories)} kcal</b></>}</span>{energy.percentage != null && <small>About {format(energy.percentage)}% of {format(calorieContributions.total)} logged kcal{energy.partial ? ' (partial data)' : ''}</small>}{key === 'carbs' && <small>Uses carbs × 4. If your food record includes fibre in carbs, this estimate overlaps with fibre calories.</small>}{key === 'fiber' && <small>Uses an average of 2 kcal/g for fibre; actual energy varies.</small>}</div>}
             {key !== 'calories' && nutrient.foods.length > 0 && <p className="diary-source-calories"><span>Calories from foods listed</span><strong>{calorieLabel(nutrient)}</strong></p>}
             {nutrient.foods.length ? <ol className="diary-source-list">{nutrient.foods.map(food => {
@@ -266,6 +250,7 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
             })}</ol> : <p className="diary-source-none">No recorded {label.toLocaleLowerCase()} from this day&apos;s foods.</p>}
             {nutrient.missing > 0 && <p className="diary-source-warning">{nutrient.missing} food {nutrient.missing === 1 ? 'is' : 'items are'} missing {label.toLocaleLowerCase()} data, so this breakdown is partial.</p>}
             {key !== 'calories' && nutrient.caloriesMissing > 0 && <p className="diary-source-warning">Calories are missing for {nutrient.caloriesMissing} contributing food {nutrient.caloriesMissing === 1 ? 'entry' : 'entries'}.</p>}
+            </div></div>
           </article>;
         })}
       </div>
