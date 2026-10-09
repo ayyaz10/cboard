@@ -80,6 +80,8 @@
 .diary-source-action--show { border-color:var(--color-accent); background:var(--color-accent-soft); color:var(--color-accent-text); }
 .diary-source-action--adjust { border-color:var(--color-accent); background:var(--color-accent); color:var(--color-accent-contrast); }
 .diary-source-action--adjust:hover:not(:disabled) { background:var(--color-accent-hover); }
+.diary-source-action--cancel { border-color:var(--color-border-strong, var(--color-border)); background:var(--color-surface-interactive); color:var(--color-text-secondary); }
+.diary-source-action--cancel:hover:not(:disabled) { border-color:var(--color-text-secondary); background:var(--color-surface-raised); color:var(--color-text); }
 .diary-simulation-panel { position:sticky; top:.5rem; z-index:10; display:grid; gap:.65rem; min-width:0; padding:.85rem var(--space-4); box-shadow:var(--shadow-card); }
 .diary-simulation-heading { display:flex; align-items:start; justify-content:space-between; gap:var(--space-4); }
 .diary-simulation-heading h3 { display:inline; margin:0 0 0 .45rem; font-size:var(--font-size-section-title); }
