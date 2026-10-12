@@ -40,3 +40,38 @@ test('zero quantity previews removing a source and preserves the source meal whe
   assert.equal(meals[0].items.length, 2);
 });
 
+test('product-only override recalculates the same 30g portion across canonical nutrients', () => {
+  const meal = newMeal('Lunch');
+  const current = foodItem({ quantity: 100, unit: 'g', calories: 600, fat: 50, protein: 25, vitaminD: 2 }, 'Regular Peanut Butter');
+  current.quantity = 30;
+  meal.items = [current];
+  const preview = simulateDiaryChanges([meal], { [simulationKey(meal.id, current.id)]: {
+    name: 'Peanut Butter Powder', basis: 100, nutritionUnit: 'g',
+    nutrition: { calories: 400, fat: 10, protein: 45, vitaminD: null },
+    source: { provider: 'Manual simulation' }, productChanged: true,
+  } });
+  assert.deepEqual([preview.currentTotals.calories.value, preview.currentTotals.fat.value], [180, 15]);
+  assert.deepEqual([preview.simulatedTotals.calories.value, preview.simulatedTotals.fat.value], [120, 3]);
+  assert.equal(preview.meals[0].items[0].quantity, 30);
+  assert.equal(preview.meals[0].items[0].name, 'Peanut Butter Powder');
+  assert.equal(preview.simulatedTotals.vitaminD.missing, 1);
+});
+
+test('product and quantity overrides combine and do not mutate recipe snapshots', () => {
+  const meal = newMeal('Lunch');
+  const original = foodItem({ quantity: 100, unit: 'g', calories: 600, fat: 50 }, 'Regular Peanut Butter');
+  original.quantity = 30;
+  original.recipeOrigin = { slug: 'source-recipe', baseline: structuredClone(original) };
+  meal.items = [original];
+  const snapshot = structuredClone([meal]);
+  const preview = simulateDiaryChanges([meal], { [simulationKey(meal.id, original.id)]: {
+    quantity: 15, name: 'Peanut Butter Powder', basis: 100, nutritionUnit: 'g',
+    nutrition: { calories: 400, fat: 10 }, productChanged: true,
+  } });
+  assert.deepEqual([preview.currentTotals.calories.value, preview.currentTotals.fat.value], [180, 15]);
+  assert.deepEqual([preview.simulatedTotals.calories.value, preview.simulatedTotals.fat.value], [60, 1.5]);
+  assert.deepEqual([meal], snapshot);
+  assert.equal(preview.meals[0].items[0].recipeOrigin.slug, 'source-recipe');
+  assert.equal(simulateDiaryChanges([meal], {}).simulatedTotals.calories.value, 180);
+});
+

@@ -459,6 +459,16 @@
           "type": "string",
           "maxLength": 4000
         },
+        "group": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Recipe section or stage, such as Chicken marinade, Sauce, or Finishing."
+        },
+        "preparation": {
+          "type": "string",
+          "maxLength": 400,
+          "description": "Preparation descriptor such as finely chopped, diced, or grated."
+        },
         "nutrition": {
           "$ref": "#/$defs/nutrition"
         },

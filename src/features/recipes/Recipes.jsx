@@ -26,7 +26,7 @@ import {
 import { RecipeImporter } from './RecipeImporter';
 import { FoodItemEditor } from '../nutrition/FoodItemEditor';
 import { buildIngredientLibrary, removeRecipeOnlyIngredients } from './ingredientLibrary';
-import { applyFoodCatalogToRecipes, catalogItemsFromRecipe, normalizeFoodName, resolveCatalogFoodForIngredient, findFoodMatches } from '../nutrition/foodCatalog.js';
+import { applyFoodCatalogToRecipes, catalogItemsFromRecipe, normalizeFoodName, findFoodMatches, resolveRecipeIngredients, resolveRecipeFoodCandidate } from '../nutrition/foodCatalog.js';
 import { deleteFoodCatalogItems, getFoodCatalog, upsertFoodCatalogItems } from '../../services/foodCatalogService.js';
 import { classifyFoodDeletion, getOrphanFoodsAfterRecipesDelete } from '../nutrition/foodReferences.js';
 import { notify } from '../../lib/notifications.js';
@@ -42,6 +42,24 @@ import {
   useRecipeCardGrid,
 } from './RecipeCardView';
 import './recipesLayout.css';
+
+function addConfirmedFoodAliases(recipe, catalog) {
+  const aliases = new Map();
+  const cleanItem = item => {
+    const { foodAliasConfirmed, ...clean } = item;
+    if (foodAliasConfirmed && item.foodId) {
+      const food = catalog.find(entry => entry.id === item.foodId);
+      const alias = String(item.name || '').trim();
+      if (food && alias && normalizeFoodName(alias) !== normalizeFoodName(food.name))
+        aliases.set(food.id, { ...food, aliases: [...new Set([...(food.aliases || []), alias])] });
+    }
+    return clean;
+  };
+  return {
+    recipe: { ...recipe, ingredients: (recipe.ingredients || []).map(cleanItem), sauces: (recipe.sauces || []).map(cleanItem), alternatives: Object.fromEntries(Object.entries(recipe.alternatives || {}).map(([key, group]) => [key, { ...group, options: (group.options || []).map(cleanItem) }])) },
+    updates: [...aliases.values()],
+  };
+}
 
 export function Recipes({ route, navigationPath = '/recipes' }) {
   return (
@@ -86,7 +104,7 @@ function RecipesContent({ route, navigationPath }) {
       const [loadedRecipes, loadedFavourites, storedFoodCatalog, loadedMealPlanRefs] = await Promise.all([getRecipes(), getRecipeFavourites(), getFoodCatalog(user.id), getMealPlanFoodReferences()]);
       const knownNames = new Set(storedFoodCatalog.flatMap(food => [food.name, ...(food.aliases || [])]).map(normalizeFoodName));
       const backfill = loadedRecipes.flatMap(catalogItemsFromRecipe).filter(item => {
-        if (resolveCatalogFoodForIngredient(item, storedFoodCatalog)) return false;
+        if (resolveRecipeFoodCandidate(item, storedFoodCatalog).status !== 'none') return false;
         const names = [item.name, ...(item.aliases || [])].map(normalizeFoodName);
         if (names.some(name => knownNames.has(name))) return false;
         names.forEach(name => knownNames.add(name));
@@ -181,14 +199,20 @@ function RecipesContent({ route, navigationPath }) {
   }
   async function save(data, image, edit) {
     let saved;
-    try { saved = await saveRecipe(data, image, { edit }); }
+    const aliasResult = addConfirmedFoodAliases(resolveRecipeIngredients(data, foodCatalog).recipe, foodCatalog);
+    const resolved = aliasResult.recipe;
+    try { saved = await saveRecipe(resolved, image, { edit }); }
     catch (error) { notify.error(error.message || 'Could not save recipe'); throw error; }
+    if (aliasResult.updates.length) {
+      try { await saveMainFoodItems(aliasResult.updates); }
+      catch (error) { notify.warning(`Recipe saved, but its confirmed food alias could not be remembered: ${error.message}`); }
+    }
     setRecipes((current) => [
       ...current.filter((item) => item.slug !== saved.slug),
       saved,
     ]);
     setDraft(null);
-    const catalogItems = catalogItemsFromRecipe(saved);
+    const catalogItems = catalogItemsFromRecipe(saved).filter(item => resolveRecipeFoodCandidate(item, foodCatalog).status === 'none');
     if (catalogItems.length) {
       try { await saveMainFoodItems(catalogItems); }
       catch (error) { notify.error(error.message || 'Recipe saved, but food nutrition could not be updated'); }
@@ -297,10 +321,16 @@ function RecipesContent({ route, navigationPath }) {
   }
   async function saveBatch(entries) {
     let saved;
-    try { saved = await saveRecipeBatch(entries); }
+    const aliasResults = entries.map(entry => addConfirmedFoodAliases(resolveRecipeIngredients(entry.recipe, foodCatalog).recipe, foodCatalog));
+    try { saved = await saveRecipeBatch(entries.map((entry, index) => ({ ...entry, recipe: aliasResults[index].recipe }))); }
     catch (error) { notify.error(error.message || 'Could not import recipes'); throw error; }
+    const aliases = new Map(aliasResults.flatMap(result => result.updates).map(food => [food.id, food]));
+    if (aliases.size) {
+      try { await saveMainFoodItems([...aliases.values()]); }
+      catch (error) { notify.warning(`Recipes imported, but a confirmed food alias could not be remembered: ${error.message}`); }
+    }
     setRecipes((current) => [...current, ...saved]);
-    const catalogItems = saved.flatMap(catalogItemsFromRecipe);
+    const catalogItems = saved.flatMap(catalogItemsFromRecipe).filter(item => resolveRecipeFoodCandidate(item, foodCatalog).status === 'none');
     if (catalogItems.length) {
       try { await saveMainFoodItems(catalogItems); }
       catch (error) { notify.warning(error.message || 'Recipes were imported, but some foods need duplicate review.'); }
@@ -312,6 +342,44 @@ function RecipesContent({ route, navigationPath }) {
     navigateTo('/recipes');
     window.scrollTo(0, 0);
     notify.success(`${saved.length} recipe${saved.length === 1 ? '' : 's'} imported`);
+  }
+  async function matchExistingFoods(recipe) {
+    const result = resolveRecipeIngredients(recipe, foodCatalog);
+    if (!result.summary.matched) {
+      notify.info(result.summary.review ? `${result.summary.review} possible match${result.summary.review === 1 ? '' : 'es'} need review. Edit the ingredient and choose a food from the suggestions.` : 'No existing foods matched these ingredients.');
+      return;
+    }
+    try {
+      const saved = await saveRecipe(result.recipe, recipe.image || null, { edit: true, expectedUserId: user.id });
+      setRecipes(current => current.map(item => item.slug === saved.slug ? saved : item));
+      notify.success(`Linked ${result.summary.matched} existing food${result.summary.matched === 1 ? '' : 's'}${result.summary.review ? ` · ${result.summary.review} need review` : ''}${result.summary.noMatch ? ` · ${result.summary.noMatch} had no match` : ''}.`);
+    } catch (error) { notify.error(error.message || 'Could not link existing foods. Reload the recipe and try again.'); }
+  }
+  async function linkRecipeFood(recipe, ingredientIndex, food) {
+    try {
+      const item = recipe.ingredients[ingredientIndex];
+      if (!item || item.foodId) return;
+      const linked = { ...recipe, ingredients: recipe.ingredients.map((ingredient, index) => index === ingredientIndex
+        ? { ...ingredient, foodId: food.id, foodAliasConfirmed: true }
+        : ingredient) };
+      const hasManualNutrition = Object.values(recipe.nutrition || {}).some(value => Number.isFinite(value));
+      if (!hasManualNutrition) linked.nutritionFromIngredients = true;
+      const updated = applyFoodCatalogToRecipes([linked], foodCatalog)[0];
+      const aliasResult = addConfirmedFoodAliases(updated, foodCatalog);
+      const saved = await saveRecipe(aliasResult.recipe, recipe.image || null, { edit: true, expectedUserId: user.id });
+      setRecipes(current => current.map(item => item.slug === saved.slug ? saved : item));
+      if (aliasResult.updates.length) await saveMainFoodItems(aliasResult.updates);
+      notify.success(`Linked to ${food.name}; the recipe wording and amount were kept.`);
+    } catch (error) { notify.error(error.message || 'Could not link this food. Reload the recipe and try again.'); }
+  }
+  async function keepRecipeFoodSeparate(recipe, ingredientIndex, matches) {
+    const alias = recipe.ingredients[ingredientIndex]?.name;
+    const foods = [...new Map(matches.map(match => [match.food.id, match.food])).values()];
+    const updates = foods.map(food => ({ ...food, separateAliases: [...new Set([...(food.separateAliases || []), alias])], separateAliasesOnly: true }));
+    try {
+      await saveMainFoodItems(updates);
+      notify.info(`Kept “${alias}” separate. CBoard will remember this choice for these foods.`);
+    } catch (error) { notify.error(error.message || 'Could not remember this separate-food choice.'); }
   }
   const categories = [
     ...new Set([
@@ -418,14 +486,20 @@ function RecipesContent({ route, navigationPath }) {
                 getSlugs={async () =>
                   (await getRecipes()).map((item) => item.slug)
                 }
-                onAiCreated={(created, imageWarning = '') => {
+                onAiCreated={async (created, imageWarning = '') => {
+                  const linked = resolveRecipeIngredients(created, foodCatalog);
+                  let result = created;
+                  if (linked.summary.matched) {
+                    try { result = await saveRecipe(linked.recipe, created.image || null, { edit: true, expectedUserId: user.id }); }
+                    catch (linkError) { notify.warning(`Recipe saved, but existing foods could not be linked: ${linkError.message}`); }
+                  }
                   setRecipes((current) => [
-                    ...current.filter((item) => item.slug !== created.slug),
-                    created,
+                    ...current.filter((item) => item.slug !== result.slug),
+                    result,
                   ]);
                   notify.success(imageWarning ? `Recipe saved without an AI image: ${imageWarning}` : 'Recipe and AI image saved.');
                   setDraft(null);
-                  navigateTo(`/recipes/${created.slug}`);
+                  navigateTo(`/recipes/${result.slug}`);
                 }}
               />
             ) : null}
@@ -582,7 +656,7 @@ function RecipesContent({ route, navigationPath }) {
                       <button type="button" className={`${secondaryButton} danger-action`} aria-label={`Delete ${recipe.title}`} onClick={() => setRemoving(recipe)}>Delete recipe</button>
                     </div>
                 </div>
-                <RecipePage key={recipe.slug} recipe={recipe} favourite={favourites.has(recipe.slug)} favouritePending={favouritePending.has(recipe.slug)} onToggleFavourite={toggleFavourite} onRecipeUpdated={recipeUpdated} />
+                <RecipePage key={recipe.slug} recipe={recipe} foodCatalog={foodCatalog} favourite={favourites.has(recipe.slug)} favouritePending={favouritePending.has(recipe.slug)} onToggleFavourite={toggleFavourite} onRecipeUpdated={recipeUpdated} onMatchExistingFoods={matchExistingFoods} onUseFood={linkRecipeFood} onKeepSeparate={keepRecipeFoodSeparate} />
               </div>
             )}
             {!error &&

@@ -35,7 +35,7 @@ export function createNutritionSearchHandler({ createClient, env, fetchImpl, now
       requests.push(now());
       const params = new URLSearchParams({ q: query, page_size: "24" });
       const url = barcode
-        ? `https://world.openfoodfacts.org/api/v3/product/${barcode}?fields=code,product_name,product_name_en,brands,quantity,nutriments,nutrition_data_per,product_quantity_unit`
+        ? `https://world.openfoodfacts.org/api/v3/product/${barcode}?fields=code,product_name,product_name_en,brands,quantity,nutriments,nutrition_data_per,product_quantity_unit,last_modified_t`
         : `https://search.openfoodfacts.org/search?${params}`;
       const response = await fetchImpl(url, {
         headers: { "User-Agent": "CBoard/0.1 (https://github.com/ayyaz10/cboard)" }, signal: AbortSignal.timeout(20000),
@@ -45,7 +45,7 @@ export function createNutritionSearchHandler({ createClient, env, fetchImpl, now
       const result = await response.json();
       if (barcode) result.hits = result.product ? [result.product] : [];
       if (!Array.isArray(result.hits) || result.timed_out) return json({ error: "The food database could not complete the search. Please try again." }, 503);
-      const fields = ["code", "product_name", "product_name_en", "brands", "quantity", "nutriments", "nutrition_data_per", "product_quantity_unit"];
+      const fields = ["code", "product_name", "product_name_en", "brands", "quantity", "nutriments", "nutrition_data_per", "product_quantity_unit", "last_modified_t"];
       const payload = { hits: result.hits.map((hit) => Object.fromEntries(fields.filter((key) => hit[key] != null).map((key) => [key, hit[key]]))) };
       if (payload.hits.length) {
         if (cache.size >= 100) cache.delete(cache.keys().next().value);

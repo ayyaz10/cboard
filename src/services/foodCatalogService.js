@@ -1,5 +1,5 @@
 import { getUserScopedClient, assertSupabaseResult } from './supabaseCrud.js';
-import { cleanFoodCatalogItem, mergeFoodCatalog, normalizeFoodText, parseFoodQuantityPrefix, findFoodMatches } from '../features/nutrition/foodCatalog.js';
+import { cleanFoodCatalogItem, mergeFoodCatalog, normalizeFoodText, parseFoodQuantityPrefix, findFoodMatches, resolveRecipeFoodCandidate } from '../features/nutrition/foodCatalog.js';
 
 const KEY = 'food-catalog:v1';
 
@@ -49,6 +49,10 @@ export async function upsertFoodCatalogItems(items, expectedUserId) {
       ? parseFoodQuantityPrefix(raw.name) : null;
     let candidate = parsed ? { ...raw, name: parsed.foodName, aliases: [...new Set([...(raw.aliases || []), raw.name])] } : { ...raw };
     if (existingById) {
+      if (raw.separateAliasesOnly) {
+        current = mergeFoodCatalog(current, [candidate]);
+        continue;
+      }
       const conflicts = findFoodMatches(candidate, current.filter(food => food.id !== existingById.id));
       if (conflicts.some(match => match.confidence === 'certain' || match.confidence === 'high' || match.confidence === 'review'))
         throw new Error(`Another food may already represent '${raw.name}'. Review Possible duplicates before renaming this record.`);
@@ -62,16 +66,22 @@ export async function upsertFoodCatalogItems(items, expectedUserId) {
       current = mergeFoodCatalog(current, [{ ...candidate, id: newId }]);
       continue;
     }
-    const matches = findFoodMatches(candidate, current);
-    const automatic = matches.filter(match => match.confidence === 'certain' || match.confidence === 'high');
+    const separateFrom = food => (food.separateAliases || []).some(alias => normalizeFoodText(alias) === normalizeFoodText(candidate.name));
+    const candidates = current.filter(food => !separateFrom(food));
+    const matches = findFoodMatches(candidate, candidates);
+    const resolution = resolveRecipeFoodCandidate(candidate, candidates);
+    if (resolution.status === 'review') throw new Error(`Possible existing food found for '${raw.name}'. Review the suggested food before saving or choose Create separately.`);
+    const automatic = resolution.status === 'matched' ? [resolution.food] : matches.filter(match => match.confidence === 'certain' || match.confidence === 'high').map(match => match.food);
     if (matches.some(match => match.confidence === 'review')) throw new Error(`Possible existing food found for '${raw.name}', but nutrition or product details differ. Review the match before saving.`);
     if (automatic.length > 1) throw new Error(`Several foods match '${raw.name}'. Open Possible duplicates and choose which records to merge.`);
     if (automatic.length === 1) {
-      const match = automatic[0].food;
+      const match = automatic[0];
       const clean = cleanFoodCatalogItem(candidate);
       const filledNutrition = Object.fromEntries(Object.keys(match.nutrition || {}).map(key => [key, match.nutrition[key] ?? clean.nutrition[key] ?? null]));
+      const nutrientSources = { ...(match.nutrientSources || {}) };
+      for (const [key, value] of Object.entries(clean.nutrition || {})) if (match.nutrition?.[key] == null && value != null && clean.nutrientSources?.[key]) nutrientSources[key] = clean.nutrientSources[key];
       const merged = { ...match, aliases: [...new Set([...(match.aliases || []), ...(clean.aliases || []), ...(raw.name !== match.name ? [raw.name] : [])])].filter(alias => normalizeFoodText(alias) !== normalizeFoodText(match.name)),
-        nutrition: filledNutrition, barcode: match.barcode || clean.barcode, sku: match.sku || clean.sku, retailer: match.retailer || clean.retailer, brand: match.brand || clean.brand };
+        nutrition: filledNutrition, nutrientSources, barcode: match.barcode || clean.barcode, sku: match.sku || clean.sku, retailer: match.retailer || clean.retailer, brand: match.brand || clean.brand };
       current = mergeFoodCatalog(current, [merged]);
       continue;
     }

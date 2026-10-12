@@ -6,7 +6,9 @@ import { BarcodeScanner } from "./BarcodeScanner";
 import { BarcodeImage } from './BarcodeImage';
 import { NutritionLabel } from "./NutritionLabel";
 import { nutrients } from "./groceryData";
-import { searchNaturalFoods, naturalPortionNutrition, nutritionForOnePortion, suggestedNaturalPortion } from '../../services/naturalFoods';
+import { searchNaturalFoods, searchCoFIDFoods, naturalPortionNutrition, nutritionForOnePortion, suggestedNaturalPortion } from '../../services/naturalFoods';
+import { mergeNutritionByNutrient } from '../nutrition/sourceAdapters.js';
+import { nutrientKeys } from '../nutrition/nutrients.js';
 
 export function NutritionLookup({ name, active, visible, onSelect, amountUnit, portionMode = 'unit', currentNutrition = null, allowLabelScan = true, scanUnits }) {
   const [mode, setMode] = useState("saved");
@@ -26,7 +28,7 @@ export function NutritionLookup({ name, active, visible, onSelect, amountUnit, p
     const id = ++request.current;
     setBusy(true); setError(""); setResults(null); setBasis({}); setPortions({});
     try {
-      const rows = await (byBarcode ? lookupBarcode(text) : mode === 'natural' ? searchNaturalFoods(text) : searchNutrition(text));
+      const rows = await (byBarcode ? lookupBarcode(text) : mode === 'natural' ? searchNaturalFoods(text) : mode === 'cofid' ? searchCoFIDFoods(text) : searchNutrition(text));
       if (id === request.current) setResults(rows);
     } catch (err) {
       if (id === request.current) setError(err.message);
@@ -40,7 +42,7 @@ export function NutritionLookup({ name, active, visible, onSelect, amountUnit, p
     searched.current = "";
   }, [name]);
   useEffect(() => {
-    if (active && ['name', 'natural'].includes(mode) && name.trim().length >= 2 && searched.current !== `${mode}:${name}`) {
+    if (active && ['name', 'natural', 'cofid'].includes(mode) && name.trim().length >= 2 && searched.current !== `${mode}:${name}`) {
       searched.current = `${mode}:${name}`;
       lookup(name);
     }
@@ -49,7 +51,7 @@ export function NutritionLookup({ name, active, visible, onSelect, amountUnit, p
   useEffect(() => { if (!visible) setScanning(false); }, [visible]);
   return <div className="g-nutrition-lookup">
     <div className="g-actions" aria-label="Nutrition lookup method">
-      {[["saved", "My saved foods"], ["name", "Branded products"], ["natural", "Natural foods"], ["barcode", "Scan barcode"], ...(allowLabelScan ? [["photo", "Scan nutrition label"]] : [])].map(([key, title]) =>
+      {[["saved", "My saved foods"], ["name", "Branded products"], ["natural", "USDA reference foods"], ["cofid", "UK CoFID foods"], ["barcode", "Scan barcode"], ...(allowLabelScan ? [["photo", "Scan nutrition label"]] : [])].map(([key, title]) =>
         <button type="button" key={key} aria-pressed={mode === key} onClick={() => {
           request.current++; setMode(key); setScanning(false); setBusy(false); setResults(null); setError("");
         }}>{title}</button>)}
@@ -80,10 +82,10 @@ export function NutritionLookup({ name, active, visible, onSelect, amountUnit, p
         <button type="button" disabled={busy || !barcode.trim()} onClick={() => lookup(barcode, true)}>Look up barcode</button>
       </div>
     </div>}
-    {['name', 'natural'].includes(mode) && <>
+    {['name', 'natural', 'cofid'].includes(mode) && <>
 
     <div className="g-tools">
-      <label>{mode === 'natural' ? 'Natural food name' : 'Product name or brand'}
+      <label>{mode === 'natural' || mode === 'cofid' ? 'Generic food name' : 'Product name or brand'}
         <input value={query} maxLength={120} onChange={(e) => {
           setQuery(e.target.value); setResults(null); setError("");
           request.current += 1; setBusy(false);
@@ -95,19 +97,22 @@ export function NutritionLookup({ name, active, visible, onSelect, amountUnit, p
         {busy ? "Searching..." : "Find nutrition"}
       </button>
     </div>
-    <p className="g-hint">{mode === 'natural' ? 'USDA reference foods: try banana, apple, raw cashews or cooked egg. Match raw/cooked and salted/unsalted. Values describe the edible portion; peel, shells and other refuse are excluded.' : 'Choose the matching food, brand and preparation (for example, dry or cooked rice). Values are for the product as sold.'}</p>
+    <p className="g-hint">{mode === 'natural' ? 'USDA reference foods: try banana, apple, raw cashews or cooked egg. Match raw/cooked and salted/unsalted. Values describe the edible portion; peel, shells and other refuse are excluded.' : mode === 'cofid' ? 'UK CoFID generic foods: choose the closest preparation match. Composition values are reference values per 100 g or 100 ml.' : 'Choose the matching food, brand and preparation (for example, dry or cooked rice). Values are for the product as sold.'}</p>
     </>}
     {busy && <p role="status">Looking up nutrition...</p>}
     {error && <p role="alert">{error}</p>}
     {results?.length === 0 && <p role="status">{mode === "barcode" ? "No nutrition record found for this barcode. Try a label photo or search by name." : 'No matching nutrition records found. Try a shorter name (for example, "cheddar") or add the brand.'}</p>}
     {results?.map((product) => {
       const unit = basis[product.code] || product.nutrition.unit;
-      const natural = product.source.provider === 'USDA FoodData Central';
+      const natural = ['USDA FoodData Central', 'UK CoFID'].includes(product.source.provider);
       const suggestedPortion = suggestedNaturalPortion(product, name, amountUnit);
       const portionIndex = Object.hasOwn(portions, product.code) ? portions[product.code] : suggestedPortion;
       const portion = product.portions?.[portionIndex];
       const allowPortion = !amountUnit || !/^(g|grams?|kg|kilograms?|mg|ml|millilitres?|milliliters?|l|litres?|liters?|oz|lb)$/i.test(amountUnit.trim());
       const displayScale = natural && allowPortion && portion ? portion.grams / product.nutrition.quantity : 1;
+      const currentQuantity = Number(currentNutrition?.quantity ?? currentNutrition?.basis);
+      const currentUnit = currentNutrition?.unit || currentNutrition?.nutritionUnit;
+      const canEnrich = natural && currentNutrition && currentUnit === unit && currentQuantity > 0 && nutrientKeys.some(key => currentNutrition[key] == null);
       return <div className="g-nutrition-result" key={product.code}>
         <strong>{product.name}</strong>
         <p>{[product.brand, product.pack].filter(Boolean).join(" / ")}</p>
@@ -124,17 +129,26 @@ export function NutritionLookup({ name, active, visible, onSelect, amountUnit, p
             {product.portions.map((value, index) => <option key={index} value={index}>{value.label} (~{Number(value.grams.toFixed(2))} g per unit)</option>)}
           </select>
         </label>}
-        {natural && <p className="g-hint">{portion ? `Estimated portion: ${portion.label}, ${portion.grams} g. Your actual food may weigh more or less.` : 'Use an actual edible weight for the best portion calculation. Size estimates are available only where USDA provides a portion weight.'} Nutrients not reported by USDA stay unknown.</p>}
+        {natural && <p className="g-hint">{portion ? `Estimated portion: ${portion.label}, ${portion.grams} g. Your actual food may weigh more or less.` : 'Use an actual edible weight for the best portion calculation. Available source portions are shown above.'} Nutrients not reported by this source stay unknown.</p>}
         <div className="g-actions">
           <button type="button" disabled={!unit} onClick={() => {
-            const selected = naturalPortionNutrition({ ...product.nutrition, unit, source: { ...product.source, name: [product.name, product.brand].filter(Boolean).join(' · '), fetchedAt: new Date().toISOString() } }, allowPortion ? portion : null);
-            onSelect(portionMode === 'weight' ? selected : nutritionForOnePortion(selected));
+            const selected = naturalPortionNutrition({ ...product.nutrition, nutrientSources: product.nutrientSources, unit, source: { ...product.source, name: [product.name, product.brand].filter(Boolean).join(' · '), fetchedAt: new Date().toISOString() } }, allowPortion ? portion : null);
+            onSelect(portionMode === 'weight' || (natural && !portion) ? selected : nutritionForOnePortion(selected));
             setResults(null);
           }}>Use these values</button>
+          {canEnrich && <button type="button" disabled={!unit} onClick={() => {
+            const selected = naturalPortionNutrition({ ...product.nutrition, nutrientSources: product.nutrientSources, unit, source: { ...product.source, name: product.name, fetchedAt: new Date().toISOString() } }, null);
+            const factor = currentQuantity / selected.quantity;
+            const reference = { ...selected, quantity: currentQuantity,
+              ...Object.fromEntries(nutrientKeys.map(key => [key, selected[key] == null ? null : selected[key] * factor])) };
+            const merged = mergeNutritionByNutrient(currentNutrition, reference, { currentSource: currentNutrition.source, incomingSources: reference.nutrientSources });
+            onSelect({ ...currentNutrition, ...merged.nutrition, nutrientSources: merged.nutrientSources, quantity: currentNutrition.quantity || currentNutrition.basis || reference.quantity, unit: currentNutrition.unit || currentNutrition.nutritionUnit || reference.unit, source: { ...currentNutrition.source, referenceSource: reference.source } });
+            setResults(null);
+          }}>Fill missing nutrients from reference</button>}
           <a href={product.source.url} target="_blank" rel="noreferrer">{natural ? 'View USDA food' : 'View product'}</a>
         </div>
       </div>;
     })}
-    <small>{mode === 'natural' ? <>Data: <a href="https://fdc.nal.usda.gov/download-datasets/" target="_blank" rel="noreferrer">USDA FoodData Central</a>, SR Legacy April 2018 / Foundation April 2026, CC0. This is a downloaded reference dataset, not a live USDA API request. Vitamin A is reported as RAE; salt is left unknown when not supplied.</> : <>Data: <a href="https://world.openfoodfacts.org" target="_blank" rel="noreferrer">Open Food Facts</a> / <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noreferrer">ODbL</a>. Coverage and completeness vary.</>}</small>
+    <small>{mode === 'cofid' ? <>Data: <a href="https://www.gov.uk/government/publications/composition-of-foods-integrated-dataset-cofid" target="_blank" rel="noreferrer">UK CoFID 2021</a>, downloaded and indexed locally under the Open Government Licence. Trace markers remain unknown.</> : mode === 'natural' ? <>Data: <a href="https://fdc.nal.usda.gov/download-datasets/" target="_blank" rel="noreferrer">USDA FoodData Central</a>, SR Legacy April 2018 / Foundation April 2026, CC0. This is a downloaded reference dataset, not a live USDA API request. Vitamin A is reported as RAE; salt is left unknown when not supplied.</> : <>Data: <a href="https://world.openfoodfacts.org" target="_blank" rel="noreferrer">Open Food Facts</a> / <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noreferrer">ODbL</a>. Coverage and completeness vary.</>}</small>
   </div>;
 }

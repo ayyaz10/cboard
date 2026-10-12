@@ -29,12 +29,12 @@ html[data-theme="midnight"] {
   --mid-radius-md: 5px;
   --mid-radius-lg: 7px;
   --mid-shadow: 0 1px 2px rgb(0 0 0 / .4);
-  --mid-bg: var(--color-bg);
-  --mid-surface: var(--color-surface);
-  --mid-raised: var(--color-surface-raised);
-  --mid-soft: var(--color-surface-interactive);
-  --mid-border: var(--color-border);
-  --mid-border-strong: var(--color-border-strong);
+  --mid-bg: var(--surface-page);
+  --mid-surface: var(--surface-secondary);
+  --mid-raised: var(--surface-elevated);
+  --mid-soft: var(--surface-hover);
+  --mid-border: var(--border-default);
+  --mid-border-strong: var(--border-strong);
   --mid-text: var(--color-text);
   --mid-secondary: var(--color-text-secondary);
   --mid-muted: var(--color-text-muted);
@@ -108,16 +108,16 @@ html[data-theme="midnight"] .f-primary,
 html[data-theme="midnight"] .g-primary,
 html[data-theme="midnight"] .app-menu-toggle,
 html[data-theme="midnight"] .primary-button { background: var(--mid-accent) !important; color: var(--mid-accent-text) !important; border-color: var(--mid-accent) !important; }
-html[data-theme="midnight"] :where(button,a,summary,input,select,textarea):focus-visible { outline: 2px solid var(--mid-accent) !important; outline-offset: 3px; }
-html[data-theme="midnight"] button:disabled { opacity: .46; }
+html[data-theme="midnight"] :where(button,a,summary,input,select,textarea):focus-visible { outline: 2px solid var(--border-focus) !important; outline-offset: 3px; }
+html[data-theme="midnight"] button:disabled { opacity: .52; }
 html[data-theme="midnight"] [aria-pressed="true"],
-html[data-theme="midnight"] [aria-current="page"] { background-color: var(--mid-accent-soft) !important; color: var(--mid-accent) !important; border-color: color-mix(in srgb, var(--color-accent) 48%, transparent) !important; }
+html[data-theme="midnight"] [aria-current="page"] { background-color: var(--surface-selected) !important; color: var(--mid-accent) !important; border-color: var(--border-interactive) !important; }
 
 /* Forms, native popups and data-heavy components. */
 html[data-theme="midnight"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
 html[data-theme="midnight"] textarea,
 html[data-theme="midnight"] select,
-html[data-theme="midnight"] .field-input { background-color: #0b0e12 !important; color: var(--mid-text) !important; border-color: var(--mid-border-strong) !important; caret-color: var(--mid-accent); }
+html[data-theme="midnight"] .field-input { background-color: var(--surface-primary) !important; color: var(--mid-text) !important; border-color: var(--border-strong) !important; caret-color: var(--mid-accent); }
 html[data-theme="midnight"] input::placeholder,
 html[data-theme="midnight"] textarea::placeholder { color: var(--mid-muted) !important; opacity: 1; }
 html[data-theme="midnight"] select option { background: var(--mid-raised); color: var(--mid-text); }
@@ -168,7 +168,7 @@ html[data-theme="midnight"] .finance .f-stat[data-tone="pink"] { background: var
 html[data-theme="midnight"] .finance .f-stat[data-tone="amber"] { background: var(--mid-warning-soft) !important; }
 html[data-theme="midnight"] .finance :is(.f-button,.f-icon,.f-tabs button,.f-mobile-tabs>button,.f-chart-zoom button) { background: var(--mid-raised) !important; color: var(--mid-text) !important; border-color: var(--mid-border-strong) !important; box-shadow: none !important; }
 html[data-theme="midnight"] .finance :is(.f-primary,.f-mobile-tab-picker select) { background: var(--mid-accent); color: var(--mid-accent-text); border-color: var(--mid-accent); box-shadow: none; }
-html[data-theme="midnight"] .finance :is(.f-form input,.f-form select,.f-form textarea,.f-input,.f-mobile-tab-picker select) { background-color: #0b0e12; color: var(--mid-text); border-color: var(--mid-border-strong); }
+html[data-theme="midnight"] .finance :is(.f-form input,.f-form select,.f-form textarea,.f-input,.f-mobile-tab-picker select) { background-color: var(--surface-primary); color: var(--mid-text); border-color: var(--border-strong); }
 html[data-theme="midnight"] .finance .f-header p,
 html[data-theme="midnight"] .finance .f-meta,
 html[data-theme="midnight"] .finance .f-help,
@@ -198,7 +198,7 @@ html[data-theme="midnight"] .groceries :is(button,.g-hint,.g-thumb,.g-stats butt
 html[data-theme="midnight"] .groceries button:hover { background: var(--mid-soft) !important; }
 html[data-theme="midnight"] .groceries .g-primary { background: var(--mid-accent) !important; color: var(--mid-accent-text) !important; border-color: var(--mid-accent) !important; }
 html[data-theme="midnight"] .groceries .g-tabs button[aria-pressed="true"] { background: var(--mid-accent-soft) !important; color: var(--mid-accent) !important; }
-html[data-theme="midnight"] .groceries :is(input:not([type="checkbox"]),select,textarea) { background: #0b0e12 !important; border-color: var(--mid-border-strong) !important; color: var(--mid-text) !important; }
+html[data-theme="midnight"] .groceries :is(input:not([type="checkbox"]),select,textarea) { background: var(--surface-primary) !important; border-color: var(--border-strong) !important; color: var(--mid-text) !important; }
 html[data-theme="midnight"] .groceries :focus-visible { outline-color: var(--mid-accent); }
 html[data-theme="midnight"] .note-editor:empty::before { color: var(--mid-muted); }
 html[data-theme="midnight"] .note-editor blockquote { background: var(--mid-warning-soft); border-color: var(--mid-warning); }
@@ -223,14 +223,14 @@ html[data-theme="midnight"] .nutrition-targets .macro-target-card :is(h3,p,span,
 html[data-theme="midnight"] .nutrition-targets .macro-target-card .macro-target-help,
 html[data-theme="midnight"] .nutrition-targets .macro-target-card .macro-target-kicker,
 html[data-theme="midnight"] .nutrition-targets .macro-target-card dt { color: var(--mid-secondary) !important; }
-html[data-theme="midnight"] .nutrition-targets .macro-target-item { background: #17191d !important; color: var(--mid-text) !important; border-color: var(--mid-border-strong) !important; box-shadow: none !important; }
+html[data-theme="midnight"] .nutrition-targets .macro-target-item { background: var(--surface-interactive) !important; color: var(--mid-text) !important; border-color: var(--border-strong) !important; box-shadow: none !important; }
 html[data-theme="midnight"] .nutrition-targets .macro-target-item[data-macro="protein"] { border-top: 3px solid #83bd70 !important; }
 html[data-theme="midnight"] .nutrition-targets .macro-target-item[data-macro="carbs"] { border-top: 3px solid #73b9d6 !important; }
 html[data-theme="midnight"] .nutrition-targets .macro-target-item[data-macro="fat"] { border-top: 3px solid #e4b65c !important; }
 html[data-theme="midnight"] .nutrition-targets .macro-target-item-heading button,
-html[data-theme="midnight"] .nutrition-targets .macro-mode-label { background: #22262c !important; color: var(--mid-text) !important; border-color: var(--mid-border-strong) !important; }
+html[data-theme="midnight"] .nutrition-targets .macro-mode-label { background: var(--surface-hover) !important; color: var(--mid-text) !important; border-color: var(--border-strong) !important; }
 html[data-theme="midnight"] .nutrition-targets .macro-target-item-heading button[aria-pressed="true"] { background: var(--mid-accent) !important; color: var(--mid-accent-text) !important; }
-html[data-theme="midnight"] .nutrition-targets .macro-grams-field input { background: #0a0c0f !important; color: var(--mid-text) !important; border-color: var(--mid-border-strong) !important; }
+html[data-theme="midnight"] .nutrition-targets .macro-grams-field input { background: var(--surface-primary) !important; color: var(--mid-text) !important; border-color: var(--border-strong) !important; }
 
 /* Charts: keep semantic series colors, tune labels, grids, axes and tooltip surfaces. */
 html[data-theme="midnight"] .recharts-cartesian-grid line,
@@ -312,7 +312,7 @@ html[data-theme="midnight"] [class*="border-white"] { border-color: var(--mid-bo
 html[data-theme="midnight"] [class*="text-black"] { color: var(--mid-text) !important; }
 html[data-theme="midnight"] [class*="text-black/"] { color: var(--mid-secondary) !important; }
 html[data-theme="midnight"] [class*="text-white/"] { color: var(--mid-secondary) !important; }
-html[data-theme="midnight"] :is(button,a,summary):hover { border-color: #6d4933; }
+html[data-theme="midnight"] :is(button,a,summary):hover { border-color: var(--border-interactive); }
 html[data-theme="midnight"] :is(button,a,summary):focus-visible { outline-color: var(--mid-accent) !important; }
 
 /* The dashboard uses a dark, numbered workspace grid instead of legacy color slabs. */
@@ -436,3 +436,54 @@ html[data-theme="midnight"] progress { accent-color: var(--mid-accent); }
 html[data-theme="midnight"] progress::-webkit-progress-bar { background: var(--mid-soft); }
 html[data-theme="midnight"] progress::-webkit-progress-value { background: var(--mid-accent); }
 html[data-theme="midnight"] progress::-moz-progress-bar { background: var(--mid-accent); }
+
+/* Final shared primitives stay on their semantic levels despite legacy utility classes. */
+html[data-theme="midnight"] .ui-panel { border-color: var(--border-subtle) !important; background: var(--surface-primary) !important; }
+html[data-theme="midnight"] .ui-card { border-color: var(--border-default) !important; background: var(--surface-elevated) !important; }
+html[data-theme="midnight"] .ui-card--interactive { background: var(--surface-secondary) !important; }
+html[data-theme="midnight"] .ui-card--interactive:hover { border-color: var(--border-interactive) !important; background: var(--surface-hover) !important; }
+html[data-theme="midnight"] .ui-card--selected { border-color: var(--border-focus) !important; background: var(--surface-selected) !important; }
+html[data-theme="midnight"] .ui-button--primary { border-color: var(--interaction-primary) !important; background: var(--interaction-primary) !important; color: var(--color-accent-contrast) !important; }
+html[data-theme="midnight"] .ui-button--primary:hover:not(:disabled) { border-color: var(--interaction-primary-hover) !important; background: var(--interaction-primary-hover) !important; }
+html[data-theme="midnight"] .ui-button--secondary { border-color: var(--border-strong) !important; background: var(--surface-elevated) !important; color: var(--color-text) !important; }
+html[data-theme="midnight"] .ui-button--secondary:hover:not(:disabled) { border-color: var(--border-interactive) !important; background: var(--surface-hover) !important; }
+html[data-theme="midnight"] .ui-button--ghost { border-color: transparent !important; background: transparent !important; }
+html[data-theme="midnight"] .ui-button--ghost:hover:not(:disabled) { border-color: var(--border-default) !important; background: var(--surface-hover) !important; }
+html[data-theme="midnight"] .ui-button:disabled { border-color: var(--border-subtle) !important; background: var(--surface-primary) !important; color: var(--color-text-disabled) !important; opacity: 1; }
+html[data-theme="midnight"] .ui-tabs :is([aria-selected="true"],[aria-current="page"],[aria-pressed="true"]) { border-color: var(--border-focus) !important; background: var(--surface-selected) !important; color: var(--color-accent) !important; box-shadow: inset 0 -2px var(--color-accent); }
+html[data-theme="midnight"] :is(input,select,textarea).ui-control,
+html[data-theme="midnight"] :is(input,select,textarea).field-input { border-color: var(--border-strong) !important; background: var(--surface-elevated) !important; color: var(--color-text) !important; }
+html[data-theme="midnight"] :is(input,select,textarea).ui-control:focus-visible,
+html[data-theme="midnight"] :is(input,select,textarea).field-input:focus-visible { border-color: var(--border-focus) !important; }
+html[data-theme="midnight"] .ui-dialog { border-color: var(--border-strong) !important; background: var(--surface-elevated) !important; box-shadow: var(--shadow-modal) !important; }
+html[data-theme="midnight"] .ui-popover { border-color: var(--border-strong) !important; background: var(--surface-elevated) !important; box-shadow: var(--shadow-popover) !important; }
+html[data-theme="midnight"] .ui-badge { border-color: var(--border-default) !important; background: var(--surface-secondary) !important; color: var(--color-text-secondary) !important; }
+html[data-theme="midnight"] .ui-badge--accent { border-color: color-mix(in srgb, var(--color-accent) 45%, var(--border-default)) !important; background: var(--color-accent-soft) !important; color: var(--color-accent) !important; }
+html[data-theme="midnight"] :is(.ui-badge--success,.ui-badge--warning,.ui-badge--danger) { background: var(--color-surface-interactive) !important; }
+html[data-theme="midnight"] .ui-progress-track { border-color: var(--border-default); background: var(--surface-interactive); }
+html[data-theme="midnight"] input[type="checkbox"],html[data-theme="midnight"] input[type="radio"] { outline: 1px solid var(--border-strong); outline-offset: 1px; }
+html[data-theme="midnight"] :is(.ui-metric-card,.tracker-stat-card) { border-color: var(--border-default); background: var(--surface-elevated); }
+html[data-theme="midnight"] .ui-metric-card__meta { color: var(--color-text-muted); }
+html[data-theme="midnight"] .finance .f-stat strong,
+html[data-theme="midnight"] .finance .f-big-number { color: var(--color-text); font-variant-numeric: tabular-nums; }
+html[data-theme="midnight"] .finance .f-stat strong { font-size: clamp(1.25rem, 2vw, 1.7rem); }
+html[data-theme="midnight"] .finance .f-table tbody tr { border-bottom: 1px solid var(--border-subtle); }
+html[data-theme="midnight"] .finance .f-table tbody tr:hover td { background: var(--surface-hover) !important; }
+html[data-theme="midnight"] .food-diary .diary-view-tabs button[aria-selected="false"],
+html[data-theme="midnight"] .food-diary .diary-report-tabs button[aria-selected="false"] { color: var(--color-text-secondary) !important; border-color: var(--border-default) !important; }
+html[data-theme="midnight"] .food-diary .diary-view-tabs button[aria-selected="true"],
+html[data-theme="midnight"] .food-diary .diary-report-tabs button[aria-selected="true"] { background: var(--surface-selected) !important; color: var(--color-accent) !important; border-color: var(--border-focus) !important; box-shadow: inset 0 -2px var(--color-accent); }
+html[data-theme="midnight"] .global-scroll-controls button,
+html[data-theme="midnight"] .reminder-toggle { border-color: var(--border-strong) !important; background: var(--surface-elevated) !important; }
+html[data-theme="midnight"] .reminder-toggle,
+html[data-theme="midnight"] .reminder-toggle.ui-button--primary,
+html[data-theme="midnight"] .reminder-toggle.ui-button--warning { background: var(--surface-elevated) !important; color: var(--color-text) !important; }
+html[data-theme="midnight"] .global-scroll-controls button:hover,
+html[data-theme="midnight"] .reminder-toggle:hover { border-color: var(--border-interactive) !important; background: var(--surface-hover) !important; }
+html[data-theme="midnight"] .page-shell-preference-actions { border-left-color: var(--border-default); }
+html[data-theme="midnight"] .page-shell-quick-action { display: inline-flex; min-height: 2.35rem; align-items: center; border: 1px solid var(--border-strong) !important; background: var(--surface-elevated) !important; color: var(--color-text-secondary) !important; box-shadow: none !important; }
+html[data-theme="midnight"] .page-shell-quick-action:hover { border-color: var(--border-interactive) !important; background: var(--surface-hover) !important; color: var(--color-text) !important; }
+html[data-theme="midnight"] .page-shell-quick-action--primary { border-color: var(--interaction-primary) !important; background: var(--interaction-primary) !important; color: var(--color-accent-contrast) !important; }
+html[data-theme="midnight"] .page-shell-quick-action--primary:hover { border-color: var(--interaction-primary-hover) !important; background: var(--interaction-primary-hover) !important; }
+html[data-theme="midnight"] .page-shell-logout { border: 1px solid transparent !important; background: transparent !important; color: var(--color-text-muted) !important; box-shadow: none !important; }
+html[data-theme="midnight"] .page-shell-logout:hover { border-color: var(--border-default) !important; background: var(--surface-hover) !important; color: var(--color-text) !important; }

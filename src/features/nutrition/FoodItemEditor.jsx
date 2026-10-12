@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { NutritionLookup } from '../groceries/NutritionLookup';
 import { NutritionLabelScan } from './NutritionLabelScan';
-import { cleanNutrients } from './nutrients.js';
-import { NUTRIENTS } from './nutrients.js';
+import { cleanNutrients, nutritionCoverage, NUTRIENTS } from './nutrients.js';
 import { validateFoodItem } from '../../../supabase/functions/_shared/foodItem.js';
 import { invokeNutritionFunction } from '../../services/nutritionLookup';
 import { notify } from '../../lib/notifications.js';
@@ -23,7 +22,7 @@ export function FoodItemEditor({ catalog, onSave, onClose, initial = null }) {
   useEffect(() => { dialog.current.showModal(); }, []);
   useEffect(() => { if (dialog.current) dialog.current.scrollTop = 0; }, [mode]);
   function useFood(food, provider) {
-    setDraft({ ...(initial?.id ? { id: initial.id } : {}), ...validateFoodItem(food), barcode: food.barcode || food.source?.barcode || food.source?.code || '', sku: food.sku || food.source?.sku || '', retailer: food.retailer || food.source?.retailer || '', brand: food.brand || food.source?.brand || '', source: { provider, ...food.source } });
+    setDraft({ ...(initial?.id ? { id: initial.id } : {}), ...validateFoodItem(food), nutrientSources: food.nutrientSources || food.nutrition?.nutrientSources || {}, barcode: food.barcode || food.source?.barcode || food.source?.code || '', sku: food.sku || food.source?.sku || '', retailer: food.retailer || food.source?.retailer || '', brand: food.brand || food.source?.brand || '', source: { provider, ...food.source } });
     setMode('manual'); setError('');
   }
   async function ai() {
@@ -46,11 +45,11 @@ export function FoodItemEditor({ catalog, onSave, onClose, initial = null }) {
     if (lock.current) return;
     if (!initial && reviewMatches.length && !duplicateChoice) { setError('Review the possible existing food, or choose Create separately.'); return; }
     lock.current = true; setBusy(true); setError('');
-    try { await onSave({ ...(initial?.id ? { id: initial.id } : {}), ...validateFoodItem(draft), barcode: draft.barcode, sku: draft.sku, retailer: draft.retailer, brand: draft.brand, source: draft.source, ...(duplicateChoice === 'separate' ? { allowDuplicate: true } : {}) }); onClose(); }
+    try { await onSave({ ...(initial?.id ? { id: initial.id } : {}), ...validateFoodItem(draft), nutrientSources: draft.nutrientSources, barcode: draft.barcode, sku: draft.sku, retailer: draft.retailer, brand: draft.brand, source: draft.source, ...(duplicateChoice === 'separate' ? { allowDuplicate: true } : {}) }); onClose(); }
     catch (err) { setError(err.message); notify.error(err.message || 'Could not save food item'); }
     finally { lock.current = false; setBusy(false); }
   }
-  const nutrientFields = rows => <div className="g-nutrition-grid">{rows.map(([key, label, unit]) => <label key={key}>{label} ({unit})<input type="number" min="0" step="any" value={draft.nutrition[key] ?? ''} onChange={event => setDraft({ ...draft, nutrition: { ...draft.nutrition, [key]: event.target.value === '' ? null : Number(event.target.value) } })} /></label>)}</div>;
+  const nutrientFields = rows => <div className="g-nutrition-grid">{rows.map(([key, label, unit]) => <label key={key}>{label} ({unit})<input type="number" min="0" step="any" value={draft.nutrition[key] ?? ''} onChange={event => setDraft({ ...draft, nutrition: { ...draft.nutrition, [key]: event.target.value === '' ? null : Number(event.target.value) }, nutrientSources: { ...draft.nutrientSources, ...(event.target.value === '' ? { [key]: undefined } : { [key]: { sourceType: 'manual', sourceId: '', sourceName: 'Manual edit', confidence: 'high', estimated: false } }) } })} />{draft.nutrientSources?.[key] && <small>{draft.nutrientSources[key].sourceName || draft.nutrientSources[key].sourceType}{draft.nutrientSources[key].estimated ? ' · reference estimate' : ''}{draft.nutrientSources[key].derived ? ' · derived' : ''}</small>}</label>)}</div>;
   return <dialog ref={dialog} className="g-dialog groceries" aria-labelledby="food-item-title" onCancel={event => { event.preventDefault(); if (!busy) onClose(); }} onClick={event => { if (event.target === dialog.current && !busy) onClose(); }}>
     <div className="g-between"><h2 id="food-item-title">{initial ? 'Edit food item' : 'Add food item'}</h2><button type="button" aria-label="Close popup" disabled={busy} onClick={onClose}>×</button></div>
     <p>Save a single food to your shared library. Search for it later in Food Diary, Recipes or Groceries. No recipe is created.</p>
@@ -72,9 +71,9 @@ export function FoodItemEditor({ catalog, onSave, onClose, initial = null }) {
       <label>Food JSON<textarea aria-label="Food JSON" rows={10} value={json} onChange={event => setJson(event.target.value)} /></label>
       <button type="button" onClick={() => parse(json)}>Review food JSON</button>
     </div>}
-    {mode === 'lookup' && <NutritionLookup currentNutrition={{...draft.nutrition,quantity:draft.quantity,unit:draft.unit,source:draft.source}} name={draft.name} visible active onSelect={label => {
+    {mode === 'lookup' && <NutritionLookup currentNutrition={{...draft.nutrition,nutrientSources:draft.nutrientSources,quantity:draft.quantity,unit:draft.unit,source:draft.source}} name={draft.name} visible active onSelect={label => {
       if(label.source?.provider==='Local nutrition label OCR'){setDraft({...draft,quantity:label.quantity,unit:label.unit,nutrition:cleanNutrients(label),source:label.source});setMode('manual');return;}
-      try { useFood({ name: label.source?.name || draft.name, quantity: label.quantity, unit: label.unit, nutrition: Object.fromEntries(NUTRIENTS.map(([key]) => [key, label[key] ?? null])), source: label.source }, 'Food lookup'); }
+      try { useFood({ name: label.source?.name || draft.name, quantity: label.quantity, unit: label.unit, nutrition: Object.fromEntries(NUTRIENTS.map(([key]) => [key, label[key] ?? null])), nutrientSources: label.nutrientSources, source: label.source }, 'Food lookup'); }
     catch (err) { setError(err.message); notify.error(err.message || 'Could not save food item'); }
     }} />}
     {mode === 'manual' && <form onSubmit={save}>
@@ -93,6 +92,7 @@ export function FoodItemEditor({ catalog, onSave, onClose, initial = null }) {
           <label>Reference unit<select value={draft.unit} onChange={event => setDraft({ ...draft, unit: event.target.value })}>{['g', 'ml', 'pieces', 'servings'].map(unit => <option key={unit}>{unit}</option>)}</select></label>
         </div>
         <p>Every nutrient below describes this reference amount. For a per 100 g label, use 100 g. Recipe quantities remain separate. Blank nutrients stay unknown.</p>
+        <p className="g-hint">Nutrition coverage: {nutritionCoverage(draft.nutrition).percent}% ({nutritionCoverage(draft.nutrition).known}/{nutritionCoverage(draft.nutrition).total} nutrients available). <button type="button" onClick={() => setMode('lookup')}>Complete missing nutrients</button></p>
         {draft.source?.provider && <p>Source: {draft.source.provider}</p>}
         <NutritionLabelScan disabled={busy} current={{...draft.nutrition,quantity:draft.quantity,unit:draft.unit,source:draft.source}} onApply={label=>setDraft({...draft,quantity:label.quantity,unit:label.unit,nutrition:cleanNutrients(label),source:label.source})}/>
         {nutrientFields(NUTRIENTS.slice(0, 5))}

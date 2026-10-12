@@ -3,6 +3,8 @@ import { ingredientLabelAmount } from '../recipes/ingredientNutrition.js';
 import { convert, canonicalUnit } from '../groceries/groceryData.js';
 import {
   cleanNutrients,
+  cleanNutrientSources,
+  nutrientSourcesForValues,
   nutrientKeys,
   validNutrient,
 } from "../nutrition/nutrients.js";
@@ -130,6 +132,7 @@ export function validateItem(item) {
     nutritionUnit: item.nutritionUnit,
     perPiece: item.unit !== item.nutritionUnit ? item.perPiece : null,
     nutrition,
+    nutrientSources: cleanNutrientSources({ ...nutrientSourcesForValues(nutrition, item.source), ...(item.nutrientSources || item.nutrition?.nutrientSources || {}) }),
     source: {
       provider: text(item.source?.provider || "Manual", 100),
       name: text(item.source?.name || "", 500),
@@ -322,6 +325,7 @@ export function foodItem(nutrition, name = "") {
     nutritionUnit: nutrition.unit,
     perPiece: null,
     nutrition: cleanNutrients(nutrition),
+    nutrientSources: cleanNutrientSources({ ...nutrientSourcesForValues(nutrition, nutrition?.source), ...(nutrition?.nutrientSources || {}) }),
     source: nutrition.source || { provider: "Manual" },
   };
 }

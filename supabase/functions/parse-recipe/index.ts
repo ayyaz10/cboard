@@ -1,7 +1,7 @@
 import { geminiJson, geminiResult, GeminiError } from "../_shared/gemini.js";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { createParseRecipeHandler } from "./handler.js";
-import { recipeSystemInstruction } from "./recipeParser.js";
+import { recipeSystemInstruction, geminiResponseSchema } from "./recipeParser.js";
 import { foodItemInstruction } from "../_shared/foodItem.js";
 
 
@@ -30,6 +30,7 @@ async function generateRecipe(recipeText: string, apiKey: string, mode = "recipe
       generationConfig: {
         temperature: 0.1,
         responseMimeType: "application/json",
+        responseJsonSchema: geminiResponseSchema,
       },
     }),
   });

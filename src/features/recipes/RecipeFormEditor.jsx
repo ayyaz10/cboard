@@ -7,6 +7,8 @@ import { NutritionLookup } from '../groceries/NutritionLookup';
 import { initialProductAmount } from './recipeProducts.js';
 import { cleanIngredientLabel, ingredientLabelAmount, ingredientLabelNutrition, recipeNutritionDisplay, ingredientRecipeTotals, prepareIngredientEditor, updateIngredientField } from './ingredientNutrition.js';
 import { applyStoredIngredient, findIngredientMatches, hasStoredNutrition } from './ingredientLibrary.js';
+import { normalizeRecipeIngredient } from '../../../supabase/functions/_shared/recipeIngredient.js';
+import { formatScaledQuantity, recipeScaleMetadata, scaleRecipe } from './recipeScaling.js';
 import '../groceries/groceries.css';
 
 export const emptyRecipe = () => ({
@@ -116,12 +118,13 @@ function IngredientNameField({ value, onChange, onSelect, library }) {
   </div>;
 }
 
-function ItemEditor({ item, onChange, groups, visible, ingredientLibrary }) {
+function ItemEditor({ item, onChange, groups, visible, ingredientLibrary, isIngredient = false, isAnchor = false, onSetAnchor }) {
   const [lookup, setLookup] = useState(false);
   const [nutritionOpen, setNutritionOpen] = useState(Boolean(item.nutritionLabel));
   const nutritionDetails = useRef(null);
   const set = (key, value) => {
-    const next = updateIngredientField(item, key, value);
+    let next = updateIngredientField(item, key, value);
+    if (key === 'name') next = normalizeRecipeIngredient(next);
     onChange(next, { calculateNutrition: ['nutrition', 'amount', 'unit'].includes(key) && Boolean(next.nutrition) });
   };
   const label = item.nutritionLabel;
@@ -150,6 +153,8 @@ function ItemEditor({ item, onChange, groups, visible, ingredientLibrary }) {
         <Field
           label="Amount"
           value={item.amount}
+          readOnly={isAnchor}
+          title={isAnchor ? 'Set the main ingredient amount in Recipe scaling below.' : undefined}
           placeholder="60, ½ or 5–10"
           onChange={(value) =>
             set(
@@ -174,6 +179,12 @@ function ItemEditor({ item, onChange, groups, visible, ingredientLibrary }) {
         value={item.note}
         onChange={(value) => set('note', value)}
       />
+      <Field label="Preparation" value={item.preparation} placeholder="Chopped, grated" onChange={value => onChange({ ...item, preparation: value })} />
+      <Field label="Group / stage" value={item.group} placeholder="Marinade, sauce, garnish" onChange={value => onChange({ ...item, group: value })} />
+      <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm font-semibold">
+        {isIngredient && <label className="flex items-center gap-2"><input type="checkbox" checked={isAnchor} onChange={event => onSetAnchor?.(event.target.checked ? item.id : '')} />Use as main ingredient</label>}
+        <label className="flex items-center gap-2"><input type="checkbox" checked={item.scaleEnabled !== false} onChange={event => onChange({ ...item, scaleEnabled: event.target.checked ? undefined : false })} />Scale with recipe</label>
+      </div>
       {groups && (
         <label className="block space-y-2 font-semibold">
           <span>Alternatives group</span>
@@ -237,7 +248,7 @@ function ItemEditor({ item, onChange, groups, visible, ingredientLibrary }) {
   );
 }
 
-function ItemRow({ title, item, index, items, onChange, groups, ingredientLibrary }) {
+function ItemRow({ title, item, index, items, onChange, groups, ingredientLibrary, isIngredient = false, anchorId, onSetAnchor }) {
   const normalizedItem = typeof item === 'string' ? { name: item } : item;
   const [open, setOpen] = useState(!normalizedItem?.name);
 
@@ -264,6 +275,9 @@ function ItemRow({ title, item, index, items, onChange, groups, ingredientLibrar
           groups={groups}
           visible={open}
           ingredientLibrary={ingredientLibrary}
+          isIngredient={isIngredient}
+          isAnchor={normalizedItem.id === anchorId}
+          onSetAnchor={onSetAnchor}
           onChange={(next, options) =>
             onChange(items.map((current, i) => (i === index ? next : current)), options)
           }
@@ -293,7 +307,7 @@ function useDesktopColumns() {
   return desktop;
 }
 
-function Items({ title, items, onChange, groups, ingredientLibrary }) {
+function Items({ title, items, onChange, groups, ingredientLibrary, isIngredient = false, anchorId, onSetAnchor }) {
   const desktop = useDesktopColumns();
   const itemRow = (item, index) => (
     <ItemRow
@@ -305,6 +319,9 @@ function Items({ title, items, onChange, groups, ingredientLibrary }) {
       onChange={onChange}
       groups={groups}
       ingredientLibrary={ingredientLibrary}
+      isIngredient={isIngredient}
+      anchorId={anchorId}
+      onSetAnchor={onSetAnchor}
     />
   );
   return (
@@ -336,8 +353,25 @@ export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary 
   const nutritionDisplay = recipeNutritionDisplay(recipe);
   const [recipeScanAmount,setRecipeScanAmount]=useState('');
   const [recipeScanUnit,setRecipeScanUnit]=useState('g');
+  const [scaleTarget, setScaleTarget] = useState('');
+  const [scaleOthers, setScaleOthers] = useState(true);
+  const [confirmScaling, setConfirmScaling] = useState(false);
   const set = (key, value, options = {}) => {
     const next = { ...recipe, [key]: value };
+    if (['ingredients', 'sauces'].includes(key) && next.scaling) {
+      const combined = [...(next.ingredients || []), ...(next.sauces || [])];
+      if (!combined.some(item => item.id === next.scaling.anchorIngredientId)) delete next.scaling;
+      else {
+        const liveAnchor = combined.find(item => item.id === next.scaling.anchorIngredientId);
+        const oldBase = next.scaling.baseQuantities || {};
+        const baseAnchor = oldBase[liveAnchor.id]?.amount;
+        const currentFactor = typeof liveAnchor.amount === 'number' && typeof baseAnchor === 'number' && baseAnchor > 0 ? liveAnchor.amount / baseAnchor : 1;
+        next.scaling = { ...next.scaling, baseQuantities: Object.fromEntries(combined.map(item => [item.id, oldBase[item.id] || {
+          amount: typeof item.amount === 'number' && currentFactor > 0 ? Number((item.amount / currentFactor).toPrecision(10)) : item.amount,
+          unit: item.unit || '',
+        }])) };
+      }
+    }
     if (key === 'nutrition') next.nutritionFromIngredients = false;
     else if (options.calculateNutrition || next.nutritionFromIngredients || [...(next.ingredients || []), ...(next.sauces || [])].some((item) => item.nutritionLabel)) {
       next.nutritionFromIngredients = true;
@@ -348,6 +382,32 @@ export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary 
     onChange(next);
   };
   const groups = recipe.alternatives ?? {};
+  const allIngredients = [...(recipe.ingredients || []), ...(recipe.sauces || [])];
+  const anchor = allIngredients.find(item => item.id === recipe.scaling?.anchorIngredientId);
+  useEffect(() => { setScaleTarget(anchor && typeof anchor.amount === 'number' ? String(anchor.amount) : ''); }, [anchor?.id]);
+  let scalingPreview = null;
+  let scalingError = '';
+  if (anchor && scaleTarget.trim() !== '' && Number.isFinite(Number(scaleTarget)) && Number(scaleTarget) >= 0) {
+    try { scalingPreview = scaleRecipe(recipe, Number(scaleTarget), { scaleOthers }); } catch (error) { scalingError = error.message; }
+  }
+  const setAnchor = id => {
+    try {
+      const scaling = id ? recipeScaleMetadata(recipe, id) : undefined;
+      const next = { ...recipe };
+      if (scaling) next.scaling = scaling;
+      else delete next.scaling;
+      onChange(next);
+      const selected = allIngredients.find(item => item.id === id);
+      setScaleTarget(selected && typeof selected.amount === 'number' ? String(selected.amount) : '');
+      setConfirmScaling(false);
+    } catch (error) { window.alert(error.message); }
+  };
+  const applyScaling = () => {
+    if (!scalingPreview) return;
+    onChange(scalingPreview.recipe);
+    setScaleTarget(String(Number(scaleTarget)));
+    setConfirmScaling(false);
+  };
   return (
     <div className="flex flex-col gap-5">
       <section className="space-y-3 rounded-2xl border-2 border-black bg-white p-4">
@@ -396,6 +456,43 @@ export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary 
           onChange={(value) => set('tags', value.split(','))}
         />
       </section>
+      <section className="space-y-3 rounded-2xl border-2 border-black bg-white p-4">
+        <h2 className="text-2xl font-bold">Recipe scaling</h2>
+        {anchor ? <>
+          <p className="text-sm text-black/70">Scaling uses the saved base amounts each time. Changing the main ingredient sets a new base without changing recipe quantities.</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <p className="self-center"><strong>Main ingredient:</strong> {anchor.name} · Base amount {recipe.scaling.baseQuantities[anchor.id]?.amount} {recipe.scaling.baseQuantities[anchor.id]?.unit}</p>
+            <Field label={`New ${anchor.name} amount (${anchor.unit || 'unit'})`} type="number" min="0" step="any" value={scaleTarget} onChange={setScaleTarget} />
+          </div>
+          <label className="flex items-center gap-2 font-semibold"><input type="checkbox" checked={scaleOthers} onChange={event => setScaleOthers(event.target.checked)} />Scale other ingredients proportionally</label>
+          {scaleTarget !== '' && !Number.isFinite(Number(scaleTarget)) && <p role="alert" className="text-sm font-semibold text-red-800">Enter a valid quantity.</p>}
+          {scaleTarget !== '' && Number.isFinite(Number(scaleTarget)) && Number(scaleTarget) < 0 && <p role="alert" className="text-sm font-semibold text-red-800">Quantity cannot be negative.</p>}
+          {scalingError && <p role="alert" className="text-sm font-semibold text-red-800">{scalingError}</p>}
+          {scalingPreview && <>
+            <div className="space-y-1 rounded-xl border border-black/20 p-3">
+              <h3 className="font-bold">Scaling preview · {scalingPreview.factor === 0 ? '0×' : `${formatScaledQuantity(scalingPreview.factor)}×`}</h3>
+              {allIngredients.map(item => {
+                const updated = [...scalingPreview.recipe.ingredients, ...scalingPreview.recipe.sauces].find(row => row.id === item.id) || item;
+                const show = value => [value.amount, value.unit].filter(part => part != null && part !== '').join(' ') || 'Not specified';
+                return <p key={item.id} className="text-sm">{item.name}: {show(item)} → {show(updated)}{item.scaleEnabled === false ? ' · Keep fixed' : ''}</p>;
+              })}
+              <p className="pt-2 text-sm font-semibold">Nutrition {nutritionDisplay.wholeRecipe ? 'for the whole recipe' : 'per serving'}: {nutritionDisplay.nutrition.calories ?? '—'} → {recipeNutritionDisplay(scalingPreview.recipe).nutrition.calories ?? '—'} kcal</p>
+              {scalingPreview.warnings.map(warning => <p key={warning} role="status" className="text-sm font-semibold text-amber-900">{warning}</p>)}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" className={secondaryButton} onClick={() => setConfirmScaling(true)}>Scale ingredients</button>
+              <button type="button" className={secondaryButton} onClick={() => { setScaleTarget(String(anchor.amount ?? '')); setConfirmScaling(false); }}>Cancel preview</button>
+              <button type="button" className={secondaryButton} onClick={() => setAnchor(anchor.id)}>Set current amounts as base recipe</button>
+            </div>
+          </>}
+          {confirmScaling && <div role="alertdialog" aria-modal="true" aria-labelledby="scale-confirm-title" className="space-y-3 rounded-xl border-2 border-black bg-[#fffdf8] p-4">
+            <h3 id="scale-confirm-title" className="text-lg font-bold">Scale recipe?</h3>
+            <p>{anchor.name}: {recipe.scaling.baseQuantities[anchor.id]?.amount} {anchor.unit} → {formatScaledQuantity(Number(scaleTarget))} {anchor.unit}. {scalingPreview.scaledCount} other ingredients will be adjusted proportionally.</p>
+            {Number(scaleTarget) === 0 && <p className="font-semibold">This sets scalable ingredient quantities to zero. Confirm to apply.</p>}
+            <div className="flex gap-2"><button type="button" className={secondaryButton} onClick={() => setConfirmScaling(false)}>Cancel</button><button type="button" className={secondaryButton} onClick={applyScaling}>Scale ingredients</button></div>
+          </div>}
+        </> : <p className="text-sm text-black/70">Choose an ingredient below with “Use as main ingredient” to enable proportional scaling. Existing recipes are left unanchored until you choose.</p>}
+      </section>
       <details className="rounded-2xl border-2 border-black bg-white p-4" open>
         <summary className="cursor-pointer text-xl font-bold">Recipe nutrition</summary>
         <p className="text-sm text-black/70">
@@ -417,6 +514,9 @@ export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary 
         items={recipe.ingredients ?? []}
         groups={groups}
         ingredientLibrary={ingredientLibrary}
+        isIngredient
+        anchorId={anchor?.id}
+        onSetAnchor={setAnchor}
         onChange={(value, options) => set('ingredients', value, options)}
       />
       <section className="space-y-3">
@@ -463,7 +563,7 @@ export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary 
       </section>
       <details className="rounded-2xl border-2 border-black bg-white p-4">
         <summary className="cursor-pointer text-xl font-bold">Sauces ({recipe.sauces?.length ?? 0})</summary>
-        <div className="mt-4"><Items title="Sauces" items={recipe.sauces ?? []} onChange={(value, options) => set('sauces', value, options)} ingredientLibrary={ingredientLibrary} /></div>
+        <div className="mt-4"><Items title="Sauces" items={recipe.sauces ?? []} onChange={(value, options) => set('sauces', value, options)} ingredientLibrary={ingredientLibrary} anchorId={anchor?.id} onSetAnchor={setAnchor} /></div>
       </details>
       {Object.keys(groups).length > 0 && (
         <details className="rounded-2xl border-2 border-black bg-white p-4">

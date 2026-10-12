@@ -1,5 +1,6 @@
 import { NutritionLabelScan } from '../nutrition/NutritionLabelScan';
 import { ingredientScanCurrent } from '../nutrition/nutritionScanAdapters.js';
+import { normalizeRecipeIngredient } from '../../../supabase/functions/_shared/recipeIngredient.js';
 import { cleanIngredientLabel, ingredientLabelNutrition, ingredientLabelAmount } from './ingredientNutrition.js';
 import { NUTRIENTS } from '../nutrition/nutrients.js';
 import { updateIngredientField } from './ingredientNutrition.js';
@@ -14,6 +15,7 @@ import { RecipeFavouriteButton } from './RecipeFavouriteButton';
 import { initialProductAmount } from './recipeProducts.js';
 import { recipeNutritionDisplay, prepareIngredientEditor } from './ingredientNutrition.js';
 import { saveRecipeIngredientNutrition } from '../../services/recipeService.js';
+import { findRecipeFoodMatches, resolveRecipeFoodCandidate } from '../nutrition/foodCatalog.js';
 
 export const secondaryButton =
   'inline-flex items-center justify-center rounded-full border-2 border-black bg-white px-4 py-2 text-sm font-bold text-black transition hover:-translate-y-px focus-visible:outline-offset-4 disabled:opacity-50';
@@ -154,6 +156,12 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
   const [unit, setUnit] = useState(item.unit);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  function changeIngredientName(value) {
+    const normalized = normalizeRecipeIngredient({ name: value, amount: amount === '' ? null : Number(amount), unit });
+    setName(normalized.name);
+    if (amount === '' && normalized.amount != null) setAmount(String(normalized.amount));
+    if (!unit && normalized.unit) setUnit(normalized.unit);
+  }
   async function save() {
     setBusy(true);
     setError('');
@@ -171,6 +179,8 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
     <div className="flex min-w-0 items-center justify-between gap-3">
       <div className="min-w-0 flex-1">
         <p className="font-semibold">{formatIngredient(item)}</p>
+        {(item.group || item.preparation) && <p className="text-xs text-black/60">{[item.group, item.preparation].filter(Boolean).join(' · ')}</p>}
+        {item.foodId && (item.nutritionLabel?.source?.foodName || item.nutritionLabel?.source?.name) && <p className="text-xs text-black/60">Food: {item.nutritionLabel.source.foodName || item.nutritionLabel.source.name}</p>}
         {preview ? (
           <p className="mt-0.5 text-xs leading-5 text-black/65">{ingredientNutritionSummary(item)}</p>
         ) : (
@@ -198,7 +208,7 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
     </div>
     {editing && <fieldset disabled={busy} className="mt-3 space-y-3 border-t-2 border-black/15 pt-3">
       <legend className="sr-only">Edit ingredient name and nutrition for {formatIngredient(item)}</legend>
-      <label>Food / ingredient name<input className="field-input" type="text" maxLength={200} required value={name} onChange={event => setName(event.target.value)} placeholder="Enter food name" /></label>
+      <label>Food / ingredient name<input className="field-input" type="text" maxLength={200} required value={name} onChange={event => changeIngredientName(event.target.value)} placeholder="Enter food name" /></label>
       <div className="grid grid-cols-2 gap-2"><label>Amount<input className="field-input" type="number" min="0.0001" step="any" value={amount ?? ''} onChange={event => {
         const next = updateIngredientField({ amount, unit, nutrition: values, nutritionLabel }, 'amount', event.target.value);
         setAmount(event.target.value); setValues(next.nutrition);
@@ -279,7 +289,13 @@ export function RecipeSteps({ steps }) {
   );
 }
 
-export function RecipePage({ recipe, preview = false, onRecipeUpdated, favourite = false, favouritePending = false, onToggleFavourite }) {
+export function RecipePage({ recipe, preview = false, onRecipeUpdated, onMatchExistingFoods, onUseFood, onKeepSeparate, foodCatalog = [], favourite = false, favouritePending = false, onToggleFavourite }) {
+  const possibleMatches = !preview ? recipe.ingredients.flatMap((item, index) => {
+    if (item.foodId) return [];
+    const resolution = resolveRecipeFoodCandidate(item, foodCatalog);
+    if (resolution.status !== 'review') return [];
+    return [{ item, index, matches: findRecipeFoodMatches(item, foodCatalog) }];
+  }) : [];
   return (
     <article className="space-y-5 break-words text-black">
       <section className="grid gap-5 lg:grid-cols-[minmax(15rem,0.75fr)_minmax(0,1.25fr)] lg:items-stretch">
@@ -315,6 +331,8 @@ export function RecipePage({ recipe, preview = false, onRecipeUpdated, favourite
           <div className="mt-4"><RecipeHealthReview recipe={recipe} /></div>
         </details>
       )}
+      {!preview && onMatchExistingFoods && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-black bg-white p-3"><p className="text-sm">Find existing reusable foods for unlinked recipe ingredients.</p><button type="button" className={secondaryButton} onClick={() => onMatchExistingFoods(recipe)}>Match existing foods</button></div>}
+      {possibleMatches.length > 0 && <section className="space-y-3 rounded-xl border-2 border-black bg-white p-4"><h2 className="font-bold">Possible existing foods</h2>{possibleMatches.map(({ item, index, matches }) => <div key={item.id || index} className="space-y-2 border-t border-black/15 pt-3"><p className="text-sm"><strong>{formatIngredient(item)}</strong> · choose a food to use its nutrition.</p><div className="flex flex-wrap gap-2">{matches.map(({ food }) => <button key={food.id} type="button" className={secondaryButton} onClick={() => onUseFood?.(recipe, index, food)}>{food.name} · {food.nutrition?.calories == null ? 'nutrition not set' : `${new Intl.NumberFormat('en-GB', { maximumFractionDigits: 1 }).format(food.nutrition.calories)} kcal / ${food.quantity} ${food.unit}`}</button>)}<button type="button" className={secondaryButton} onClick={() => onKeepSeparate?.(recipe, index, matches)}>Keep separate</button></div></div>)}</section>}
       <IngredientList recipe={recipe} preview={preview} onRecipeUpdated={onRecipeUpdated} />
       <RecipeSteps steps={recipe.steps} />
       {!preview && (

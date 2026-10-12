@@ -5,6 +5,6 @@ export function PageHeader({ eyebrow, title, description, actions, className = '
   </header>;
 }
 
-export function SectionHeader({ title, description, actions, className = '' }) {
-  return <header className={`ui-section-header ${className}`}><div><h2>{title}</h2>{description && <p>{description}</p>}</div>{actions && <div>{actions}</div>}</header>;
+export function SectionHeader({ eyebrow, title, description, actions, className = '' }) {
+  return <header className={`ui-section-header ${className}`}><div>{eyebrow && <p className="ui-eyebrow">{eyebrow}</p>}<h2>{title}</h2>{description && <p>{description}</p>}</div>{actions && <div className="ui-section-header__actions">{actions}</div>}</header>;
 }

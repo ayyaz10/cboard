@@ -16,7 +16,7 @@ export function NutritionTotals({ meals, goals, compact = false }) {
   );
   function nutrient([key, label, unit]) {
     const total = totals[key];
-    const target = goals?.[key];
+    const target = goals?.[key] ?? goals?.micronutrients?.[key];
     return (
       <div key={key} className="diary-nutrient">
         <span>{label}</span>

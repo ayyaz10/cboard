@@ -91,7 +91,14 @@ function SavedFoodSuggestions({ item, library, onChange }) {
 function NutritionFields({ item, onChange }) {
   const [open, setOpen] = useState(false);
   const nutrition = item.nutrition || { quantity: 100, unit: "g" };
-  const update = (values) => onChange({ ...item, nutrition: { ...nutrition, ...values, ...(nutrition.source ? { source: { ...nutrition.source, modified: true } } : {}) } });
+  const update = (values) => {
+    const nutrientSources = { ...(nutrition.nutrientSources || {}) };
+    for (const key of Object.keys(values).filter(key => nutrients.some(([id]) => id === key))) {
+      if (values[key] == null) delete nutrientSources[key];
+      else nutrientSources[key] = { sourceType: 'manual', sourceId: '', sourceName: 'Manual edit', confidence: 'high', estimated: false };
+    }
+    onChange({ ...item, nutrition: { ...nutrition, ...values, nutrientSources, ...(nutrition.source ? { source: { ...nutrition.source, modified: true } } : {}) } });
+  };
   const number = (value) => value === "" ? null : Number(value);
   return <details className="g-nutrition-fields" onToggle={(e) => setOpen(e.currentTarget.open)}>
     <summary>{item.nutrition ? `Nutrition saved · per ${nutrition.quantity} ${nutrition.unit}` : 'Nutrition (optional)'}</summary>

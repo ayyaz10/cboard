@@ -15,16 +15,38 @@ test('saved recipe ingredients become searchable suggestions without exact dupli
   assert.equal(findIngredientMatches(library, 'med')[0].item.name, 'Medium Banana');
 });
 
-test('selecting a stored ingredient copies all useful fields and preserves the current alternative group', () => {
-  const selected = applyStoredIngredient({ alternativeGroup: 'fruit' }, banana);
+test('selecting a stored ingredient applies its name and nutrition while preserving recipe amount and context', () => {
+  const selected = applyStoredIngredient({ alternativeGroup: 'fruit', name: 'Banana', amount: 2, unit: 'pieces', group: 'Topping' }, { ...banana, foodId: 'banana-food' });
   assert.equal(selected.name, 'Medium Banana');
-  assert.equal(selected.amount, 1);
+  assert.equal(selected.amount, 2);
+  assert.equal(selected.unit, 'pieces');
   assert.equal(selected.note, 'Peeled');
   assert.equal(selected.alternativeGroup, 'fruit');
+  assert.equal(selected.group, 'Topping');
+  assert.equal(selected.foodId, 'banana-food');
+  assert.equal(selected.foodAliasConfirmed, undefined);
   assert.equal(selected.nutrition.calories, 105);
   assert.equal(selected.nutritionLabel.source.name, 'Bananas, raw');
   assert.notEqual(selected.nutrition, banana.nutrition);
   assert.equal(hasStoredNutrition(selected), true);
+});
+
+test('selecting a reusable food recalculates label nutrition using the amount already in the recipe row', () => {
+  const current = { name: 'Cheese', amount: 30, unit: 'g', note: 'Grated', group: 'Sauce', scaleEnabled: false };
+  const food = {
+    foodId: 'cheddar-food', name: 'British Extra Mature Cheddar Cheese', amount: 100, unit: 'g',
+    nutrition: { calories: 400, protein: 25, carbs: 1, fat: 33, fiber: 0 },
+    nutritionLabel: { quantity: 100, unit: 'g', calories: 400, protein: 25, carbs: 1, fat: 33, fiber: 0, source: { name: 'British Extra Mature Cheddar Cheese', provider: 'Open Food Facts' } },
+  };
+
+  const selected = applyStoredIngredient(current, food);
+  assert.equal(selected.name, food.name);
+  assert.equal(selected.amount, 30);
+  assert.equal(selected.unit, 'g');
+  assert.equal(selected.note, 'Grated');
+  assert.equal(selected.group, 'Sauce');
+  assert.equal(selected.scaleEnabled, false);
+  assert.deepEqual(['calories', 'protein', 'carbs', 'fat', 'fiber'].map(key => selected.nutrition[key]), [120, 7.5, 0.3, 9.9, 0]);
 });
 
 test('recipe rows with stale food IDs still attach to the reusable item by its legacy alias', () => {

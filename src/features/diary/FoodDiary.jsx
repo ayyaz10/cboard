@@ -428,7 +428,7 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
         </button>
       </div>
       {view === "sources" ? (
-        <DiaryFoodSources meals={day.meals} goals={goals} date={date} today={today} disabled={disabled} onApplyChanges={meals => persist({ ...day, meals, complete: day.complete && canComplete({ ...day, meals }) }, 'What-if changes applied to this day.')} />
+        <DiaryFoodSources meals={day.meals} goals={goals} date={date} today={today} disabled={disabled} foodCatalog={foodCatalog} onSaveAlternativeFood={item => onFoodCatalogChange?.([item])} onApplyChanges={meals => persist({ ...day, meals, complete: day.complete && canComplete({ ...day, meals }) }, 'What-if changes applied to this day.')} />
       ) : <>
       <DiaryReports
         days={days}

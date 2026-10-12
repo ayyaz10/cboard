@@ -19,6 +19,7 @@ function recipeTemplate(ingredient, recipeTitle) {
       nutritionUnit: label.unit,
       perPiece: null,
       nutrition: cleanNutrients(label),
+      nutrientSources: label.nutrientSources || {},
       source: { ...label.source },
     };
   }
@@ -31,6 +32,7 @@ function recipeTemplate(ingredient, recipeTitle) {
     nutritionUnit: amountSupported ? ingredient.unit : 'servings',
     perPiece: null,
     nutrition: cleanNutrients(ingredient.nutrition),
+    nutrientSources: ingredient.nutrientSources || {},
     source: { provider: 'Recipe ingredient', name: recipeTitle || '' },
   };
 }
@@ -38,6 +40,7 @@ function recipeTemplate(ingredient, recipeTitle) {
 const signature = (item) => [
   normalise(item.name), item.nutritionUnit, item.basis,
   normalise(item.source?.provider), normalise(item.source?.name),
+  JSON.stringify(item.nutrientSources || {}),
   ...nutrientKeys.map((key) => item.nutrition?.[key] ?? ''),
 ].join('|');
 
@@ -81,6 +84,7 @@ export function applyStoredDiaryFood(current, stored) {
     ...stored,
     id: current.id,
     nutrition: { ...(stored.nutrition || {}) },
+    nutrientSources: { ...(stored.nutrientSources || {}) },
     source: { ...(stored.source || { provider: 'Manual' }) },
   };
 }

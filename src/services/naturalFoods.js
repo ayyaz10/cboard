@@ -1,4 +1,5 @@
-import { cleanNutrients, nutrientKeys } from '../features/nutrition/nutrients.js';
+import { nutrientKeys } from '../features/nutrition/nutrients.js';
+import { adaptCoFIDFood, adaptUSDAFood } from '../features/nutrition/sourceAdapters.js';
 
 function words(value) {
   return value.toLowerCase().replace(/cashews?/g, 'cashew').replace(/bananas?/g, 'banana').replace(/apples?/g, 'apple').replace(/eggs?/g, 'egg').replace(/almonds?/g, 'almond').replace(/boiled/g, 'cooked').replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/);
@@ -23,12 +24,10 @@ export function findNaturalFoods(foods, query) {
         - (/\bwhite\b|\byolk\b|\bfrozen\b|\bdried\b|\bduck\b|\bgoose\b|\bquail\b|\bturkey\b/.test(name) ? 12 : 0)
       : 0;
     return { food, score: (food.type === 'Foundation' ? 4 : 0) + (/\braw\b/.test(name) ? 5 : 0) + (food.portions?.length ? 2 : 0) + (size && food.portions?.some((portion) => portion.label.toLowerCase().startsWith(size)) ? 10 : 0) + everydayEgg - terms.length };
-  }).filter(Boolean).sort((a, b) => b.score - a.score || a.food.name.localeCompare(b.food.name)).slice(0, 30).map(({ food }) => ({
-    code: `usda-${food.id}`, name: food.name, brand: '', pack: `${food.type} · ${food.release}`,
-    nutrition: { ...cleanNutrients(food.nutrition), quantity: 100, unit: 'g' },
-    portions: food.portions || [],
-    source: { provider: 'USDA FoodData Central', code: String(food.id), name: food.name, url: `https://fdc.nal.usda.gov/food-details/${food.id}/nutrients`, license: 'CC0', release: food.release },
-  }));
+  }).filter(Boolean).sort((a, b) => b.score - a.score || a.food.name.localeCompare(b.food.name)).slice(0, 30).map(({ food }) => {
+    const adapted = food.type === 'CoFID' ? adaptCoFIDFood(food) : adaptUSDAFood(food);
+    return { ...adapted, nutrition: { ...adapted.nutrition, quantity: 100, unit: adapted.unit || 'g' }, portions: food.portions || [] };
+  });
 }
 
 export function suggestedNaturalPortion(product, recipeName = '', amountUnit = '') {
@@ -68,11 +67,31 @@ export function createNaturalFoodSearch(fetchImpl, url) {
     return findNaturalFoods(await catalog, query);
   };
 }
+
+export function createCoFIDFoodSearch(fetchImpl = fetch, url = '/nutrition/cofid-foods.json') {
+  let catalog;
+  return async (query) => {
+    if (typeof query !== 'string' || query.trim().length < 2 || query.length > 120) throw new Error('Enter a food name between 2 and 120 characters.');
+    if (!catalog) catalog = (async () => {
+      const response = await fetchImpl(url, { signal: AbortSignal.timeout(20000) });
+      if (!response.ok) throw new Error('UK food-composition data could not load. Please try again.');
+      const data = await response.json();
+      if (data.version !== 1 || !Array.isArray(data.foods)) throw new Error('The UK food-composition catalog is unavailable. Please try again.');
+      return data.foods.map(food => ({ ...food, type: 'CoFID', release: data.release }));
+    })().catch(error => { catalog = null; throw error; });
+    return findNaturalFoods(await catalog, query);
+  };
+}
 // Kept separate from the app bundle; downloaded only when Natural foods is used.
 let search;
 export function searchNaturalFoods(query) {
   search ||= createNaturalFoodSearch(fetch, `${import.meta.env.BASE_URL}nutrition/usda-foods.json`);
   return search(query);
+}
+let cofidSearch;
+export function searchCoFIDFoods(query) {
+  cofidSearch ||= createCoFIDFoodSearch(fetch, `${import.meta.env.BASE_URL}nutrition/cofid-foods.json`);
+  return cofidSearch(query);
 }
 export function naturalPortionNutrition(nutrition, portion) {
   if (!portion) return nutrition;

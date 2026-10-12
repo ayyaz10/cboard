@@ -333,10 +333,15 @@ export function DiaryMealEditor({
                                       ? null
                                       : Number(event.target.value),
                                 },
+                            nutrientSources: {
+                              ...item.nutrientSources,
+                              ...(event.target.value === "" ? { [key]: undefined } : { [key]: { sourceType: 'manual', sourceId: '', sourceName: 'Manual edit', confidence: 'high', estimated: false } }),
+                            },
                                 source: { ...item.source, modified: true },
                               })
                             }
                           />
+                          {item.nutrientSources?.[key] && <small>{item.nutrientSources[key].sourceName || item.nutrientSources[key].sourceType}{item.nutrientSources[key].estimated ? ' · reference estimate' : ''}{item.nutrientSources[key].derived ? ' · derived' : ''}</small>}
                         </label>
                       ))}
                     </div>
@@ -532,7 +537,7 @@ export function DiaryMealEditor({
                 is per 100 g.
               </p>
               <NutritionLookup
-                currentNutrition={lookup!=='new'?(()=>{const item=draft.items.find(value=>value.id===lookup);return item?{...item.nutrition,quantity:item.basis,unit:item.nutritionUnit,source:item.source}:null;})():null}
+                currentNutrition={lookup!=='new'?(()=>{const item=draft.items.find(value=>value.id===lookup);return item?{...item.nutrition,nutrientSources:item.nutrientSources,quantity:item.basis,unit:item.nutritionUnit,source:item.source}:null;})():null}
                 key={lookup}
                 name={
                   lookup === "new"

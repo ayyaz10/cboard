@@ -14,40 +14,41 @@ export function PageShell({ children }) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <BrandBadge />
 
-          <div className="flex flex-wrap items-center justify-end gap-3">
+          <div className="page-shell-topbar-actions flex flex-wrap items-center justify-end gap-3">
             {user ? (
               <>
-                <a href={getAppHref('/account')} aria-label="Open profile and account" title="Profile and account" className="account-avatar-link">
-                  <span className="account-avatar-small">{profile?.avatarUrl ? <img src={profile.avatarUrl} alt=""/> : getProfileInitials(displayName,user.email)}</span>
-                  <span className="max-w-[10rem] truncate">{displayName}</span>
-                </a>
-                <a
-                  href={getAppHref('/notes')}
-                  className="page-shell-quick-action rounded-full border-2 border-black bg-[#9fe3ff] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[3px_3px_0_#000] transition hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_#000]"
-                >
-                  Notes
-                </a>
-                <a
-                  href={getAppHref('/focus-timer')}
-                  className="page-shell-quick-action rounded-full border-2 border-black bg-[#c5ff6f] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[3px_3px_0_#000] transition hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_#000]"
-                >
-                  Start Focus
-                </a>
+                <div className="page-shell-identity-group">
+                  <a href={getAppHref('/account')} aria-label="Open profile and account" title="Profile and account" className="account-avatar-link">
+                    <span className="account-avatar-small">{profile?.avatarUrl ? <img src={profile.avatarUrl} alt=""/> : getProfileInitials(displayName,user.email)}</span>
+                    <span className="max-w-[10rem] truncate">{displayName}</span>
+                  </a>
+                </div>
+                <div className="page-shell-quick-actions">
+                  <a
+                    href={getAppHref('/notes')}
+                    className="page-shell-quick-action rounded-full border-2 border-black bg-[#9fe3ff] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[3px_3px_0_#000] transition hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_#000]"
+                  >
+                    Notes
+                  </a>
+                  <a
+                    href={getAppHref('/focus-timer')}
+                    className="page-shell-quick-action page-shell-quick-action--primary rounded-full border-2 border-black bg-[#c5ff6f] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[3px_3px_0_#000] transition hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_#000]"
+                  >
+                    Start Focus
+                  </a>
+                </div>
               </>
             ) : null}
-            <ThemeToggle />
-
-            {user ? (
-              <>
-              <button
+            <div className="page-shell-preference-actions">
+              <ThemeToggle />
+              {user && <button
                 type="button"
                 onClick={signOut}
-                className="rounded-full border-2 border-black bg-white px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[3px_3px_0_#000] transition hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_#000]"
+                className="page-shell-logout rounded-full border-2 border-black bg-white px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[3px_3px_0_#000] transition hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_#000]"
               >
                 Logout
-              </button>
-              </>
-            ) : null}
+              </button>}
+            </div>
           </div>
         </div>
         {children}

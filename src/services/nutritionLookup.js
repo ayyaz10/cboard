@@ -1,7 +1,6 @@
-import { offNutrients } from '../features/nutrition/nutrients.js';
+import { adaptOpenFoodFactsProduct } from '../features/nutrition/sourceAdapters.js';
 // Search-a-licious supports broader product-name matching. Browser calls use
 // our authenticated proxy because the upstream search does not allow browser CORS.
-const value = (n) => typeof n === "number" && Number.isFinite(n) && n >= 0 ? n : null;
 export function nutritionUnit(product) {
   // Prefer the recorded label/package basis over a guess from the food name.
   if (product.nutrition_data_per === "100ml") return "ml";
@@ -17,28 +16,18 @@ export function nutritionUnit(product) {
   return "g";
 }
 export function nutritionProduct(product) {
-  if (!product || !/^\d+$/.test(String(product.code || ""))) return null;
-  const name = product.product_name_en || product.product_name;
-  if (typeof name !== "string" || !name.trim()) return null;
-  const n = product.nutriments || {};
-  const kcal = value(n["energy-kcal_100g"]);
-  const kj = value(n["energy-kj_100g"]);
+  const adapted = adaptOpenFoodFactsProduct(product);
+  if (!adapted) return null;
   const nutrition = {
-    ...offNutrients(n),
+    ...adapted.nutrition,
     quantity: 100,
     // OFF uses *_100g for both weight and volume.
     unit: nutritionUnit(product),
-    calories: kcal ?? (kj == null ? null : Math.round(kj / 4.184 * 100) / 100),
-    protein: value(n.proteins_100g), carbs: value(n.carbohydrates_100g), fat: value(n.fat_100g), fiber: value(n.fiber_100g),
   };
-  if ([nutrition.calories, nutrition.protein, nutrition.carbs, nutrition.fat, nutrition.fiber].every((v) => v == null)) return null;
   return {
-    code: String(product.code), name: name.trim(),
-    brand: Array.isArray(product.brands) ? product.brands.filter((v) => typeof v === "string").join(", ") : typeof product.brands === "string" ? product.brands : "",
-    pack: typeof product.quantity === "string" ? product.quantity : "",
+    ...adapted,
     nutrition,
-    source: { provider: "Open Food Facts", code: String(product.code), name: name.trim(),
-      url: `https://world.openfoodfacts.org/product/${product.code}`, license: "ODbL" },
+    source: { ...adapted.source, provider: "Open Food Facts" },
   };
 }
 export function createNutritionSearch(fetchImpl = fetch, now = Date.now) {

@@ -1,14 +1,11 @@
-const PREFIX = /^\s*(\d+(?:\.\d+)?|\d+\/\d+|[½¼¾⅓⅔⅛⅜⅝⅞])\s*(tsp\.?|teaspoons?|tbsp\.?|tablespoons?|cups?|g|grams?|kg|kilograms?|ml|millilit(?:er|re)s?|oz\.?|ounces?|lb|pounds?|pieces?|cloves?)\s+(.+)$/i;
+import { normalizeRecipeUnit, parseIngredientText, normalizeRecipeIngredient, RECIPE_INGREDIENT_UNITS } from '../../../supabase/functions/_shared/recipeIngredient.js';
+
+export { normalizeRecipeUnit, parseIngredientText, normalizeRecipeIngredient, RECIPE_INGREDIENT_UNITS };
 
 export function parseFoodQuantityPrefix(value) {
-  const match = String(value || '').match(PREFIX);
-  if (!match) return null;
-  const fractions = { '½': 0.5, '¼': 0.25, '¾': 0.75, '⅓': 1 / 3, '⅔': 2 / 3, '⅛': 0.125, '⅜': 0.375, '⅝': 0.625, '⅞': 0.875 };
-  const quantity = fractions[match[1]] ?? (match[1].includes('/') ? Number(match[1].split('/')[0]) / Number(match[1].split('/')[1]) : Number(match[1]));
-  const foodName = match[3].trim();
-  return quantity > 0 && foodName ? { quantity, unit: match[2].toLocaleLowerCase().replace(/\.$/, ''), foodName } : null;
+  const parsed = parseIngredientText(value);
+  return parsed?.parsed && parsed.amount > 0 && parsed.unit ? { quantity: parsed.amount, unit: parsed.unit, foodName: parsed.sourceName || parsed.name } : null;
 }
-
 export function normalizeFoodText(value) {
   const text = String(value || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase()
     .replace(/[’‘`']/g, '').replace(/[‐‑‒–—-]/g, ' ').replace(/[^\p{L}\p{N}%]+/gu, ' ').trim().replace(/\s+/g, ' ');
@@ -16,8 +13,8 @@ export function normalizeFoodText(value) {
   return text.split(' ').map(token => synonyms.get(token) || token).join(' ');
 }
 
-export const normalizeFoodName = value => normalizeFoodText(parseFoodQuantityPrefix(value)?.foodName || value);
-export const recipeFoodName = value => parseFoodQuantityPrefix(value)?.foodName || String(value || '').trim();
+export const normalizeFoodName = value => normalizeFoodText(parseIngredientText(value)?.sourceName || value);
+export const recipeFoodName = value => parseIngredientText(value)?.sourceName || String(value || '').trim();
 
 export function validFoodBarcode(value) {
   const digits = String(value || '').replace(/\D/g, '');

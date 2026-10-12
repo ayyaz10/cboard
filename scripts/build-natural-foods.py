@@ -16,13 +16,18 @@ SOURCES = [
 ]
 # IDs, not nutrient names: units are validated before values are retained.
 FIELDS = {
-    'calories': ([1008, 2048, 2047], 'kcal'), 'protein': ([1003], 'g'),
+    'calories': ([1008, 2048, 2047], 'kcal'), 'energyKJ': ([1062], 'kj'), 'protein': ([1003], 'g'),
     'carbs': ([1005], 'g'), 'fat': ([1004], 'g'), 'fiber': ([1079], 'g'),
     'sugars': ([2000, 1063], 'g'), 'saturatedFat': ([1258], 'g'),
+    'monounsaturatedFat': ([1292], 'g'), 'polyunsaturatedFat': ([1293], 'g'), 'transFat': ([1257], 'g'),
+    'omega3': ([1404, 1270], 'g'), 'omega6': ([1405, 1269], 'g'), 'cholesterol': ([1253], 'mg'),
     'sodium': ([1093], 'mg'), 'potassium': ([1092], 'mg'), 'calcium': ([1087], 'mg'),
-    'iron': ([1089], 'mg'), 'magnesium': ([1090], 'mg'), 'zinc': ([1095], 'mg'),
+    'iron': ([1089], 'mg'), 'magnesium': ([1090], 'mg'), 'phosphorus': ([1091], 'mg'), 'zinc': ([1095], 'mg'),
+    'copper': ([1098], 'mg'), 'manganese': ([1101], 'mg'), 'selenium': ([1103], 'ug'),
     'vitaminA': ([1106], 'ug'), 'vitaminC': ([1162], 'mg'), 'vitaminD': ([1114], 'ug'),
-    'vitaminE': ([1109], 'mg'), 'vitaminB12': ([1178], 'ug'), 'folate': ([1177], 'ug'),
+    'vitaminE': ([1109], 'mg'), 'vitaminK': ([1185], 'ug'), 'vitaminB1': ([1165], 'mg'),
+    'vitaminB2': ([1166], 'mg'), 'vitaminB3': ([1167], 'mg'), 'vitaminB5': ([1170], 'mg'),
+    'vitaminB6': ([1175], 'mg'), 'biotin': ([1176], 'ug'), 'vitaminB12': ([1178], 'ug'), 'folate': ([1177], 'ug'),
 }
 
 def positive(value):

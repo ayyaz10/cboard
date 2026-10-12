@@ -61,6 +61,10 @@ test('missing units and upper limits are flagged, negative values are excluded',
  const column=first('Per 100g\nFat 8\nSalt <0.01g\nProtein -3g');
  assert.equal(column.nutrients.fat.missingUnit,true);assert.equal(column.nutrients.salt.upperBound,true);assert.equal(value(column,'protein'),undefined);
 });
+test('unitless micronutrients are not assigned guessed units',()=>{
+ const column=first('Per 100g\nVitamin D 5\nIron 2\nProtein 3g');
+ assert.equal(value(column,'vitaminD'),undefined);assert.equal(value(column,'iron'),undefined);
+});
 test('kJ without kcal is not imported as calories',()=>{
  const column=first('Per 100g\nEnergy 420kJ\nFat 2g');assert.equal(value(column,'energyKJ'),420);assert.equal(value(column,'calories'),undefined);
 });

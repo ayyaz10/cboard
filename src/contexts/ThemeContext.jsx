@@ -36,8 +36,8 @@ export function ThemeProvider({ children }) {
 
   useEffect(() => {
     const handlePreviewTheme = (event) => setTheme(event.detail);
-    window.addEventListener('cboard-theme-preview', handlePreviewTheme);
-    return () => window.removeEventListener('cboard-theme-preview', handlePreviewTheme);
+    document.addEventListener('cboard-theme-preview', handlePreviewTheme);
+    return () => document.removeEventListener('cboard-theme-preview', handlePreviewTheme);
   }, []);
 
   const value = useMemo(() => ({

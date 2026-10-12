@@ -24,6 +24,16 @@ test('daily targets preserve zero and optional values through a save round trip'
     assert.throws(() => validateGoals({ protein: value }), /Protein/);
 });
 
+test('optional vitamin and mineral targets validate, persist and keep unset fields unknown', () => {
+  const goals = validateGoals({ micronutrients: { vitaminC: '80', calcium: '0' } });
+  assert.equal(goals.micronutrients.vitaminC, 80);
+  assert.equal(goals.micronutrients.calcium, 0);
+  assert.equal(goals.micronutrients.iron, null);
+  assert.deepEqual(validateGoals(JSON.parse(JSON.stringify(goals))).micronutrients, goals.micronutrients);
+  for (const value of [-1, Infinity, NaN, true, 'invalid', 100001])
+    assert.throws(() => validateGoals({ micronutrients: { magnesium: value } }), /Magnesium/);
+});
+
 test('meal selections and fractional portions compare independently against each goal', () => {
   const entries = [{ id: 'meal', slug: 'oats', portions: 2 }];
   const recipes = [{ slug: 'oats', nutrition: { calories: 600, protein: 30, carbs: 70, fat: 20 } }];

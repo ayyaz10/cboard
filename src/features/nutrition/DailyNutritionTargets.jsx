@@ -3,6 +3,7 @@ import { getPreference, setPreference } from '../../services/preferenceService';
 import {
   GOAL_KEY,
   GOAL_FIELDS,
+  MICRONUTRIENT_TARGETS,
   emptyGoals,
   hydrateCalculatedGoals,
   prepareGoalsForSave,
@@ -68,7 +69,7 @@ export function DailyNutritionTargets({ controller }) {
   const [saveError, setSaveError] = useState('');
   const [saved, setSaved] = useState(false);
   const lock = useRef(false);
-  const hasGoals = GOAL_FIELDS.some(([key]) => goals[key] != null);
+  const hasGoals = GOAL_FIELDS.some(([key]) => goals[key] != null) || Object.values(goals.micronutrients || {}).some(value => value != null);
   const calorieDifference = maintenanceDifference(goals);
   async function submit(event) {
     event.preventDefault();
@@ -121,6 +122,17 @@ export function DailyNutritionTargets({ controller }) {
             </label>)}
           </div>
           <MacroTargetCard goals={draft} editing onChange={setDraft} />
+          <details className="nutrition-micronutrient-targets">
+            <summary>Optional vitamin and mineral targets</summary>
+            <p>Enter targets you already use. Blank fields are not included in comparisons.</p>
+            <div className="nutrition-basics-grid">
+              {MICRONUTRIENT_TARGETS.map(([key, label, unit]) => <label key={key}>
+                <span>{label} ({unit}/day)</span>
+                <input type="number" min="0" max="100000" step="any" placeholder="Not set" value={draft.micronutrients?.[key] ?? ''}
+                  onChange={event => setDraft(current => ({ ...current, micronutrients: { ...current.micronutrients, [key]: event.target.value } }))} />
+              </label>)}
+            </div>
+          </details>
           <p>Maintenance calories are your estimated weight-maintaining intake. The meal planner compares meals with your calorie target.</p>
           <p>Maintenance calories and fibre can be left blank. A calorie target is required to calculate macros.</p>
           <div className="nutrition-targets-actions">
@@ -135,6 +147,12 @@ export function DailyNutritionTargets({ controller }) {
             <dt>{label}</dt><dd>{goals[key] == null ? 'Not set' : <>{formatMacro(goals[key])} <small>{unit}/day</small></>}</dd>
           </div>)}
         </dl>
+        {Object.values(goals.micronutrients || {}).some(value => value != null) && <details className="nutrition-micronutrient-targets">
+          <summary>Vitamin and mineral targets</summary>
+          <dl className="nutrition-basics-grid">
+            {MICRONUTRIENT_TARGETS.filter(([key]) => goals.micronutrients[key] != null).map(([key, label, unit]) => <div key={key}><dt>{label}</dt><dd>{formatMacro(goals.micronutrients[key])} <small>{unit}/day</small></dd></div>)}
+          </dl>
+        </details>}
         {goals.calories != null && <MacroTargetCard goals={goals} />}
       </>}
       {!editing && calorieDifference != null && (

@@ -1,5 +1,5 @@
 import { cleanLabelBasis } from '../nutrition/nutritionLabelReview.js';
-import { cleanNutrients, nutrientKeys } from '../nutrition/nutrients.js';
+import { cleanNutrients, cleanNutrientSources, nutrientKeys } from '../nutrition/nutrients.js';
 export const macroKeys = nutrientKeys;
 export const productIngredients = (recipe) => [...recipe.ingredients, ...(recipe.sauces || [])];
 export const productBasis = (recipe) => JSON.stringify(productIngredients(recipe).map(({ name, amount, unit, note }) => [name, amount, unit, note || '']));
@@ -15,7 +15,7 @@ export function normalizeProducts(value, recipe) {
     const source = nutrition.source || {};
     return { quantity: item.quantity, unit: item.unit, nutrition: {
       quantity: nutrition.quantity, unit: item.unit,
-      ...cleanNutrients(nutrition),
+      ...cleanNutrients(nutrition), nutrientSources: cleanNutrientSources(nutrition.nutrientSources),
       source: { ...(cleanLabelBasis(source?.labelBasis) ? {labelBasis:cleanLabelBasis(source?.labelBasis)} : {}), name: text(source.name), provider: text(source.provider), code: text(source.code), fetchedAt: text(source.fetchedAt), modified: source.modified === true, estimatedPortion: source.estimatedPortion === true, portionDescription: text(source.portionDescription) },
     } };
   });

@@ -6,6 +6,7 @@ import {
 } from '../features/recipes/recipeData';
 import { isRecipeImage } from '../features/recipes/recipeImage';
 import { requireSupabase } from '../lib/supabaseClient';
+import { normalizeRecipeIngredient } from '../../supabase/functions/_shared/recipeIngredient.js';
 
 const PREFIX = 'recipe:v1:';
 const FAVOURITE_PREFIX = 'recipe-favourite:v1:';
@@ -26,9 +27,10 @@ export async function saveRecipeIngredientNutrition(recipe, ingredientIndex, nut
     const { nutritionLabel, ...manualItem } = item;
     const name = typeof quantity.name === 'string' ? quantity.name.trim() : item.name;
     if (!name || name.length > 200) throw new Error('Enter an ingredient name of 1 to 200 characters.');
-    return { ...manualItem, ...quantity, name, nutrition };
+    const normalized = normalizeRecipeIngredient({ ...manualItem, ...quantity, name, amount: quantity.amount > 0 ? quantity.amount : null, nutrition, nutritionOverride: true });
+    if (!(typeof normalized.amount === 'number' && normalized.amount > 0)) throw new Error('Enter a positive ingredient amount or include one at the start of its name.');
+    return normalized;
   });
-  if (quantity.amount != null && !(quantity.amount > 0)) throw new Error("Enter a positive ingredient amount.");
   const draft = { ...stored, ingredients, nutritionFromIngredients: true };
   if (stored.productNutrition) {
     delete draft.productNutrition;

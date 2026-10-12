@@ -2,6 +2,7 @@ import { normaliseFibreSource, fibreBasis } from './recipeFibre.js';
 import { cleanIngredientLabel, ingredientLabelNutrition, ingredientRecipeTotals } from './ingredientNutrition.js';
 import { normalizeProducts, calculateProducts, macroKeys } from './recipeProducts.js';
 import { storedHealthReview } from "../../../supabase/functions/_shared/recipeHealthReview.js";
+import { normalizeRecipeIngredient } from "../../../supabase/functions/_shared/recipeIngredient.js";
 export const MAX_JSON_BYTES = 256 * 1024;
 
 // Photos remain in the uploader state, never in the editable JSON document.
@@ -62,6 +63,7 @@ function nutrition(value, label = 'Nutrition') {
 function ingredient(value, label) {
   if (!object(value))
     throw new Error(`${label} must be an object with a name, amount and unit.`);
+  value = normalizeRecipeIngredient(value);
   const amount =
     typeof value.amount === 'string'
       ? string(value.amount, `${label} amount`, true, 80)
@@ -73,7 +75,12 @@ function ingredient(value, label) {
     amount,
     unit: string(value.unit, `${label} unit`, false, 80),
     note: string(value.note, `${label} note`),
+    ...(value.group != null && string(value.group, `${label} group`, false, 200) ? { group: string(value.group, `${label} group`, false, 200) } : {}),
+    ...(value.preparation != null && string(value.preparation, `${label} preparation`, false, 400) ? { preparation: string(value.preparation, `${label} preparation`, false, 400) } : {}),
     nutrition: nutrition(value.nutrition, `${label} nutrition`),
+    ...(value.scaleEnabled === false ? { scaleEnabled: false } : {}),
+    ...(value.foodAliasConfirmed === true ? { foodAliasConfirmed: true } : {}),
+    ...(value.nutritionOverride === true ? { nutritionOverride: true } : {}),
     ...(value.alternativeGroup != null
       ? {
           alternativeGroup: string(
@@ -212,6 +219,19 @@ export function validateRecipe(data) {
   for (const group of ['ingredients', 'sauces']) clean[group].forEach((item, index) => { item.id ||= `${slug}:${group}:${index}`; });
   const ingredientIds = [...clean.ingredients, ...clean.sauces].map(item => item.id);
   if (new Set(ingredientIds).size !== ingredientIds.length) throw new Error('Ingredient IDs must be unique within a recipe.');
+  if (data.scaling != null) {
+    const scaling = data.scaling;
+    const anchor = [...clean.ingredients, ...clean.sauces].find(item => item.id === scaling.anchorIngredientId);
+    if (!anchor || typeof anchor.amount !== 'number' || !Number.isFinite(anchor.amount) || anchor.amount <= 0) throw new Error('Recipe scaling needs a main ingredient with a positive numeric amount.');
+    if (!scaling.baseQuantities || typeof scaling.baseQuantities !== 'object' || Array.isArray(scaling.baseQuantities)) throw new Error('Recipe scaling base quantities are invalid.');
+    const baseQuantities = {};
+    for (const item of [...clean.ingredients, ...clean.sauces]) {
+      const base = scaling.baseQuantities[item.id];
+      if (!base || !(base.amount === null || typeof base.amount === 'number' && Number.isFinite(base.amount) && base.amount >= 0 || typeof base.amount === 'string' && base.amount.length <= 80) || item.id === anchor.id && (!(typeof base.amount === 'number') || base.amount <= 0)) throw new Error(`Recipe scaling base amount for ${item.name} is invalid.`);
+      baseQuantities[item.id] = { amount: base.amount, unit: string(base.unit, `Recipe scaling unit for ${item.name}`, false, 80) };
+    }
+    clean.scaling = { anchorIngredientId: anchor.id, baseQuantities };
+  }
   const source = normaliseFibreSource(data.fibreSource, clean);
   if (source && source.ingredients !== fibreBasis(clean)) clean.nutrition.fiber = null;
   else if (source) clean.fibreSource = source;
@@ -330,7 +350,10 @@ export function assignBatchSlugs(recipes, existingSlugs) {
 }
 
 export function formatIngredient(item) {
-  return [item.amount, item.unit, item.name]
+  const amount = typeof item.amount === 'number' && Number.isFinite(item.amount)
+    ? new Intl.NumberFormat('en-GB', { maximumFractionDigits: 2, useGrouping: false }).format(item.amount)
+    : item.amount;
+  return [amount, item.unit, item.name]
     .filter((part) => part !== null && part !== undefined && part !== '')
     .join(' ');
 }

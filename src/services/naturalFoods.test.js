@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { findNaturalFoods, createNaturalFoodSearch, naturalPortionNutrition, nutritionForOnePortion, suggestedNaturalPortion } from './naturalFoods.js';
+import { findNaturalFoods, createNaturalFoodSearch, createCoFIDFoodSearch, naturalPortionNutrition, nutritionForOnePortion, suggestedNaturalPortion } from './naturalFoods.js';
 import { cleanIngredientLabel, ingredientLabelNutrition } from '../features/recipes/ingredientNutrition.js';
 import { foodItem, itemNutrition, validateDay, emptyDay, newMeal } from '../features/diary/diaryData.js';
 const catalog = JSON.parse(readFileSync(new URL('../../public/nutrition/usda-foods.json', import.meta.url)));
@@ -47,6 +47,13 @@ test('USDA data uses canonical units and missing nutrients are not fabricated', 
   assert.ok(catalog.foods.length > 8000);
   assert.ok(catalog.sources.every((source) => source.sha256.length === 64));
 });
+test('USDA reference index includes the expanded micronutrient and fatty-acid mappings', () => {
+  const almond = findNaturalFoods(catalog.foods, 'almonds')[0];
+  assert.equal(almond.name, 'Nuts, almonds, whole, raw');
+  for (const key of ['energyKJ', 'saturatedFat', 'monounsaturatedFat', 'polyunsaturatedFat', 'vitaminB1', 'biotin', 'calcium', 'magnesium', 'phosphorus', 'potassium', 'copper', 'manganese'])
+    assert.ok(Number.isFinite(almond.nutrition[key]), key);
+  assert.equal(almond.nutrition.salt, null);
+});
 test('natural catalog is lazy, shared by concurrent searches and retries a failed fetch', async () => {
   let calls = 0;
   const search = createNaturalFoodSearch(async () => {
@@ -58,4 +65,18 @@ test('natural catalog is lazy, shared by concurrent searches and retries a faile
   const results = await Promise.all([search('banana'), search('cashew')]);
   assert.equal(calls, 2); assert.ok(results.every((rows) => rows.length));
   await assert.rejects(search('x'), /food name/);
+});
+
+test('CoFID reference search keeps explicit zeroes, unknowns, source identity and volume basis', async () => {
+  const cofid = JSON.parse(readFileSync(new URL('../../public/nutrition/cofid-foods.json', import.meta.url)));
+  const search = createCoFIDFoodSearch(async () => ({ ok: true, json: async () => cofid }), '/nutrition/cofid-foods.json');
+  const foods = await search('beer bitter');
+  assert.ok(foods.length);
+  const beer = foods[0];
+  assert.equal(beer.source.provider, 'UK CoFID');
+  assert.equal(beer.nutrition.unit, 'ml');
+  assert.equal(beer.nutrition.quantity, 100);
+  assert.equal(beer.nutrition.vitaminD, 0);
+  assert.equal(beer.nutrition.vitaminA, null);
+  assert.equal(beer.nutrientSources.vitaminD.sourceType, 'cofid');
 });

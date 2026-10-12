@@ -1,4 +1,5 @@
-import { catalogIngredient, resolveCatalogFoodForIngredient } from '../nutrition/foodCatalog.js';
+import { catalogIngredient, resolveCatalogFoodForIngredient, findRecipeFoodMatches } from '../nutrition/foodCatalog.js';
+import { ingredientLabelAmount, ingredientLabelNutrition } from './ingredientNutrition.js';
 
 const normalise = (value) => String(value || '').trim().toLocaleLowerCase();
 
@@ -82,12 +83,15 @@ export function removeRecipeOnlyIngredients(recipes = [], keys = []) {
 export function findIngredientMatches(library, query, limit = 8) {
   const needle = normalise(query);
   if (needle.length < 2) return [];
-  return library
-    .filter((entry) => normalise(entry.item.name).includes(needle))
+  const direct = library.filter(entry => normalise(entry.item.name).includes(needle));
+  const semantic = findRecipeFoodMatches({ name: query }, library.filter(entry => entry.item.foodId).map(entry => entry.item))
+    .map(match => library.find(entry => entry.item.foodId === match.food.id)).filter(Boolean);
+  return [...new Map([...direct, ...semantic].map(entry => [entry.key, entry])).values()]
     .sort((a, b) => {
       const aName = normalise(a.item.name);
       const bName = normalise(b.item.name);
-      return Number(bName.startsWith(needle)) - Number(aName.startsWith(needle)) || aName.localeCompare(bName);
+      const aDirect = aName.includes(needle), bDirect = bName.includes(needle);
+      return Number(bDirect) - Number(aDirect) || Number(bName.startsWith(needle)) - Number(aName.startsWith(needle)) || aName.localeCompare(bName);
     })
     .slice(0, limit);
 }
@@ -97,12 +101,19 @@ export function applyStoredIngredient(current, stored) {
     ...(current.id ? { id: current.id } : {}),
     ...(stored.foodId ? { foodId: stored.foodId } : {}),
     name: stored.name,
-    amount: stored.amount ?? null,
-    unit: stored.unit || '',
-    note: stored.note || '',
+    amount: current.amount ?? null,
+    unit: current.unit || '',
+    note: current.note ?? stored.note ?? '',
+    ...(current.group ? { group: current.group } : {}),
+    ...(current.preparation ? { preparation: current.preparation } : {}),
+    ...(current.scaleEnabled === false ? { scaleEnabled: false } : {}),
     nutrition: { ...(stored.nutrition || {}) },
     ...(stored.nutritionLabel ? { nutritionLabel: { ...stored.nutritionLabel, source: { ...stored.nutritionLabel.source } } } : {}),
   };
+  // Stored food nutrition is expressed per its label quantity (for example,
+  // per 100 g). Recalculate it against the recipe row's existing amount and
+  // unit as soon as the food is selected, rather than waiting for an edit.
+  if (next.nutritionLabel && ingredientLabelAmount(next) != null) next.nutrition = ingredientLabelNutrition(next);
   if (current.alternativeGroup) next.alternativeGroup = current.alternativeGroup;
   return next;
 }

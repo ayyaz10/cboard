@@ -1,7 +1,7 @@
 import { buildDiaryFoodLibrary, findDiaryFoodMatches } from '../diary/diaryFoodLibrary.js';
 import { prepareIngredientEditor } from '../recipes/ingredientNutrition.js';
 import { applyFoodCatalogToRecipes, normalizeFoodName } from './foodCatalog.js';
-import { cleanNutrients } from './nutrients.js';
+import { cleanNutrients, cleanNutrientSources } from './nutrients.js';
 
 export function buildSavedFoods(recipes = [], days = [], catalog = [], groceries = {}) {
   const prepared = applyFoodCatalogToRecipes(recipes.map(prepareIngredientEditor), catalog);
@@ -15,6 +15,7 @@ export function buildSavedFoods(recipes = [], days = [], catalog = [], groceries
       unit: item.nutrition?.unit || item.unit,
       basis: item.nutrition?.quantity || 1, nutritionUnit: item.nutrition?.unit || item.unit,
       nutrition: cleanNutrients(item.nutrition), source: { ...item.nutrition?.source },
+      nutrientSources: cleanNutrientSources(item.nutrientSources || item.nutrition?.nutrientSources),
     } });
   }
   return entries;
@@ -25,6 +26,7 @@ export const findSavedFoods = findDiaryFoodMatches;
 export function savedFoodNutrition(item) {
   if (!Object.values(item.nutrition || {}).some(Number.isFinite)) return null;
   return { ...cleanNutrients(item.nutrition), quantity: item.basis, unit: item.nutritionUnit,
+    nutrientSources: cleanNutrientSources(item.nutrientSources || item.nutrition?.nutrientSources),
     source: { ...item.source, name: item.name, provider: item.source?.provider || 'Saved food' } };
 }
 
@@ -45,5 +47,5 @@ export function groceryCatalogUpdates(before, after) {
     const old = previous.get(item.id);
     return item.nutrition && (!old || old.name !== item.name || JSON.stringify(old.nutrition) !== JSON.stringify(item.nutrition));
   }).map(item => ({ name: item.name, quantity: item.nutrition.quantity, unit: item.nutrition.unit,
-    nutrition: item.nutrition, source: item.nutrition.source }));
+    nutrition: item.nutrition, nutrientSources: item.nutrition.nutrientSources, source: item.nutrition.source }));
 }

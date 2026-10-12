@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { itemNutrition, nutrientContributions } from './diaryData.js';
+import { diaryTotals, itemNutrition, nutrientContributions } from './diaryData.js';
 import { nutrientEnergy } from './nutrientEnergy.js';
 import { simulateDiaryChanges, simulationKey } from './diarySimulation.js';
 import { NUTRIENTS } from '../nutrition/nutrients.js';
@@ -8,6 +8,8 @@ import { Badge } from '../../components/ui/Badge.jsx';
 import { Panel } from '../../components/ui/Card.jsx';
 import { Dialog } from '../../components/ui/Dialog.jsx';
 import { IconButton } from '../../components/ui/IconButton.jsx';
+import { NutritionLabelScan } from '../nutrition/NutritionLabelScan.jsx';
+import { cleanNutrients, nutrientKeys, nutrientSourcesForValues } from '../nutrition/nutrients.js';
 
 const SOURCE_CARDS = [
   ['calories', 'Calories', 'Energy from your food', '--chart-primary', 'kcal'],
@@ -17,13 +19,7 @@ const SOURCE_CARDS = [
   ['fiber', 'Fibre', 'Digestion & fullness', '--chart-axis', 'g'],
 ];
 const TARGET_KEYS = ['calories', 'protein', 'carbs', 'fat', 'fiber'];
-const EDITOR_NUTRIENTS = [
-  ['calories', 'Calories', 'kcal'],
-  ['protein', 'Protein', 'g'],
-  ['carbs', 'Carbs', 'g'],
-  ['fat', 'Fat', 'g'],
-  ['fiber', 'Fibre', 'g'],
-];
+const EDITOR_NUTRIENTS = NUTRIENTS;
 const SOURCE_VISIBILITY_STORAGE_KEY = 'cboard:food-diary:source-visibility:v1';
 function defaultSourceVisibility() {
   return Object.fromEntries(SOURCE_CARDS.map(([key]) => [key, true]));
@@ -48,7 +44,7 @@ function totalText(total, key) {
   return `${format(total.value)} ${unit}${total.missing ? ' · known subtotal' : ''}`;
 }
 
-export function DiaryFoodSources({ meals, goals, date, today, disabled = false, onApplyChanges }) {
+export function DiaryFoodSources({ meals, goals, date, today, disabled = false, onApplyChanges, foodCatalog = [], onSaveAlternativeFood }) {
   const [adjusting, setAdjusting] = useState(false);
   const [mode, setMode] = useState('percent');
   const [overrides, setOverrides] = useState({});
@@ -60,6 +56,10 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
   const sourcePositions = useRef(null);
   const [confirmApply, setConfirmApply] = useState(false);
   const [applyError, setApplyError] = useState('');
+  const [alternativeQuery, setAlternativeQuery] = useState('');
+  const [alternativeName, setAlternativeName] = useState('');
+  const [alternativeNutrition, setAlternativeNutrition] = useState(null);
+  const [productMessage, setProductMessage] = useState('');
   const contributions = useMemo(() => nutrientContributions(meals), [meals]);
   const simulation = useMemo(() => simulateDiaryChanges(meals, overrides), [meals, overrides]);
   const foodCount = meals.reduce((count, meal) => count + meal.items.length, 0);
@@ -88,16 +88,26 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
       const currentValue = itemNutrition(entry)[key];
       if (currentValue == null) currentMissing += 1;
       else current += currentValue;
-      const quantity = overrides[entry.key]?.quantity ?? entry.quantity;
-      const previewValue = quantity <= 0 ? 0 : itemNutrition({ ...entry, quantity })[key];
+      const previewItem = { ...entry, ...overrides[entry.key], nutrition: overrides[entry.key]?.nutrition || entry.nutrition };
+      const previewValue = previewItem.quantity <= 0 ? 0 : itemNutrition(previewItem)[key];
       if (previewValue == null) previewMissing += 1;
       else preview += previewValue;
     }
     return { key, label, unit, current, preview, currentMissing, previewMissing };
   }) : [];
-  const changed = Object.values(overrides).some(Boolean) && simulation.changes.length > 0;
+  const selectedMealImpacts = selectedFood ? [...new Set(selectedFood.entries.map(entry => entry.mealId))].map(mealId => {
+    const currentMeal = meals.find(meal => meal.id === mealId);
+    const simulatedMeal = simulation.meals.find(meal => meal.id === mealId);
+    return { title: currentMeal?.title || currentMeal?.meal || 'Meal', current: diaryTotals(currentMeal ? [currentMeal] : []), simulated: diaryTotals(simulatedMeal ? [simulatedMeal] : []) };
+  }) : [];
+  const changed = simulation.changes.length > 0;
   const currentTotals = simulation.currentTotals;
   const simulatedTotals = simulation.simulatedTotals;
+  const configuredTargetKeys = [...new Set([...TARGET_KEYS, ...Object.keys(goals?.micronutrients || {})])]
+    .filter(key => Number(goals?.[key] ?? goals?.micronutrients?.[key]) > 0);
+  const visibleSourceCards = adjusting && !SOURCE_CARDS.some(([key]) => key === selectedNutrient)
+    ? [...SOURCE_CARDS, [selectedNutrient, nutrientMeta.get(selectedNutrient)?.label || selectedNutrient, 'Food source breakdown', '--chart-primary', nutrientMeta.get(selectedNutrient)?.unit || '']]
+    : SOURCE_CARDS;
 
   useEffect(() => {
     try { localStorage.setItem(SOURCE_VISIBILITY_STORAGE_KEY, JSON.stringify(visibleSources)); }
@@ -124,22 +134,22 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
 
   function toggleSource(key) {
     captureSourcePositions();
-    setVisibleSources(previous => ({ ...previous, [key]: !previous[key] }));
+    setVisibleSources(previous => ({ ...previous, [key]: !(previous[key] !== false) }));
   }
 
   function applyAmount(entry, number) {
     const quantity = mode === 'percent' ? entry.quantity * number / 100 : number;
     if (!Number.isFinite(quantity) || quantity > 1000000) return;
     if (quantity === entry.quantity) {
-      setOverrides(previous => { const next = { ...previous }; delete next[entry.key]; return next; });
+      setOverrides(previous => { const next = { ...previous }; const override = { ...next[entry.key] }; delete override.quantity; if (Object.keys(override).length) next[entry.key] = override; else delete next[entry.key]; return next; });
       return;
     }
-    setOverrides(previous => ({ ...previous, [entry.key]: { quantity } }));
+    setOverrides(previous => ({ ...previous, [entry.key]: { ...previous[entry.key], quantity } }));
   }
   function setAmount(entry, value) {
     setAmountDrafts(previous => ({ ...previous, [entry.key]: value }));
     if (value === '') {
-      setOverrides(previous => { const next = { ...previous }; delete next[entry.key]; return next; });
+      setOverrides(previous => { const next = { ...previous }; const override = { ...next[entry.key] }; delete override.quantity; if (Object.keys(override).length) next[entry.key] = override; else delete next[entry.key]; return next; });
       return;
     }
     const normalized = value.replace(',', '.');
@@ -152,6 +162,46 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
     setOverrides(previous => { const next = { ...previous }; delete next[key]; return next; });
     setAmountDrafts(previous => { const next = { ...previous }; delete next[key]; return next; });
   }
+  function applyNutritionToFood(food, product) {
+    if (!food) return;
+    const basisUnit = product.unit;
+    const compatible = food.entries.every(entry => entry.nutritionUnit === basisUnit || (entry.unit === 'pieces' && basisUnit === entry.nutritionUnit && Number.isFinite(entry.perPiece)));
+    if (!compatible) { setApplyError(`This alternative uses ${basisUnit}; the logged amount uses a different unit. Convert the amount in the diary editor before comparing.`); return; }
+    const nutrition = cleanNutrients(product.nutrition || {});
+    const name = String(product.name || food.name).trim() || food.name;
+    const basis = Number(product.basis ?? product.quantity);
+    if (!Number.isFinite(basis) || basis <= 0) { setApplyError('Enter a valid positive nutrition basis.'); return; }
+    for (const entry of food.entries) {
+      const originalNutrition = JSON.stringify(entry.nutrition);
+      setOverrides(previous => ({ ...previous, [entry.key]: {
+        ...previous[entry.key], name, ...(product.foodId ? { foodId: product.foodId } : {}),
+        basis, nutritionUnit: basisUnit, nutrition,
+        nutrientSources: { ...nutrientSourcesForValues(nutrition, product.source), ...(product.nutrientSources || {}) },
+        source: { ...(product.source || { provider: 'Manual simulation' }), modified: false },
+        productChanged: true,
+      }}));
+      if (originalNutrition === JSON.stringify(nutrition) && name === entry.name && basis === entry.basis && basisUnit === entry.nutritionUnit) {
+        setOverrides(previous => { const next = { ...previous }; const override = { ...next[entry.key] }; delete override.nutrition; delete override.name; delete override.basis; delete override.nutritionUnit; delete override.nutrientSources; delete override.source; if (!Object.keys(override).length) delete next[entry.key]; else next[entry.key] = override; return next; });
+      }
+    }
+    setAlternativeNutrition({ name, basis, unit: basisUnit, nutrition, nutrientSources: product.nutrientSources || {}, source: product.source || { provider: 'Manual simulation' }, ...(product.foodId ? { foodId: product.foodId } : {}) });
+    setAlternativeName(name);
+    setApplyError('');
+  }
+  function resetProduct(food, keepQuantity = true) {
+    if (!food) return;
+    setOverrides(previous => {
+      const next = { ...previous };
+      for (const entry of food.entries) {
+        const value = { ...next[entry.key] };
+        for (const field of ['name', 'foodId', 'basis', 'nutritionUnit', 'nutrition', 'nutrientSources', 'source', 'productChanged']) delete value[field];
+        if (!keepQuantity) delete value.quantity;
+        if (Object.keys(value).length) next[entry.key] = value; else delete next[entry.key];
+      }
+      return next;
+    });
+    setAlternativeNutrition(null); setAlternativeName(''); setAlternativeQuery(''); setProductMessage('');
+  }
   function chooseMode(nextMode) {
     setMode(nextMode);
     setAmountDrafts({});
@@ -163,7 +213,7 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
     for (const entry of selectedFood.entries) {
       if (!Number.isFinite(entry.quantity) || entry.quantity <= 0) continue;
       const quantity = entry.quantity * percent / 100;
-      if (quantity === entry.quantity) delete nextOverrides[entry.key];
+      if (quantity === entry.quantity) { if (nextOverrides[entry.key]) { delete nextOverrides[entry.key].quantity; if (!Object.keys(nextOverrides[entry.key]).length) delete nextOverrides[entry.key]; } }
       else nextOverrides[entry.key] = { quantity };
     }
     setOverrides(nextOverrides);
@@ -180,7 +230,7 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
     setCustomPercentDraft(value);
   }
   function closeAdjustments() {
-    setAdjusting(false); setOverrides({}); setAmountDrafts({}); setCustomPercentDraft(null); setExpandedFood(''); setConfirmApply(false); setApplyError('');
+    setAdjusting(false); setOverrides({}); setAmountDrafts({}); setCustomPercentDraft(null); setExpandedFood(''); setConfirmApply(false); setApplyError(''); setAlternativeNutrition(null); setAlternativeName(''); setAlternativeQuery(''); setProductMessage('');
   }
   async function applyChanges() {
     if (!changed || disabled) return;
@@ -191,7 +241,7 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
       else setApplyError('Could not apply these changes. Your diary is unchanged; try again.');
     } catch (error) { setApplyError(error.message || 'Could not save these diary changes.'); }
   }
-  function openAdjustments(key) { setAdjusting(true); setSelectedNutrient(key); setOverrides({}); setAmountDrafts({}); setCustomPercentDraft(null); setExpandedFood(''); setApplyError(''); }
+  function openAdjustments(key) { setAdjusting(true); setSelectedNutrient(key); setOverrides({}); setAmountDrafts({}); setCustomPercentDraft(null); setExpandedFood(''); setApplyError(''); setAlternativeNutrition(null); setAlternativeName(''); setAlternativeQuery(''); setProductMessage(''); }
   function selectAdjustmentNutrient(key) {
     if (!adjusting) { openAdjustments(key); return; }
     setSelectedNutrient(key);
@@ -213,8 +263,8 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
     {!foodCount ? <Panel className="diary-sources-empty"><strong>No foods logged for this day yet.</strong><p>Open the Day log tab and add a meal to see where your calories, macros and fibre come from.</p></Panel> : <>
       {adjusting && <Panel className="diary-simulation-panel" aria-label="Food quantity simulation">
         <header className="diary-simulation-heading">
-          <div><Badge variant="accent">Preview only</Badge><h3>{date === today ? 'Today' : dateLabel(date, today)} — what if?</h3><p>Try amounts without changing your diary. Each entry keeps its logged unit and nutrition snapshot.</p></div>
-          <div className="diary-simulation-actions"><Button size="sm" disabled={!changed} onClick={() => { setOverrides({}); setAmountDrafts({}); }}>Reset all</Button><IconButton label="Close simulation" onClick={closeAdjustments}>×</IconButton></div>
+          <div><Badge variant="accent">Preview only</Badge><h3>{date === today ? 'Today' : dateLabel(date, today)} — what if?</h3><p>Try amounts without changing your diary. Each entry keeps its logged unit and nutrition snapshot.</p><label>Analyze food sources for<select className="ui-control" value={selectedNutrient} onChange={event => selectAdjustmentNutrient(event.target.value)}>{NUTRIENTS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label></div>
+          <div className="diary-simulation-actions"><Button size="sm" disabled={!changed} onClick={() => { setOverrides({}); setAmountDrafts({}); setAlternativeNutrition(null); setAlternativeName(''); setAlternativeQuery(''); setProductMessage(''); }}>Reset all</Button><IconButton label="Close simulation" onClick={closeAdjustments}>×</IconButton></div>
         </header>
 
         <div className="diary-simulation-quick-summary" aria-label="Simulated daily totals">{TARGET_KEYS.map(key => <div key={key}><span>{nutrientMeta.get(key).label}</span><strong>{key === 'calories' ? `${format(simulatedTotals[key].value)} kcal` : `${format(simulatedTotals[key].value)} g`}</strong><small>{format(simulation.deltas[key])}{key === 'calories' ? ' kcal' : ' g'} change</small></div>)}</div>
@@ -223,8 +273,8 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
           {NUTRIENTS.map(([key, label]) => <tr key={key}><th scope="row">{label}</th><td data-label="Current">{totalText(currentTotals[key], key)}</td><td data-label="Simulated">{totalText(simulatedTotals[key], key)}</td><td data-label="Change">{format(simulation.deltas[key])} {nutrientMeta.get(key).unit}</td></tr>)}
         </tbody></table></div></details>
 
-        {TARGET_KEYS.filter(key => Number(goals?.[key]) > 0).length > 0 && <details className="diary-simulation-target-details"><summary>Daily target impact</summary><div className="diary-simulation-targets"><div>{TARGET_KEYS.filter(key => Number(goals?.[key]) > 0).map(key => {
-          const { label, unit } = nutrientMeta.get(key); const target = Number(goals[key]); const current = currentTotals[key].value; const next = simulatedTotals[key].value;
+        {configuredTargetKeys.length > 0 && <details className="diary-simulation-target-details"><summary>Daily target impact</summary><div className="diary-simulation-targets"><div>{configuredTargetKeys.map(key => {
+          const { label, unit } = nutrientMeta.get(key); const target = Number(goals?.[key] ?? goals?.micronutrients?.[key]); const current = currentTotals[key].value; const next = simulatedTotals[key].value;
           return <div className="diary-simulation-target" key={key}><span>{label}</span><span>{format(current)} / {format(target)} {unit} → {format(next)} / {format(target)} {unit}</span><div className="ui-progress-track"><div className="ui-progress-fill" style={{ width: `${Math.min(100, next / target * 100)}%` }} /></div></div>;
         })}</div></div></details>}
 
@@ -232,20 +282,21 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
       </Panel>}
 
       <div className="diary-source-grid">
-        {SOURCE_CARDS.map(([key, label, description, colorToken, unit]) => {
+        {visibleSourceCards.map(([key, label, description, colorToken, unit]) => {
+          const sourceVisible = visibleSources[key] !== false;
           const nutrient = adjusting ? simulation.contributions[key] : contributions[key];
           const calorieContributions = adjusting ? simulation.contributions.calories : contributions.calories;
           const energy = nutrientEnergy(key, nutrient, calorieContributions);
-          const target = goals?.[key]; const targetPercent = target > 0 ? (nutrient.total / target) * 100 : null;
+          const target = goals?.[key] ?? goals?.micronutrients?.[key]; const targetPercent = target > 0 ? (nutrient.total / target) * 100 : null;
           const cardIsAdjusting = adjusting && key === selectedNutrient;
           const detailsId = `diary-source-body-${key}`;
-          return <article data-source-motion={key} className={`diary-source-card${adjusting && key === selectedNutrient ? ' is-editing' : ''}${visibleSources[key] ? '' : ' is-collapsed'}`} key={key} style={{ '--source-color': `var(${colorToken})` }}>
-            <header className="diary-source-card-heading"><div className="diary-source-card-title"><span>{description}</span><h3>{label}</h3></div><div className="diary-source-card-controls"><div className="diary-source-total"><strong>{format(nutrient.total)} {unit}</strong>{target > 0 && <small>{format(targetPercent)}% of {format(target)} {unit} target</small>}</div><div className="diary-source-card-actions"><Button size="sm" className={`diary-source-action ${visibleSources[key] ? 'diary-source-action--hide' : 'diary-source-action--show'}`} aria-label={`${visibleSources[key] ? 'Hide' : 'Show'} ${label} details`} aria-controls={detailsId} aria-expanded={visibleSources[key]} onClick={() => toggleSource(key)}>{visibleSources[key] ? 'Hide' : 'Show'}</Button><Button size="sm" className={`diary-source-action ${cardIsAdjusting ? 'diary-source-action--cancel' : 'diary-source-action--adjust'}`} aria-label={cardIsAdjusting ? `Cancel ${label} adjustment` : `Adjust ${label}`} aria-pressed={cardIsAdjusting} disabled={disabled && !cardIsAdjusting} onClick={() => { if (cardIsAdjusting) { closeAdjustments(); return; } if (!visibleSources[key]) toggleSource(key); selectAdjustmentNutrient(key); }}>{cardIsAdjusting ? 'Cancel adjust' : 'Adjust'}</Button></div></div></header>
-            <div id={detailsId} className={`diary-source-body-shell${visibleSources[key] ? ' is-open' : ''}`} aria-hidden={!visibleSources[key]} inert={!visibleSources[key]}><div className="diary-source-card-body">
+          return <article data-source-motion={key} className={`diary-source-card${adjusting && key === selectedNutrient ? ' is-editing' : ''}${sourceVisible ? '' : ' is-collapsed'}`} key={key} style={{ '--source-color': `var(${colorToken})` }}>
+            <header className="diary-source-card-heading"><div className="diary-source-card-title"><span>{description}</span><h3>{label}</h3></div><div className="diary-source-card-controls"><div className="diary-source-total"><strong>{format(nutrient.total)} {unit}</strong>{target > 0 && <small>{format(targetPercent)}% of {format(target)} {unit} target</small>}</div><div className="diary-source-card-actions"><Button size="sm" className={`diary-source-action ${sourceVisible ? 'diary-source-action--hide' : 'diary-source-action--show'}`} aria-label={`${sourceVisible ? 'Hide' : 'Show'} ${label} details`} aria-controls={detailsId} aria-expanded={sourceVisible} onClick={() => toggleSource(key)}>{sourceVisible ? 'Hide' : 'Show'}</Button><Button size="sm" className={`diary-source-action ${cardIsAdjusting ? 'diary-source-action--cancel' : 'diary-source-action--adjust'}`} aria-label={cardIsAdjusting ? `Cancel ${label} adjustment` : `Adjust ${label}`} aria-pressed={cardIsAdjusting} disabled={disabled && !cardIsAdjusting} onClick={() => { if (cardIsAdjusting) { closeAdjustments(); return; } if (!sourceVisible) toggleSource(key); selectAdjustmentNutrient(key); }}>{cardIsAdjusting ? 'Cancel adjust' : 'Adjust'}</Button></div></div></header>
+            <div id={detailsId} className={`diary-source-body-shell${sourceVisible ? ' is-open' : ''}`} aria-hidden={!sourceVisible} inert={!sourceVisible}><div className="diary-source-card-body">
             {energy && <div className="diary-source-energy"><strong>Estimated calories from {label.toLocaleLowerCase()}</strong><span>{energy.calories == null ? 'Unknown' : <>{format(nutrient.total)} g × {energy.factor} kcal/g = <b>{format(energy.calories)} kcal</b></>}</span>{energy.percentage != null && <small>About {format(energy.percentage)}% of {format(calorieContributions.total)} logged kcal{energy.partial ? ' (partial data)' : ''}</small>}{key === 'carbs' && <small>Uses carbs × 4. If your food record includes fibre in carbs, this estimate overlaps with fibre calories.</small>}{key === 'fiber' && <small>Uses an average of 2 kcal/g for fibre; actual energy varies.</small>}</div>}
             {key !== 'calories' && nutrient.foods.length > 0 && <p className="diary-source-calories"><span>Calories from foods listed</span><strong>{calorieLabel(nutrient)}</strong></p>}
             {nutrient.foods.length ? <ol className="diary-source-list">{nutrient.foods.map(food => {
-              const group = groups.find(item => item.key === sourceKey(food.name));
+              const group = groups.find(item => item.key === sourceKey(food.name)) || groups.find(item => item.entries.some(entry => sourceKey(overrides[entry.key]?.name) === sourceKey(food.name)));
               const adjusted = group?.entries.some(entry => overrides[entry.key]?.quantity != null && overrides[entry.key].quantity !== entry.quantity);
               return <li key={food.name.toLocaleLowerCase()}><div className="diary-source-row"><strong>{food.name}{key !== 'calories' && <small className="diary-source-food-calories"> · {calorieLabel(food)}</small>}{adjusted && <Badge variant="accent">Adjusted</Badge>}</strong><span><b>{format(food.value)} {unit}</b> · {format(food.percentage)}%</span></div><div className="diary-source-track" aria-hidden="true"><span style={{ width: `${food.percentage}%` }} /></div>{adjusting && key === selectedNutrient && group && <Button size="sm" className="diary-source-adjust" aria-haspopup="dialog" onClick={() => { setExpandedFood(group.key); setAmountDrafts({}); setCustomPercentDraft(null); }}>{group.entries.some(entry => overrides[entry.key]?.quantity != null) ? 'Adjust again' : 'Adjust'}</Button>}</li>;
             })}</ol> : <p className="diary-source-none">No recorded {label.toLocaleLowerCase()} from this day&apos;s foods.</p>}
@@ -275,6 +326,7 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
             })}</div>
             {EDITOR_NUTRIENTS.some(([key]) => currentTotals[key].missing || simulatedTotals[key].missing) && <small className="diary-simulation-impact-note">* Known subtotal; some foods have no data for that nutrient.</small>}
           </section>
+          <section className="diary-simulation-food-impact" aria-label="Affected meal nutrition totals"><div className="diary-simulation-impact-heading"><strong>Affected meal totals</strong><span>Meal and all nutrients</span></div>{selectedMealImpacts.map((meal, index) => <details key={`${meal.title}-${index}`}><summary>{meal.title}: {format(meal.current.calories.value)} → {format(meal.simulated.calories.value)} kcal</summary><div className="diary-simulation-table-wrap"><table className="diary-simulation-table"><thead><tr><th>Nutrient</th><th>Current</th><th>Simulated</th><th>Change</th></tr></thead><tbody>{NUTRIENTS.map(([key, label, unit]) => <tr key={key}><th scope="row">{label}</th><td>{totalText(meal.current[key], key)}</td><td>{totalText(meal.simulated[key], key)}</td><td>{format(meal.simulated[key].value - meal.current[key].value)} {unit}</td></tr>)}</tbody></table></div></details>)}</section>
           <section className="diary-simulation-food-impact" aria-label={`Nutrition impact for ${selectedFood.name}`}>
             <div className="diary-simulation-impact-heading"><strong>This food</strong><span>Across {selectedFood.entries.length} logged {selectedFood.entries.length === 1 ? 'entry' : 'entries'}</span></div>
             <div className="diary-simulation-impact-grid">{selectedFoodImpact.map(({ key, label, unit, current, preview, currentMissing, previewMissing }) => {
@@ -287,6 +339,33 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
               return <div className={`diary-simulation-impact-item${key === selectedNutrient ? ' is-active' : ''}`} key={key}><span>{label}</span><strong>{currentText} <span aria-hidden="true">→</span> {previewText}</strong><small>{changeText}</small></div>;
             })}</div>
             {selectedFoodImpact.some(item => item.currentMissing || item.previewMissing) && <small className="diary-simulation-impact-note">Partial values use the nutrition data available for these entries.</small>}
+          </section>
+          <section className="diary-simulation-product" aria-label="Change product or nutrition">
+            <div className="diary-simulation-impact-heading"><strong>Change product / nutrition</strong><span>Simulation only</span></div>
+            <p>Current basis: per {selectedFood.entries[0].basis} {selectedFood.entries[0].nutritionUnit}. Product and quantity can be changed independently.</p>
+            <label>Choose alternative food<input className="ui-control" type="search" value={alternativeQuery} onChange={event => setAlternativeQuery(event.target.value)} placeholder="Search saved foods" /></label>
+            {foodCatalog.filter(food => !alternativeQuery || [food.name, ...(food.aliases || [])].some(name => name.toLocaleLowerCase().includes(alternativeQuery.toLocaleLowerCase()))).slice(0, 8).map(food => <Button key={food.id} size="sm" onClick={() => applyNutritionToFood(selectedFood, { name: food.name, foodId: food.id, basis: food.quantity, unit: food.unit, nutrition: food.nutrition, nutrientSources: food.nutrientSources, source: food.source })}>{food.name} · per {food.quantity} {food.unit}</Button>)}
+            <label>Simulated product name<input className="ui-control" value={alternativeName} onChange={event => { setAlternativeName(event.target.value); if (alternativeNutrition) applyNutritionToFood(selectedFood, { ...alternativeNutrition, name: event.target.value }); }} placeholder={selectedFood.name} /></label>
+            <details><summary>Enter alternative nutrition manually</summary>
+              {(() => {
+                const first = selectedFood.entries[0];
+                const draft = alternativeNutrition || { name: alternativeName || `${first.name} alternative`, basis: first.basis, unit: first.nutritionUnit, nutrition: cleanNutrients({}), nutrientSources: {}, source: { provider: 'Manual simulation', name: alternativeName || `${first.name} alternative` } };
+                return <>
+                  <div className="diary-simulation-product-basis"><label>Values per<input className="ui-control" type="number" min="0.001" value={draft.basis} onChange={event => { const basis = Number(event.target.value); if (basis > 0) applyNutritionToFood(selectedFood, { ...draft, basis }); }} /></label><label>Basis unit<select className="ui-control" value={draft.unit} onChange={event => applyNutritionToFood(selectedFood, { ...draft, unit: event.target.value })}>{['g','ml','pieces','servings'].map(unit => <option key={unit}>{unit}</option>)}</select></label></div>
+                  <div className="diary-simulation-product-nutrients">{NUTRIENTS.map(([key, label, unit]) => <label key={key}>{label} ({unit})<input className="ui-control" type="number" min="0" step="any" placeholder="Unknown" value={draft.nutrition[key] ?? ''} onChange={event => applyNutritionToFood(selectedFood, { ...draft, source: { provider: 'Manual simulation', name: draft.name }, nutrition: { ...draft.nutrition, [key]: event.target.value === '' ? null : Number(event.target.value) }, nutrientSources: { ...draft.nutrientSources, [key]: { sourceType: 'manual', sourceName: 'Manual simulation', confidence: 'high', estimated: false } } })} /></label>)}</div>
+                </>;
+              })()}
+            </details>
+            <NutritionLabelScan current={null} onApply={label => applyNutritionToFood(selectedFood, { name: alternativeName || `Alternative to ${selectedFood.name}`, basis: label.quantity, unit: label.unit, nutrition: cleanNutrients(label), nutrientSources: label.nutrientSources, source: label.source })} />
+            {alternativeNutrition && <details className="diary-simulation-basis-comparison"><summary>Compare nutrition per basis</summary><div className="diary-simulation-table-wrap"><table className="diary-simulation-table"><thead><tr><th>Nutrient</th><th>Current · per {selectedFood.entries[0].basis} {selectedFood.entries[0].nutritionUnit}</th><th>Alternative · per {alternativeNutrition.basis} {alternativeNutrition.unit}</th><th>Change</th></tr></thead><tbody>{NUTRIENTS.map(([key, label, unit]) => {
+              const original = selectedFood.entries[0][key] ?? selectedFood.entries[0].nutrition?.[key];
+              const alternative = alternativeNutrition.nutrition?.[key];
+              const comparable = selectedFood.entries[0].basis === alternativeNutrition.basis && selectedFood.entries[0].nutritionUnit === alternativeNutrition.unit;
+              return <tr key={key}><th scope="row">{label}</th><td>{original == null ? 'Unknown' : `${format(original)} ${unit}`}</td><td>{alternative == null ? 'Unknown' : `${format(alternative)} ${unit}`}</td><td>{!comparable || original == null || alternative == null ? '—' : `${alternative - original > 0 ? '+' : ''}${format(alternative - original)} ${unit}`}</td></tr>;
+            })}</tbody></table></div></details>}
+            {(alternativeNutrition || selectedFood.entries.some(entry => overrides[entry.key]?.nutrition)) && <div className="diary-simulation-product-actions"><Button size="sm" onClick={() => resetProduct(selectedFood, true)}>Reset nutrition</Button><Button size="sm" onClick={() => resetProduct(selectedFood, true)}>Reset product</Button>{onSaveAlternativeFood && alternativeNutrition && <Button size="sm" onClick={async () => { try { await onSaveAlternativeFood({ name: alternativeNutrition.name, quantity: alternativeNutrition.basis, unit: alternativeNutrition.unit, nutrition: alternativeNutrition.nutrition, nutrientSources: alternativeNutrition.nutrientSources, source: alternativeNutrition.source }); setProductMessage('Alternative saved to the Food Library.'); } catch (error) { setApplyError(error.message || 'Could not save this alternative food.'); } }}>Save alternative as food</Button>}</div>}
+            {productMessage && <p role="status">{productMessage}</p>}
+            {applyError && <p role="alert" className="diary-simulation-error">{applyError}</p>}
           </section>
           <div className="diary-simulation-mode" role="group" aria-label="Adjustment mode"><Button size="sm" aria-pressed={mode === 'percent'} onClick={() => chooseMode('percent')}>% of logged</Button><Button size="sm" aria-pressed={mode === 'exact'} onClick={() => chooseMode('exact')}>Exact amount</Button></div>
           {mode === 'percent' && <div className="diary-simulation-scale">
@@ -312,7 +391,7 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
       <div className="diary-simulation-confirm-heading"><Badge variant="warning">Review changes</Badge><IconButton label="Cancel apply" onClick={() => setConfirmApply(false)}>×</IconButton></div>
       <h3 id="diary-simulation-confirm-title">Apply these changes to {date}?</h3>
       <p>Only the selected day&apos;s logged meal entries will change. Recipe records and other days stay as they are. Grocery stock will reconcile through the normal diary save.</p>
-      <ul>{simulation.changes.map(change => <li key={change.key}><strong>{change.name}</strong><span>{format(change.before)} {change.unit} → {change.after === 0 ? 'remove' : `${format(change.after)} ${change.unit}`}</span></li>)}</ul>
+      <ul>{simulation.changes.map(change => <li key={change.key}><strong>{change.name}{change.afterName && change.afterName !== change.name ? ` → ${change.afterName}` : ''}</strong><span>{format(change.before)} {change.unit} → {change.after === 0 ? 'remove' : `${format(change.after)} ${change.unit}`}</span></li>)}</ul>
       <div className="diary-simulation-confirm-totals">{['calories', 'protein', 'carbs', 'fat', 'fiber'].map(key => <p key={key}><span>{nutrientMeta.get(key).label}</span><strong>{totalText(currentTotals[key], key)} → {totalText(simulatedTotals[key], key)}</strong></p>)}</div>
       {applyError && <p role="alert" className="diary-simulation-error">{applyError}</p>}
       <div className="diary-simulation-confirm-actions"><Button onClick={() => setConfirmApply(false)}>Cancel</Button><Button variant="primary" disabled={disabled || !changed} onClick={() => void applyChanges()}>Apply to this day</Button></div>

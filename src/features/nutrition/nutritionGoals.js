@@ -3,6 +3,7 @@ import {
   MACRO_PRESETS,
   calculateMacroTargets,
 } from './macroTargets.js';
+import { NUTRIENT_REGISTRY } from './nutrients.js';
 
 export const GOAL_KEY = 'nutrition:daily-goals:v1';
 export const GOAL_FIELDS = [
@@ -13,9 +14,13 @@ export const GOAL_FIELDS = [
   ['fat', 'Fat', 'g'],
   ['fiber', 'Fibre', 'g'],
 ];
+export const MICRONUTRIENT_TARGETS = NUTRIENT_REGISTRY
+  .filter(({ group }) => ['vitamins', 'bVitamins', 'minerals'].includes(group))
+  .map(({ id, label, canonicalUnit }) => [id, label, canonicalUnit]);
 export const DEFAULT_MACRO_PERCENTAGES = { ...MACRO_PRESETS.balanced.percentages };
 export const emptyGoals = () => ({
   ...Object.fromEntries(GOAL_FIELDS.map(([key]) => [key, null])),
+  micronutrients: Object.fromEntries(MICRONUTRIENT_TARGETS.map(([key]) => [key, null])),
   macroPreset: 'balanced',
   customMacroPercentages: { ...DEFAULT_MACRO_PERCENTAGES },
   macroLocked: Object.fromEntries(MACRO_KEYS.map((key) => [key, false])),
@@ -38,6 +43,17 @@ export function validateGoals(value) {
     const belowMinimum = key === 'calories' ? number <= 0 : number < 0;
     if (typeof number !== 'number' || !Number.isFinite(number) || belowMinimum || number > 100000)
       throw new Error(`${label}: enter ${key === 'calories' ? 'a number greater than 0' : 'a number between 0 and 100,000'}, or leave it blank.`);
+    return [key, number];
+  }));
+
+  if (value.micronutrients != null && (typeof value.micronutrients !== 'object' || Array.isArray(value.micronutrients)))
+    throw new Error('Could not read your optional micronutrient targets.');
+  const micronutrients = Object.fromEntries(MICRONUTRIENT_TARGETS.map(([key, label]) => {
+    const raw = value.micronutrients?.[key];
+    if (raw == null || (typeof raw === 'string' && !raw.trim())) return [key, null];
+    const number = typeof raw === 'string' ? Number(raw) : raw;
+    if (typeof number !== 'number' || !Number.isFinite(number) || number < 0 || number > 100000)
+      throw new Error(`${label}: enter a number between 0 and 100,000, or leave it blank.`);
     return [key, number];
   }));
 
@@ -71,6 +87,7 @@ export function validateGoals(value) {
 
   return {
     ...targets,
+    micronutrients,
     macroPreset,
     customMacroPercentages,
     macroLocked,

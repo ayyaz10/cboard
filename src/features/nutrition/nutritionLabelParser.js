@@ -3,6 +3,9 @@ import { NUTRIENTS } from './nutrients.js';
 // Labels and OCR spellings are matched only in nutrient-name context.
 const names = [
   ['saturatedFat', /^(?:of\s+which\s+)?(?:saturat(?:ed\s+fat|es|e[ds]?)|sat\.?\s*fat)\b/i],
+  ['monounsaturatedFat', /^(?:mono)?unsaturat(?:ed)?\s+fat\b/i],
+  ['polyunsaturatedFat', /^(?:poly)?unsaturat(?:ed)?\s+fat\b/i],
+  ['transFat', /^trans\s+fat\b/i], ['omega3', /^(?:omega|n-)\s*-?3\b/i], ['omega6', /^(?:omega|n-)\s*-?6\b/i],
   ['sugars', /^(?:of\s+which\s+|total\s+)?sugars?\b/i],
   ['fiber', /^(?:dietary\s+)?f[i1]br[ea]\b|^(?:dietary\s+)?fiber\b/i],
   ['carbs', /^(?:total\s+)?carb[o0]hydrates?\b|^carbs?\b/i],
@@ -10,7 +13,15 @@ const names = [
   ['fat', /^(?:total\s+)?fat\b/i],
   ['salt', /^salt\b/i], ['sodium', /^sodium\b/i],
   ['potassium', /^potassium\b/i], ['calcium', /^calcium\b/i],
-  ['iron', /^iron\b/i], ['magnesium', /^magnesium\b/i], ['zinc', /^zinc\b/i],
+  ['iron', /^iron\b/i], ['magnesium', /^magnesium\b/i], ['phosphorus', /^phosphorus\b/i], ['zinc', /^zinc\b/i],
+  ['copper', /^copper\b/i], ['manganese', /^manganese\b/i], ['selenium', /^selenium\b/i], ['iodine', /^iodine\b/i],
+  ['cholesterol', /^cholesterol\b/i],
+  ['vitaminB1', /^vit(?:amin)?\.?\s*b\s*1\b|^thiamin\b/i],
+  ['vitaminB2', /^vit(?:amin)?\.?\s*b\s*2\b|^riboflavin\b/i],
+  ['vitaminB3', /^vit(?:amin)?\.?\s*b\s*3\b|^niacin\b/i],
+  ['vitaminB5', /^vit(?:amin)?\.?\s*b\s*5\b|^pantothenic\s+acid\b/i],
+  ['vitaminB6', /^vit(?:amin)?\.?\s*b\s*6\b/i],
+  ['biotin', /^vit(?:amin)?\.?\s*b\s*7\b|^biotin\b/i],
   ['vitaminB12', /^vit(?:amin)?\.?\s*b\s*12\b/i],
   ...['A','C','D','E'].map(letter => [`vitamin${letter}`, new RegExp(`^vit(?:amin)?\\.?\\s*${letter}\\b`, 'i')]),
   ['folate', /^(?:folate|folic\s+acid)\b/i],
@@ -86,7 +97,7 @@ function amountField(key, value, label) {
     return null;
   }
   const expected=cleanUnit(units[key] || '');
-  if (!value.unit) return [key,units[key],value.value];
+  if (!value.unit) return expected === 'g' ? [key,units[key],value.value] : null;
   if (!(value.unit in mass) || !(expected in mass)) return null;
   return [key,units[key],Number((value.value*mass[value.unit]/mass[expected]).toPrecision(12))];
 }

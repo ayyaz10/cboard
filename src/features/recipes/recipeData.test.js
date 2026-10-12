@@ -145,6 +145,20 @@ test('required fields and nested errors are actionable', () => {
     /non-empty/,
   );
 });
+test('malformed legacy names are repaired without merging repeated ingredient usages or losing nutrition', () => {
+  const recipe = validateRecipe({ ...example, ingredients: [
+    { foodId: 'salt-food', name: '1 tsp salt (for chicken)', amount: null, unit: '', nutrition: { calories: 0, sodium: 390 } },
+    { foodId: 'salt-food', name: '1/4 tsp salt (for sauce)', amount: null, unit: '', nutrition: { calories: 0, sodium: 97.5 }, scaleEnabled: false },
+    { name: '0% Greek Yogurt', amount: null, unit: '' },
+  ] });
+  assert.equal(recipe.ingredients.length, 3);
+  assert.deepEqual(recipe.ingredients.slice(0, 2).map(item => [item.name, item.amount, item.unit, item.group, item.scaleEnabled, item.nutrition.sodium]), [
+    ['Salt', 1, 'tsp', 'Chicken', undefined, 390],
+    ['Salt', 0.25, 'tsp', 'Sauce', false, 97.5],
+  ]);
+  assert.notEqual(recipe.ingredients[0].id, recipe.ingredients[1].id);
+  assert.equal(recipe.ingredients[2].name, '0% Greek Yogurt');
+});
 test('malformed, oversized, and unsupported documents are rejected', () => {
   assert.throws(() => parseRecipe('{'), /Could not read the JSON/);
   assert.throws(() => parseRecipe(' '.repeat(262145)), /256 KB/);
