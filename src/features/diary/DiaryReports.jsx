@@ -4,10 +4,14 @@ import {
   dailyCalorieReport,
   shiftDate,
   weeklyCalorieReport,
+  weekDates,
 } from "./diaryData";
+import { NUTRIENTS } from "../nutrition/nutrients";
 
 const number = (value) =>
   new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value);
+const averageNumber = (value) =>
+  new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(value);
 const dayLabel = (date) =>
   new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(
     new Date(`${date}T12:00:00Z`),
@@ -41,18 +45,46 @@ export function DiaryReports({ days, date, today, goals, disabled, onSelectDate 
     Math.max(1, ...weekly.entries.map((entry) => entry.calories || 0));
   const progress = daily.calories == null ? 0 : Math.min(100, (daily.calories / scale) * 100);
   const weekRange = `${fullDate(weekly.start)} – ${fullDate(weekly.end)}`;
+  const monthStart = `${date.slice(0, 7)}-01`;
+  const monthDays = new Date(Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)), 0)).getUTCDate();
+  const monthLastDate = `${date.slice(0, 7)}-${String(monthDays).padStart(2, "0")}`;
+  const monthRange = `${fullDate(monthStart)} – ${fullDate(monthLastDate)}`;
+  const nutrientAverages = (periodDays) => {
+    const eligibleDays = periodDays.filter((day) => day.date <= today && day.meals?.length);
+    return NUTRIENTS.map(([key, label, unit]) => {
+      const totals = eligibleDays.map((day) => diaryTotals(day.meals)[key]).filter((total) => total.known > 0);
+      return {
+        key, label, unit,
+        average: totals.length ? totals.reduce((sum, total) => sum + total.value, 0) / totals.length : null,
+        logged: totals.length,
+      };
+    });
+  };
+  const periodDays = view === "weekly"
+    ? weekDates(date).map((dayDate) => days.find((day) => day.date === dayDate) || { date: dayDate, meals: [] })
+    : view === "monthly"
+      ? Array.from({ length: monthDays }, (_, index) => {
+          const dayDate = `${date.slice(0, 7)}-${String(index + 1).padStart(2, "0")}`;
+          return days.find((day) => day.date === dayDate) || { date: dayDate, meals: [] };
+        })
+      : days.filter((day) => day.date <= today);
+  const averages = view === "daily" ? [] : nutrientAverages(periodDays);
+  const periodTitle = view === "weekly" ? weekRange : view === "monthly" ? monthRange : "All recorded days";
+  const loggedDays = periodDays.filter((day) => day.date <= today && day.meals?.length).length;
 
   return (
     <section className="diary-panel diary-report" aria-labelledby="calorie-report-heading">
       <div className="diary-section-heading">
         <div>
           <span className="pill">Nutrition report</span>
-          <h2 id="calorie-report-heading">Calories</h2>
+          <h2 id="calorie-report-heading">Nutrition</h2>
         </div>
-        <div className="diary-report-tabs" role="tablist" aria-label="Calorie report period">
+        <div className="diary-report-tabs" role="tablist" aria-label="Nutrition report period">
           {[
             ["daily", "Daily"],
             ["weekly", "Weekly"],
+            ["monthly", "Monthly"],
+            ["overall", "Overall"],
           ].map(([value, label]) => (
             <button
               key={value}
@@ -127,7 +159,7 @@ export function DiaryReports({ days, date, today, goals, disabled, onSelectDate 
           {daily.missing > 0 && <p className="diary-hint">This is a known subtotal. {daily.missing} food {daily.missing === 1 ? "item has" : "items have"} missing calorie data.</p>}
           {daily.target == null && <p className="diary-hint">Set a daily calorie target above to see remaining and over-budget values.</p>}
         </div>
-      ) : (
+      ) : view === "weekly" ? (
         <div role="tabpanel" className="diary-report-body">
           <div className="diary-report-date-nav">
             <button type="button" disabled={disabled || shiftDate(date, -7) < "2000-01-01"} aria-label="Previous report week" onClick={() => onSelectDate(shiftDate(date, -7))}>←</button>
@@ -168,8 +200,46 @@ export function DiaryReports({ days, date, today, goals, disabled, onSelectDate 
             {weekly.balance != null && <p><strong>{number(Math.abs(weekly.balance))} calories</strong> {weekly.balance < 0 ? "over" : "under"} target across logged days</p>}
           </div>
           <p className="diary-hint">Blank days are not counted as zero. Striped bars contain foods with missing calorie values.</p>
+          <div className="diary-average-section">
+            <h3>Average daily intake</h3>
+            <p className="diary-hint">Average across days with known values for each nutrient; blank days and unknown nutrients are excluded.</p>
+            <NutrientAverageCards averages={averages} loggedDays={loggedDays} />
+          </div>
+        </div>
+      ) : (
+        <div role="tabpanel" className="diary-report-body">
+          {view === "monthly" && <div className="diary-report-date-nav">
+            <button type="button" disabled={disabled || monthStart <= "2000-01-01"} aria-label="Previous report month" onClick={() => onSelectDate(shiftDate(monthStart, -1))}>←</button>
+            <strong>{periodTitle}</strong>
+            <button type="button" disabled={disabled || date.slice(0, 7) >= today.slice(0, 7)} aria-label="Next report month" onClick={() => {
+              const nextMonth = new Date(`${monthStart}T12:00:00Z`);
+              nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1);
+              const next = `${nextMonth.getUTCFullYear()}-${String(nextMonth.getUTCMonth() + 1).padStart(2, "0")}-01`;
+              onSelectDate(next > today ? today : next);
+            }}>→</button>
+          </div>}
+          {view === "overall" && <h3 className="diary-overall-title">All recorded days</h3>}
+          <div className="diary-weekly-summary">
+            <p><strong>{loggedDays}</strong> {view === "monthly" ? "days logged this month" : "days with food logged"}</p>
+            {view !== "overall" && <p>{periodTitle}</p>}
+          </div>
+          <div className="diary-average-section">
+            <h3>Average daily intake</h3>
+            <p className="diary-hint">Average across days with known values for each nutrient; blank days and unknown nutrients are excluded.</p>
+            <NutrientAverageCards averages={averages} loggedDays={loggedDays} />
+          </div>
         </div>
       )}
     </section>
   );
+}
+
+function NutrientAverageCards({ averages, loggedDays }) {
+  return <div className="diary-report-nutrients" aria-label="Average daily nutrient intake">
+    {averages.map(({ key, label, unit, average, logged }) => <article className="diary-report-nutrient" data-nutrient={key} key={key}>
+      <div className="diary-report-nutrient-heading"><strong>{label}</strong></div>
+      <p>{average == null ? "—" : averageNumber(average)}<small> {unit}</small></p>
+      <small className="diary-report-nutrient-caption">{average == null ? "No data yet" : `${logged} of ${loggedDays} logged days`}</small>
+    </article>)}
+  </div>;
 }
