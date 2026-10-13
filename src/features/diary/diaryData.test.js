@@ -22,6 +22,16 @@ import {
 } from "./diaryData.js";
 import { offNutrients } from "../nutrition/nutrients.js";
 
+test('nutrition-excluded diary foods contribute neither nutrients nor missing-value warnings', () => {
+  const hidden = { ...foodItem({ quantity: 100, unit: 'g', calories: 99, protein: 20, source: { provider: 'Manual' } }, 'Salt'), nutritionExcluded: true, foodId: 'salt' };
+  const logged = foodItem({ quantity: 100, unit: 'g', calories: 50, protein: 3, source: { provider: 'Manual' } }, 'Soup');
+  const meal = { ...newMeal('Lunch'), items: [hidden, logged] };
+  assert.equal(itemNutrition(hidden).calories, null);
+  assert.deepEqual(diaryTotals([meal]).calories, { value: 50, known: 1, missing: 0 });
+  assert.equal(nutrientContributions([meal]).calories.total, 50);
+  assert.equal(nutrientContributions([meal]).calories.missing, 0);
+});
+
 const egg = () =>
   foodItem(
     {

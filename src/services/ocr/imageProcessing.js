@@ -237,11 +237,12 @@ export function processReceiptPixels(image, { layout = 'receipt' } = {}) {
   } catch { region=null;cropped=image; }
   if (layout !== 'receipt') {
     // Keep punctuation and anti-aliased screenshot text. Thermal contrast and
-    // thresholding remain available to receipts, but are not nutrition inputs.
+    // thresholding remain separate candidates for small, reflective package labels.
     const gray=grayscale(cropped),blurred=meanImage(gray,cropped.width,cropped.height,1);
     const gentle=new Uint8ClampedArray(gray.length);
     for(let i=0;i<gentle.length;i++)gentle[i]=clamp(gray[i]+.3*(gray[i]-blurred[i]),0,255);
-    return {region,cropped,variants:{gray,gentle},angle:0,detection};
+    const local=thermalVariants(cropped);
+    return {region,cropped,variants:{gray,gentle,normalized:local.normalized,adaptive:local.adaptive},angle:0,detection};
   }
   const variants=thermalVariants(cropped);
   const angle=estimateReceiptSkew(variants.adaptive,cropped.width,cropped.height);

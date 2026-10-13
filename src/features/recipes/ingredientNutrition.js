@@ -45,10 +45,11 @@ export function ingredientRecipeCalculation(recipe) {
     const value = item.nutrition?.[key];
     return [key, typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null];
   })));
-  const known = Object.fromEntries(macroKeys.map((key) => [key, ingredients.filter((item) => item[key] != null).length]));
-  const missing = Object.fromEntries(macroKeys.map((key) => [key, ingredients.length - known[key]]));
+  const included = ingredients.filter((_, index) => items[index].nutritionTrackingEnabled !== false);
+  const known = Object.fromEntries(macroKeys.map((key) => [key, included.filter((item) => item[key] != null).length]));
+  const missing = Object.fromEntries(macroKeys.map((key) => [key, included.length - known[key]]));
   const total = Object.fromEntries(macroKeys.map((key) => [key, known[key]
-    ? ingredients.reduce((sum, item) => sum + (item[key] ?? 0), 0)
+    ? included.reduce((sum, item) => sum + (item[key] ?? 0), 0)
     : null]));
   const perServing = Object.fromEntries(macroKeys.map((key) => [key, total[key] != null && recipe.servings > 0
     ? Math.round(total[key] / recipe.servings * 100) / 100
@@ -58,11 +59,15 @@ export function ingredientRecipeCalculation(recipe) {
 export function ingredientRecipeTotals(recipe) {
   return ingredientRecipeCalculation(recipe).perServing;
 }
+export function recipeProductCalculation(recipe) {
+  const parts = [...(recipe.ingredients || []), ...(recipe.sauces || [])];
+  return calculateProducts(recipe.productNutrition.items.filter((_, index) => parts[index]?.nutritionTrackingEnabled !== false), recipe.servings);
+}
 // Keep stored per-serving values separate from whole-recipe display totals.
 // Diary imports still require a serving count before dividing ingredients.
 export function recipeNutritionDisplay(recipe) {
   const calculation = recipe.productNutrition
-    ? calculateProducts(recipe.productNutrition.items, recipe.servings)
+    ? recipeProductCalculation(recipe)
     : recipe.nutritionFromIngredients ? ingredientRecipeCalculation(recipe) : null;
   const wholeRecipe = Boolean(calculation && !(recipe.servings > 0));
   const nutrition = calculation

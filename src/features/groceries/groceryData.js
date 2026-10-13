@@ -228,11 +228,13 @@ export const ingredientKey = (recipe, item, index) => `${recipe.slug}/${item.id 
 function recipeStock(recipe, ingredient, index, state) {
   const linkedId = state.ingredientLinks?.[ingredientKey(recipe, ingredient, index)];
   const linked = linkedId && state.items.find(item => item.id === linkedId);
-  return (linked && !linked.removed ? linked : null) || state.items.find(item => !item.removed && normalizeName(item.name) === normalizeName(ingredient.name));
+  return (linked && !linked.removed ? linked : null) || state.items.find(item => !item.removed && ingredient.foodId && item.foodId === ingredient.foodId) || state.items.find(item => !item.removed && normalizeName(item.name) === normalizeName(ingredient.name));
 }
-export function recipeNutrition(recipe, state, multiplier = 1) {
+export function recipeNutrition(recipe, state, multiplier = 1, foodCatalog = []) {
   const totals = Object.fromEntries(nutrients.map(([key]) => [key, { value: null, missing: [] }]));
   for (const [index, ingredient] of [...recipe.ingredients, ...(recipe.sauces || [])].entries()) {
+    const food = ingredient.foodId && foodCatalog.find(item => item.id === ingredient.foodId);
+    if (ingredient.nutritionTrackingEnabled === false || food?.nutritionTrackingEnabled === false) continue;
     const item = recipeStock(recipe, ingredient, index, state);
     const nutrition = item?.nutrition;
     const amount = nutrition && Number.isFinite(ingredient.amount) && ingredient.amount > 0
@@ -372,9 +374,11 @@ export function purchase(state, purchases) {
   }
   return next;
 }
-export function recipeNeeds(recipe, state, multiplier = 1) {
+export function recipeNeeds(recipe, state, multiplier = 1, foodCatalog = []) {
   const grouped = [];
   for (const [index, ingredient] of [...recipe.ingredients, ...(recipe.sauces || [])].entries()) {
+    const food = ingredient.foodId && foodCatalog.find(item => item.id === ingredient.foodId);
+    if (ingredient.groceryTrackingEnabled === false || food?.groceryTrackingEnabled === false) continue;
     const unit = canonicalUnit(ingredient.unit);
     const amount =
       typeof ingredient.amount === "number" && ingredient.amount > 0
@@ -402,6 +406,7 @@ export function recipeNeeds(recipe, state, multiplier = 1) {
         required,
         available: item ? item.quantity : 0,
         category: item?.category || "Other",
+        autoShoppingEnabled: ingredient.groceryTrackingEnabled !== false && ingredient.shoppingListEnabled !== false && food?.shoppingListEnabled !== false,
         image: groceryImageFor(state, ingredient.name),
       });
   }

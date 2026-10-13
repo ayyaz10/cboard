@@ -170,6 +170,34 @@ test('recipe pieces with a confirmed edible weight deduct matching grams', () =>
   assert.equal(quantity(reconcileInventory(stock(),null,first).state),850);
 });
 
+test('Grocery-off foods create no stock rows, preserve existing stock, and reuse it when re-enabled', () => {
+  const foodOff = { id: 'salt-food', name: 'Salt', groceryTrackingEnabled: false };
+  const recipeOff = validateRecipe({ slug: 'salt-recipe', title: 'Salt recipe', mealType: 'Dinner', servings: 1,
+    ingredients: [{ id: 'salt-use', foodId: foodOff.id, name: 'Salt', amount: 50, unit: 'g', nutrition: { calories: 0, sodium: 19500 }, groceryTrackingEnabled: false, nutritionTrackingEnabled: true }],
+    steps: ['Cook'], nutritionFromIngredients: true });
+  const empty = { items: [], shopping: [], settings: {}, ingredientLinks: {} };
+  assert.equal(linkRecipeInventory(empty, [recipeOff], [], [foodOff]).items.length, 0);
+
+  const stored = { items: [{ id: 'salt-stock', foodId: foodOff.id, name: 'Salt', quantity: 250, unit: 'g' }], shopping: [], settings: {}, ingredientLinks: { 'salt-recipe/salt-use': 'salt-stock' } };
+  const inactive = linkRecipeInventory(stored, [recipeOff], [], [foodOff]);
+  assert.equal(inactive.items.length, 1);
+  assert.equal(inactive.items[0].quantity, 250);
+  assert.equal(inactive.items[0].trackingDisabled, true);
+  const disabledLog = day(recipeItems(recipeOff));
+  assert.equal(disabledLog.meals[0].items[0].inventoryUsage.length, 0);
+  assert.equal(reconcileInventory(inactive, null, disabledLog, [foodOff]).state.items[0].quantity, 250);
+
+  const foodOn = { ...foodOff, groceryTrackingEnabled: true, shoppingListEnabled: false };
+  const recipeOn = validateRecipe({ ...recipeOff, ingredients: recipeOff.ingredients.map(item => ({ ...item, groceryTrackingEnabled: true, shoppingListEnabled: false })) });
+  const reenabled = linkRecipeInventory(inactive, [recipeOn], [], [foodOn]);
+  assert.equal(reenabled.items.filter(item => item.foodId === foodOn.id).length, 1);
+  assert.equal(reenabled.items[0].id, 'salt-stock');
+  assert.equal(reenabled.items[0].quantity, 250);
+  assert.equal(reenabled.items[0].trackingDisabled, false);
+  const logged = day(recipeItems(recipeOn));
+  assert.equal(reconcileInventory(reenabled, null, logged, [foodOn]).state.items[0].quantity, 200);
+});
+
 test('shared product barcodes link differently named ingredients to the same stock record', () => {
   const a=recipe(), b=recipe('second');
   a.ingredients[0].nutritionLabel={quantity:100,unit:'g',source:{code:'12345678'}};

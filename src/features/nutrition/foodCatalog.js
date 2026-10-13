@@ -123,7 +123,7 @@ export function foodNutritionConflicts(foods = []) {
   return keys.filter(key => new Set(foods.map(food => food.nutrition?.[key]).filter(value => Number.isFinite(value))).size > 1);
 }
 
-export function mergeCanonicalFoods(foods = [], keepId, mergeIds = [], nutritionSourceId = keepId) {
+export function mergeCanonicalFoods(foods = [], keepId, mergeIds = [], nutritionSourceId = keepId, behaviorSourceId = keepId) {
   const selectedIds = new Set([keepId, ...mergeIds]);
   const selected = foods.filter(food => selectedIds.has(food.id));
   const keep = selected.find(food => food.id === keepId);
@@ -141,15 +141,24 @@ export function mergeCanonicalFoods(foods = [], keepId, mergeIds = [], nutrition
   }
   const quantityPrefix = !keep.barcode && !keep.sku && !keep.brand ? parseFoodQuantityPrefix(keep.name) : null;
   const canonicalName = quantityPrefix?.foodName || keep.name;
+  const behaviorSource = selected.find(food => food.id === behaviorSourceId) || keep;
   return cleanFoodCatalogItem({ ...keep, name: canonicalName,
     aliases: [...new Set([...selected.flatMap(food => [food.name, ...(food.aliases || [])]), ...(keep.aliases || [])])].filter(name => normalizeFoodText(name) !== normalizeFoodText(canonicalName)),
     nutrition, nutrientSources,
+    groceryTrackingEnabled: behaviorSource.groceryTrackingEnabled,
+    shoppingListEnabled: behaviorSource.shoppingListEnabled,
+    nutritionTrackingEnabled: behaviorSource.nutritionTrackingEnabled,
     barcode: keep.barcode || nutritionSource.barcode,
     sku: keep.sku || nutritionSource.sku,
     retailer: keep.retailer || nutritionSource.retailer,
     brand: keep.brand || nutritionSource.brand,
     source: { ...(nutritionSource.source || {}), ...(keep.source || {}), name: nutritionSource.source?.name || keep.source?.name || keep.name },
   });
+}
+
+export function foodBehaviorConflicts(foods = []) {
+  return ['groceryTrackingEnabled', 'shoppingListEnabled', 'nutritionTrackingEnabled']
+    .filter(key => new Set(foods.map(food => food[key] !== false)).size > 1);
 }
 
 function newFoodId() {
@@ -181,6 +190,9 @@ export function cleanFoodCatalogItem(value) {
     brand: String(value?.brand || value?.source?.brand || '').trim().slice(0, 120),
     quantity,
     unit,
+    groceryTrackingEnabled: value?.groceryTrackingEnabled !== false,
+    shoppingListEnabled: value?.groceryTrackingEnabled === false ? false : value?.shoppingListEnabled !== false,
+    nutritionTrackingEnabled: value?.nutritionTrackingEnabled !== false,
     nutrition: cleanNutrients(value.nutrition),
     nutrientSources: cleanNutrientSources({ ...nutrientSourcesForValues(value.nutrition, value.source), ...(value.nutrientSources || value.nutrition?.nutrientSources || {}) }),
     source: {
@@ -222,6 +234,8 @@ export function mergeFoodCatalog(current = [], updates = []) {
     }
     const previous = items.get(clean.id);
     if (previous) {
+      for (const key of ['groceryTrackingEnabled', 'shoppingListEnabled', 'nutritionTrackingEnabled'])
+        if (update?.[key] === undefined) clean[key] = previous[key] !== false;
       if (!explicitId) {
         clean.name = previous.name;
         const selectedSources = {};
@@ -280,6 +294,8 @@ export function diaryItemFromCatalog(current, catalogItem) {
   return {
     ...current,
     foodId: catalogItem.id,
+    nutritionExcluded: catalogItem.nutritionTrackingEnabled === false,
+    groceryTrackingEnabled: catalogItem.groceryTrackingEnabled !== false,
     basis: catalogItem.quantity,
     nutritionUnit: catalogItem.unit,
     unit: current.unit === current.nutritionUnit ? catalogItem.unit : current.unit,
@@ -294,6 +310,9 @@ export function ingredientFromCatalog(current, catalogItem) {
   const hasRecipeNutrition = Object.values(current.nutrition || {}).some(value => Number.isFinite(value));
   const nutritionOverride = current.nutritionOverride === true || !current.foodId && !current.nutritionLabel && hasRecipeNutrition;
   const next = { ...current, foodId: catalogItem.id, name: current.name || catalogItem.name, nutritionLabel, nutrientSources: catalogItem.nutrientSources,
+    groceryTrackingEnabled: catalogItem.groceryTrackingEnabled !== false,
+    shoppingListEnabled: catalogItem.groceryTrackingEnabled !== false && catalogItem.shoppingListEnabled !== false,
+    nutritionTrackingEnabled: catalogItem.nutritionTrackingEnabled !== false,
     ...(nutritionOverride ? { nutritionOverride: true } : { nutritionOverride: false }) };
   next.nutrition = nutritionOverride ? { ...current.nutrition } : ingredientLabelNutrition(next);
   return next;
@@ -317,10 +336,18 @@ export function applyFoodCatalogToRecipes(recipes = [], catalog = []) {
         return { ...product, nutrition: { ...food.nutrition, quantity: food.quantity, unit: food.unit, source: { ...food.source } } };
       });
       if (!matched) return recipe;
-      const calculated = calculateProducts(products, recipe.servings);
+      const parts = [...(recipe.ingredients || []), ...(recipe.sauces || [])];
+      const withPreferences = parts.map(item => {
+        const food = resolveCatalogFoodForIngredient(item, catalog);
+        return food ? { ...item, foodId: food.id, groceryTrackingEnabled: food.groceryTrackingEnabled !== false,
+          shoppingListEnabled: food.groceryTrackingEnabled !== false && food.shoppingListEnabled !== false,
+          nutritionTrackingEnabled: food.nutritionTrackingEnabled !== false } : item;
+      });
+      const calculated = calculateProducts(products.filter((_, index) => withPreferences[index]?.nutritionTrackingEnabled !== false), recipe.servings);
+      let nutritionIndex = 0;
       return { ...recipe, productNutrition: { ...recipe.productNutrition, items: products }, nutrition: calculated.perServing,
-        ingredients: recipe.ingredients.map((item, index) => ({ ...item, nutrition: calculated.ingredients[index] })),
-        sauces: (recipe.sauces || []).map((item, index) => ({ ...item, nutrition: calculated.ingredients[recipe.ingredients.length + index] })) };
+        ingredients: recipe.ingredients.map((_, index) => ({ ...withPreferences[index], nutrition: withPreferences[index].nutritionTrackingEnabled === false ? withPreferences[index].nutrition : calculated.ingredients[nutritionIndex++] })),
+        sauces: (recipe.sauces || []).map((_, index) => { const item = withPreferences[recipe.ingredients.length + index]; return { ...item, nutrition: item.nutritionTrackingEnabled === false ? item.nutrition : calculated.ingredients[nutritionIndex++] }; }) };
     }
     const next = {
       ...recipe,
@@ -336,6 +363,9 @@ export function applyFoodCatalogToRecipes(recipes = [], catalog = []) {
 export function catalogIngredient(item) {
   return {
     foodId: item.id,
+    groceryTrackingEnabled: item.groceryTrackingEnabled !== false,
+    shoppingListEnabled: item.groceryTrackingEnabled !== false && item.shoppingListEnabled !== false,
+    nutritionTrackingEnabled: item.nutritionTrackingEnabled !== false,
     name: item.name,
     amount: item.quantity,
     unit: item.unit,

@@ -341,7 +341,7 @@ export function Groceries() {
   const currency = data?.settings.currency || "GBP";
   const money = (amount) => new Intl.NumberFormat(undefined, { style: "currency", currency }).format(amount);
   const estimate = shoppingEstimate(data?.shopping || []);
-  const list = data ? (tab === "stock" ? data.items.filter(item => !item.recipeOnly && !item.removed) : data.shopping) : [];
+  const list = data ? (tab === "stock" ? data.items.filter(item => !item.recipeOnly && !item.removed && !item.trackingDisabled) : data.shopping) : [];
   const filtered = list.filter(
     (i) =>
       i.name.toLowerCase().includes(query.toLowerCase()) &&

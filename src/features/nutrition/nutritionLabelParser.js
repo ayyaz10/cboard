@@ -2,16 +2,16 @@ import { NUTRIENTS } from './nutrients.js';
 
 // Labels and OCR spellings are matched only in nutrient-name context.
 const names = [
-  ['saturatedFat', /^(?:of\s+which\s+)?(?:saturat(?:ed\s+fat|es|e[ds]?)|sat\.?\s*fat)\b/i],
+  ['saturatedFat', /^(?:(?:of\s+which|de\s+las\s+cuales|dos\s+quais|das\s+quais)\s+)?(?:saturat(?:ed\s+fat|es|e[ds]?)|saturad[ao]s?|sat\.?\s*fat)\b/i],
   ['monounsaturatedFat', /^(?:mono)?unsaturat(?:ed)?\s+fat\b/i],
   ['polyunsaturatedFat', /^(?:poly)?unsaturat(?:ed)?\s+fat\b/i],
   ['transFat', /^trans\s+fat\b/i], ['omega3', /^(?:omega|n-)\s*-?3\b/i], ['omega6', /^(?:omega|n-)\s*-?6\b/i],
-  ['sugars', /^(?:of\s+which\s+|total\s+)?sugars?\b/i],
-  ['fiber', /^(?:dietary\s+)?f[i1]br[ea]\b|^(?:dietary\s+)?fiber\b/i],
-  ['carbs', /^(?:total\s+)?carb[o0]hydrates?\b|^carbs?\b/i],
-  ['protein', /^pr[o0]tein\b/i],
-  ['fat', /^(?:total\s+)?fat\b/i],
-  ['salt', /^salt\b/i], ['sodium', /^sodium\b/i],
+  ['sugars', /^(?:(?:of\s+which|de\s+los\s+cuales|dos\s+quais|das\s+quais)\s+|total\s+)?(?:sugars?|az[uú]cares?|a[cç]úcares?)\b/i],
+  ['fiber', /^(?:dietary\s+)?(?:f[i1]br[ea]\b|fibra\s+(?:alimentaria|alimentar)\b|fiber\b)/i],
+  ['carbs', /^(?:(?:total\s+)?carb[o0]hydrates?|carbs?|hidratos?\s+de\s+carbono|gl[uú]cidos?)\b/i],
+  ['protein', /^(?:pr[o0]te[ií]nas?|prote[ií]na)\b/i],
+  ['fat', /^(?:(?:total\s+)?fat|grasas?|gorduras?)\b/i],
+  ['salt', /^(?:salt|sal)\b/i], ['sodium', /^sodium\b/i],
   ['potassium', /^potassium\b/i], ['calcium', /^calcium\b/i],
   ['iron', /^iron\b/i], ['magnesium', /^magnesium\b/i], ['phosphorus', /^phosphorus\b/i], ['zinc', /^zinc\b/i],
   ['copper', /^copper\b/i], ['manganese', /^manganese\b/i], ['selenium', /^selenium\b/i], ['iodine', /^iodine\b/i],
@@ -23,13 +23,13 @@ const names = [
   ['vitaminB6', /^vit(?:amin)?\.?\s*b\s*6\b/i],
   ['biotin', /^vit(?:amin)?\.?\s*b\s*7\b|^biotin\b/i],
   ['vitaminB12', /^vit(?:amin)?\.?\s*b\s*12\b/i],
-  ...['A','C','D','E'].map(letter => [`vitamin${letter}`, new RegExp(`^vit(?:amin)?\\.?\\s*${letter}\\b`, 'i')]),
+  ...['A','C','D','E','K'].map(letter => [`vitamin${letter}`, new RegExp(`^vit(?:amin)?\\.?\\s*${letter}\\b`, 'i')]),
   ['folate', /^(?:folate|folic\s+acid)\b/i],
-  ['energy', /^(?:energy|calories|calorific\s+value)\b/i],
+  ['energy', /^(?:energy|calories|calorific\s+value|valor\s+energ[eé]tico|energ[ií]a)\b/i],
 ];
 const units = Object.fromEntries(NUTRIENTS.map(([key, , unit]) => [key, unit]));
 const mass = {g:1, mg:.001, ug:.000001, mcg:.000001};
-const heading = /\b(?:nutrition(?:al)?(?:\s+(?:information|facts))?|typical\s+values|average\s+values)\b/i;
+const heading = /^\s*(?:nutrition(?:al)?(?:\s+(?:information|facts|values))?|typical\s+values|average\s+values)(?:\s+(?:per|for)\b.*)?\s*:?\s*$/i;
 const noise = /^(?:ingredients?|allerg(?:en|y)|storage|store\s|cooking|directions|manufacturer|recycl|serving\s+suggestion|reference\s+intake|percent\s+daily|\*|keep\s)/i;
 const cleanUnit = unit => unit.toLowerCase().replace(/[µμ]/g, 'u');
 
@@ -53,19 +53,51 @@ function servingInfo(text) {
 
 function findBases(line, serving) {
   const bases=[];
-  const pattern=/\bper\s+(?:(\d+(?:[.,]\d+)?)\s*(g|ml)\b(?:\s*(?:serving|portion))?|(?:(?:1|one)\s+)?(serving|portion|item|pack|slice|scoop|container|pot)\b(?:\s*\(?\s*(\d+(?:[.,]\d+)?)\s*(g|ml)\s*\)?)?)/gi;
+  const pattern=/\b(?:per|por)\s+(?:(\d+(?:[.,]\d+)?)\s*(g|ml)\b(?:\s*(?:serving|portion|por[cç][aã]o))?|(?:(?:1|one)\s+)?(serving|portion|item|pack|slice|scoop|container|pot|por[cç][aã]o)\b(?:\s*\(?\s*(\d+(?:[.,]\d+)?)\s*(g|ml)\s*\)?)?)/gi;
   for (const match of line.text.matchAll(pattern)) {
     const kind = match[3]?.toLowerCase() || (Number(match[1])===100 ? `100${match[2].toLowerCase()}` : 'portion');
     const known = match[1] ? {quantity:Number(match[1].replace(',','.')),unit:match[2].toLowerCase()} : match[4] ? {quantity:Number(match[4].replace(',','.')),unit:match[5].toLowerCase()} : ['serving','portion'].includes(kind) && serving ? serving : {quantity:1,unit:'pieces'};
     bases.push({label:match[0],kind,...known,serving:!kind.startsWith('100') ? {...known,description:match[0]} : serving, x:xAt(line,match.index), confirmed:true});
   }
+  // EU wrappers often print bare columns such as "100 g  30 g  %RI".
+  // Only accept these as bases on a header-only row, never on nutrient rows.
+  const isNutrientRow=names.some(([,name])=>name.test(line.text));
+  if (!bases.length && !isNutrientRow) {
+    const quantities=[...line.text.matchAll(/(?<![\d.,])(\d+(?:[.,]\d+)?)\s*(g|ml)\b/gi)]
+      .filter(match=>!/%[^\d]*$/.test(line.text.slice(0,match.index)));
+    if (quantities.length>=2) for (const match of quantities) {
+      const quantity=Number(match[1].replace(',','.')),unit=match[2].toLowerCase();
+      if (!Number.isFinite(quantity)||quantity<=0) continue;
+      const kind=quantity===100?`100${unit}`:'portion';
+      const known={quantity,unit};
+      bases.push({label:`Per ${quantity} ${unit}`,kind,...known,serving:quantity!==100?{...known,description:`${quantity} ${unit}`} : serving,x:xAt(line,match.index),confirmed:true});
+    }
+  }
   return bases;
+}
+
+function parseNutritionNumber(raw) {
+  let normalized = raw.replace(/\s/g, '').replace(/[Oo]/g, '0').replace(/[Il]/g, '1').replace(/S/gi, '5');
+  const commas = (normalized.match(/,/g) || []).length;
+  const dots = (normalized.match(/\./g) || []).length;
+  if (commas && dots) {
+    // Use the final separator as the decimal mark and strip the other as grouping.
+    if (normalized.lastIndexOf(',') > normalized.lastIndexOf('.'))
+      normalized = normalized.replace(/\./g, '').replace(',', '.');
+    else normalized = normalized.replace(/,/g, '');
+  } else if (commas) {
+    const groups = normalized.split(',');
+    const thousands = groups.length > 1 && groups[0].length <= 3 && groups[0] !== '0' && groups.slice(1).every(group => group.length === 3);
+    normalized = thousands ? groups.join('') : groups.length === 2 ? groups.join('.') : '';
+  }
+  const value = Number(normalized);
+  return Number.isFinite(value) ? value : null;
 }
 
 function valuesIn(line, offset) {
   const values=[];
   // A percent sign belongs to its number, never to a nutrient quantity.
-  const pattern=/(<?\s*)(-?[\dOIlS]+(?:\s*[.,]\s*[\dOIlS]+)?)\s*(kcal|kJ|mcg|[µμu]g|mg|g|%|ml)?/gi;
+  const pattern=/(<?\s*)(-?[\dOIlS]+(?:\s*[.,]\s*[\dOIlS]+)*)\s*(kcal|kJ|mcg|[µμu]g|mg|g|%|ml)?/gi;
   for (const match of line.text.slice(offset).matchAll(pattern)) {
     const start=offset+match.index;
     const before=line.text[start+match[1].length-1],after=line.text[start+match[0].length];
@@ -73,9 +105,8 @@ function valuesIn(line, offset) {
     const raw=match[2], unit=cleanUnit(match[3] || '');
     if (unit==='%' || /%/.test(line.text.slice(start+match[0].length).match(/^\s*%/)?.[0] || '')) continue;
     if (!/\d/.test(raw) && !unit) continue;
-    const repaired=raw.replace(/\s/g,'').replace(/[Oo]/g,'0').replace(/[Il]/g,'1').replace(/S/gi,'5').replace(',','.');
-    const value=Number(repaired);
-    if (!Number.isFinite(value) || value<0) continue;
+    const value=parseNutritionNumber(raw);
+    if (value==null || value<0) continue;
     let at=0;
     const numberStart=start+match[1].length, numberEnd=numberStart+raw.length;
     const tokenWords=(line.words||[]).filter(word=>{const begin=at;at+=word.text.length+1;return begin<numberEnd && at-1>numberStart;});
@@ -105,16 +136,20 @@ function amountField(key, value, label) {
 export function parseNutritionLabel(input) {
   const lines=(typeof input==='string' ? input.split(/\r?\n/).map(text=>({text})) : input.lines?.length ? input.lines : String(input.text||'').split(/\r?\n/).map(text=>({text})))
     .map(line=>({...line,text:line.text.trim()})).filter(line=>line.text);
-  const tables=[];let table=null, stopped=false, pendingHeading=false, serving=null;
+  const tables=[];let table=null, stopped=false, pendingHeading=false, pendingMicronutrients=false, serving=null;
   function newTable(bases=[]) {
     table={id:`table-${tables.length+1}`,columns:(bases.length?bases:[{label:'Basis not identified',kind:'unknown',quantity:null,unit:'g',confirmed:false,serving}]).map((basis,i)=>({...basis,id:`table-${tables.length+1}-column-${i+1}`,nutrients:{}})),warnings:[],rows:0};
     tables.push(table);stopped=false;pendingHeading=false;return table;
   }
   for (const line of lines) {
     if (heading.test(line.text)) { pendingHeading=Boolean(table?.rows); stopped=false; }
+    if (/^\s*micronutrients?\b/i.test(line.text)) { pendingMicronutrients=true; pendingHeading=false; stopped=false; }
     const info=servingInfo(line.text); if(info)serving=info;
     const bases=findBases(line,serving);
     if (bases.length) {
+      const sameBasis=table&&bases.length===table.columns.length&&bases.every((basis,index)=>basis.quantity===table.columns[index].quantity&&basis.unit===table.columns[index].unit&&basis.kind===table.columns[index].kind);
+      if (pendingMicronutrients&&sameBasis) { pendingMicronutrients=false; pendingHeading=false; stopped=false; continue; }
+      pendingMicronutrients=false;
       if (!table || table.rows || pendingHeading) newTable(bases);
       else table.columns=bases.map((basis,i)=>({...basis,id:`${table.id}-column-${i+1}`,nutrients:{}}));
       continue;

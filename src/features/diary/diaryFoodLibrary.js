@@ -13,6 +13,9 @@ function recipeTemplate(ingredient, recipeTitle) {
     const amount = ingredientLabelAmount(ingredient);
     return {
       name: ingredient.name,
+      ...(ingredient.foodId ? { foodId: ingredient.foodId } : {}),
+      ...(ingredient.groceryTrackingEnabled !== undefined ? { groceryTrackingEnabled: ingredient.groceryTrackingEnabled } : {}),
+      ...(ingredient.nutritionTrackingEnabled === false ? { nutritionExcluded: true } : {}),
       quantity: positive(amount) ? amount : label.quantity,
       unit: label.unit,
       basis: label.quantity,
@@ -26,6 +29,9 @@ function recipeTemplate(ingredient, recipeTitle) {
   const amountSupported = positive(ingredient.amount) && supportedUnits.has(ingredient.unit);
   return {
     name: ingredient.name,
+    ...(ingredient.foodId ? { foodId: ingredient.foodId } : {}),
+    ...(ingredient.groceryTrackingEnabled !== undefined ? { groceryTrackingEnabled: ingredient.groceryTrackingEnabled } : {}),
+    ...(ingredient.nutritionTrackingEnabled === false ? { nutritionExcluded: true } : {}),
     quantity: amountSupported ? ingredient.amount : 1,
     unit: amountSupported ? ingredient.unit : 'servings',
     basis: amountSupported ? ingredient.amount : 1,

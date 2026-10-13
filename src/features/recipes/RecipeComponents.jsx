@@ -180,6 +180,7 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
       <div className="min-w-0 flex-1">
         <p className="font-semibold">{formatIngredient(item)}</p>
         {(item.group || item.preparation) && <p className="text-xs text-black/60">{[item.group, item.preparation].filter(Boolean).join(' · ')}</p>}
+        {item.nutritionTrackingEnabled === false && <p className="text-xs text-black/60">Nutrition excluded</p>}
         {item.foodId && (item.nutritionLabel?.source?.foodName || item.nutritionLabel?.source?.name) && <p className="text-xs text-black/60">Food: {item.nutritionLabel.source.foodName || item.nutritionLabel.source.name}</p>}
         {preview ? (
           <p className="mt-0.5 text-xs leading-5 text-black/65">{ingredientNutritionSummary(item)}</p>
@@ -338,7 +339,7 @@ export function RecipePage({ recipe, preview = false, onRecipeUpdated, onMatchEx
       {!preview && (
         <details className="rounded-2xl border-2 border-black bg-white p-4">
           <summary className="cursor-pointer font-bold">Kitchen stock, shopping and fibre tools</summary>
-          <div className="mt-4"><RecipeGroceries key={recipe.slug} recipe={recipe} onRecipeUpdated={onRecipeUpdated} /></div>
+          <div className="mt-4"><RecipeGroceries key={recipe.slug} recipe={recipe} foodCatalog={foodCatalog} onRecipeUpdated={onRecipeUpdated} /></div>
         </details>
       )}
       {recipe.sauces.length > 0 && (

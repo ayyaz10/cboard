@@ -4,7 +4,7 @@ import { getAppHref } from "../../app/useRoute";
 import { useGroceries } from "./useGroceries";
 import { addShopping, cookRecipe, recipeNeeds, recipeNutrition, nutrients } from "./groceryData";
 import "./groceries.css";
-export function RecipeGroceries({ recipe, onRecipeUpdated }) {
+export function RecipeGroceries({ recipe, foodCatalog = [], onRecipeUpdated }) {
   const { data, busy, error, reload, change, notice, undo } = useGroceries();
   const [multiplier, setMultiplier] = useState(1),
     [review, setReview] = useState(false);
@@ -21,8 +21,8 @@ export function RecipeGroceries({ recipe, onRecipeUpdated }) {
         )}
       </section>
     );
-  const needs = recipeNeeds(recipe, data, multiplier);
-  const nutrition = recipeNutrition(recipe, data, multiplier);
+  const needs = recipeNeeds(recipe, data, multiplier, foodCatalog);
+  const nutrition = recipeNutrition(recipe, data, multiplier, foodCatalog);
   const servings = Number(recipe.servings) > 0 ? Number(recipe.servings) * multiplier : null;
   const format = (value) => new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(value);
   const unresolved = needs.some((i) => i.missing == null);
@@ -109,11 +109,11 @@ export function RecipeGroceries({ recipe, onRecipeUpdated }) {
       )}
       <div className="g-actions">
         <button
-          disabled={busy || !needs.some((i) => i.missing > 0)}
+          disabled={busy || !needs.some((i) => i.missing > 0 && i.autoShoppingEnabled)}
           onClick={() =>
             change((s) => {
-              for (const need of recipeNeeds(recipe, s, multiplier))
-                if (need.missing > 0)
+              for (const need of recipeNeeds(recipe, s, multiplier, foodCatalog))
+                if (need.missing > 0 && need.autoShoppingEnabled)
                   s.shopping = addShopping(
                     s.shopping,
                     need,
@@ -124,7 +124,7 @@ export function RecipeGroceries({ recipe, onRecipeUpdated }) {
             }, "Missing amounts added to shopping list")
           }
         >
-          ＋ Add missing to shopping list
+          ＋ Add auto-buy shortages to shopping list
         </button>
         {data.settings.stockTrackingPaused ? <button
           disabled={busy || !needs.length || needs.some((i) => i.missing !== 0)}
@@ -143,7 +143,7 @@ export function RecipeGroceries({ recipe, onRecipeUpdated }) {
               onClick={async () => {
                 if (
                   await change(
-                    (s) => cookRecipe(s, recipeNeeds(recipe, s, multiplier)),
+                    (s) => cookRecipe(s, recipeNeeds(recipe, s, multiplier, foodCatalog)),
                     "Meal cooked · Stock updated",
                   )
                 )

@@ -1,6 +1,8 @@
 import { getRecipes } from './recipeService';
 import { getFoodDiary } from './foodDiaryService';
 import { linkRecipeInventory } from '../features/groceries/inventory.js';
+import { getFoodCatalog } from './foodCatalogService.js';
+import { resolveRecipeIngredients } from '../features/nutrition/foodCatalog.js';
 import { getUserScopedClient, assertSupabaseResult } from "./supabaseCrud";
 import {
   initialState,
@@ -16,7 +18,7 @@ export async function loadGroceries() {
     .eq("key", key)
     .maybeSingle();
   assertSupabaseResult(result);
-  const [recipes, days] = await Promise.all([getRecipes(), getFoodDiary(userId)]);
+  const [recipes, days, foodCatalog] = await Promise.all([getRecipes(), getFoodDiary(userId), getFoodCatalog(userId)]);
   const loaded = result.data
     ? {
         state: normalizeGroceryState(result.data.value),
@@ -24,7 +26,8 @@ export async function loadGroceries() {
         userId,
       }
     : { state: initialState(), version: null, userId };
-  loaded.state = linkRecipeInventory(loaded.state, recipes, days);
+  const resolvedRecipes = recipes.map(recipe => resolveRecipeIngredients(recipe, foodCatalog).recipe);
+  loaded.state = linkRecipeInventory(loaded.state, resolvedRecipes, days, foodCatalog);
   return loaded;
 }
 export async function saveGroceries(state, version, expectedUserId) {

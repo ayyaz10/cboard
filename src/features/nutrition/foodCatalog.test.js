@@ -40,6 +40,29 @@ test('main food values flow into calculated recipes and planner totals', () => {
   assert.equal(recipe.nutrition.protein, 6.5);
 });
 
+test('linked recipe ingredients receive independent grocery, shopping and nutrition preferences', () => {
+  const food = { ...oats, id: 'salt-id', name: 'Salt', groceryTrackingEnabled: false, shoppingListEnabled: false, nutritionTrackingEnabled: true,
+    nutrition: { calories: 0, salt: 100, sodium: 39000 } };
+  const recipe = { title: 'Salt test', servings: 1, nutritionFromIngredients: true, nutrition: {}, ingredients: [{ name: 'Salt', amount: 1, unit: 'g', nutrition: {} }], sauces: [], alternatives: {} };
+  const [linked] = applyFoodCatalogToRecipes([recipe], [food]);
+  assert.equal(linked.ingredients[0].foodId, 'salt-id');
+  assert.equal(linked.ingredients[0].groceryTrackingEnabled, false);
+  assert.equal(linked.ingredients[0].shoppingListEnabled, false);
+  assert.equal(linked.ingredients[0].nutritionTrackingEnabled, true);
+  assert.equal(linked.nutrition.salt, 1);
+  assert.equal(linked.nutrition.sodium, 390);
+});
+
+test('explicitly nutrition-disabled linked foods are excluded without counting as missing', () => {
+  const recipe = { title: 'Rice', servings: 1, nutritionFromIngredients: true, nutrition: {}, ingredients: [
+    { name: 'Salt', foodId: 'salt', amount: 1, unit: 'g', nutrition: { calories: 0, salt: 1 }, nutritionTrackingEnabled: false },
+    { name: 'Rice', amount: 100, unit: 'g', nutrition: { calories: 350, protein: 7 } },
+  ], sauces: [], alternatives: {} };
+  const [linked] = applyFoodCatalogToRecipes([recipe], [{ id: 'salt', name: 'Salt', quantity: 100, unit: 'g', nutrition: { calories: 0, salt: 100 }, nutritionTrackingEnabled: false }]);
+  assert.equal(linked.nutrition.calories, 350);
+  assert.equal(linked.nutrition.protein, 7);
+});
+
 test('catalog IDs survive renames and same-name records stay distinct', () => {
   const first = { ...oats, id: 'food-a' };
   const second = { ...oats, id: 'food-b', name: 'Oats' };

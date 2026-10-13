@@ -1,5 +1,4 @@
-import { calculateProducts } from './recipeProducts.js';
-import { ingredientRecipeCalculation } from './ingredientNutrition.js';
+import { ingredientRecipeCalculation, recipeProductCalculation } from './ingredientNutrition.js';
 
 export const MEAL_SLOTS = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 export const MACROS = ['calories', 'protein', 'carbs', 'fat', 'fiber'];
@@ -79,7 +78,7 @@ export function calculateMealPlan(entries, recipes) {
     .map((entry) => {
       const recipe = bySlug.get(entry.slug);
       const productCalculation = recipe?.productNutrition
-        ? calculateProducts(recipe.productNutrition.items, recipe.servings)
+        ? recipeProductCalculation(recipe)
         : recipe?.nutritionFromIngredients
           ? ingredientRecipeCalculation(recipe)
           : null;

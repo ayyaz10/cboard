@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ingredientLabelNutrition, cleanIngredientLabel, ingredientRecipeCalculation, ingredientRecipeTotals, prepareIngredientEditor, updateIngredientField, recipeNutritionDisplay } from './ingredientNutrition.js';
 import { validateRecipe } from './recipeData.js';
+import { productBasis } from './recipeProducts.js';
 const label = cleanIngredientLabel({ quantity: 100, unit: 'g', calories: 90, protein: 1, carbs: 20, fat: 0, fiber: 3, source: { name: 'Banana', provider: 'Open Food Facts' } });
 test('recipes without servings display whole totals while stored serving nutrition stays unknown', () => {
   const recipe = validateRecipe({ title: 'Meal', mealType: 'Lunch', steps: ['Serve'], nutritionFromIngredients: true,
@@ -32,6 +33,34 @@ test('manual recipe nutrition and completely unknown ingredients remain unchange
   const display = recipeNutritionDisplay({ nutritionFromIngredients: true, ingredients: [{ name: 'Unknown' }] });
   assert.equal(display.nutrition.calories, null);
   assert.deepEqual(display.partialKeys, []);
+});
+
+test('nutrition-excluded foods are omitted from calculated products without creating missing entries', () => {
+  const recipe = { servings: 1, ingredients: [
+    { name: 'Salt', nutritionTrackingEnabled: false },
+    { name: 'Rice', nutritionTrackingEnabled: true },
+  ], sauces: [], productNutrition: { items: [
+    { quantity: 5, unit: 'g', nutrition: { quantity: 100, unit: 'g', calories: 0, protein: 0 } },
+    { quantity: 100, unit: 'g', nutrition: { quantity: 100, unit: 'g', calories: 350, protein: 7 } },
+  ] } };
+  const display = recipeNutritionDisplay(recipe);
+  assert.equal(display.nutrition.calories, 350);
+  assert.deepEqual(display.partialKeys, []);
+});
+
+test('recipe validation retains product nutrition for disabled ingredients but excludes it from recipe totals', () => {
+  const recipe = { title: 'Rice with salt', mealType: 'Dinner', servings: 1, steps: ['Cook'], ingredients: [
+    { id: 'salt', name: 'Salt', amount: 5, unit: 'g', nutritionTrackingEnabled: false, nutrition: {} },
+    { id: 'rice', name: 'Rice', amount: 100, unit: 'g', nutrition: {} },
+  ], sauces: [] };
+  recipe.productNutrition = { basis: productBasis(recipe), items: [
+    { quantity: 5, unit: 'g', nutrition: { quantity: 100, unit: 'g', calories: 0, sodium: 39000 } },
+    { quantity: 100, unit: 'g', nutrition: { quantity: 100, unit: 'g', calories: 350, protein: 7 } },
+  ] };
+  const saved = validateRecipe(recipe);
+  assert.equal(saved.ingredients[0].nutrition.sodium, 1950);
+  assert.equal(saved.nutrition.calories, 350);
+  assert.equal(recipeNutritionDisplay(saved).nutrition.calories, 350);
 });
 test('ingredient editor scales fractions by confirmed piece weight and keeps unknown weight unknown', () => {
   const item = { name: 'Banana', amount: '1/2', unit: 'piece', nutritionLabel: label };

@@ -67,7 +67,7 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
   return <section className="nscan" aria-label="Nutrition label scanner">
     {!open?<button type="button" disabled={disabled} onClick={()=>setOpen(true)}>Scan nutrition label</button>:<>
       <div className="nscan-actions"><strong id={`${id}-title`}>Nutrition label scan</strong><button type="button" onClick={discard}>Close scanner</button></div>
-      <p>Scan on this device. Include the column headings and serving size. JPEG, PNG or WEBP, up to 15 MB. Review before applying; the image is temporary.</p>
+      <p>Scan on this device. Include the column headings and serving size. For small, glossy or wrinkled packages, crop tightly around the full nutrition table and rescan. JPEG, PNG or WEBP, up to 15 MB. Review before applying; the image is temporary.</p>
       <div className="nscan-actions">
         <label>Upload nutrition label<input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy||disabled} onChange={event=>{upload(event.target.files?.[0]);event.target.value='';}}/></label>
         <label>Take nutrition photo<input type="file" capture="environment" accept="image/jpeg,image/png,image/webp" disabled={busy||disabled} onChange={event=>{upload(event.target.files?.[0]);event.target.value='';}}/></label>

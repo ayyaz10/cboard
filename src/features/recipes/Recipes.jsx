@@ -25,6 +25,7 @@ import {
 } from './RecipeComponents';
 import { RecipeImporter } from './RecipeImporter';
 import { FoodItemEditor } from '../nutrition/FoodItemEditor';
+import { loadGroceries } from '../../services/groceryService';
 import { buildIngredientLibrary, removeRecipeOnlyIngredients } from './ingredientLibrary';
 import { applyFoodCatalogToRecipes, catalogItemsFromRecipe, normalizeFoodName, findFoodMatches, resolveRecipeIngredients, resolveRecipeFoodCandidate } from '../nutrition/foodCatalog.js';
 import { deleteFoodCatalogItems, getFoodCatalog, upsertFoodCatalogItems } from '../../services/foodCatalogService.js';
@@ -133,6 +134,16 @@ function RecipesContent({ route, navigationPath }) {
   }
   async function saveMainFoodItems(items) {
     if (!items.length) return foodCatalog;
+    const disabling = items.filter(item => item.id && item.groceryTrackingEnabled === false && foodCatalog.some(food => food.id === item.id && food.groceryTrackingEnabled !== false));
+    if (disabling.length) {
+      const groceries = await loadGroceries();
+      for (const food of disabling) {
+        const canonical = foodCatalog.find(entry => entry.id === food.id);
+        const stock = groceries.state.items.find(item => !item.removed && !item.recipeOnly && (item.foodId === food.id || [canonical.name, ...(canonical.aliases || [])].some(name => name.trim().toLocaleLowerCase() === item.name.trim().toLocaleLowerCase())));
+        if (stock && typeof window !== 'undefined' && !window.confirm(`Stop tracking ${canonical.name} in Grocery? Current stock: ${stock.quantity ?? 'unknown'} ${stock.unit}. The stock record will be preserved and reused if you turn tracking on again.`))
+          throw new Error('Grocery tracking change cancelled.');
+      }
+    }
     const saved = await upsertFoodCatalogItems(items, user.id);
     setFoodCatalog(saved);
     setRecipes(current => applyFoodCatalogToRecipes(current, saved));
@@ -312,8 +323,8 @@ function RecipesContent({ route, navigationPath }) {
       throw error;
     }
   }
-  async function mergeFoods({ keepId, mergeIds, nutritionSourceId }) {
-    const result = await mergeFoodRecords({ keepId, mergeIds, nutritionSourceId, expectedUserId: user.id });
+  async function mergeFoods({ keepId, mergeIds, nutritionSourceId, behaviorSourceId }) {
+    const result = await mergeFoodRecords({ keepId, mergeIds, nutritionSourceId, behaviorSourceId, expectedUserId: user.id });
     const refreshedRecipes = await getRecipes();
     setFoodCatalog(result.catalog);
     setRecipes(applyFoodCatalogToRecipes(refreshedRecipes, result.catalog));

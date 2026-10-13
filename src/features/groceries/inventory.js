@@ -2,15 +2,24 @@ import { newItem, convert, canonicalUnit, round, ingredientKey } from './grocery
 const nameKey = name => String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
 const baseUnit = unit => ['g', 'kg'].includes(canonicalUnit(unit)) ? 'g' : ['ml', 'L'].includes(canonicalUnit(unit)) ? 'ml' : canonicalUnit(unit);
 
-function resolve(state, usage, active = false) {
+function resolve(state, usage, active = false, foodCatalog = []) {
   state.ingredientLinks ||= {};
   const linkedId = usage.itemId || state.ingredientLinks[usage.key];
   let item = linkedId && state.items.find(item => item.id === linkedId);
+  const food = usage.foodId && foodCatalog.find(food => food.id === usage.foodId);
+  const track = usage.groceryTrackingEnabled !== false && food?.groceryTrackingEnabled !== false;
+  if (!track) {
+    item ||= state.items.find(item => !item.removed && usage.foodId && item.foodId === usage.foodId);
+    if (item && food) { item.foodId = food.id; item.trackingDisabled = true; }
+    if (linkedId && item) state.ingredientLinks[usage.key] = item.id;
+    return item || null;
+  }
   if (usage.itemId && !item) throw new Error(`${usage.name}: its tracked stock record is missing. Restore that stock record before changing the diary entry.`);
   if (!item) {
-    const compatible = state.items.filter(item => convert(1, usage.unit, item.unit) != null);
+    const compatible = state.items.filter(item => !item.removed && convert(1, usage.unit, item.unit) != null);
+    const foodMatches = usage.foodId ? compatible.filter(item => item.foodId === usage.foodId) : [];
     const codeMatches = usage.code ? compatible.filter(item => (item.nutrition?.source?.code || item.ingredientCode) === usage.code) : [];
-    const matches = codeMatches.length ? codeMatches : compatible.filter(item => nameKey(item.name) === nameKey(usage.name) &&
+    const matches = foodMatches.length ? foodMatches : codeMatches.length ? codeMatches : compatible.filter(item => nameKey(item.name) === nameKey(usage.name) &&
       !(usage.code && (item.nutrition?.source?.code || item.ingredientCode) && (item.nutrition?.source?.code || item.ingredientCode) !== usage.code));
     if (matches.length) item = matches[0];
     else {
@@ -19,11 +28,19 @@ function resolve(state, usage, active = false) {
     }
     state.ingredientLinks[usage.key] = item.id;
   }
+  if (food) { item.foodId = food.id; item.trackingDisabled = false; }
   if (active) item.recipeOnly = false;
   return item;
 }
-export function linkRecipeInventory(state, recipes, days = []) {
+export function linkRecipeInventory(state, recipes, days = [], foodCatalog = []) {
   const next = structuredClone(state);
+  for (const item of next.items) {
+    const matches = foodCatalog.filter(food => item.foodId === food.id || [food.name, ...(food.aliases || [])].some(name => nameKey(name) === nameKey(item.name)));
+    if (matches.length === 1) {
+      item.foodId = matches[0].id;
+      item.trackingDisabled = matches[0].groceryTrackingEnabled === false;
+    }
+  }
   for (const item of next.items) item.recipeRefs = [];
   const active = new Set(days.flatMap(day => day.meals.flatMap(meal => meal.items.map(item => item.recipeOrigin?.slug).filter(Boolean))));
   // Legacy recipe titles are used only to establish visibility, never to deduct stock.
@@ -32,21 +49,31 @@ export function linkRecipeInventory(state, recipes, days = []) {
     [...recipe.ingredients, ...(recipe.sauces || [])].forEach((part, index) => {
       const unit = baseUnit(recipe.productNutrition?.items[index]?.unit || part.nutritionLabel?.unit || part.unit);
 
-      const item = resolve(next, { key: ingredientKey(recipe, part, index), name: part.name, unit, code: recipe.productNutrition?.items[index]?.nutrition?.source?.code || part.nutritionLabel?.source?.code }, active.has(recipe.slug));
+      const food = part.foodId && foodCatalog.find(food => food.id === part.foodId);
+      const matchingFood = food || foodCatalog.find(candidate => [candidate.name, ...(candidate.aliases || [])].some(name => nameKey(name) === nameKey(part.name)));
+      const item = resolve(next, { ...(matchingFood ? { foodId: matchingFood.id, groceryTrackingEnabled: matchingFood.groceryTrackingEnabled } : {}), key: ingredientKey(recipe, part, index), name: part.name, unit, code: recipe.productNutrition?.items[index]?.nutrition?.source?.code || part.nutritionLabel?.source?.code }, active.has(recipe.slug), foodCatalog);
+      if (!item) return;
       item.recipeRefs ||= [];
       if (!item.recipeRefs.some(ref => ref.slug === recipe.slug)) item.recipeRefs.push({ slug: recipe.slug, title: recipe.title });
     });
   }
   return next;
 }
-function dayUsage(state, day, activate) {
+function dayUsage(state, day, activate, foodCatalog = []) {
   const entries = new Map();
   for (const meal of day?.meals || []) for (const food of meal.items) {
     const amounts = new Map();
     const usages = food.inventoryUsage || (food.unit !== 'servings' ? [{ key: `food:${food.source?.code || nameKey(food.name)}:${food.nutritionUnit}`, name: food.name, code: food.source?.code, unit: food.nutritionUnit, amount: 1 }] : []);
     for (const usage of usages) {
       if (!(usage.amount >= 0) || !Number.isFinite(usage.amount)) continue;
-      const item = resolve(state, usage, activate);
+      const linkedStockId = usage.itemId || state.ingredientLinks?.[usage.key];
+      const linkedStock = linkedStockId && state.items.find(item => item.id === linkedStockId);
+      const usageFood = foodCatalog.find(food => food.id === usage.foodId || food.id === linkedStock?.foodId ||
+        [food.name, ...(food.aliases || [])].some(name => nameKey(name) === nameKey(usage.name)));
+      const foodDisabled = usage.groceryTrackingEnabled === false || usageFood?.groceryTrackingEnabled === false;
+      if (foodDisabled) continue;
+      const item = resolve(state, usage, activate, foodCatalog);
+      if (!item) continue;
       if (activate && food.inventoryUsage) usage.itemId = item.id;
       // For a single physical ingredient, the edited weight/volume is authoritative.
       const physical = convert(food.quantity, food.unit, usage.unit);
@@ -64,11 +91,11 @@ function dayUsage(state, day, activate) {
 }
 // A per-entry applied ledger distinguishes actual deductions from old or paused logs.
 // Repeated saves reconcile to zero; deletion restores only stock actually deducted.
-export function reconcileInventory(state, before, after) {
+export function reconcileInventory(state, before, after, foodCatalog = []) {
   const next = structuredClone(state);
   next.inventoryLedger ||= {};
-  const previous = dayUsage(next, before, false);
-  const current = dayUsage(next, after, true);
+  const previous = dayUsage(next, before, false, foodCatalog);
+  const current = dayUsage(next, after, true, foodCatalog);
   const adjustments = [];
   for (const key of new Set([...previous.keys(), ...current.keys()])) {
     const old = previous.get(key) || new Map();
@@ -81,7 +108,8 @@ export function reconcileInventory(state, before, after) {
       const prior = applied[itemId] ? convert(applied[itemId].amount, applied[itemId].unit, item.unit) : 0;
       if (prior == null) throw new Error(`${item.name}: use the original stock unit before changing its diary entry.`);
       const delta = (now.get(itemId) || 0) - (old.get(itemId) || 0);
-      const target = next.settings.stockTrackingPaused || item.stockTrackingPaused || item.removed ? prior : current.has(key) ? Math.max(0, round(prior + delta)) : 0;
+      const foodTrackingDisabled = foodCatalog.find(food => food.id === item.foodId)?.groceryTrackingEnabled === false || item.trackingDisabled === true;
+      const target = next.settings.stockTrackingPaused || item.stockTrackingPaused || item.removed || foodTrackingDisabled ? prior : current.has(key) ? Math.max(0, round(prior + delta)) : 0;
       const change = round(target - prior);
       if (change && item.quantity != null) {
         item.quantity = round(item.quantity - change);

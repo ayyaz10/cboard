@@ -81,6 +81,9 @@ function ingredient(value, label) {
     ...(value.scaleEnabled === false ? { scaleEnabled: false } : {}),
     ...(value.foodAliasConfirmed === true ? { foodAliasConfirmed: true } : {}),
     ...(value.nutritionOverride === true ? { nutritionOverride: true } : {}),
+    ...(typeof value.groceryTrackingEnabled === 'boolean' ? { groceryTrackingEnabled: value.groceryTrackingEnabled } : {}),
+    ...(typeof value.shoppingListEnabled === 'boolean' ? { shoppingListEnabled: value.shoppingListEnabled } : {}),
+    ...(typeof value.nutritionTrackingEnabled === 'boolean' ? { nutritionTrackingEnabled: value.nutritionTrackingEnabled } : {}),
     ...(value.alternativeGroup != null
       ? {
           alternativeGroup: string(
@@ -240,9 +243,12 @@ export function validateRecipe(data) {
     delete clean.fibreSource;
     if (products) {
       clean.productNutrition = products;
-      const calculated = calculateProducts(products.items, clean.servings);
-      clean.nutrition = calculated.perServing;
-      [...clean.ingredients, ...clean.sauces].forEach((item, index) => { item.nutrition = calculated.ingredients[index]; });
+      const parts = [...clean.ingredients, ...clean.sauces];
+      const allCalculated = calculateProducts(products.items, clean.servings);
+      const enabledProducts = products.items.filter((_, index) => parts[index]?.nutritionTrackingEnabled !== false);
+      const recipeCalculated = calculateProducts(enabledProducts, clean.servings);
+      clean.nutrition = recipeCalculated.perServing;
+      parts.forEach((item, index) => { item.nutrition = allCalculated.ingredients[index]; });
     } else {
       clean.nutrition = Object.fromEntries(macroKeys.map((key) => [key, null]));
       [...clean.ingredients, ...clean.sauces].forEach((item) => { item.nutrition = { ...clean.nutrition }; });

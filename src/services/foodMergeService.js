@@ -17,7 +17,7 @@ async function readAllRecipes(client, userId) {
   }
 }
 
-export async function mergeFoodRecords({ keepId, mergeIds, nutritionSourceId, expectedUserId }) {
+export async function mergeFoodRecords({ keepId, mergeIds, nutritionSourceId, behaviorSourceId, expectedUserId }) {
   const { client, userId } = await getUserScopedClient();
   if (expectedUserId && userId !== expectedUserId) throw new Error('Your account changed. Reload before merging foods.');
   if (!Array.isArray(mergeIds) || !mergeIds.length || new Set([keepId, ...mergeIds]).size !== mergeIds.length + 1) throw new Error('Select one canonical food and at least one different food to merge.');
@@ -33,7 +33,7 @@ export async function mergeFoodRecords({ keepId, mergeIds, nutritionSourceId, ex
   const selectedIds = new Set([keepId, ...mergeIds]);
   const selectedFoods = catalog.filter(food => selectedIds.has(food.id));
   if (selectedFoods.length !== selectedIds.size) throw new Error('One of the selected foods changed or was deleted. Reload Possible duplicates.');
-  const keptFood = mergeCanonicalFoods(catalog, keepId, mergeIds, nutritionSourceId);
+  const keptFood = mergeCanonicalFoods(catalog, keepId, mergeIds, nutritionSourceId, behaviorSourceId || keepId);
   const nextCatalog = mergeFoodCatalog(catalog.filter(food => !mergeIds.includes(food.id)), [keptFood]);
   const rewrittenRows = [];
   for (const row of recipeRows) {

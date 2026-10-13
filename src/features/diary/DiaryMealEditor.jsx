@@ -206,6 +206,7 @@ export function DiaryMealEditor({
                     {item.source.name ? ` · ${item.source.name}` : ""}
                     {item.source.modified ? " · edited values" : ""}
                   </p>
+                  {item.nutritionExcluded && <p className="diary-hint">Nutrition excluded by this food’s setting.</p>}
                   <div className="diary-fields">
                     <label>
                       Amount eaten

@@ -123,9 +123,12 @@ export function validateItem(item) {
   return {
     id: text(item.id, 100, true),
     name: text(item.name, 300, true),
+    ...(typeof item.foodId === 'string' ? { foodId: item.foodId.slice(0, 150) } : {}),
+    ...(typeof item.nutritionExcluded === 'boolean' ? { nutritionExcluded: item.nutritionExcluded } : {}),
+    ...(typeof item.groceryTrackingEnabled === 'boolean' ? { groceryTrackingEnabled: item.groceryTrackingEnabled } : {}),
     ...(Array.isArray(item.inventoryUnresolved) ? { inventoryUnresolved: item.inventoryUnresolved.filter(name => typeof name === 'string').slice(0, 200) } : {}),
     ...(item.recipeOrigin ? { recipeOrigin: structuredClone(item.recipeOrigin) } : {}),
-    ...(Array.isArray(item.inventoryUsage) ? { inventoryUsage: item.inventoryUsage.filter(use => typeof use.key === 'string' && typeof use.name === 'string' && Number.isFinite(use.amount) && use.amount >= 0 && ['g', 'ml', 'pieces'].includes(use.unit)).map(use => ({ ...(typeof use.code === 'string' ? { code: use.code.slice(0, 30) } : {}), ...(typeof use.itemId === 'string' ? { itemId: use.itemId.slice(0, 150) } : {}), key: use.key.slice(0, 300), name: use.name.slice(0, 300), amount: use.amount, unit: use.unit })) } : {}),
+    ...(Array.isArray(item.inventoryUsage) ? { inventoryUsage: item.inventoryUsage.filter(use => typeof use.key === 'string' && typeof use.name === 'string' && Number.isFinite(use.amount) && use.amount >= 0 && ['g', 'ml', 'pieces'].includes(use.unit)).map(use => ({ ...(typeof use.code === 'string' ? { code: use.code.slice(0, 30) } : {}), ...(typeof use.itemId === 'string' ? { itemId: use.itemId.slice(0, 150) } : {}), ...(typeof use.foodId === 'string' ? { foodId: use.foodId.slice(0, 150) } : {}), ...(typeof use.groceryTrackingEnabled === 'boolean' ? { groceryTrackingEnabled: use.groceryTrackingEnabled } : {}), key: use.key.slice(0, 300), name: use.name.slice(0, 300), amount: use.amount, unit: use.unit })) } : {}),
     quantity: item.quantity,
     unit: item.unit,
     basis: item.basis,
@@ -209,6 +212,7 @@ export function validateDay(value, today = localDate()) {
   return result;
 }
 export function itemNutrition(item) {
+  if (item.nutritionExcluded === true) return Object.fromEntries(nutrientKeys.map(key => [key, null]));
   const quantity =
     item.unit === item.nutritionUnit
       ? item.quantity
@@ -229,7 +233,7 @@ export function itemNutrition(item) {
   );
 }
 export function diaryTotals(meals) {
-  const items = meals.flatMap((meal) => meal.items).map(itemNutrition);
+  const items = meals.flatMap((meal) => meal.items).filter(item => item.nutritionExcluded !== true).map(itemNutrition);
   return Object.fromEntries(
     nutrientKeys.map((key) => [
       key,
@@ -249,6 +253,7 @@ export function nutrientContributions(meals, keys = ["calories", "protein", "car
     let missing = 0;
     let known = 0;
     for (const item of items) {
+      if (item.nutritionExcluded === true) continue;
       const nutrition = itemNutrition(item);
       const value = nutrition[key];
       if (value == null) {
@@ -337,10 +342,16 @@ function rawRecipeItems(recipe, portions = 1, ingredients = false) {
       return product
         ? {
             ...foodItem(product.nutrition, ingredient.name),
+            ...(ingredient.foodId ? { foodId: ingredient.foodId } : {}),
+            ...(ingredient.nutritionTrackingEnabled === false ? { nutritionExcluded: true } : {}),
+            ...(ingredient.groceryTrackingEnabled !== undefined ? { groceryTrackingEnabled: ingredient.groceryTrackingEnabled } : {}),
             quantity: (product.quantity / recipe.servings) * portions,
           }
         : {
             ...foodItem({ quantity: 1, unit: "servings" }, ingredient.name),
+            ...(ingredient.foodId ? { foodId: ingredient.foodId } : {}),
+            ...(ingredient.nutritionTrackingEnabled === false ? { nutritionExcluded: true } : {}),
+            ...(ingredient.groceryTrackingEnabled !== undefined ? { groceryTrackingEnabled: ingredient.groceryTrackingEnabled } : {}),
             quantity: portions,
           };
     });
@@ -367,6 +378,9 @@ function rawRecipeItems(recipe, portions = 1, ingredients = false) {
         ),
         quantity:
           ((supported ? amount : 1) / recipe.servings) * portions,
+        ...(ingredient.foodId ? { foodId: ingredient.foodId } : {}),
+        ...(ingredient.nutritionTrackingEnabled === false ? { nutritionExcluded: true } : {}),
+        ...(ingredient.groceryTrackingEnabled !== undefined ? { groceryTrackingEnabled: ingredient.groceryTrackingEnabled } : {}),
       };
     });
   }
@@ -394,15 +408,16 @@ export function recipeItems(recipe, portions = 1, ingredients = false, { wholeRe
   const parts = productIngredients({ ...recipe, ingredients: recipe.ingredients || [] });
   const individual = Boolean(recipe.productNutrition || recipe.nutritionFromIngredients || ingredients);
   const usage = (part, index, divisor) => {
+    if (part.groceryTrackingEnabled === false) return [];
     const product = recipe.productNutrition?.items[index];
     const rawUnit = product?.unit || part.nutritionLabel?.unit || part.unit;
     const unit = ['kg', 'g'].includes(canonicalUnit(rawUnit)) ? 'g' : ['L', 'ml'].includes(canonicalUnit(rawUnit)) ? 'ml' : 'pieces';
     const amount = convert(Number(product?.quantity ?? (part.nutritionLabel ? ingredientLabelAmount(part) : part.amount)), rawUnit, unit);
-    return amount != null && amount > 0 && divisor > 0 ? [{ key: `${recipe.slug}/${part.id || `ingredient:${index}`}`, name: part.name, amount: amount / divisor, unit }] : [];
+    return amount != null && amount > 0 && divisor > 0 ? [{ ...(part.foodId ? { foodId: part.foodId } : {}), groceryTrackingEnabled: part.groceryTrackingEnabled !== false, key: `${recipe.slug}/${part.id || `ingredient:${index}`}`, name: part.name, amount: amount / divisor, unit }] : [];
   };
   return items.map((item, index) => ({ ...item,
     recipeOrigin: { slug: recipe.slug, ingredientId: individual ? parts[index]?.id : null, ingredientAmount: individual ? initialProductAmount({ amount: parts[index]?.amount, unit: 'pieces' }, 'pieces') : null, baseline: structuredClone(item) },
-    inventoryUnresolved: (individual ? [index] : parts.map((_, index) => index)).filter(i => !usage(parts[i], i, 1).length || !(recipe.servings > 0)).map(i => parts[i].name),
+    inventoryUnresolved: (individual ? [index] : parts.map((_, index) => index)).filter(i => parts[i].groceryTrackingEnabled !== false && (!usage(parts[i], i, 1).length || !(recipe.servings > 0))).map(i => parts[i].name),
     inventoryUsage: individual ? usage(parts[index], index, item.quantity * recipe.servings / portions) : parts.flatMap((part, index) => usage(part, index, recipe.servings)),
   }));
 }

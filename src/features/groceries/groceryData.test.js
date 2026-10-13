@@ -69,6 +69,13 @@ test("low stock and recipe additions ensure the needed shopping amount without d
   list = addShopping(list, { ...item, unit: "kg" }, 0.5, true);
   assert.equal(list[0].quantity, 500);
 });
+
+test('foods with automatic shopping disabled can still be added to a trip manually', () => {
+  const pepper = { ...newItem('Black pepper'), groceryTrackingEnabled: true, shoppingListEnabled: false };
+  const shopping = addShopping([], pepper, 1);
+  assert.equal(shopping.length, 1);
+  assert.equal(shopping[0].name, 'Black pepper');
+});
 test("purchasing increments stock atomically and cannot count the same entry twice", () => {
   const oats = newItem("Oats", 100, "g");
   const state = { items: [oats], shopping: addShopping([], oats, 500) };
@@ -201,6 +208,19 @@ test("recipe nutrition converts label units and scales independently of stock", 
   assert.equal(totals.protein.value, 35);
   assert.equal(totals.fat.value, 0);
   assert.deepEqual(totals.fat.missing, []);
+});
+
+test('recipe grocery requirements honor Grocery and auto-shopping preferences independently', () => {
+  const rice = { ...newItem('Chicken', 200, 'g'), id: 'chicken-stock' };
+  const recipe = { slug: 'chicken', ingredients: [{ id: 'chicken-part', foodId: 'chicken-food', name: 'Chicken', amount: 500, unit: 'g', groceryTrackingEnabled: true, shoppingListEnabled: false }] };
+  const catalog = [{ id: 'chicken-food', name: 'Chicken', groceryTrackingEnabled: true, shoppingListEnabled: false }];
+  const [need] = recipeNeeds(recipe, { items: [rice], ingredientLinks: { 'chicken/chicken-part': 'chicken-stock' } }, 1, catalog);
+  assert.equal(need.missing, 300);
+  assert.equal(need.autoShoppingEnabled, false);
+  const [automatic] = recipeNeeds({ ...recipe, ingredients: [{ ...recipe.ingredients[0], shoppingListEnabled: true }] }, { items: [rice], ingredientLinks: { 'chicken/chicken-part': 'chicken-stock' } }, 1, [{ ...catalog[0], shoppingListEnabled: true }]);
+  assert.equal(automatic.missing, 300);
+  assert.equal(automatic.autoShoppingEnabled, true);
+  assert.deepEqual(recipeNeeds({ ...recipe, ingredients: [{ ...recipe.ingredients[0], groceryTrackingEnabled: false }] }, { items: [rice] }, 1, [{ ...catalog[0], groceryTrackingEnabled: false }]), []);
 });
 test("recipe nutrition exposes partial and unknown values instead of zero", () => {
   const item = { ...newItem("Milk"), nutrition: { quantity: 100, unit: "ml", protein: 3, fat: 0 } };

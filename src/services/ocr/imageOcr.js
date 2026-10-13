@@ -30,14 +30,14 @@ export async function prepareOcrImage(file, rotation = 0, crop = null) {
   } finally { bitmap.close(); }
 }
 
-function variantCanvas(pixels, width, height, angle = 0) {
+function variantCanvas(pixels, width, height, angle = 0, maxScale = 2) {
   const source=document.createElement('canvas');source.width=width;source.height=height;
   let rgba=pixels;
   if(pixels.length===width*height){rgba=new Uint8ClampedArray(width*height*4);for(let i=0;i<pixels.length;i++){rgba[i*4]=rgba[i*4+1]=rgba[i*4+2]=pixels[i];rgba[i*4+3]=255;}}
   source.getContext('2d').putImageData(new ImageData(rgba,width,height),0,0);
   const radians=angle*Math.PI/180,cos=Math.abs(Math.cos(radians)),sin=Math.abs(Math.sin(radians));
   const rotatedWidth=width*cos+height*sin,rotatedHeight=height*cos+width*sin;
-  const scale=Math.min(2,3200/Math.max(rotatedWidth,rotatedHeight),Math.sqrt(4000000/(rotatedWidth*rotatedHeight)));
+  const scale=Math.min(maxScale,3200/Math.max(rotatedWidth,rotatedHeight),Math.sqrt(4000000/(rotatedWidth*rotatedHeight)));
   const canvas=document.createElement('canvas');canvas.width=Math.round(rotatedWidth*scale);canvas.height=Math.round(rotatedHeight*scale);
   const context=canvas.getContext('2d');context.fillStyle='white';context.fillRect(0,0,canvas.width,canvas.height);
   context.translate(canvas.width/2,canvas.height/2);context.rotate(radians);context.scale(scale,scale);context.drawImage(source,-width/2,-height/2);
@@ -138,12 +138,17 @@ export function createImageOcrSession(profile, onProgress = () => {}) {
         const candidates=[];
         if(profile.layout === 'nutrition') {
           const original=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height);
-          const enlarged=variantCanvas(original.data,canvas.width,canvas.height);canvases.push(enlarged);
+          const enlarged=variantCanvas(original.data,canvas.width,canvas.height,0,4);canvases.push(enlarged);
           // Sparse mode handles website labels and values separated by a wide
           // gap; preserve the full image so basis headings remain available.
           candidates.push({name:'original-upscaled',psm:'11',image:enlarged});
-          if(processed) for(const [name,pixels,psm] of [['grayscale',processed.variants.gray,'6'],['light-sharpen',processed.variants.gentle,'11']]) {
-            const image=variantCanvas(pixels,processed.cropped.width,processed.cropped.height,processed.angle);canvases.push(image);candidates.push({name,psm,image});
+          if(processed) for(const [name,pixels,psm] of [
+            ['grayscale',processed.variants.gray,'6'],
+            ['light-sharpen',processed.variants.gentle,'11'],
+            ['local-contrast',processed.variants.normalized,'6'],
+            ['adaptive-contrast',processed.variants.adaptive,'6'],
+          ]) {
+            const image=variantCanvas(pixels,processed.cropped.width,processed.cropped.height,processed.angle,4);canvases.push(image);candidates.push({name,psm,image});
           }
         } else if(processed){
           const {cropped,variants,angle}=processed;

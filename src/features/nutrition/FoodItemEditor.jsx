@@ -12,7 +12,7 @@ const example = { name: "McDonald's burger", quantity: 1, unit: 'pieces', nutrit
 export function FoodItemEditor({ catalog, onSave, onClose, initial = null }) {
   const dialog = useRef(null), lock = useRef(false);
   const [mode, setMode] = useState('manual');
-  const [draft, setDraft] = useState(() => initial ? structuredClone(initial) : { name: '', quantity: 1, unit: 'pieces', nutrition: {}, source: { provider: 'Manual' } });
+  const [draft, setDraft] = useState(() => initial ? structuredClone(initial) : { name: '', quantity: 1, unit: 'pieces', nutrition: {}, groceryTrackingEnabled: true, shoppingListEnabled: true, nutritionTrackingEnabled: true, source: { provider: 'Manual' } });
   const [json, setJson] = useState(JSON.stringify(example, null, 2));
   const [description, setDescription] = useState('');
   const [busy, setBusy] = useState(false), [error, setError] = useState('');
@@ -22,7 +22,7 @@ export function FoodItemEditor({ catalog, onSave, onClose, initial = null }) {
   useEffect(() => { dialog.current.showModal(); }, []);
   useEffect(() => { if (dialog.current) dialog.current.scrollTop = 0; }, [mode]);
   function useFood(food, provider) {
-    setDraft({ ...(initial?.id ? { id: initial.id } : {}), ...validateFoodItem(food), nutrientSources: food.nutrientSources || food.nutrition?.nutrientSources || {}, barcode: food.barcode || food.source?.barcode || food.source?.code || '', sku: food.sku || food.source?.sku || '', retailer: food.retailer || food.source?.retailer || '', brand: food.brand || food.source?.brand || '', source: { provider, ...food.source } });
+    setDraft({ ...(initial?.id ? { id: initial.id } : {}), ...validateFoodItem(food), groceryTrackingEnabled: food.groceryTrackingEnabled ?? initial?.groceryTrackingEnabled ?? true, shoppingListEnabled: food.shoppingListEnabled ?? initial?.shoppingListEnabled ?? true, nutritionTrackingEnabled: food.nutritionTrackingEnabled ?? initial?.nutritionTrackingEnabled ?? true, nutrientSources: food.nutrientSources || food.nutrition?.nutrientSources || {}, barcode: food.barcode || food.source?.barcode || food.source?.code || '', sku: food.sku || food.source?.sku || '', retailer: food.retailer || food.source?.retailer || '', brand: food.brand || food.source?.brand || '', source: { provider, ...food.source } });
     setMode('manual'); setError('');
   }
   async function ai() {
@@ -45,7 +45,7 @@ export function FoodItemEditor({ catalog, onSave, onClose, initial = null }) {
     if (lock.current) return;
     if (!initial && reviewMatches.length && !duplicateChoice) { setError('Review the possible existing food, or choose Create separately.'); return; }
     lock.current = true; setBusy(true); setError('');
-    try { await onSave({ ...(initial?.id ? { id: initial.id } : {}), ...validateFoodItem(draft), nutrientSources: draft.nutrientSources, barcode: draft.barcode, sku: draft.sku, retailer: draft.retailer, brand: draft.brand, source: draft.source, ...(duplicateChoice === 'separate' ? { allowDuplicate: true } : {}) }); onClose(); }
+    try { await onSave({ ...(initial?.id ? { id: initial.id } : {}), ...validateFoodItem(draft), groceryTrackingEnabled: draft.groceryTrackingEnabled !== false, shoppingListEnabled: draft.groceryTrackingEnabled === false ? false : draft.shoppingListEnabled !== false, nutritionTrackingEnabled: draft.nutritionTrackingEnabled !== false, nutrientSources: draft.nutrientSources, barcode: draft.barcode, sku: draft.sku, retailer: draft.retailer, brand: draft.brand, source: draft.source, ...(duplicateChoice === 'separate' ? { allowDuplicate: true } : {}) }); onClose(); }
     catch (err) { setError(err.message); notify.error(err.message || 'Could not save food item'); }
     finally { lock.current = false; setBusy(false); }
   }
@@ -95,6 +95,14 @@ export function FoodItemEditor({ catalog, onSave, onClose, initial = null }) {
         <p className="g-hint">Nutrition coverage: {nutritionCoverage(draft.nutrition).percent}% ({nutritionCoverage(draft.nutrition).known}/{nutritionCoverage(draft.nutrition).total} nutrients available). <button type="button" onClick={() => setMode('lookup')}>Complete missing nutrients</button></p>
         {draft.source?.provider && <p>Source: {draft.source.provider}</p>}
         <NutritionLabelScan disabled={busy} current={{...draft.nutrition,quantity:draft.quantity,unit:draft.unit,source:draft.source}} onApply={label=>setDraft({...draft,quantity:label.quantity,unit:label.unit,nutrition:cleanNutrients(label),source:label.source})}/>
+        <fieldset className="g-tools" aria-label="Food behavior">
+          <legend><strong>Behavior</strong></legend>
+          <label className="g-check"><input type="checkbox" checked={draft.nutritionTrackingEnabled !== false} onChange={event => setDraft({ ...draft, nutritionTrackingEnabled: event.target.checked })}/>Include in nutrition calculations</label>
+          <label className="g-check"><input type="checkbox" checked={draft.groceryTrackingEnabled !== false} onChange={event => setDraft({ ...draft, groceryTrackingEnabled: event.target.checked, shoppingListEnabled: event.target.checked ? draft.shoppingListEnabled !== false : false })}/>Track in Grocery</label>
+          <label className="g-check"><input type="checkbox" disabled={draft.groceryTrackingEnabled === false} checked={draft.groceryTrackingEnabled !== false && draft.shoppingListEnabled !== false} onChange={event => setDraft({ ...draft, shoppingListEnabled: event.target.checked })}/>Auto-add to Shopping List when needed</label>
+          {draft.groceryTrackingEnabled === false && <small>Enable Grocery tracking to use shopping automation. Existing stock will be preserved when tracking is stopped.</small>}
+          {draft.nutritionTrackingEnabled === false && <small>Nutrition excluded. This food remains available in recipes and the diary.</small>}
+        </fieldset>
         {nutrientFields(NUTRIENTS.slice(0, 5))}
         <details><summary>More nutrients: vitamins, minerals and other label values</summary>{nutrientFields(NUTRIENTS.slice(5))}</details>
         {!initial && reviewMatches.length > 0 && <section className="rounded-xl border-2 border-black bg-[#fff8dd] p-3" aria-label="Possible existing foods">

@@ -31,14 +31,16 @@ export function mergeFoodReferencesInRecipe(recipe, mergeIds, selectedFoods, kep
 
 export function mergeFoodNamesInGroceryState(state, selectedFoods, keptFood) {
   let changed = false;
-  const replace = item => {
+  const replace = (item, stock = false) => {
     if (!item || typeof item !== 'object') return item;
     const key = normalizeFoodName(item.name);
     const matches = selectedFoods.filter(food => [food.name, ...(food.aliases || [])].some(name => normalizeFoodName(name) === key));
-    if (!matches.length || new Set(matches.map(food => normalizeFoodName(food.name))).size !== 1 || item.name === keptFood.name) return item;
+    if (!matches.length || new Set(matches.map(food => normalizeFoodName(food.name))).size !== 1) return item;
+    const trackingDisabled = stock && keptFood.groceryTrackingEnabled === false;
+    if (item.name === keptFood.name && item.foodId === keptFood.id && (item.trackingDisabled === true) === trackingDisabled) return item;
     changed = true;
-    return { ...item, name: keptFood.name };
+    return { ...item, name: keptFood.name, foodId: keptFood.id, ...(stock ? { trackingDisabled } : {}) };
   };
-  const next = { ...state, items: (state.items || []).map(replace), shopping: (state.shopping || []).map(replace) };
+  const next = { ...state, items: (state.items || []).map(item => replace(item, true)), shopping: (state.shopping || []).map(item => replace(item)) };
   return { state: next, changed };
 }

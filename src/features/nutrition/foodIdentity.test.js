@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { normalizeFoodName, parseFoodQuantityPrefix, scoreFoodMatch, validFoodBarcode, findPossibleFoodDuplicateGroups, auditFoodDuplicates } from './foodIdentity.js';
-import { foodNutritionConflicts, mergeCanonicalFoods, mergeFoodCatalog } from './foodCatalog.js';
+import { foodNutritionConflicts, foodBehaviorConflicts, mergeCanonicalFoods, mergeFoodCatalog } from './foodCatalog.js';
 
 test('canonical names normalize case, punctuation, unicode spaces and safe common variants', () => {
   assert.equal(normalizeFoodName('  CORIANDER   POWDER '), 'coriander powder');
@@ -82,4 +82,23 @@ test('merge keeps canonical identity, preserves aliases, and exposes nutrition c
   assert.deepEqual(merged.aliases, ['1 tbsp coriander powder']);
   assert.equal(merged.nutrition.calories, 295);
   assert.equal(merged.nutrition.protein, 10);
+});
+
+test('food behavior defaults preserve existing behavior and invalid shopping automation is inactive', () => {
+  const [legacy] = mergeFoodCatalog([], [{ id: 'salt', name: 'Salt', quantity: 100, unit: 'g', nutrition: {} }]);
+  assert.deepEqual([legacy.nutritionTrackingEnabled, legacy.groceryTrackingEnabled, legacy.shoppingListEnabled], [true, true, true]);
+  const [disabled] = mergeFoodCatalog([], [{ id: 'pepper', name: 'Pepper', quantity: 100, unit: 'g', nutrition: {}, groceryTrackingEnabled: false, shoppingListEnabled: true }]);
+  assert.deepEqual([disabled.groceryTrackingEnabled, disabled.shoppingListEnabled], [false, false]);
+});
+
+test('merging foods detects behavior conflicts and retains the selected preference source', () => {
+  const foods = [
+    { id: 'a', name: 'Salt', quantity: 100, unit: 'g', nutrition: {}, nutritionTrackingEnabled: true, groceryTrackingEnabled: true, shoppingListEnabled: false },
+    { id: 'b', name: 'Table salt', quantity: 100, unit: 'g', nutrition: {}, nutritionTrackingEnabled: false, groceryTrackingEnabled: false, shoppingListEnabled: false },
+  ];
+  assert.deepEqual(foodBehaviorConflicts(foods), ['groceryTrackingEnabled', 'nutritionTrackingEnabled']);
+  const merged = mergeCanonicalFoods(foods, 'a', ['b'], 'a', 'b');
+  assert.equal(merged.nutritionTrackingEnabled, false);
+  assert.equal(merged.groceryTrackingEnabled, false);
+  assert.equal(merged.shoppingListEnabled, false);
 });

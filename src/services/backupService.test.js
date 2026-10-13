@@ -155,3 +155,11 @@ test('backup shape can retain real recipe, diary, grocery, and nutrition source 
   assert.equal(parsed.modules.find(module => module.moduleId === 'recipes').data.rows[0].value.recipe.slug, recipeId);
   assert.equal(parsed.modules.find(module => module.moduleId === 'foodDiary').data.rows[0].value.meals[0].items[0].recipeSlug, recipeId);
 });
+
+test('food library backups preserve independent nutrition, Grocery and shopping preferences', async () => {
+  const food = { id: 'salt', name: 'Salt', nutritionTrackingEnabled: true, groceryTrackingEnabled: false, shoppingListEnabled: false };
+  const library = { rows: [{ key: 'food-catalog:v1', value: { version: 1, items: [food] } }] };
+  const parsed = await parseBackupFile(await asFile(await backupFor(['foodLibrary'], { foodLibrary: library })));
+  const restored = parsed.modules.find(module => module.moduleId === 'foodLibrary').data.rows[0].value.items[0];
+  assert.deepEqual([restored.nutritionTrackingEnabled, restored.groceryTrackingEnabled, restored.shoppingListEnabled], [true, false, false]);
+});

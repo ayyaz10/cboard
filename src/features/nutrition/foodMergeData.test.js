@@ -33,7 +33,7 @@ test('merge updates active grocery names but preserves grocery quantities and nu
   const grocery = { items: [{ id: 'stock-1', name: '1 tbsp coriander powder', quantity: 20, nutrition: { calories: 60 } }], shopping: [{ id: 'shop-1', name: '1 tbsp coriander powder', quantity: 2 }] };
   const result = mergeFoodNamesInGroceryState(grocery, originalFoods, { ...originalFoods[0], name: 'Coriander Powder' });
   assert.equal(result.changed, true);
-  assert.deepEqual(result.state.items[0], { id: 'stock-1', name: 'Coriander Powder', quantity: 20, nutrition: { calories: 60 } });
+  assert.deepEqual(result.state.items[0], { id: 'stock-1', name: 'Coriander Powder', quantity: 20, nutrition: { calories: 60 }, foodId: 'canonical', trackingDisabled: false });
   assert.equal(result.state.shopping[0].quantity, 2);
   assert.equal(grocery.items[0].name, '1 tbsp coriander powder');
 });

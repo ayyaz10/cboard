@@ -19,7 +19,7 @@ import { DiaryCalendar } from "./DiaryCalendar";
 import { DiaryMonthPicker } from "./DiaryMonthPicker";
 import { DiaryFoodSources } from "./DiaryFoodSources";
 import { buildSavedFoods } from '../nutrition/savedFoods.js';
-import { catalogItemsFromDiaryMeal } from "../nutrition/foodCatalog.js";
+import { catalogItemsFromDiaryMeal, normalizeFoodName } from "../nutrition/foodCatalog.js";
 import { notify } from '../../lib/notifications.js';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog.jsx';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog.js';
@@ -91,7 +91,12 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
     setLoadError("");
     try {
       const saved = await getFoodDiary(user.id);
-      if (id === generation.current) setDays(saved);
+      if (id === generation.current) setDays(saved.map(day => ({ ...day, meals: day.meals.map(meal => ({ ...meal, items: meal.items.map(item => {
+        const recipePart = item.recipeOrigin?.slug && recipes.find(recipe => recipe.slug === item.recipeOrigin.slug)?.ingredients.find(part => part.id === item.recipeOrigin.ingredientId);
+        const candidates = foodCatalog.filter(food => [food.name, ...(food.aliases || [])].some(name => normalizeFoodName(name) === normalizeFoodName(item.name)));
+        const food = foodCatalog.find(entry => entry.id === item.foodId) || foodCatalog.find(entry => entry.id === recipePart?.foodId) || (candidates.length === 1 ? candidates[0] : null);
+        return food ? { ...item, foodId: item.foodId || food.id, nutritionExcluded: food.nutritionTrackingEnabled === false, groceryTrackingEnabled: food.groceryTrackingEnabled !== false } : item;
+      }) })) })));
     } catch (err) {
       if (id === generation.current)
         setLoadError(err.message || "Could not load your diary.");
@@ -104,7 +109,7 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
     return () => {
       generation.current++;
     };
-  }, [user.id]);
+  }, [user.id, foodCatalog, recipes]);
   useEffect(() => {
     const timer = setInterval(() => setToday(localDate()), 30000);
     return () => clearInterval(timer);

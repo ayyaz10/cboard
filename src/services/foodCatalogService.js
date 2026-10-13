@@ -23,7 +23,9 @@ export async function getFoodCatalog(expectedUserId) {
   const result = await client.from('user_tool_preferences').select('value,updated_at').eq('user_id', userId).eq('key', KEY).maybeSingle();
   assertSupabaseResult(result);
   const stored = Array.isArray(result.data?.value?.items) ? result.data.value.items : [];
-  const migrated = stored.some(item => typeof item?.id !== 'string' || !item.id.trim());
+  const migrated = stored.some(item => typeof item?.id !== 'string' || !item.id.trim() ||
+    item.groceryTrackingEnabled === undefined || item.shoppingListEnabled === undefined || item.nutritionTrackingEnabled === undefined ||
+    item.groceryTrackingEnabled === false && item.shoppingListEnabled !== false);
   const items = mergeFoodCatalog([], stored);
   if (migrated) {
     await writeCatalog(client, userId, items, result.data);
