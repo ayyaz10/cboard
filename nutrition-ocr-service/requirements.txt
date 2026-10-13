@@ -1,0 +1,6 @@
+paddleocr[doc-parser]==3.7.0
+transformers==5.19.0
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30,<1
+python-multipart>=0.0.20,<1
+httpx>=0.27,<1

@@ -12,7 +12,7 @@ const display=value=>value==null?'Unknown':new Intl.NumberFormat(undefined,{maxi
 
 export function NutritionLabelScan({current=null,onApply,disabled=false,initialOpen=false,basisUnits=['g','ml','pieces','servings']}) {
   const id=useId(),session=useRef(null),job=useRef(0),fileRef=useRef(null),urlRef=useRef(null),imageDialog=useRef(null);
-  const [open,setOpen]=useState(initialOpen),[photo,setPhoto]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  const [open,setOpen]=useState(initialOpen),[photo,setPhoto]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[basicMode,setBasicMode]=useState(false);
   const [showImage,setShowImage]=useState(false);
   const [progress,setProgress]=useState(null),[rotation,setRotation]=useState(0),[crop,setCrop]=useState({left:0,top:0,right:100,bottom:100});
   const [columns,setColumns]=useState([]),[active,setActive]=useState(''),[warnings,setWarnings]=useState([]),[raw,setRaw]=useState('');
@@ -28,25 +28,30 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
   const column=columns.find(value=>value.id===active);
   const converted=column?currentAtBasis(current,column):null;
   function stop(){job.current++;session.current?.dispose();session.current=null;setBusy(false);setProgress(null);}
-  function discard(){stop();setOpen(false);setShowImage(false);setColumns([]);setRaw('');setDiagnostics(null);setError('');fileRef.current=null;if(urlRef.current)URL.revokeObjectURL(urlRef.current);urlRef.current=null;setPhoto('');}
+  function discard(){stop();setOpen(false);setShowImage(false);setColumns([]);setRaw('');setDiagnostics(null);setError('');setBasicMode(false);fileRef.current=null;if(urlRef.current)URL.revokeObjectURL(urlRef.current);urlRef.current=null;setPhoto('');}
   useEffect(()=>()=>{job.current++;session.current?.dispose();if(urlRef.current)URL.revokeObjectURL(urlRef.current);},[]);
-  async function scan(file=fileRef.current,nextRotation=rotation,nextCrop=crop) {
+  async function scan(file=fileRef.current,nextRotation=rotation,nextCrop=crop,mode=basicMode?'basic':'advanced') {
     if(!file)return;
     const run=++job.current;setBusy(true);setError('');setProgress({status:'Loading scanner',progress:0});setColumns([]);setRaw('');setDiagnostics(null);setWarnings([]);
     try {
       validateOcrImage(file);
-      if(!session.current)session.current=createNutritionOcrSession(message=>setProgress(message));
+      if(!session.current||session.current.mode!==mode){session.current?.dispose();session.current=createNutritionOcrSession(message=>setProgress(message),mode);}
       // One live session reports progress across rescans; disposal suppresses late updates.
       const result=await session.current.scan(file,nextRotation,{crop:nextCrop,debug:debugEnabled});
       if(run!==job.current)return;
       const next=result.parsed.columns.length?result.parsed.columns.map(reviewColumn):[blankColumn()];
       setColumns(next);setActive(next[0].id);setWarnings(result.parsed.warnings);setRaw(result.parsed.text);setClearIncompatible(false);
       if (result.parsed.columns.length) notify.info('Nutrition label scanned. Review the values before applying.');
-      if(debugEnabled)setDiagnostics({selected:result.name,candidates:result.debug?.candidates.map(({image,...candidate})=>candidate)});
+      if(debugEnabled&&result.provider==='paddleocr-vl'){
+        const doc=result.debug?.rawDocument?.layout_det_res;
+        const blocks=result.debug?.rawDocument?.parsing_res_list||[];
+        setDiagnostics({engine:result.name,provider:result.debug?.provider,detectedTables:doc?.boxes?.filter(box=>box.label==='table')||[],tableCount:result.debug?.tableCount,rawRows:result.debug?.normalizedRows,rawDocument:result.debug?.rawDocument,rejectedCandidates:blocks.filter(block=>block.block_label!=='table').map(block=>({type:block.block_label,text:block.block_content,bbox:block.block_bbox})),validationErrors:result.debug?.basisIssues||[],finalValues:result.parsed.columns.map(value=>({basis:value.label,values:value.nutrients}))});
+      }else if(debugEnabled)setDiagnostics({selected:result.name,candidates:result.debug?.candidates?.map(({image,...candidate})=>candidate)||[]});
     }catch(err){if(run===job.current){setError(err.message||'Could not scan this label. Try a clearer image.');notify.error(err.message||'Could not scan nutrition label');session.current?.dispose();session.current=null;}}
     finally{if(run===job.current){setBusy(false);setProgress(null);}}
   }
-  function upload(file){if(!file)return;try{validateOcrImage(file);}catch(err){setError(err.message);return;}setError('');fileRef.current=file;if(urlRef.current)URL.revokeObjectURL(urlRef.current);urlRef.current=URL.createObjectURL(file);setPhoto(urlRef.current);setRotation(0);const full={left:0,top:0,right:100,bottom:100};setCrop(full);void scan(file,0,full);}
+  function upload(file){if(!file)return;try{validateOcrImage(file);}catch(err){setError(err.message);return;}setError('');setBasicMode(false);fileRef.current=file;if(urlRef.current)URL.revokeObjectURL(urlRef.current);urlRef.current=URL.createObjectURL(file);setPhoto(urlRef.current);setRotation(0);const full={left:0,top:0,right:100,bottom:100};setCrop(full);void scan(file,0,full,'advanced');}
+  function tryBasicScan(){setBasicMode(true);void scan(fileRef.current,rotation,crop,'basic');}
   function pasteImage(event){
     if(busy||disabled)return;
     const items=Array.from(event.clipboardData?.items||[]);
@@ -95,6 +100,7 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
       </>}
       {busy&&<div role="status"><p>{progress?.status}{progress?.pass?` · pass ${progress.pass}`:''}</p><progress max="1" value={progress?.progress||0}/><button type="button" onClick={stop}>Cancel scan</button></div>}
       {error&&<p role="alert" className="nscan-warning">{error}</p>}
+      {error&&!basicMode&&<div className="nscan-actions"><button type="button" disabled={busy||disabled||!fileRef.current} onClick={tryBasicScan}>Try basic scan</button><button type="button" disabled={busy} onClick={discard}>Close scanner and enter manually</button></div>}
       {warnings.map(message=><p className="nscan-warning" key={message}>{message}</p>)}
       {column&&!busy&&<div>
         <label>Nutrition column<select aria-label="Nutrition column" value={active} onChange={event=>{setActive(event.target.value);setClearIncompatible(false);}}>{columns.map(value=><option key={value.id} value={value.id}>{columns.some(other=>other.tableId!==value.tableId)?`${value.tableId}: `:''}{value.label}</option>)}</select></label>

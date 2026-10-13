@@ -1,4 +1,8 @@
 node_modules
+.venv/
+nutrition-ocr-service/.venv/
+nutrition-ocr-service/__pycache__/
+*.pyc
 dist
 .DS_Store
 npm-debug.log*

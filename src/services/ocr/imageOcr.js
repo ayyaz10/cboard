@@ -44,6 +44,36 @@ function variantCanvas(pixels, width, height, angle = 0, maxScale = 2) {
   source.width=source.height=0;return canvas;
 }
 
+// Small nutrition panels occupy little of a phone photo. Tesseract's sparse
+// page mode often spends its capacity on the package and background, so run a
+// couple of bounded panel-focused passes as well as the full-image passes.
+// The overlapping crops cover both a detected wrapper (panel tends to sit high
+// on the wrapper) and an uncropped phone photo (panel tends to sit near centre).
+function nutritionFocusCanvases(source, wrapperDetected) {
+  const boxes=wrapperDetected
+    ? [{left:.04,top:.14,right:.96,bottom:.74},{left:.04,top:.22,right:.96,bottom:.82}]
+    : [{left:.08,top:.38,right:.94,bottom:.78},{left:.06,top:.30,right:.96,bottom:.74}];
+  // The preprocessing worker returns ImageData-shaped pixel buffers, while
+  // the no-worker fallback is already an HTML canvas. Normalize both forms
+  // before calling drawImage (which rejects plain {data,width,height} objects).
+  let drawable=source;
+  if(typeof source.getContext!=='function') {
+    drawable=document.createElement('canvas');drawable.width=source.width;drawable.height=source.height;
+    drawable.getContext('2d').putImageData(new ImageData(source.data,source.width,source.height),0,0);
+  }
+  const images=boxes.map(box=>{
+    const sx=Math.round(drawable.width*box.left),sy=Math.round(drawable.height*box.top);
+    const sw=Math.max(1,Math.round(drawable.width*(box.right-box.left))),sh=Math.max(1,Math.round(drawable.height*(box.bottom-box.top)));
+    const sourceCanvas=document.createElement('canvas');sourceCanvas.width=sw;sourceCanvas.height=sh;
+    sourceCanvas.getContext('2d').drawImage(drawable,sx,sy,sw,sh,0,0,sw,sh);
+    const image=variantCanvas(sourceCanvas.getContext('2d').getImageData(0,0,sw,sh).data,sw,sh,0,4);
+    sourceCanvas.width=sourceCanvas.height=0;
+    return image;
+  });
+  if(drawable!==source)drawable.width=drawable.height=0;
+  return images;
+}
+
 function recoverNutritionPunctuation(lines, image, parsed) {
   const context=image.getContext('2d');
   const processed=new Set();
@@ -142,6 +172,11 @@ export function createImageOcrSession(profile, onProgress = () => {}) {
           // Sparse mode handles website labels and values separated by a wide
           // gap; preserve the full image so basis headings remain available.
           candidates.push({name:'original-upscaled',psm:'11',image:enlarged});
+          const panelSource=processed?.cropped||canvas;
+          for(const [index,image] of nutritionFocusCanvases(panelSource,Boolean(processed?.region)).entries()) {
+            canvases.push(image);
+            candidates.push({name:`nutrition-panel-crop-${index+1}`,psm:index===0?'6':'11',image});
+          }
           if(processed) for(const [name,pixels,psm] of [
             ['grayscale',processed.variants.gray,'6'],
             ['light-sharpen',processed.variants.gentle,'11'],
