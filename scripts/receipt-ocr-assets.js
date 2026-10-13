@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-// Serve the worker, WASM and English model from CBoard, never a third-party CDN.
+// Serve OCR workers, WASM and language models from CBoard, never a third-party CDN.
 export function receiptOcrAssets() {
   let files, base;
   return {
@@ -12,6 +12,8 @@ export function receiptOcrAssets() {
       files = new Map([
         ['worker.min.js', resolve(root, 'tesseract.js/dist/worker.min.js')],
         ['eng.traineddata.gz', resolve(root, '@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz')],
+        ['spa.traineddata.gz', resolve(root, '@tesseract.js-data/spa/4.0.0_best_int/spa.traineddata.gz')],
+        ['por.traineddata.gz', resolve(root, '@tesseract.js-data/por/4.0.0_best_int/por.traineddata.gz')],
         ['LICENSE-tesseract.txt', resolve(root, 'tesseract.js/LICENSE.md')],
         ...readdirSync(resolve(root, 'tesseract.js-core')).filter(name => name.endsWith('.wasm.js')).map(name => [name, resolve(root, 'tesseract.js-core', name)]),
       ]);

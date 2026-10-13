@@ -4,7 +4,7 @@ import { nutritionCandidatesAgree, finalizeNutritionCandidates } from './nutriti
 
 export function createNutritionOcrSession(onProgress) {
   return createImageOcrSession({
-    layout:'nutrition', parse:parseNutritionLabel, score:scoreNutritionCandidate,
+    layout:'nutrition', languages:'eng+spa+por', parse:parseNutritionLabel, score:scoreNutritionCandidate,
     shouldStop:nutritionCandidatesAgree,
     finalize:finalizeNutritionCandidates,
   },onProgress);

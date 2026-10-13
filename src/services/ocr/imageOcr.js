@@ -113,7 +113,7 @@ export function createImageOcrSession(profile, onProgress = () => {}) {
       const { createWorker } = await import('tesseract.js');
       if (disposed) throw new Error('Scan cancelled.');
       const base = new URL(`${import.meta.env.BASE_URL}ocr/`, window.location.origin).href;
-      const created = await createWorker('eng', 1, { workerPath: `${base}worker.min.js`, corePath: base, langPath: base.slice(0, -1),
+      const created = await createWorker(profile.languages || 'eng', 1, { workerPath: `${base}worker.min.js`, corePath: base, langPath: base.slice(0, -1),
         logger: message => { if (!disposed) onProgress({...message,pass}); }, errorHandler: () => {},
       });
       if (disposed) { await created.terminate(); throw new Error('Scan cancelled.'); }

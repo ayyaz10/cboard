@@ -16,6 +16,8 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.105.1",
     "@tesseract.js-data/eng": "^1.0.0",
+    "@tesseract.js-data/por": "^1.0.0",
+    "@tesseract.js-data/spa": "^1.0.0",
     "@zxing/browser": "^0.2.1",
     "motion": "^13.4.2",
     "react": "^19.0.0",
