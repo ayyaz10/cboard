@@ -19,7 +19,7 @@ import { DiaryCalendar } from "./DiaryCalendar";
 import { DiaryMonthPicker } from "./DiaryMonthPicker";
 import { DiaryFoodSources } from "./DiaryFoodSources";
 import { buildSavedFoods } from '../nutrition/savedFoods.js';
-import { catalogItemsFromDiaryMeal, normalizeFoodName } from "../nutrition/foodCatalog.js";
+import { catalogItemsFromDiaryMeal, normalizeFoodName, resolveRecipeFoodCandidate } from "../nutrition/foodCatalog.js";
 import { notify } from '../../lib/notifications.js';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog.jsx';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog.js';
@@ -44,6 +44,33 @@ import "./foodDiary.css";
 
 const format = (n) =>
   new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(n);
+
+function missingCatalogFoods(days, catalog) {
+  const knownNames = new Set(catalog.flatMap(food => [food.name, ...(food.aliases || [])]).map(normalizeFoodName));
+  const candidates = new Map();
+  const needsReview = new Set();
+  [...days].sort((a, b) => String(b.date).localeCompare(String(a.date))).forEach(day => {
+    (day.meals || []).forEach(meal => (meal.items || []).forEach(item => {
+      const name = String(item.name || '').trim();
+      const key = normalizeFoodName(name);
+      if (!key || item.foodId && catalog.some(food => food.id === item.foodId) || knownNames.has(key) || candidates.has(key)) return;
+      const candidate = {
+        name,
+        quantity: Number.isFinite(Number(item.basis)) && Number(item.basis) > 0 ? Number(item.basis) : 100,
+        unit: ['g', 'ml', 'pieces', 'servings'].includes(item.nutritionUnit) ? item.nutritionUnit : 'g',
+        nutrition: item.nutrition || {},
+        nutrientSources: item.nutrientSources || {},
+        source: item.source || { provider: 'Food diary', name },
+      };
+      const resolution = resolveRecipeFoodCandidate(candidate, catalog);
+      if (resolution.status === 'review') { needsReview.add(name); return; }
+      if (resolution.status !== 'none') { knownNames.add(key); return; }
+      candidates.set(key, candidate);
+    }));
+  });
+  return { candidates: [...candidates.values()], needsReview: [...needsReview] };
+}
+
 export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCatalogChange, onDiaryRecipeUpdated }) {
   const { user } = useAuth();
   const { confirm: confirmDiscard, dialog: discardDialog } = useConfirmDialog();
@@ -91,10 +118,24 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
     setLoadError("");
     try {
       const saved = await getFoodDiary(user.id);
+      let catalogForDiary = foodCatalog;
+      if (onFoodCatalogChange) {
+        const { candidates, needsReview } = missingCatalogFoods(saved, foodCatalog);
+        if (candidates.length) {
+          const trackInGroceries = typeof window !== 'undefined' && window.confirm(`Also track ${candidates.length === 1 ? 'this older diary food' : `${candidates.length} older diary foods`} in Groceries? They will be added to All Food Items either way. Choose Cancel to keep them out of Groceries.`);
+          try {
+            catalogForDiary = await onFoodCatalogChange(candidates.map(item => ({ ...item, groceryTrackingEnabled: trackInGroceries, shoppingListEnabled: trackInGroceries })));
+            notify.success(`${candidates.length} older ${candidates.length === 1 ? 'diary food was' : 'diary foods were'} added to All Food Items.`);
+          } catch (migrationError) {
+            notify.error(`Your diary loaded, but older foods could not be added to All Food Items: ${migrationError.message || 'Please try again.'}`);
+          }
+        }
+        if (needsReview.length) notify.warning(`${needsReview.length} older diary ${needsReview.length === 1 ? 'food needs' : 'foods need'} a duplicate review before it can be added to All Food Items.`);
+      }
       if (id === generation.current) setDays(saved.map(day => ({ ...day, meals: day.meals.map(meal => ({ ...meal, items: meal.items.map(item => {
         const recipePart = item.recipeOrigin?.slug && recipes.find(recipe => recipe.slug === item.recipeOrigin.slug)?.ingredients.find(part => part.id === item.recipeOrigin.ingredientId);
-        const candidates = foodCatalog.filter(food => [food.name, ...(food.aliases || [])].some(name => normalizeFoodName(name) === normalizeFoodName(item.name)));
-        const food = foodCatalog.find(entry => entry.id === item.foodId) || foodCatalog.find(entry => entry.id === recipePart?.foodId) || (candidates.length === 1 ? candidates[0] : null);
+        const candidates = catalogForDiary.filter(food => [food.name, ...(food.aliases || [])].some(name => normalizeFoodName(name) === normalizeFoodName(item.name)));
+        const food = catalogForDiary.find(entry => entry.id === item.foodId) || catalogForDiary.find(entry => entry.id === recipePart?.foodId) || (candidates.length === 1 ? candidates[0] : null);
         return food ? { ...item, foodId: item.foodId || food.id, nutritionExcluded: food.nutritionTrackingEnabled === false, groceryTrackingEnabled: food.groceryTrackingEnabled !== false } : item;
       }) })) })));
     } catch (err) {
@@ -170,8 +211,52 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
     setError("");
     const id = generation.current;
     try {
+      let prepared = structuredClone(next);
+      const newFoods = [];
+      prepared.meals = prepared.meals.map(meal => ({
+        ...meal,
+        items: meal.items.map(item => {
+          if (item.foodId) return item;
+          const matches = foodCatalog.filter(food => [food.name, ...(food.aliases || [])]
+            .some(name => normalizeFoodName(name) === normalizeFoodName(item.name)));
+          if (matches.length === 1) return { ...item, foodId: matches[0].id,
+            groceryTrackingEnabled: matches[0].groceryTrackingEnabled !== false,
+            nutritionExcluded: matches[0].nutritionTrackingEnabled === false };
+          newFoods.push(item);
+          return item;
+        }),
+      }));
+      if (newFoods.length && onFoodCatalogChange) {
+        const names = [...new Set(newFoods.map(item => item.name))];
+        const trackInGroceries = window.confirm(`Also track ${names.length === 1 ? names[0] : `${names.length} new diary foods`} in Groceries? These foods will be saved to All Food Items either way. Choose Cancel to keep them out of Groceries.`);
+        const catalogItems = newFoods.map(item => ({
+          ...(item.foodId || item.source?.foodId ? { id: item.foodId || item.source.foodId } : {}),
+          name: item.name,
+          quantity: item.basis || 100,
+          unit: item.nutritionUnit || 'g',
+          nutrition: item.nutrition || {},
+          nutrientSources: item.nutrientSources || {},
+          source: item.source || { provider: 'Food diary', name: item.name },
+          groceryTrackingEnabled: trackInGroceries,
+          shoppingListEnabled: trackInGroceries,
+        }));
+        const savedFoods = await onFoodCatalogChange(catalogItems);
+        prepared.meals = prepared.meals.map(meal => ({
+          ...meal,
+          items: meal.items.map(item => {
+            if (item.foodId) return item;
+            const matches = (savedFoods || []).filter(food => [food.name, ...(food.aliases || [])]
+              .some(name => normalizeFoodName(name) === normalizeFoodName(item.name)));
+            if (matches.length !== 1) return item;
+            const food = matches[0];
+            return { ...item, foodId: food.id,
+              groceryTrackingEnabled: food.groceryTrackingEnabled !== false,
+              nutritionExcluded: food.nutritionTrackingEnabled === false };
+          }),
+        }));
+      }
       const saved = await saveFoodDiary(
-        { ...next, updatedAt: day.updatedAt },
+        { ...prepared, updatedAt: day.updatedAt },
         user.id,
       );
       if (id !== generation.current) return false;

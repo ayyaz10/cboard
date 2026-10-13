@@ -66,7 +66,7 @@ html[data-theme="matrix"] .finance .f-tabs a{border-color:var(--matrix-border-st
 html[data-theme="matrix"] .finance .f-tabs a[aria-current=page]{border-color:var(--matrix-border-strong);background:var(--matrix-accent);color:var(--matrix-accent-text);box-shadow:3px 3px var(--matrix-border)}
 
 /* Money timeline: an honest balance line with optional transaction markers. */
-.f-timeline-page{--finance-chart-line:#111;--finance-chart-grid:#1112;min-width:0}
+.f-timeline-page{--finance-chart-line:#111;--finance-chart-grid:#1112;--finance-chart-fill:var(--f-green);min-width:0}
 .f-timeline-card{overflow:hidden;padding:1.25rem}
 .f-timeline-heading{align-items:flex-end;margin-top:1rem}
 .f-timeline-heading>div:first-child{min-width:0}

@@ -49,15 +49,23 @@ export function NutritionLookup({ name, active, visible, onSelect, amountUnit, p
   }, [active, name, mode]);
   useEffect(() => () => { request.current += 1; }, []);
   useEffect(() => { if (!visible) setScanning(false); }, [visible]);
+  function changeMode(nextMode) {
+    request.current++;
+    setMode(nextMode);
+    setScanning(false);
+    setBusy(false);
+    setResults(null);
+    setError("");
+  }
+  const modes = [["saved", "My saved foods"], ["name", "Branded products"], ["natural", "USDA reference foods"], ["cofid", "UK CoFID foods"], ["barcode", "Scan barcode"], ...(allowLabelScan ? [["photo", "Scan nutrition label"]] : [])];
   return <div className="g-nutrition-lookup">
-    <div className="g-actions" aria-label="Nutrition lookup method">
-      {[["saved", "My saved foods"], ["name", "Branded products"], ["natural", "USDA reference foods"], ["cofid", "UK CoFID foods"], ["barcode", "Scan barcode"], ...(allowLabelScan ? [["photo", "Scan nutrition label"]] : [])].map(([key, title]) =>
-        <button type="button" key={key} aria-pressed={mode === key} onClick={() => {
-          request.current++; setMode(key); setScanning(false); setBusy(false); setResults(null); setError("");
-        }}>{title}</button>)}
-    </div>
+    <label className="g-lookup-source">Food source
+      <select aria-label="Food source" value={mode} onChange={event => changeMode(event.target.value)}>
+        {modes.map(([key, title]) => <option key={key} value={key}>{title}</option>)}
+      </select>
+    </label>
     {mode === 'saved' && <>
-      <label>Search recipes, diary and groceries
+      <label>Search saved foods
         <input value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') event.preventDefault(); }} />
       </label>
       {savedFoods.loading && <p role="status">Loading saved foods...</p>}
@@ -69,7 +77,7 @@ export function NutritionLookup({ name, active, visible, onSelect, amountUnit, p
           <small>{nutrients.map(([key, label, suffix]) => `${label}: ${entry.item.nutrition[key] == null ? 'unknown' : `${entry.item.nutrition[key]} ${suffix}`}`).join(' / ')}</small>
         </button>)}
       </div>
-      {!savedFoods.loading && query.trim().length >= 2 && !savedMatches.length && <p role="status">No saved nutrition matches. Try Branded products, Natural foods, a barcode or a label photo.</p>}
+      {!savedFoods.loading && query.trim().length >= 2 && !savedMatches.length && <p role="status">No saved food matches. Choose another food source above to search branded or reference foods.</p>}
       {query.trim().length < 2 && <p className="g-hint">Type at least two characters to find a saved food.</p>}
     </>}
     {mode === "photo" && <NutritionLabel basisUnits={scanUnits} key={name} current={currentNutrition} onSelect={onSelect} />}
@@ -101,7 +109,7 @@ export function NutritionLookup({ name, active, visible, onSelect, amountUnit, p
     </>}
     {busy && <p role="status">Looking up nutrition...</p>}
     {error && <p role="alert">{error}</p>}
-    {results?.length === 0 && <p role="status">{mode === "barcode" ? "No nutrition record found for this barcode. Try a label photo or search by name." : 'No matching nutrition records found. Try a shorter name (for example, "cheddar") or add the brand.'}</p>}
+    {results?.length === 0 && <p role="status">{mode === "barcode" ? "No nutrition record found for this barcode. Try another food source or add the food manually." : 'No matching nutrition records found. Try a shorter name (for example, "cheddar") or add the food manually.'}</p>}
     {results?.map((product) => {
       const unit = basis[product.code] || product.nutrition.unit;
       const natural = ['USDA FoodData Central', 'UK CoFID'].includes(product.source.provider);

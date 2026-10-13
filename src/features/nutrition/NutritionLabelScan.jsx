@@ -12,7 +12,7 @@ const display=value=>value==null?'Unknown':new Intl.NumberFormat(undefined,{maxi
 
 export function NutritionLabelScan({current=null,onApply,disabled=false,initialOpen=false,basisUnits=['g','ml','pieces','servings']}) {
   const id=useId(),session=useRef(null),job=useRef(0),fileRef=useRef(null),urlRef=useRef(null),imageDialog=useRef(null);
-  const [open,setOpen]=useState(initialOpen),[photo,setPhoto]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[basicMode,setBasicMode]=useState(false);
+  const [open,setOpen]=useState(initialOpen),[photo,setPhoto]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[basicMode,setBasicMode]=useState(false),[fallbackMessage,setFallbackMessage]=useState('');
   const [showImage,setShowImage]=useState(false);
   const [progress,setProgress]=useState(null),[rotation,setRotation]=useState(0),[crop,setCrop]=useState({left:0,top:0,right:100,bottom:100});
   const [columns,setColumns]=useState([]),[active,setActive]=useState(''),[warnings,setWarnings]=useState([]),[raw,setRaw]=useState('');
@@ -28,7 +28,7 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
   const column=columns.find(value=>value.id===active);
   const converted=column?currentAtBasis(current,column):null;
   function stop(){job.current++;session.current?.dispose();session.current=null;setBusy(false);setProgress(null);}
-  function discard(){stop();setOpen(false);setShowImage(false);setColumns([]);setRaw('');setDiagnostics(null);setError('');setBasicMode(false);fileRef.current=null;if(urlRef.current)URL.revokeObjectURL(urlRef.current);urlRef.current=null;setPhoto('');}
+  function discard(){stop();setOpen(false);setShowImage(false);setColumns([]);setRaw('');setDiagnostics(null);setError('');setBasicMode(false);setFallbackMessage('');fileRef.current=null;if(urlRef.current)URL.revokeObjectURL(urlRef.current);urlRef.current=null;setPhoto('');}
   useEffect(()=>()=>{job.current++;session.current?.dispose();if(urlRef.current)URL.revokeObjectURL(urlRef.current);},[]);
   async function scan(file=fileRef.current,nextRotation=rotation,nextCrop=crop,mode=basicMode?'basic':'advanced') {
     if(!file)return;
@@ -47,10 +47,22 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
         const blocks=result.debug?.rawDocument?.parsing_res_list||[];
         setDiagnostics({engine:result.name,provider:result.debug?.provider,detectedTables:doc?.boxes?.filter(box=>box.label==='table')||[],tableCount:result.debug?.tableCount,rawRows:result.debug?.normalizedRows,rawDocument:result.debug?.rawDocument,rejectedCandidates:blocks.filter(block=>block.block_label!=='table').map(block=>({type:block.block_label,text:block.block_content,bbox:block.block_bbox})),validationErrors:result.debug?.basisIssues||[],finalValues:result.parsed.columns.map(value=>({basis:value.label,values:value.nutrients}))});
       }else if(debugEnabled)setDiagnostics({selected:result.name,candidates:result.debug?.candidates?.map(({image,...candidate})=>candidate)||[]});
-    }catch(err){if(run===job.current){setError(err.message||'Could not scan this label. Try a clearer image.');notify.error(err.message||'Could not scan nutrition label');session.current?.dispose();session.current=null;}}
+    }catch(err){if(run===job.current){
+      const unavailable=mode==='advanced'&&/advanced nutrition scanner is unavailable|failed to fetch|networkerror|load failed/i.test(err.message||'');
+      session.current?.dispose();session.current=null;
+      if(unavailable&&fileRef.current){
+        setBasicMode(true);
+        setFallbackMessage('The advanced OCR service is unavailable. CBoard switched to the local basic scanner. Start the nutrition OCR service to use PaddleOCR-VL.');
+        notify.info('Advanced OCR unavailable. Trying the local basic scanner.');
+        void scan(file,nextRotation,nextCrop,'basic');
+      }else{
+        setError(err.message||'Could not scan this label. Try a clearer image.');
+        notify.error(err.message||'Could not scan nutrition label');
+      }
+    }}
     finally{if(run===job.current){setBusy(false);setProgress(null);}}
   }
-  function upload(file){if(!file)return;try{validateOcrImage(file);}catch(err){setError(err.message);return;}setError('');setBasicMode(false);fileRef.current=file;if(urlRef.current)URL.revokeObjectURL(urlRef.current);urlRef.current=URL.createObjectURL(file);setPhoto(urlRef.current);setRotation(0);const full={left:0,top:0,right:100,bottom:100};setCrop(full);void scan(file,0,full,'advanced');}
+  function upload(file){if(!file)return;try{validateOcrImage(file);}catch(err){setError(err.message);return;}setError('');setFallbackMessage('');setBasicMode(false);fileRef.current=file;if(urlRef.current)URL.revokeObjectURL(urlRef.current);urlRef.current=URL.createObjectURL(file);setPhoto(urlRef.current);setRotation(0);const full={left:0,top:0,right:100,bottom:100};setCrop(full);void scan(file,0,full,'advanced');}
   function tryBasicScan(){setBasicMode(true);void scan(fileRef.current,rotation,crop,'basic');}
   function pasteImage(event){
     if(busy||disabled)return;
@@ -99,6 +111,7 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
         </details>
       </>}
       {busy&&<div role="status"><p>{progress?.status}{progress?.pass?` · pass ${progress.pass}`:''}</p><progress max="1" value={progress?.progress||0}/><button type="button" onClick={stop}>Cancel scan</button></div>}
+      {fallbackMessage&&<p role="status" className="nscan-warning">{fallbackMessage}</p>}
       {error&&<p role="alert" className="nscan-warning">{error}</p>}
       {error&&!basicMode&&<div className="nscan-actions"><button type="button" disabled={busy||disabled||!fileRef.current} onClick={tryBasicScan}>Try basic scan</button><button type="button" disabled={busy} onClick={discard}>Close scanner and enter manually</button></div>}
       {warnings.map(message=><p className="nscan-warning" key={message}>{message}</p>)}

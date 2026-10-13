@@ -276,18 +276,22 @@ export function catalogItemsFromDiaryMeal(meal) {
 
 export function catalogItemFromRecipeIngredient(item) {
   const label = item?.nutritionLabel;
-  if (!label || item.foodId && label.source?.foodId === item.foodId) return null;
+  if (item?.foodId && (!label || label.source?.foodId === item.foodId)) return null;
   const name = recipeFoodName(item.name);
-  return { ...(item.foodId || label.source?.foodId ? { id: item.foodId || label.source.foodId } : {}), name,
+  const unit = ['g', 'ml', 'pieces', 'servings'].includes(label?.unit) ? label.unit : 'g';
+  const quantity = Number.isFinite(Number(label?.quantity)) && Number(label.quantity) > 0 ? Number(label.quantity) : 100;
+  return { ...(item.foodId || label?.source?.foodId ? { id: item.foodId || label.source.foodId } : {}), name,
     ...(normalizeFoodText(name) !== normalizeFoodText(item.name) ? { aliases: [item.name] } : {}),
-    quantity: label.quantity, unit: label.unit, nutrition: label, nutrientSources: label.nutrientSources, source: label.source };
+    quantity, unit, nutrition: label || {}, nutrientSources: label?.nutrientSources || {},
+    source: label?.source || { provider: 'Recipe ingredient', name } };
 }
 
 export function catalogItemsFromRecipe(recipe) {
   const ingredients = [...(recipe?.ingredients || []), ...(recipe?.sauces || []), ...Object.values(recipe?.alternatives || {}).flatMap(group => group?.options || [])];
-  if (recipe?.productNutrition?.items) return recipe.productNutrition.items.map((product, index) => product?.nutrition && ingredients[index]?.name && !ingredients[index]?.foodId
-    ? catalogItemFromRecipeIngredient({ ...ingredients[index], nutritionLabel: product.nutrition }) : null).filter(Boolean);
-  return ingredients.map(catalogItemFromRecipeIngredient).filter(Boolean);
+  return ingredients.map((ingredient, index) => {
+    const productNutrition = recipe?.productNutrition?.items?.[index]?.nutrition;
+    return catalogItemFromRecipeIngredient({ ...ingredient, nutritionLabel: ingredient.nutritionLabel || productNutrition });
+  }).filter(Boolean);
 }
 
 export function diaryItemFromCatalog(current, catalogItem) {

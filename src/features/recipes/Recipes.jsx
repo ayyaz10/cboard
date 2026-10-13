@@ -97,6 +97,7 @@ function RecipesContent({ route, navigationPath }) {
   const [busy, setBusy] = useState(false);
   const ingredientLibrary = useMemo(() => buildIngredientLibrary(recipes, foodCatalog), [recipes, foodCatalog]);
   const dialog = useRef(null);
+  const dialogBackdropPointerDown = useRef(false);
   const deleteLock = useRef(false);
   async function refresh() {
     setLoading(true);
@@ -149,11 +150,18 @@ function RecipesContent({ route, navigationPath }) {
     setRecipes(current => applyFoodCatalogToRecipes(current, saved));
     return saved;
   }
+  async function saveRecipeFoodsToCatalog(recipeList) {
+    const items = recipeList.flatMap(catalogItemsFromRecipe)
+      .filter(item => resolveRecipeFoodCandidate(item, foodCatalog).status !== 'matched');
+    if (!items.length) return;
+    const names = [...new Set(items.map(item => item.name))];
+    const trackInGroceries = window.confirm(`Also track ${names.length === 1 ? names[0] : `${names.length} new recipe foods`} in Groceries? These foods will be saved to All Food Items either way. Choose Cancel to keep them out of Groceries.`);
+    await saveMainFoodItems(items.map(item => ({ ...item, groceryTrackingEnabled: trackInGroceries, shoppingListEnabled: trackInGroceries })));
+  }
   function recipeUpdated(updated) {
     setRecipes(current => current.map(item => item.slug === updated.slug ? updated : item));
-    const catalogItems = catalogItemsFromRecipe(updated);
     notify.success('Recipe updated');
-    if (catalogItems.length) saveMainFoodItems(catalogItems).catch(error => notify.error(error.message || 'Recipe saved, but the food library could not be updated.'));
+    saveRecipeFoodsToCatalog([updated]).catch(error => notify.error(error.message || 'Recipe saved, but the food library could not be updated.'));
   }
   useEffect(() => {
     refresh();
@@ -223,11 +231,8 @@ function RecipesContent({ route, navigationPath }) {
       saved,
     ]);
     setDraft(null);
-    const catalogItems = catalogItemsFromRecipe(saved).filter(item => resolveRecipeFoodCandidate(item, foodCatalog).status === 'none');
-    if (catalogItems.length) {
-      try { await saveMainFoodItems(catalogItems); }
-      catch (error) { notify.error(error.message || 'Recipe saved, but food nutrition could not be updated'); }
-    }
+    try { await saveRecipeFoodsToCatalog([saved]); }
+    catch (error) { notify.error(error.message || 'Recipe saved, but its foods could not be added to All Food Items.'); }
     notify.success(edit ? 'Recipe updated' : 'Recipe saved');
     navigateTo(`/recipes/${saved.slug}`);
   }
@@ -341,11 +346,8 @@ function RecipesContent({ route, navigationPath }) {
       catch (error) { notify.warning(`Recipes imported, but a confirmed food alias could not be remembered: ${error.message}`); }
     }
     setRecipes((current) => [...current, ...saved]);
-    const catalogItems = saved.flatMap(catalogItemsFromRecipe).filter(item => resolveRecipeFoodCandidate(item, foodCatalog).status === 'none');
-    if (catalogItems.length) {
-      try { await saveMainFoodItems(catalogItems); }
-      catch (error) { notify.warning(error.message || 'Recipes were imported, but some foods need duplicate review.'); }
-    }
+    try { await saveRecipeFoodsToCatalog(saved); }
+    catch (error) { notify.warning(error.message || 'Recipes were imported, but their foods could not be added to All Food Items.'); }
     setDraft(null);
     setSearch('');
     setCategory('All');
@@ -462,6 +464,10 @@ function RecipesContent({ route, navigationPath }) {
           if (item.reuseExisting) { notify.info('Existing food reused'); return; }
           const reuse = !item.id && findFoodMatches(item, foodCatalog).some(match => match.confidence === 'certain' || match.confidence === 'high');
           const editing = foodCatalog.some(food => food.id === item.id || food.name.trim().toLocaleLowerCase() === item.name.trim().toLocaleLowerCase());
+          if (!item.id && !reuse && !editing) {
+            const trackInGroceries = window.confirm(`Also track ${item.name} in Groceries? It will be saved to All Food Items either way. Choose Cancel to keep it out of Groceries.`);
+            item = { ...item, groceryTrackingEnabled: trackInGroceries, shoppingListEnabled: trackInGroceries };
+          }
           await saveMainFoodItems([item]);
           notify.success(reuse ? 'Existing food reused' : editing ? 'Food updated' : 'Food added to your library');
         }} />}
@@ -504,6 +510,8 @@ function RecipesContent({ route, navigationPath }) {
                     try { result = await saveRecipe(linked.recipe, created.image || null, { edit: true, expectedUserId: user.id }); }
                     catch (linkError) { notify.warning(`Recipe saved, but existing foods could not be linked: ${linkError.message}`); }
                   }
+                  try { await saveRecipeFoodsToCatalog([result]); }
+                  catch (catalogError) { notify.warning(`Recipe saved, but its foods could not be added to All Food Items: ${catalogError.message}`); }
                   setRecipes((current) => [
                     ...current.filter((item) => item.slug !== result.slug),
                     result,
@@ -693,7 +701,8 @@ function RecipesContent({ route, navigationPath }) {
         {!importing && <button type="button" className="recipe-mobile-add" onClick={() => startImport()}>＋ Add recipe</button>}
         <dialog
           ref={dialog}
-          onClick={event => { if (event.target === dialog.current && !busy) { dialog.current.close(); setRemoving(null); setConfirmBulkDelete(false); } }}
+          onPointerDown={event => { const rect = dialog.current?.getBoundingClientRect(); dialogBackdropPointerDown.current = Boolean(rect && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)); }}
+          onClick={event => { const startedOnBackdrop = dialogBackdropPointerDown.current; dialogBackdropPointerDown.current = false; if (event.target === dialog.current && startedOnBackdrop && !busy) { dialog.current.close(); setRemoving(null); setConfirmBulkDelete(false); } }}
           onCancel={(event) => {
             if (busy || recipeCleanup) event.preventDefault();
             else { setRemoving(null); setConfirmBulkDelete(false); }

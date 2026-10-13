@@ -498,6 +498,7 @@ kbd {
 
 .g-nutrition-lookup { margin: 14px 0; }
 .g-nutrition-lookup .g-tools { align-items: end; }
+.g-nutrition-lookup .g-lookup-source { display: grid; gap: .35rem; max-width: 26rem; }
 .g-nutrition-result { padding: 12px; margin: 10px 0; border: 1px solid #dce3d7; border-radius: 10px; overflow-wrap: anywhere; }
 .g-nutrition-lookup a { text-decoration: underline; }
 

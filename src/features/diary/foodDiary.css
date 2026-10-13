@@ -364,19 +364,19 @@
   margin-top: 0.75rem;
 }
 .food-diary .diary-find-food-button {
-  border-color: #75a832;
-  background: #c5ff6f;
-  color: #13210b;
+  border-color: #7f3e1e;
+  background: #b95c2b;
+  color: #fff7f0;
   box-shadow: 3px 3px 0 #1b2813;
 }
-.food-diary .diary-find-food-button:hover { background: #adf04d; }
+.food-diary .diary-find-food-button:hover { background: #b95c2b; }
 .food-diary .diary-manual-food-button {
-  border-color: #4a91ad;
-  background: #9fe3ff;
-  color: #10242c;
+  border-color: #244d5d;
+  background: #346f86;
+  color: #f3fbff;
   box-shadow: 3px 3px 0 #17323d;
 }
-.food-diary .diary-manual-food-button:hover { background: #7bd7fc; }
+.food-diary .diary-manual-food-button:hover { background: #346f86; }
 .diary-panel,
 .diary-editor {
   border: 1px solid var(--g-border);
@@ -999,6 +999,8 @@
 .diary-section-heading > span { color: var(--color-text-secondary, #666); font-size: 0.82rem; }
 .diary-add-methods { justify-content: flex-start; margin-top: 0.45rem; }
 .diary-add-methods > button { flex: 0 1 auto; }
+.diary-lookup-manual { align-items: center; justify-content: space-between; gap: .5rem 1rem; }
+.diary-lookup-manual p { margin: 0; }
 .diary-meal-totals { padding-top: 0.8rem; border-top: 1px solid var(--g-border); }
 .diary-meal-totals > .diary-hint { margin: 0.35rem 0 0; }
 .diary-meal-notes label { margin: 0.35rem 0 0.55rem; }
@@ -1036,6 +1038,16 @@
   padding: 0;
   overflow: hidden;
 }
+.diary-food-heading { display: flex; align-items: center; gap: .45rem; }
+.diary-food-reorder { display: flex; flex: 0 0 auto; align-items: center; gap: .2rem; padding: .2rem; border: 1px solid var(--g-border); border-radius: .65rem; background: color-mix(in srgb, var(--g-surface, #111) 88%, white); }
+.diary-food-reorder button { display: grid; flex: 0 0 1.65rem; place-items: center; width: 1.65rem; min-width: 1.65rem; height: 1.65rem; min-height: 1.65rem; padding: 0; border: 0; border-radius: .4rem; background: transparent; color: inherit; font-size: 1rem; font-weight: 700; line-height: 1; }
+.diary-food-reorder button:disabled { opacity: .3; cursor: not-allowed; }
+.diary-food-reorder .diary-food-drag-handle { color: var(--g-muted, #aaa); cursor: grab; touch-action: none; user-select: none; font-size: 1.1rem; }
+.diary-food-reorder .diary-food-drag-handle:active { cursor: grabbing; }
+.diary-food-reorder .diary-food-move-button:not(:disabled) { background: color-mix(in srgb, var(--g-accent, #f28a3c) 13%, transparent); }
+.diary-food-toggle { flex: 1 1 auto; min-width: 0; }
+.diary-food.is-dragging { opacity: .45; }
+.diary-food.is-drag-over { outline: 2px solid var(--color-accent, #f28a3c); outline-offset: -2px; }
 .food-diary .diary-food-toggle {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

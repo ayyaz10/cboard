@@ -1,5 +1,5 @@
-// Keep each income and its dependent allocations together, with income first.
-// The persisted sequence breaks ties even when timestamps are identical.
+// Keep an income and its generated allocations together. History lists the
+// allocations first; the chronological timeline lists the income first.
 export function orderedTransactions(transactions, newestFirst = true) {
   const byId = new Map(transactions.map(item => [item.id, item]));
   const position = new Map(transactions.map((item, index) => [item.id, index]));
@@ -10,7 +10,10 @@ export function orderedTransactions(transactions, newestFirst = true) {
   return [...transactions].sort((a, b) => {
     if (a.id === b.id) return 0;
     const ar = root(a), br = root(b);
-    if (ar.id === br.id) return a.id === ar.id ? -1 : b.id === br.id ? 1 : sequence(a) - sequence(b) || a.id.localeCompare(b.id);
+    if (ar.id === br.id) {
+      if (newestFirst) return a.id === ar.id ? 1 : b.id === br.id ? -1 : sequence(a) - sequence(b) || a.id.localeCompare(b.id);
+      return a.id === ar.id ? -1 : b.id === br.id ? 1 : sequence(a) - sequence(b) || a.id.localeCompare(b.id);
+    }
     const order = ar.date.localeCompare(br.date) || (ar.createdAt || '').localeCompare(br.createdAt || '') || sequence(ar) - sequence(br) || ar.id.localeCompare(br.id);
     return newestFirst ? -order : order;
   });

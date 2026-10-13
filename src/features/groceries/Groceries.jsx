@@ -141,11 +141,12 @@ function PriceFields({ item, currency, onChange }) {
 }
 function Modal({ title, close, children, error }) {
   const ref = useRef(null);
+  const backdropPointerDown = useRef(false);
   useEffect(() => {
     ref.current.showModal();
   }, []);
   return (
-    <dialog className="g-dialog groceries" ref={ref} onCancel={event => { event.preventDefault(); close(); }} onClick={event => { if (event.target === ref.current) close(); }}>
+    <dialog className="g-dialog groceries" ref={ref} onCancel={event => { event.preventDefault(); close(); }} onPointerDown={event => { const rect = ref.current?.getBoundingClientRect(); backdropPointerDown.current = Boolean(rect && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)); }} onClick={event => { const startedOnBackdrop = backdropPointerDown.current; backdropPointerDown.current = false; if (event.target === ref.current && startedOnBackdrop) close(); }}>
       <div className="g-between">
         <h2>{title}</h2>
         <button type="button" aria-label="Close popup" onClick={close}>

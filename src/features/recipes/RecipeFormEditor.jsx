@@ -9,6 +9,7 @@ import { cleanIngredientLabel, ingredientLabelAmount, ingredientLabelNutrition, 
 import { applyStoredIngredient, findIngredientMatches, hasStoredNutrition } from './ingredientLibrary.js';
 import { normalizeRecipeIngredient } from '../../../supabase/functions/_shared/recipeIngredient.js';
 import { formatScaledQuantity, recipeScaleMetadata, scaleRecipe } from './recipeScaling.js';
+import { notify } from '../../lib/notifications.js';
 import '../groceries/groceries.css';
 
 export const emptyRecipe = () => ({
@@ -400,7 +401,7 @@ export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary 
       const selected = allIngredients.find(item => item.id === id);
       setScaleTarget(selected && typeof selected.amount === 'number' ? String(selected.amount) : '');
       setConfirmScaling(false);
-    } catch (error) { window.alert(error.message); }
+    } catch (error) { notify.error(error.message || 'Could not update the recipe scaling.'); }
   };
   const applyScaling = () => {
     if (!scalingPreview) return;

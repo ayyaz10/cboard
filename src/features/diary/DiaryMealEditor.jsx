@@ -87,6 +87,9 @@ export function DiaryMealEditor({
   const [lookup, setLookup] = useState(null);
   const [openFood, setOpenFood] = useState(null);
   const [manualId, setManualId] = useState(null);
+  const [nutritionOpen, setNutritionOpen] = useState({});
+  const [draggingFoodId, setDraggingFoodId] = useState(null);
+  const [dragOverFoodId, setDragOverFoodId] = useState(null);
   const [error, setError] = useState("");
   const [recipeError, setRecipeError] = useState("");
   const [recipeNotice, setRecipeNotice] = useState("");
@@ -150,14 +153,67 @@ export function DiaryMealEditor({
     setOpenFood(selectedId);
     setLookup(null);
   }
+  function addManualFood() {
+    if (draft.items.length >= 100 || manualId) return;
+    const item = { ...foodItem({ quantity: 100, unit: "g" }), name: '' };
+    setManualId(item.id);
+    setDraft(current => ({ ...current, items: [...current.items, item] }));
+    setOpenFood(item.id);
+    setLookup(null);
+  }
+  function finalizeManualFood(id = manualId) {
+    if (!id) return true;
+    const item = draft.items.find(value => value.id === id);
+    try {
+      validateItem(item);
+      setManualId(current => current === id ? null : current);
+      setError('');
+      return true;
+    } catch (err) {
+      setError(err.message);
+      return false;
+    }
+  }
+  function toggleNewFoodLookup() {
+    if (manualId) {
+      if (!finalizeManualFood(manualId)) return;
+    }
+    setLookup(current => current === "new" ? null : "new");
+  }
+  function moveFood(sourceId, targetId, after = false) {
+    if (!sourceId || !targetId || sourceId === targetId) return;
+    setDraft(current => {
+      const items = [...current.items];
+      const sourceIndex = items.findIndex(item => item.id === sourceId);
+      if (sourceIndex < 0) return current;
+      const [source] = items.splice(sourceIndex, 1);
+      const targetIndex = items.findIndex(item => item.id === targetId);
+      if (targetIndex < 0) return current;
+      items.splice(targetIndex + Number(after), 0, source);
+      return { ...current, items };
+    });
+  }
+  function moveFoodBy(id, offset) {
+    const index = draft.items.findIndex(item => item.id === id);
+    const target = draft.items[index + offset];
+    if (target) moveFood(id, target.id, offset > 0);
+  }
   function renderFood(item, index) {
               const totals = itemNutrition(item);
               return (
                 <section
                   key={item.id}
-                  className="diary-food diary-food-compact"
+                  className={`diary-food diary-food-compact${draggingFoodId === item.id ? ' is-dragging' : ''}${dragOverFoodId === item.id ? ' is-drag-over' : ''}`}
                   aria-label={`Food ${index + 1}`}
+                  onDragOver={event => { if (draggingFoodId) { event.preventDefault(); event.dataTransfer.dropEffect = 'move'; setDragOverFoodId(item.id); } }}
+                  onDrop={event => { event.preventDefault(); const bounds = event.currentTarget.getBoundingClientRect(); moveFood(draggingFoodId || event.dataTransfer.getData('text/plain'), item.id, event.clientY >= bounds.top + bounds.height / 2); setDraggingFoodId(null); setDragOverFoodId(null); }}
                 >
+                  <div className="diary-food-heading">
+                    <div className="diary-food-reorder" aria-label={`Reorder ${item.name || 'food'}`}>
+                      <button type="button" className="diary-food-drag-handle" draggable aria-label={`Drag to reorder ${item.name || 'food'}`} title="Drag to reorder" onDragStart={event => { event.dataTransfer.effectAllowed = 'move'; event.dataTransfer.setData('text/plain', item.id); setDraggingFoodId(item.id); }} onDragEnd={() => { setDraggingFoodId(null); setDragOverFoodId(null); }}>⠿</button>
+                      <button type="button" className="diary-food-move-button" aria-label={`Move ${item.name || 'food'} up`} title="Move up" disabled={index === 0} onClick={() => moveFoodBy(item.id, -1)}>↑</button>
+                      <button type="button" className="diary-food-move-button" aria-label={`Move ${item.name || 'food'} down`} title="Move down" disabled={index === draft.items.length - 1} onClick={() => moveFoodBy(item.id, 1)}>↓</button>
+                    </div>
                   <button
                     type="button"
                     className="diary-food-toggle"
@@ -179,6 +235,7 @@ export function DiaryMealEditor({
                       <path d="m6 9 6 6 6-6" />
                     </motion.svg>
                   </button>
+                  </div>
                   <AnimatePresence initial={false}>
                   {openFood === item.id && <motion.div
                     key="food-editor"
@@ -188,7 +245,10 @@ export function DiaryMealEditor({
                     exit={{ height: 0, opacity: 0 }}
                     transition={{ height: { duration: reduceMotion ? 0 : 0.38, ease: [0.22, 1, 0.36, 1] }, opacity: { duration: reduceMotion ? 0 : 0.22 } }}
                   >
-                  <div className="diary-food-editor-inner">
+                  <div className="diary-food-editor-inner" onBlurCapture={event => {
+                    if (item.id !== manualId || event.currentTarget.contains(event.relatedTarget)) return;
+                    finalizeManualFood(item.id);
+                  }}>
                   {item.inventoryUnresolved?.length > 0 && <p className="diary-hint">Stock needs review for {item.inventoryUnresolved.join(', ')}. Set compatible ingredient weights/units and servings in Recipes, then add the recipe again. These unknown amounts will not be deducted.</p>}
                   <DiaryStoredFoodName
                     autoFocus={item.id === manualId}
@@ -272,11 +332,18 @@ export function DiaryMealEditor({
                     ...(item.unit!==label.unit && !(item.unit==='pieces' && ['g','ml'].includes(label.unit)) ? {unit:label.unit,quantity:''} : {}),
                     ...(item.nutritionUnit!==label.unit ? {perPiece:null} : {}),
                   })}/>
-                  <details>
-                    <summary>Edit label values and micronutrients</summary>
+                  <details
+                    open={nutritionOpen[item.id] ?? false}
+                    onToggle={event => {
+                      const open = event.currentTarget.open;
+                      setNutritionOpen(current => current[item.id] === open ? current : { ...current, [item.id]: open });
+                    }}
+                  >
+                    <summary>{item.id === manualId ? 'Enter nutrition manually' : 'Edit nutrition values'}</summary>
+                    {item.id === manualId && <p className="diary-hint">Type the label values directly below. They are per 100 g by default and do not change the amount eaten.</p>}
                     <div className="diary-fields">
                       <label>
-                        Label values per
+                        Nutrition values per
                         <input
                           required
                           type="number"
@@ -293,7 +360,7 @@ export function DiaryMealEditor({
                         />
                       </label>
                       <label>
-                        Label unit
+                        Nutrition basis unit
                         <select
                           value={item.nutritionUnit}
                           onChange={(event) =>
@@ -348,9 +415,7 @@ export function DiaryMealEditor({
                     </div>
                   </details>
                   <div className="diary-actions">
-                    {item.id === manualId && <button type="button" className="diary-primary" onClick={() => {
-                      try { validateItem(item); setManualId(null); setOpenFood(null); setError(''); } catch (err) { setError(err.message); }
-                    }}>Save food</button>}
+                    {item.id === manualId && <span className="diary-hint">This food is added to the meal when you leave its editor.</span>}
                     <button type="button" onClick={() => setLookup(item.id)}>
                       Replace from food lookup
                     </button>
@@ -367,7 +432,7 @@ export function DiaryMealEditor({
                         if (manualId === item.id) setManualId(null);
                       }}
                     >
-                      Remove food
+                      {item.id === manualId ? 'Cancel manual add' : 'Remove food'}
                     </button>
                   </div>
                   </div>
@@ -385,7 +450,7 @@ export function DiaryMealEditor({
       <form
         onSubmit={(event) => {
           event.preventDefault();
-          if (manualId) { setError('Save the manual food first.'); return; }
+          if (manualId && !finalizeManualFood(manualId)) return;
           onSave(draft);
         }}
       >
@@ -496,32 +561,26 @@ export function DiaryMealEditor({
             </section>
           </details>}
           <section className="diary-add-food" aria-label="Add foods to this meal">
-            <div className="diary-section-heading"><h3>Add food</h3><span>Search or scan a barcode, or enter food details yourself.</span></div>
+            <div className="diary-section-heading"><h3>Add food</h3><span>Choose a saved or reference food, or add one manually.</span></div>
             <div className="diary-actions diary-add-methods">
               <button
                 type="button"
                 className="diary-find-food-button"
                 disabled={draft.items.length >= 100}
-                onClick={() => setLookup(lookup === "new" ? null : "new")}
+                onClick={toggleNewFoodLookup}
               >
-                Find food or scan barcode
+                Find a food
               </button>
               <button
                 type="button"
                 className="diary-manual-food-button"
                 disabled={draft.items.length >= 100 || Boolean(manualId)}
-                onClick={() => {
-                  const item = { ...foodItem({ quantity: 100, unit: "g" }), name: '' };
-                  setManualId(item.id);
-                  setDraft({ ...draft, items: [...draft.items, item] });
-                  setOpenFood(item.id);
-                }}
+                onClick={addManualFood}
               >
-                Enter manually
+                Add manually
               </button>
             </div>
           </section>
-          {manualId && renderFood(draft.items.find(item => item.id === manualId), 0)}
           {lookup && (
             <section className="diary-lookup" aria-label="Find food">
               <div className="diary-actions">
@@ -532,11 +591,10 @@ export function DiaryMealEditor({
                   Close food lookup
                 </button>
               </div>
-              <p>
-                For eggs, choose a matching cooked product. To log 2 eggs,
-                choose pieces and enter the edible weight per egg if the record
-                is per 100 g.
-              </p>
+              <div className="diary-actions diary-lookup-manual">
+                <p>Choose a saved food, branded product or reference food. You can enter a food manually too.</p>
+                {lookup === "new" && <button type="button" disabled={draft.items.length >= 100 || Boolean(manualId)} onClick={addManualFood}>Add manually</button>}
+              </div>
               <NutritionLookup
                 currentNutrition={lookup!=='new'?(()=>{const item=draft.items.find(value=>value.id===lookup);return item?{...item.nutrition,nutrientSources:item.nutrientSources,quantity:item.basis,unit:item.nutritionUnit,source:item.source}:null;})():null}
                 key={lookup}
@@ -547,12 +605,13 @@ export function DiaryMealEditor({
                 }
                 active
                 visible
+                allowLabelScan={false}
                 onSelect={selectFood}
               />
             </section>
           )}
           <div className="diary-foods">
-            {draft.items.filter(item => item.id !== manualId).map(renderFood)}
+            {draft.items.map(renderFood)}
           </div>
           <section className="diary-meal-totals" aria-label="Draft meal nutrition">
             <h3>Meal total</h3>

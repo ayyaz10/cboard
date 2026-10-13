@@ -218,7 +218,7 @@ export function FinanceTimeline({ data, month, setMonth, change, transactionScop
         >
         <div className="f-chart-wrap" role="img" aria-label={`Available cash timeline ending at ${formatMoney(endBalance,currency)}`}>
         <ResponsiveContainer width="100%" height="100%"><ComposedChart data={timeline} margin={{top:30,right:28,bottom:12,left:8}}>
-          <defs><linearGradient id="financeBalanceFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--f-green)" stopOpacity=".42"/><stop offset="100%" stopColor="var(--f-green)" stopOpacity=".04"/></linearGradient></defs>
+          <defs><linearGradient id="financeBalanceFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--finance-chart-fill,var(--f-green))" stopOpacity=".24"/><stop offset="100%" stopColor="var(--finance-chart-fill,var(--f-green))" stopOpacity=".03"/></linearGradient></defs>
           <CartesianGrid stroke="var(--finance-chart-grid,#1112)" strokeDasharray="4 5" vertical={false}/>
           <XAxis type="number" dataKey="index" domain={[viewport.x0,viewport.x1]} allowDataOverflow ticks={timeline.map((_,index)=>index)} interval="preserveStartEnd" minTickGap={22} tickFormatter={(index)=>timeline[index]?.date!==timeline[index-1]?.date?(allTime?timeline[index]?.date:timeline[index]?.date?.slice(8,10)):''} tick={{fontSize:12,fontWeight:700,fill:'currentColor'}} axisLine={{stroke:'var(--finance-chart-line,#111)'}} tickLine={false}/>
           <YAxis width={74} domain={[viewport.y0,viewport.y1]} allowDataOverflow tickFormatter={(value)=>new Intl.NumberFormat(undefined,{style:'currency',currency,notation:'compact',maximumFractionDigits:1}).format(value/100)} tick={{fontSize:11,fontWeight:700,fill:'currentColor'}} axisLine={false} tickLine={false}/>
