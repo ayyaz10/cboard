@@ -25,7 +25,7 @@ export function applyAllocation(state, rule, income, date, sourceIncomeId = '') 
   if (!amount || amount < 0) return false;
   const previousTime = Math.max(0, ...state.transactions.map(item => Date.parse(item.createdAt) || 0));
   const now = new Date(Math.max(Date.now(), previousTime + 1)).toISOString();
-  const transaction = { id: id(), sequence: nextTransactionSequence(state), title: allocationTitle(rule, state), amount, type: rule.targetType, targetId: rule.targetId || '', categoryId: rule.categoryId || '', date, note: rule.note || 'Automatic income allocation', paymentMethod: '', createdAt: now, updatedAt: now, allocationRuleId: rule.id, sourceIncomeId, allocationStatus: ['debt','donation'].includes(rule.targetType) ? 'allocated' : 'completed' };
+  const transaction = { id: id(), sequence: nextTransactionSequence(state), title: allocationTitle(rule, state), amount, type: rule.targetType, targetId: rule.targetId || '', categoryId: rule.categoryId || '', date, note: rule.note || 'Automatic income allocation', paymentMethod: '', createdAt: now, updatedAt: now, allocationRuleId: rule.id, sourceIncomeId, allocationStatus: 'allocated', accountingKind: 'allocation', allocatedOn: date };
   if (rule.targetType === 'goal') {
     const goal = state.goals.find(x => x.id === rule.targetId);
     if (!goal) return false;
@@ -39,9 +39,6 @@ export function applyAllocation(state, rule, income, date, sourceIncomeId = '') 
   if (rule.targetType === 'investment') {
     const investment = state.investments.find(x => x.id === rule.targetId);
     if (!investment) return false;
-    investment.contributed += amount;
-    investment.currentValue += amount;
-    investment.date = date;
   }
   if (rule.targetType === 'debt') {
     const debt = state.debts.find(x => x.id === rule.targetId);
@@ -56,21 +53,26 @@ export function applyAllocation(state, rule, income, date, sourceIncomeId = '') 
 
 // Reconcile only the generated records owned by this income. Stable IDs keep
 // manually-created transactions and unrelated allocations untouched.
-export function reconcileIncomeAllocations(state, income, deleting = false) {
+export function reconcileIncomeAllocations(state, income, operation = 'replace') {
+  const deleting = operation === 'delete' || operation === true;
   const linked = state.transactions.filter(x => x.sourceIncomeId === income.id && x.allocationRuleId);
-  const protectedRecords = linked.filter(x => ['paid','completed'].includes(x.allocationStatus) && ['debt','donation'].includes(x.type));
-  if (deleting && protectedRecords.length) return { protectedCount: protectedRecords.length };
-  const ids = new Set(linked.map(x => x.id));
-  const goalContribIds = new Set((state.goalContributions || []).filter(x => ids.has(x.transactionId)).map(x => x.id));
-  for (const tx of linked) {
+  const protectedRecords = linked.filter(x => ['paid','completed','transferred'].includes(x.allocationStatus) && !['allocated','cancelled'].includes(x.allocationStatus));
+  const protectedIds = new Set(protectedRecords.map(x => x.id));
+  const removable = linked.filter(x => !protectedIds.has(x.id));
+  const ids = new Set(removable.map(x => x.id));
+  for (const tx of removable) {
     if (tx.type === 'goal') { const goal=state.goals.find(x=>x.id===tx.targetId); if(goal) goal.saved=Math.max(0,goal.saved-tx.amount); }
-    if (tx.type === 'investment') { const inv=state.investments.find(x=>x.id===tx.targetId); if(inv){inv.contributed=Math.max(0,inv.contributed-tx.amount);inv.currentValue=Math.max(0,inv.currentValue-tx.amount);} }
+    if (tx.type === 'investment' && ['paid','completed','transferred'].includes(tx.allocationStatus)) { const inv=state.investments.find(x=>x.id===tx.targetId); if(inv){inv.contributed=Math.max(0,inv.contributed-tx.amount);inv.currentValue=Math.max(0,inv.currentValue-tx.amount);} }
   }
   state.goalContributions=(state.goalContributions||[]).filter(x=>!ids.has(x.transactionId));
   state.debtPayments=(state.debtPayments||[]).filter(x=>!ids.has(x.transactionId));
   state.transactions=state.transactions.filter(x=>!ids.has(x.id));
+  if (deleting) for (const record of protectedRecords) {
+    record.originalSourceIncomeId ||= income.id;
+    record.sourceIncomeId = '';
+  }
   if (!deleting) applyIncomeAllocations(state, income);
-  return { protectedCount: 0 };
+  return { protectedCount: protectedRecords.length };
 }
 
 export function applyIncomeAllocations(state, incomeTransaction) {
@@ -88,4 +90,44 @@ export function applyDueMonthlyAllocations(state, date) {
     if (!state.transactions.some(x => x.allocationRuleId === rule.id && inMonth(x.date, month))) applyAllocation(state, rule, income, date);
   }
   return state;
+}
+
+export function settleAllocation(state, transactionId, date) {
+  const transaction = state.transactions.find(item => item.id === transactionId);
+  if (!transaction || transaction.allocationStatus !== 'allocated') return false;
+  transaction.allocatedOn ||= transaction.date;
+  transaction.paymentDate = date;
+  transaction.date = date;
+  transaction.updatedAt = new Date().toISOString();
+  transaction.allocationStatus = transaction.type === 'savings' ? 'transferred' : 'paid';
+  if (transaction.type === 'goal') {
+    const goal = state.goals.find(item => item.id === transaction.targetId);
+    if (goal) {
+      goal.saved = Math.max(0, goal.saved - transaction.amount);
+      markGoalCompletion(goal, date);
+    }
+  }
+  if (transaction.type === 'investment') {
+    const investment = state.investments.find(item => item.id === transaction.targetId);
+    if (investment) {
+      investment.contributed = Number(investment.contributed || 0) + transaction.amount;
+      investment.currentValue = Number(investment.currentValue || 0) + transaction.amount;
+      investment.date = date;
+      transaction.allocationStatus = 'transferred';
+      transaction.accountingKind = 'tracked-asset-transfer';
+    }
+  }
+  if (transaction.type === 'debt') {
+    const debt = state.debts.find(item => item.id === transaction.targetId);
+    if (debt) {
+      const paid = Math.min(transaction.amount, debt.remaining);
+      debt.remaining -= paid;
+      if (!debt.remaining) debt.status = 'paid';
+      transaction.amount = paid;
+      if (!(state.debtPayments || []).some(item => item.transactionId === transaction.id)) {
+        state.debtPayments.push({ id: id(), debtId: debt.id, amount: paid, date, allocationRuleId: transaction.allocationRuleId, sourceIncomeId: transaction.sourceIncomeId, transactionId: transaction.id });
+      }
+    }
+  }
+  return true;
 }

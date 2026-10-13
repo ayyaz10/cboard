@@ -636,6 +636,10 @@ export function DiaryMealEditor({
               />
             </label>
           </details>
+          <div className="diary-actions diary-add-methods diary-add-methods-bottom" aria-label="Add another food">
+            <button type="button" className="diary-find-food-button" disabled={draft.items.length >= 100} onClick={toggleNewFoodLookup}>Find a food</button>
+            <button type="button" className="diary-manual-food-button" disabled={draft.items.length >= 100 || Boolean(manualId)} onClick={addManualFood}>Add manually</button>
+          </div>
           <div className="diary-actions diary-editor-footer">
             <button
               className="diary-primary"

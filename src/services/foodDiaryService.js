@@ -58,7 +58,7 @@ async function commitDay(day, expectedUserId, deleting = false) {
     p_adjustments: inventory.adjustments,
   });
   assertSupabaseResult(result);
-  return deleting ? clean.date : { ...clean, updatedAt: result.data };
+  return deleting ? clean.date : { ...clean, updatedAt: result.data, inventoryWarnings: inventory.warnings };
 }
 export const saveFoodDiary = (day, expectedUserId) => commitDay(day, expectedUserId);
 export function deleteFoodDiaryDay(day, expectedUserId) {

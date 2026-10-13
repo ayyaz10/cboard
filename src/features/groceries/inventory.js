@@ -61,6 +61,7 @@ export function linkRecipeInventory(state, recipes, days = [], foodCatalog = [])
 }
 function dayUsage(state, day, activate, foodCatalog = []) {
   const entries = new Map();
+  entries.warnings = new Set();
   for (const meal of day?.meals || []) for (const food of meal.items) {
     const amounts = new Map();
     const usages = food.inventoryUsage || (food.unit !== 'servings' ? [{ key: `food:${food.source?.code || nameKey(food.name)}:${food.nutritionUnit}`, name: food.name, code: food.source?.code, unit: food.nutritionUnit, amount: 1 }] : []);
@@ -82,7 +83,10 @@ function dayUsage(state, day, activate, foodCatalog = []) {
       const consumed = usages.length === 1 && food.unit !== 'servings' ? pieces ?? physical ?? (originalUnit === food.unit ? food.quantity * usage.amount : null) : food.quantity * usage.amount;
       if (consumed == null) throw new Error(`${food.name}: confirm a compatible stock unit or edible weight.`);
       const amount = convert(consumed, usage.unit, item.unit);
-      if (amount == null) throw new Error(`${item.name}: stock unit no longer matches the logged food. Restore its unit before saving.`);
+      if (amount == null) {
+        entries.warnings.add(`${item.name}: diary saved, but grocery stock was not adjusted because its unit does not match the logged food. Restore the original stock unit to reconcile it.`);
+        continue;
+      }
       amounts.set(item.id, round((amounts.get(item.id) || 0) + amount));
     }
     entries.set(`${day.date}/${meal.id}/${food.id}`, amounts);
@@ -96,6 +100,7 @@ export function reconcileInventory(state, before, after, foodCatalog = []) {
   next.inventoryLedger ||= {};
   const previous = dayUsage(next, before, false, foodCatalog);
   const current = dayUsage(next, after, true, foodCatalog);
+  const warnings = new Set([...previous.warnings, ...current.warnings]);
   const adjustments = [];
   for (const key of new Set([...previous.keys(), ...current.keys()])) {
     const old = previous.get(key) || new Map();
@@ -106,7 +111,12 @@ export function reconcileInventory(state, before, after, foodCatalog = []) {
       const item = next.items.find(item => item.id === itemId);
       if (!item) throw new Error('A tracked stock item was removed. Reload groceries before reconciling this entry.');
       const prior = applied[itemId] ? convert(applied[itemId].amount, applied[itemId].unit, item.unit) : 0;
-      if (prior == null) throw new Error(`${item.name}: use the original stock unit before changing its diary entry.`);
+      if (prior == null) {
+        if (!after) throw new Error(`${item.name}: use the original stock unit before deleting this diary entry.`);
+        warnings.add(`${item.name}: diary saved, but grocery stock was not adjusted because its unit changed. Restore the original stock unit to reconcile it.`);
+        updated[itemId] = applied[itemId];
+        continue;
+      }
       const delta = (now.get(itemId) || 0) - (old.get(itemId) || 0);
       const foodTrackingDisabled = foodCatalog.find(food => food.id === item.foodId)?.groceryTrackingEnabled === false || item.trackingDisabled === true;
       const target = next.settings.stockTrackingPaused || item.stockTrackingPaused || item.removed || foodTrackingDisabled ? prior : current.has(key) ? Math.max(0, round(prior + delta)) : 0;
@@ -120,5 +130,5 @@ export function reconcileInventory(state, before, after, foodCatalog = []) {
     if (Object.keys(updated).length) next.inventoryLedger[key] = updated;
     else delete next.inventoryLedger[key];
   }
-  return { state: next, adjustments };
+  return { state: next, adjustments, warnings: [...warnings] };
 }

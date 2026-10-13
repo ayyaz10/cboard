@@ -364,19 +364,26 @@
   margin-top: 0.75rem;
 }
 .food-diary .diary-find-food-button {
-  border-color: #7f3e1e;
-  background: #b95c2b;
+  border-color: #743313;
+  background: #a94e20;
   color: #fff7f0;
   box-shadow: 3px 3px 0 #1b2813;
 }
-.food-diary .diary-find-food-button:hover { background: #b95c2b; }
+.food-diary .diary-find-food-button:hover { background: #a94e20; }
 .food-diary .diary-manual-food-button {
-  border-color: #244d5d;
-  background: #346f86;
+  border-color: #1e485a;
+  background: #28657d;
   color: #f3fbff;
   box-shadow: 3px 3px 0 #17323d;
 }
-.food-diary .diary-manual-food-button:hover { background: #346f86; }
+.food-diary .diary-manual-food-button:hover { background: #28657d; }
+.food-diary .diary-add-methods-bottom {
+  margin: 1rem 0;
+  padding: 0.8rem;
+  border: 1px solid var(--g-border);
+  border-radius: 0.8rem;
+  background: color-mix(in srgb, var(--g-surface, #fffdf8) 90%, #5b4636 10%);
+}
 .diary-panel,
 .diary-editor {
   border: 1px solid var(--g-border);

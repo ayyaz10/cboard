@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Area, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { budgetTarget, formatMoney, moneyInput, monthKey, shiftMonth } from './financeMath.js';
-import { buildCashTimeline, merchantLogoUrl, parseOpeningBalance } from './financeChartData.js';
+import { merchantLogoUrl, parseOpeningBalance } from './financeChartData.js';
+import { balanceViewValue, calculateFinanceBalances } from './financeBalances.js';
+import { FinanceBalanceControls } from './FinanceBalanceControls.jsx';
 
 const markerTypes = ['income', 'expense', 'savings', 'goal', 'investment', 'donation', 'budget', 'debt', 'transfer'];
 const markerLabels = { income:'Income', expense:'Spending', savings:'Savings', goal:'Goals', investment:'Investments', donation:'Donations', budget:'Budget pots', debt:'Repayments', transfer:'Transfers' };
@@ -27,14 +29,17 @@ function TimelineDot({ cx, cy, payload, visibleTypes, showLogos, selectTransacti
 function TimelineTooltip({ active, payload, currency, showLogos }) {
   if (!active || !payload?.length) return null;
   const point = payload[0].payload;
-  if (!point.transaction) return <div className="f-chart-tooltip"><strong>Opening balance</strong><span>{formatMoney(point.balance,currency)}</span></div>;
+  const balanceDetails=<><div className="f-between"><span>Actual cash</span><strong>{formatMoney(point.actualCash,currency)}</strong></div><div className="f-between"><span>Reserved</span><strong>{formatMoney(point.reservedTotal,currency)}</strong></div><div className="f-between"><span>Available</span><strong>{formatMoney(point.availableCash,currency)}</strong></div></>;
+  if (!point.transaction && point.eventKind==='snapshot') return <div className="f-chart-tooltip"><strong>Current goal reserve snapshot</strong><span>{point.date}</span>{balanceDetails}</div>;
+  if (!point.transaction) return <div className="f-chart-tooltip"><strong>Opening balance</strong><span>{formatMoney(point.balance,currency)}</span>{balanceDetails}</div>;
   const transaction = point.transaction;
   const sign = point.change > 0 ? '+' : point.change < 0 ? '−' : '';
+  const isReservation=point.eventKind==='reserve';
+  const isRelease=point.eventKind==='release';
   return <div className="f-chart-tooltip">
-    <div className="f-chart-tooltip-title"><MerchantMark transaction={transaction} showLogos={showLogos} compact/><div><strong>{transaction.title}</strong><span>{markerLabels[transaction.type] || transaction.type} · {transaction.date}</span></div></div>
-    <div className="f-between"><span>Movement</span><strong className={transaction.type==='income'?'f-positive':''}>{sign}{formatMoney(Math.abs(point.change),currency)}</strong></div>
-    {transaction.allocationStatus==='allocated'&&<div className="f-between"><span>Status</span><strong>Allocated · not paid</strong></div>}
-    <div className="f-between"><span>Available after</span><strong>{formatMoney(point.balance,currency)}</strong></div>
+    <div className="f-chart-tooltip-title"><MerchantMark transaction={transaction} showLogos={showLogos} compact/><div><strong>{transaction.title}</strong><span>{markerLabels[transaction.type] || transaction.type} · {point.date}</span></div></div>
+    <div className="f-between"><span>{isReservation?'Reserved':isRelease?'Reserve released':'Cash movement'}</span><strong className={!isReservation&&!isRelease&&transaction.type==='income'?'f-positive':''}>{isReservation||isRelease?formatMoney(transaction.amount,currency):`${sign}${formatMoney(Math.abs(point.change),currency)}`}</strong></div>
+    {balanceDetails}
   </div>;
 }
 
@@ -85,6 +90,8 @@ export function FinanceTimeline({ data, month, setMonth, change, transactionScop
   const [selectedTransactionId,setSelectedTransactionId] = useState(null);
   const [visibleTypes,setVisibleTypes] = useState(()=>new Set(markerTypes));
   const [visibleProgress,setVisibleProgress] = useState(()=>new Set(Object.keys(progressLabels)));
+  const [balanceView,setBalanceView] = useState('available');
+  const [includedBalanceComponents,setIncludedBalanceComponents] = useState(()=>new Set());
   const savedOpening = data.openingBalances?.[openingMonth] || 0;
   const [opening,setOpening] = useState(moneyInput(savedOpening));
   const [openingError,setOpeningError] = useState('');
@@ -93,7 +100,9 @@ export function FinanceTimeline({ data, month, setMonth, change, transactionScop
   const pinch = useRef(null);
   const wheelHandler = useRef(null);
   useEffect(()=>setOpening(moneyInput(savedOpening)),[openingMonth,savedOpening]);
-  const timeline = useMemo(()=>buildCashTimeline(transactions,rangeMonth,savedOpening),[transactions,rangeMonth,savedOpening]);
+  const balanceState = useMemo(()=>({...data,transactions}),[data,transactions]);
+  const balances = useMemo(()=>calculateFinanceBalances(balanceState,{month:rangeMonth,openingBalance:savedOpening}),[balanceState,rangeMonth,savedOpening]);
+  const timeline = useMemo(()=>balances.timeline.map(point=>({...point,balance:balanceViewValue(point,balanceView,includedBalanceComponents)})),[balances,balanceView,includedBalanceComponents]);
   const selectedTransaction=transactions.find(item=>item.id===selectedTransactionId)||null;
   useEffect(()=>{if(selectedTransactionId&&!selectedTransaction)setSelectedTransactionId(null)},[selectedTransactionId,selectedTransaction]);
   const fullViewport = useMemo(()=>{
@@ -108,22 +117,16 @@ export function FinanceTimeline({ data, month, setMonth, change, transactionScop
   const [dragging,setDragging] = useState(false);
   useEffect(()=>setViewport(fullViewport),[rangeMonth,fullViewport.x0,fullViewport.x1,fullViewport.y0,fullViewport.y1]);
   const targets = useMemo(()=>buildTargetCards(data,rangeMonth),[data,rangeMonth]);
-  const endBalance = timeline.at(-1)?.balance || 0;
+  const endBalance = balanceViewValue(balances,balanceView,includedBalanceComponents);
   const fullXSpan=fullViewport.x1-fullViewport.x0;
   const fullYSpan=fullViewport.y1-fullViewport.y0;
   const chartZoom=Math.round(fullXSpan/(viewport.x1-viewport.x0)*100);
   const toggle=(setter,current,key)=>setter(()=>{const next=new Set(current);if(next.has(key))next.delete(key);else next.add(key);return next});
+  const toggleBalanceComponent=(key)=>setIncludedBalanceComponents(current=>{const next=new Set(current);if(next.has(key))next.delete(key);else next.add(key);return next});
   function chartRatios(clientX,clientY) {
     const bounds=chartViewport.current?.getBoundingClientRect();
     if(!bounds)return {x:.5,y:.5};
     return {x:clamp((clientX-bounds.left)/bounds.width,0,1),y:clamp(1-(clientY-bounds.top)/bounds.height,0,1)};
-  }
-  function constrainX(next) {
-    const span=next.x1-next.x0;
-    if(span>=fullXSpan){const padding=(span-fullXSpan)/2;return {...next,x0:fullViewport.x0-padding,x1:fullViewport.x1+padding};}
-    if(next.x0<fullViewport.x0)return {...next,x0:fullViewport.x0,x1:fullViewport.x0+span};
-    if(next.x1>fullViewport.x1)return {...next,x0:fullViewport.x1-span,x1:fullViewport.x1};
-    return next;
   }
   function zoomChart(factor,clientX,clientY) {
     const ratios=clientX==null?{x:.5,y:.5}:chartRatios(clientX,clientY);
@@ -134,7 +137,7 @@ export function FinanceTimeline({ data, month, setMonth, change, transactionScop
       const nextY=clamp(oldY*factor,fullYSpan/5,fullYSpan*4);
       const anchorX=current.x0+ratios.x*oldX;
       const anchorY=current.y0+ratios.y*oldY;
-      return constrainX({x0:anchorX-ratios.x*nextX,x1:anchorX+(1-ratios.x)*nextX,y0:anchorY-ratios.y*nextY,y1:anchorY+(1-ratios.y)*nextY});
+      return {x0:anchorX-ratios.x*nextX,x1:anchorX+(1-ratios.x)*nextX,y0:anchorY-ratios.y*nextY,y1:anchorY+(1-ratios.y)*nextY};
     });
   }
   function panFrom(origin,clientX,clientY,horizontalOnly=false) {
@@ -144,7 +147,15 @@ export function FinanceTimeline({ data, month, setMonth, change, transactionScop
     const ySpan=origin.viewport.y1-origin.viewport.y0;
     const xMove=-(clientX-origin.x)/Math.max(1,bounds.width)*xSpan;
     const yMove=horizontalOnly?0:(clientY-origin.y)/Math.max(1,bounds.height)*ySpan;
-    setViewport(constrainX({x0:origin.viewport.x0+xMove,x1:origin.viewport.x1+xMove,y0:origin.viewport.y0+yMove,y1:origin.viewport.y1+yMove}));
+    setViewport({x0:origin.viewport.x0+xMove,x1:origin.viewport.x1+xMove,y0:origin.viewport.y0+yMove,y1:origin.viewport.y1+yMove});
+  }
+  function scaleFrom(origin,clientY) {
+    const bounds=chartViewport.current?.getBoundingClientRect();
+    if(!bounds)return;
+    const oldY=origin.viewport.y1-origin.viewport.y0;
+    const nextY=clamp(oldY*Math.exp((clientY-origin.y)*2/Math.max(1,bounds.height)),fullYSpan/5,fullYSpan*4);
+    const anchorY=origin.viewport.y0+origin.yRatio*oldY;
+    setViewport({...origin.viewport,y0:anchorY-origin.yRatio*nextY,y1:anchorY+(1-origin.yRatio)*nextY});
   }
   function touchDistance(touches) {
     const x = touches[0].clientX - touches[1].clientX;
@@ -172,9 +183,19 @@ export function FinanceTimeline({ data, month, setMonth, change, transactionScop
     }
   }
   wheelHandler.current=(event)=>{
-    if(!(event.ctrlKey||event.metaKey))return;
+    const scalingAxis=event.target.closest('.recharts-yAxis');
+    if(!scalingAxis&&!(event.ctrlKey||event.metaKey))return;
     event.preventDefault();
-    zoomChart(event.deltaY<0?.86:1.16,event.clientX,event.clientY);
+    if(scalingAxis){
+      const factor=event.deltaY<0?.9:1.1;
+      setViewport((current)=>{
+        const oldY=current.y1-current.y0;
+        const nextY=clamp(oldY*factor,fullYSpan/5,fullYSpan*4);
+        const ratio=chartRatios(event.clientX,event.clientY).y;
+        const anchorY=current.y0+ratio*oldY;
+        return {...current,y0:anchorY-ratio*nextY,y1:anchorY+(1-ratio)*nextY};
+      });
+    }else zoomChart(event.deltaY<0?.86:1.16,event.clientX,event.clientY);
   };
   useEffect(()=>{
     const element=chartViewport.current;
@@ -187,15 +208,22 @@ export function FinanceTimeline({ data, month, setMonth, change, transactionScop
   return <div className="f-timeline-page">
     <div className="f-tabs" role="group" aria-label="Timeline date range"><button type="button" aria-pressed={!allTime} onClick={()=>setTransactionScope('month')}>By month</button><button type="button" aria-pressed={allTime} onClick={()=>setTransactionScope('all')}>All time</button></div>
     {!allTime&&<div className="f-between f-timeline-month"><div className="f-actions"><button className="f-button" onClick={()=>setMonth(shiftMonth(month,-1))} aria-label="Previous month">←</button><span className="f-month">{new Date(`${month}-15`).toLocaleDateString([],{month:'long',year:'numeric'})}</span><button className="f-button" onClick={()=>setMonth(shiftMonth(month,1))} aria-label="Next month">→</button></div><button className="f-button" onClick={()=>setMonth(monthKey())}>Current month</button></div>}
-    <div className="f-between f-timeline-heading"><div><span className="pill">Money movement</span><h2 className="text-3xl font-bold mt-4">Money Timeline</h2><p className="f-help mt-2">The line rises with income and falls when money leaves your available cash.</p></div><div className="f-stat" data-tone={endBalance>=0?'blue':'pink'}><strong>{formatMoney(endBalance,currency)}</strong><span>{allTime?'Available after all transactions':'Available at month end'}</span></div></div>
+    <div className="f-between f-timeline-heading"><div><span className="pill">Money movement</span><h2 className="text-3xl font-bold mt-4">Money Timeline</h2><p className="f-help mt-2">Track bank cash separately from money you have reserved for a purpose.</p></div><div className="f-stat" data-tone={endBalance>=0?'blue':'pink'}><strong>{formatMoney(endBalance,currency)}</strong><span>{balanceView==='available'?(includedBalanceComponents.size?'Custom available':'Available to spend'):balanceView==='actual'?'Actual cash':'Overall owned'} · {allTime?'all time':'selected month'}</span></div></div>
     <section className="f-card f-timeline-card mt-5">
       <div className="f-timeline-controls"><form className="f-opening-form" onSubmit={saveOpening}><label>Opening balance for {openingMonth}<input inputMode="decimal" value={opening} onChange={(event)=>setOpening(event.target.value)} /></label><button className="f-button">Save</button></form><label className="f-logo-toggle"><input type="checkbox" checked={showLogos} onChange={(event)=>setShowLogos(event.target.checked)}/> Show recognised merchant logos</label></div>
       {allTime&&<p className="f-help">Starts with the opening balance for the earliest transaction month ({openingMonth}), then applies every recorded transaction once. Later monthly opening balances are not added again.</p>}
       {openingError&&<p className="f-alert" role="alert">{openingError}</p>}
+      <FinanceBalanceControls view={balanceView} setView={setBalanceView} included={includedBalanceComponents} toggleComponent={toggleBalanceComponent} idPrefix="timeline-balance"/>
+      <details className="f-balance-breakdown"><summary>Current balance breakdown</summary><dl>
+        <div><dt>Actual cash</dt><dd>{formatMoney(balances.actualCash,currency)}</dd></div>
+        <div><dt>Reserved</dt><dd>{formatMoney(balances.reservedTotal,currency)}</dd></div>
+        <div><dt>Available</dt><dd>{formatMoney(balances.availableCash,currency)}</dd></div>
+        <div><dt>Overall owned</dt><dd>{formatMoney(balances.overallOwned,currency)}</dd></div>
+      </dl><p className="f-help">Overall owned includes tracked savings and investment values and subtracts current debt. Goal and other virtual reserves are already part of cash and are not added a second time.</p></details>
       <fieldset className="f-filter-fieldset"><legend>Marker visibility</legend><div className="f-filter-chips">{markerTypes.map((type)=><label key={type} className="f-filter-chip" data-active={visibleTypes.has(type)}><input type="checkbox" checked={visibleTypes.has(type)} onChange={()=>toggle(setVisibleTypes,visibleTypes,type)}/>{markerLabels[type]}</label>)}</div></fieldset>
       {timeline.length===1?<div className="f-empty mt-5">{allTime?'No transactions recorded yet.':'No transactions in this month yet.'} Your opening balance is ready for the first movement.</div>:<div className="f-chart-shell">
         <div className="f-chart-toolbar">
-          <p><strong>Explore timeline</strong><span>Drag to pan · Ctrl/⌘ + wheel or pinch to zoom</span></p>
+          <p><strong>Explore timeline</strong><span>Drag to pan · Drag or scroll the right scale to stretch · Ctrl/⌘ + wheel or pinch to zoom</span></p>
           <div className="f-chart-zoom" aria-label="Timeline zoom controls">
             <button type="button" onClick={()=>zoomChart(1.25)} disabled={chartZoom<=25} aria-label="Zoom out">−</button>
             <output aria-live="polite">{chartZoom}%</output>
@@ -205,11 +233,11 @@ export function FinanceTimeline({ data, month, setMonth, change, transactionScop
         </div>
         <div
           ref={chartViewport}
-          className={`f-chart-viewport${dragging?' is-dragging':''}`}
+          className={`f-chart-viewport${dragging?' is-dragging':''}${dragging&&drag.current?.mode==='scale'?' is-scaling':''}`}
           tabIndex="0"
           aria-label="Pannable and zoomable money timeline"
-          onPointerDown={(event)=>{if(event.target.closest('.f-chart-dot-button')||event.pointerType==='touch'||event.button!==0)return;event.preventDefault();event.currentTarget.setPointerCapture(event.pointerId);drag.current={x:event.clientX,y:event.clientY,viewport};setDragging(true)}}
-          onPointerMove={(event)=>{if(drag.current)panFrom(drag.current,event.clientX,event.clientY)}}
+          onPointerDown={(event)=>{if(event.target.closest('.f-chart-dot-button')||event.pointerType==='touch'||event.button!==0)return;event.preventDefault();event.currentTarget.setPointerCapture(event.pointerId);const bounds=chartViewport.current?.getBoundingClientRect();const axisDrag=Boolean(event.target.closest('.recharts-yAxis'));drag.current={mode:axisDrag?'scale':'pan',x:event.clientX,y:event.clientY,yRatio:bounds?clamp(1-(event.clientY-bounds.top)/bounds.height,0,1):.5,viewport};setDragging(true)}}
+          onPointerMove={(event)=>{if(drag.current){if(drag.current.mode==='scale')scaleFrom(drag.current,event.clientY);else panFrom(drag.current,event.clientX,event.clientY)}}}
           onPointerUp={(event)=>{if(drag.current){drag.current=null;setDragging(false);event.currentTarget.releasePointerCapture(event.pointerId)}}}
           onPointerCancel={()=>{drag.current=null;setDragging(false)}}
           onTouchStart={startPinch}
@@ -221,11 +249,11 @@ export function FinanceTimeline({ data, month, setMonth, change, transactionScop
           <defs><linearGradient id="financeBalanceFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--finance-chart-fill,var(--f-green))" stopOpacity=".24"/><stop offset="100%" stopColor="var(--finance-chart-fill,var(--f-green))" stopOpacity=".03"/></linearGradient></defs>
           <CartesianGrid stroke="var(--finance-chart-grid,#1112)" strokeDasharray="4 5" vertical={false}/>
           <XAxis type="number" dataKey="index" domain={[viewport.x0,viewport.x1]} allowDataOverflow ticks={timeline.map((_,index)=>index)} interval="preserveStartEnd" minTickGap={22} tickFormatter={(index)=>timeline[index]?.date!==timeline[index-1]?.date?(allTime?timeline[index]?.date:timeline[index]?.date?.slice(8,10)):''} tick={{fontSize:12,fontWeight:700,fill:'currentColor'}} axisLine={{stroke:'var(--finance-chart-line,#111)'}} tickLine={false}/>
-          <YAxis width={74} domain={[viewport.y0,viewport.y1]} allowDataOverflow tickFormatter={(value)=>new Intl.NumberFormat(undefined,{style:'currency',currency,notation:'compact',maximumFractionDigits:1}).format(value/100)} tick={{fontSize:11,fontWeight:700,fill:'currentColor'}} axisLine={false} tickLine={false}/>
+          <YAxis orientation="right" width={74} domain={[viewport.y0,viewport.y1]} allowDataOverflow tickFormatter={(value)=>new Intl.NumberFormat(undefined,{style:'currency',currency,notation:'compact',maximumFractionDigits:1}).format(value/100)} tick={{fontSize:11,fontWeight:700,fill:'currentColor'}} axisLine={{stroke:'var(--finance-chart-line,#111)'}} tickLine={false}/>
           <ReferenceLine y={0} stroke="var(--finance-chart-line,#111)" strokeDasharray="6 4"/>
           <Tooltip content={<TimelineTooltip currency={currency} showLogos={showLogos}/>} cursor={{stroke:'var(--finance-chart-line,#111)',strokeDasharray:'3 3'}}/>
           <Area type="monotoneX" dataKey="balance" stroke="none" fill="url(#financeBalanceFill)" isAnimationActive={false}/>
-          <Line type="monotoneX" dataKey="balance" stroke="var(--finance-chart-line,#111)" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" dot={<TimelineDot visibleTypes={visibleTypes} showLogos={showLogos} selectTransaction={(transaction)=>setSelectedTransactionId(transaction.id)}/>} activeDot={{r:7,fill:'var(--f-green)',stroke:'var(--finance-chart-line,#111)',strokeWidth:2}} isAnimationActive={false}/>
+          <Line type="monotoneX" dataKey="balance" stroke="var(--finance-balance-line,var(--finance-chart-line,#111))" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" dot={<TimelineDot visibleTypes={visibleTypes} showLogos={showLogos} selectTransaction={(transaction)=>setSelectedTransactionId(transaction.id)}/>} activeDot={{r:7,fill:'var(--finance-chart-fill,var(--f-green))',stroke:'var(--finance-balance-line,var(--finance-chart-line,#111))',strokeWidth:2}} isAnimationActive={false}/>
         </ComposedChart></ResponsiveContainer>
         </div>
         </div>

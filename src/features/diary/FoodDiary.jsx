@@ -20,6 +20,7 @@ import { DiaryMonthPicker } from "./DiaryMonthPicker";
 import { DiaryFoodSources } from "./DiaryFoodSources";
 import { buildSavedFoods } from '../nutrition/savedFoods.js';
 import { catalogItemsFromDiaryMeal, normalizeFoodName, resolveRecipeFoodCandidate } from "../nutrition/foodCatalog.js";
+import { prepareDiaryCatalogItems } from './diaryCatalog.js';
 import { notify } from '../../lib/notifications.js';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog.jsx';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog.js';
@@ -212,20 +213,10 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
     const id = generation.current;
     try {
       let prepared = structuredClone(next);
-      const newFoods = [];
-      prepared.meals = prepared.meals.map(meal => ({
-        ...meal,
-        items: meal.items.map(item => {
-          if (item.foodId) return item;
-          const matches = foodCatalog.filter(food => [food.name, ...(food.aliases || [])]
-            .some(name => normalizeFoodName(name) === normalizeFoodName(item.name)));
-          if (matches.length === 1) return { ...item, foodId: matches[0].id,
-            groceryTrackingEnabled: matches[0].groceryTrackingEnabled !== false,
-            nutritionExcluded: matches[0].nutritionTrackingEnabled === false };
-          newFoods.push(item);
-          return item;
-        }),
-      }));
+      const catalogResolution = prepareDiaryCatalogItems(prepared.meals, foodCatalog);
+      prepared.meals = catalogResolution.meals;
+      const { newFoods, reviewFoods } = catalogResolution;
+      let catalogSaveError = '';
       if (newFoods.length && onFoodCatalogChange) {
         const names = [...new Set(newFoods.map(item => item.name))];
         const trackInGroceries = window.confirm(`Also track ${names.length === 1 ? names[0] : `${names.length} new diary foods`} in Groceries? These foods will be saved to All Food Items either way. Choose Cancel to keep them out of Groceries.`);
@@ -240,20 +231,24 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
           groceryTrackingEnabled: trackInGroceries,
           shoppingListEnabled: trackInGroceries,
         }));
-        const savedFoods = await onFoodCatalogChange(catalogItems);
-        prepared.meals = prepared.meals.map(meal => ({
-          ...meal,
-          items: meal.items.map(item => {
-            if (item.foodId) return item;
-            const matches = (savedFoods || []).filter(food => [food.name, ...(food.aliases || [])]
-              .some(name => normalizeFoodName(name) === normalizeFoodName(item.name)));
-            if (matches.length !== 1) return item;
-            const food = matches[0];
-            return { ...item, foodId: food.id,
-              groceryTrackingEnabled: food.groceryTrackingEnabled !== false,
-              nutritionExcluded: food.nutritionTrackingEnabled === false };
-          }),
-        }));
+        try {
+          const savedFoods = await onFoodCatalogChange(catalogItems);
+          prepared.meals = prepared.meals.map(meal => ({
+            ...meal,
+            items: meal.items.map(item => {
+              if (item.foodId) return item;
+              const matches = (savedFoods || []).filter(food => [food.name, ...(food.aliases || [])]
+                .some(name => normalizeFoodName(name) === normalizeFoodName(item.name)));
+              if (matches.length !== 1) return item;
+              const food = matches[0];
+              return { ...item, foodId: food.id,
+                groceryTrackingEnabled: food.groceryTrackingEnabled !== false,
+                nutritionExcluded: food.nutritionTrackingEnabled === false };
+            }),
+          }));
+        } catch (err) {
+          catalogSaveError = err.message || 'Could not save new diary foods to All Food Items.';
+        }
       }
       const saved = await saveFoodDiary(
         { ...prepared, updatedAt: day.updatedAt },
@@ -265,6 +260,9 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
         saved,
       ]);
       notify.success(success);
+      const foodsToReview = [...new Set([...reviewFoods, ...(catalogSaveError ? newFoods.map(item => item.name) : [])])];
+      if (foodsToReview.length) notify.warning(`Diary saved. Review ${foodsToReview.join(', ')} in food lookup before adding ${foodsToReview.length === 1 ? 'it' : 'them'} to All Food Items.${catalogSaveError ? ` ${catalogSaveError}` : ''}`);
+      if (saved.inventoryWarnings?.length) notify.warning([...new Set(saved.inventoryWarnings)].join(' '));
       return true;
     } catch (err) {
       if (id === generation.current)
@@ -323,7 +321,7 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
     let prepared;
     try {
       prepared = pendingRecipe.savedRecipe || (newRecipe ? buildDiaryRecipe(meal, recipes, newRecipe) : recipe ? buildDiaryRecipeUpdate(recipe, meal, selections, share) : null);
-    } catch (err) { setRecipeError(err.message); return; }
+    } catch (err) { setRecipeError(err.message); notify.error(err.message || 'Could not prepare the recipe update'); return; }
     if (!pendingRecipe.diarySaved) {
       const exists = day.meals.some(entry => entry.id === meal.id);
       if (!await persist({ ...day,
@@ -351,6 +349,7 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
         notify.success(`Meal saved and ${prepared.title} ${newRecipe ? 'added to Recipes' : 'updated'}${share ? '. Shared food nutrition updated too' : ''}`);
       } catch (err) {
         setRecipeError(`Your diary is saved. ${err.message}`);
+        notify.error(`Your diary is saved, but the recipe update failed: ${err.message}`);
         return;
       } finally { lock.current = false; setBusy(false); }
     }

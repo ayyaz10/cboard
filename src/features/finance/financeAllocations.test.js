@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyDueMonthlyAllocations, applyIncomeAllocations, reconcileIncomeAllocations } from './financeAllocations.js';
+import { applyDueMonthlyAllocations, applyIncomeAllocations, reconcileIncomeAllocations, settleAllocation } from './financeAllocations.js';
 
 function state() {
   return { settings:{monthlyIncome:300000}, transactions:[], allocationRules:[], goals:[], goalContributions:[], investments:[], debts:[], debtPayments:[] };
@@ -17,7 +17,7 @@ test('income rules create deductions once for each income transaction', () => {
   assert.equal(value.transactions[1].sourceIncomeId,'pay-1');
 });
 
-test('goal, investment, and debt allocations update their tracked balances', () => {
+test('goal allocations reserve goal progress while investment balances wait for transfer confirmation', () => {
   const value=state();
   value.goals=[{id:'g',title:'Holiday',target:50000,saved:45000,status:'active'}];
   value.investments=[{id:'i',name:'ISA',contributed:10000,currentValue:12000,date:'2026-08-01'}];
@@ -29,11 +29,31 @@ test('goal, investment, and debt allocations update their tracked balances', () 
   ];
   applyIncomeAllocations(value,{id:'pay',amount:100000,date:'2026-09-26'});
   assert.equal(value.goals[0].saved,50000);
-  assert.equal(value.investments[0].contributed,12000);
-  assert.equal(value.investments[0].currentValue,14000);
+  assert.equal(value.investments[0].contributed,10000);
+  assert.equal(value.investments[0].currentValue,12000);
   assert.equal(value.debts[0].remaining,3000);
   assert.equal(value.transactions.find(x=>x.type==='debt').allocationStatus,'allocated');
+  assert.equal(value.transactions.find(x=>x.type==='investment').allocationStatus,'allocated');
   assert.deepEqual(value.transactions.map(x=>x.amount),[5000,2000,3000]);
+});
+
+test('settling a savings reserve transfers it without losing total owned money', () => {
+  const value=state();
+  value.transactions.push({id:'save',type:'savings',amount:2000,date:'2026-09-01',allocationStatus:'allocated'});
+  assert.equal(settleAllocation(value,'save','2026-09-03'),true);
+  assert.equal(value.transactions[0].allocationStatus,'transferred');
+  assert.equal(value.transactions[0].allocatedOn,'2026-09-01');
+  assert.equal(value.transactions[0].paymentDate,'2026-09-03');
+});
+
+test('settling a goal allocation releases its reserve and reopens a completed goal', () => {
+  const value=state();
+  value.goals=[{id:'holiday',target:5000,saved:5000,status:'completed'}];
+  value.transactions.push({id:'goal-payment',type:'goal',targetId:'holiday',amount:5000,date:'2026-09-01',allocationStatus:'allocated'});
+  assert.equal(settleAllocation(value,'goal-payment','2026-09-04'),true);
+  assert.equal(value.goals[0].saved,0);
+  assert.equal(value.goals[0].status,'active');
+  assert.equal(value.transactions[0].allocationStatus,'paid');
 });
 
 test('income reconciliation removes only its generated allocations and can recreate edited amounts', () => {

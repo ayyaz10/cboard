@@ -54,6 +54,18 @@ test('recipe log, repeated save, quantity edit, reload and delete reconcile exac
   assert.equal(quantity(reconcileInventory(state, edited, null).state), 1000);
 });
 
+test('a changed grocery stock unit does not block a diary save or alter stock', () => {
+  const r = recipe(); const logged = day(recipeItems(r));
+  let state = reconcileInventory(linkRecipeInventory(stock(), [r]), null, logged).state;
+  state.items[0].unit = 'pieces';
+  const edited = structuredClone(logged);
+  edited.meals[0].title = 'Updated lunch';
+  const result = reconcileInventory(state, logged, edited);
+  assert.equal(quantity(result.state), 850);
+  assert.ok(result.warnings.some(message => message.includes('Chicken') && message.includes('diary saved')));
+  assert.deepEqual(result.adjustments, []);
+});
+
 test('shared ingredients use one stock ID; renames and recipe edits preserve existing snapshots', () => {
   const a = recipe(), b = recipe('another');
   let state = linkRecipeInventory(stock(), [a, b]);

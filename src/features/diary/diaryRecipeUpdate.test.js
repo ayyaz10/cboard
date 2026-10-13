@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { buildDiaryRecipe, buildDiaryRecipeUpdate, recipeUpdateRows, suggestedDiaryRecipe } from './diaryRecipeUpdate.js';
 import { foodItem } from './diaryData.js';
 import { applyFoodCatalogToRecipes } from '../nutrition/foodCatalog.js';
+import { validateRecipe } from '../recipes/recipeData.js';
 
 const recipe = { ...JSON.parse(readFileSync(new URL('../../../public/recipes/greek-yogurt-oats.json', import.meta.url))), updatedAt: '2026-09-29T00:00:00Z' };
 const item = foodItem({ quantity: 100, unit: 'g', calories: 100, protein: 8, source: { provider: 'Recipe ingredient', name: recipe.title } }, 'New yogurt');
@@ -44,6 +45,21 @@ test('matching ingredients update without duplication and unselected foods stay 
   assert.equal(saved.ingredients.length, recipe.ingredients.length);
   assert.equal(saved.ingredients[0].nutrition.protein, 16);
   assert.deepEqual(saved.ingredients[1].name, recipe.ingredients[1].name);
+});
+
+test('recipe update repairs legacy duplicate ingredient IDs and keeps scaling valid', () => {
+  const malformed = structuredClone(validateRecipe(recipe));
+  malformed.ingredients[1].id = malformed.ingredients[0].id;
+  malformed.ingredients[0].amount = 100;
+  malformed.scaling = {
+    anchorIngredientId: malformed.ingredients[0].id,
+    baseQuantities: Object.fromEntries(malformed.ingredients.map(item => [item.id, { amount: item.amount, unit: item.unit }])),
+  };
+  const row = { ...recipeUpdateRows(meal, malformed)[0], selected: true, amount: 250 };
+  const updated = buildDiaryRecipeUpdate(malformed, meal, [row]);
+  const ids = [...updated.ingredients, ...updated.sauces].map(item => item.id);
+  assert.equal(new Set(ids).size, ids.length);
+  assert.ok(updated.scaling.baseQuantities[updated.ingredients.at(-1).id]);
 });
 
 test('recipe-only labels survive shared catalog reloads; sharing opts back into shared values', () => {

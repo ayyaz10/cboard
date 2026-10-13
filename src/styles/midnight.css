@@ -155,10 +155,16 @@ html[data-theme="midnight"] .account-avatar { background: var(--mid-accent-soft)
 
 /* Finance's scoped stylesheet uses its own palette, so map its components intentionally. */
 html[data-theme="midnight"] .finance { color: var(--mid-text); --f-blue: var(--mid-blue-soft); --f-green: var(--mid-accent-soft); --f-pink: var(--mid-pink-soft); --f-amber: var(--mid-warning-soft); --f-scroll-surface: var(--mid-surface); --f-scroll-track: var(--mid-bg); --f-scroll-thumb: #46515e; --f-scroll-thumb-hover: #697585; --finance-chart-line: #c9c7c3; --finance-chart-grid: rgb(255 255 255 / .1); --finance-chart-fill: var(--mid-accent); }
+html[data-theme="midnight"] .finance .f-timeline-page { --finance-chart-line: #b5b4b1; --finance-chart-grid: rgb(181 180 177 / .2); --finance-chart-fill: var(--mid-accent); --finance-balance-line: var(--mid-accent); }
 html[data-theme="midnight"] .finance :is(.f-card,.f-stat,.f-item,.f-dialog,.f-kbd,.f-table td) { background: var(--mid-surface) !important; color: var(--mid-text) !important; border-color: var(--mid-border) !important; }
 html[data-theme="midnight"] .finance :is(.f-target-card,.f-chart-shell,.f-chart-toolbar,.f-chart-selected,.f-chart-tooltip,.f-report-feature,.f-converter-result,.f-conversion-preview,.f-cashflow-result,.f-cashflow-shortfall) { background: var(--mid-surface) !important; color: var(--mid-text) !important; border-color: var(--mid-border) !important; box-shadow: none !important; }
 html[data-theme="midnight"] .finance .f-chart-shell { background: var(--mid-raised) !important; border-color: var(--mid-border-strong) !important; }
 html[data-theme="midnight"] .finance .f-chart-toolbar { background: var(--mid-raised) !important; }
+html[data-theme="midnight"] .finance .f-chart-toolbar p span { color: var(--mid-secondary) !important; }
+html[data-theme="midnight"] .finance .f-balance-controls { background: var(--mid-raised); border-color: var(--mid-border); }
+html[data-theme="midnight"] .finance .f-balance-view-buttons button { border-color: var(--mid-border-strong); color: var(--mid-text); }
+html[data-theme="midnight"] .finance .f-balance-view-buttons button.is-selected { border-color: var(--mid-accent); background: color-mix(in srgb,var(--mid-accent) 15%,var(--mid-surface)); color: var(--mid-accent); }
+html[data-theme="midnight"] .finance .f-balance-breakdown dl div { border-color: var(--mid-border); }
 html[data-theme="midnight"] .finance .f-merchant-mark { background: var(--mid-raised) !important; color: var(--mid-text) !important; border-color: var(--mid-border-strong) !important; box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 42%, transparent), 0 2px 8px rgb(0 0 0 / .45) !important; }
 html[data-theme="midnight"] .finance .f-merchant-mark[data-type="income"] { background: #173327 !important; color: #c4f4d4 !important; border-color: #4c9b6b !important; }
 html[data-theme="midnight"] .finance .f-merchant-mark[data-type="expense"] { background: #341d22 !important; color: #ffd5da !important; border-color: #a85962 !important; }
@@ -360,10 +366,11 @@ html[data-theme="midnight"] .food-diary :is(.diary-panel,.diary-editor,.diary-so
 html[data-theme="midnight"] .food-diary :is(.diary-streak,.diary-sources-intro) { background: var(--mid-sage-soft) !important; color: var(--mid-text) !important; border-color: var(--mid-border-strong) !important; }
 html[data-theme="midnight"] .food-diary :is(.diary-sources-intro p,.diary-source-total small,.diary-source-card header > div:first-child > span,.diary-copy-option small,.diary-copy-option .diary-copy-foods,.diary-calorie-ring span,.diary-food-suggestions small,.diary-ingredient-list,.diary-ingredients summary span,.diary-food-macro-summary,.diary-food-amount) { color: var(--mid-secondary) !important; }
 html[data-theme="midnight"] .food-diary :is(.diary-source-count,.diary-view-tabs button[aria-selected="true"],.diary-report-tabs button[aria-selected="true"],.diary-copy-option:hover,.diary-food-suggestions button:hover,.diary-food-suggestions button.is-active) { background: var(--mid-accent-soft) !important; color: var(--mid-text) !important; border-color: #704326 !important; }
-html[data-theme="midnight"] .food-diary .diary-find-food-button { background: #b95c2b !important; color: #fff7f0 !important; border-color: #7f3e1e !important; box-shadow: none !important; }
-html[data-theme="midnight"] .food-diary .diary-find-food-button:hover { background: #b95c2b !important; }
-html[data-theme="midnight"] .food-diary .diary-manual-food-button { background: #346f86 !important; color: #f3fbff !important; border-color: #244d5d !important; box-shadow: none !important; }
-html[data-theme="midnight"] .food-diary .diary-manual-food-button:hover { background: #346f86 !important; }
+html[data-theme="midnight"] .food-diary .diary-find-food-button { background: #a94e20 !important; color: #fff7f0 !important; border-color: #743313 !important; box-shadow: none !important; }
+html[data-theme="midnight"] .food-diary .diary-find-food-button:hover { background: #a94e20 !important; }
+html[data-theme="midnight"] .food-diary .diary-manual-food-button { background: #28657d !important; color: #f3fbff !important; border-color: #1e485a !important; box-shadow: none !important; }
+html[data-theme="midnight"] .food-diary .diary-manual-food-button:hover { background: #28657d !important; }
+html[data-theme="midnight"] .food-diary .diary-add-methods-bottom { background: #151b1f; border-color: #34424a; }
 html[data-theme="midnight"] .food-diary .diary-primary { background: var(--mid-accent) !important; color: var(--mid-accent-text) !important; border-color: var(--mid-accent) !important; box-shadow: none !important; }
 html[data-theme="midnight"] .food-library [data-food-action-menu] > summary { background: #302117 !important; border-color: #855d43 !important; color: #f3b282 !important; }
 html[data-theme="midnight"] .food-library [data-food-action-menu] > summary:hover { background: #302117 !important; }

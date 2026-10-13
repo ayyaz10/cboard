@@ -23,6 +23,27 @@ export function buildDiaryRecipe(meal, recipes, { title, servings, steps }) {
 }
 
 const nameKey = name => String(name || '').trim().toLowerCase();
+function repairIngredientIds(recipe) {
+  const used = new Set();
+  const baseQuantities = { ...(recipe.scaling?.baseQuantities || {}) };
+  for (const group of ['ingredients', 'sauces']) {
+    recipe[group] = (recipe[group] || []).map((item, index) => {
+      let id = String(item.id || '').trim();
+      if (!id || used.has(id)) {
+        const originalId = id;
+        const base = originalId ? baseQuantities[originalId] : null;
+        let suffix = 1;
+        do { id = `${recipe.slug}:repaired:${group}:${index}${suffix === 1 ? '' : `-${suffix}`}`; suffix++; }
+        while (used.has(id));
+        if (recipe.scaling) baseQuantities[id] = base ? { ...base } : { amount: item.amount, unit: item.unit || '' };
+      }
+      used.add(id);
+      return { ...item, id };
+    });
+  }
+  if (recipe.scaling) recipe.scaling.baseQuantities = baseQuantities;
+}
+
 export function suggestedDiaryRecipe(meal, recipes) {
   const matches = recipes.filter(recipe => meal.items.some(item =>
     item.recipeOrigin?.slug === recipe.slug ||
@@ -79,5 +100,6 @@ export function buildDiaryRecipeUpdate(recipe, meal, selections, share = false) 
     else next.ingredients.push(ingredient);
   }
   next.nutritionFromIngredients = true;
+  repairIngredientIds(next);
   return { ...validateRecipe(next), image: recipe.image, updatedAt: recipe.updatedAt };
 }

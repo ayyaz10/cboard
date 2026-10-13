@@ -67,6 +67,11 @@ html[data-theme="matrix"] .finance .f-tabs a[aria-current=page]{border-color:var
 
 /* Money timeline: an honest balance line with optional transaction markers. */
 .f-timeline-page{--finance-chart-line:#111;--finance-chart-grid:#1112;--finance-chart-fill:var(--f-green);min-width:0}
+.f-balance-controls{display:flex;align-items:end;gap:1rem;flex-wrap:wrap;margin:.25rem 0 1rem;padding:.8rem;border:1px solid #1112;border-radius:.85rem;background:transparent}
+.f-balance-views{margin:0;padding:0;border:0}.f-balance-views legend{margin-bottom:.35rem;font-size:.7rem;font-weight:850;text-transform:uppercase;letter-spacing:.06em}
+.f-balance-view-buttons{display:flex;flex-wrap:wrap;gap:.4rem}.f-balance-view-buttons button{border:1px solid #1115;border-radius:.55rem;padding:.48rem .7rem;background:transparent;color:inherit;font-size:.78rem;font-weight:800}.f-balance-view-buttons button.is-selected{border-color:var(--f-green,#f58a43);background:color-mix(in srgb,var(--f-green,#f58a43) 18%,transparent);color:var(--f-green,#f58a43)}
+.f-balance-components{font-size:.76rem}.f-balance-components summary{font-weight:800;cursor:pointer}.f-balance-components summary span{margin-left:.35rem;opacity:.7;font-weight:500}.f-balance-component-list{display:flex;flex-wrap:wrap;gap:.55rem;margin-top:.65rem}.f-balance-component-list label{display:flex;align-items:center;gap:.35rem}.f-balance-component-list input{accent-color:var(--f-green,#f58a43)}
+.f-balance-overview{display:grid;grid-template-columns:1fr;gap:.8rem}.f-balance-overview-total{margin:.45rem 0;font-size:clamp(1.7rem,4vw,2.5rem);font-weight:900}.f-balance-breakdown{margin-top:.55rem;font-size:.74rem}.f-balance-breakdown summary{cursor:pointer;font-weight:750}.f-balance-breakdown dl{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.6rem;margin:.65rem 0 0}.f-balance-breakdown dl div{display:grid;gap:.2rem;padding:.55rem;border:1px solid #1113;border-radius:.55rem}.f-balance-breakdown dt{opacity:.7}.f-balance-breakdown dd{margin:0;font-weight:800}
 .f-timeline-card{overflow:hidden;padding:1.25rem}
 .f-timeline-heading{align-items:flex-end;margin-top:1rem}
 .f-timeline-heading>div:first-child{min-width:0}
@@ -93,6 +98,8 @@ html[data-theme="matrix"] .finance .f-tabs a[aria-current=page]{border-color:var
 .f-chart-zoom output{min-width:3.25rem;text-align:center;font-size:.72rem;font-weight:800;font-variant-numeric:tabular-nums}
 .f-chart-viewport{max-width:100%;overflow:hidden;touch-action:pan-y;cursor:grab;user-select:none}
 .f-chart-viewport.is-dragging{cursor:grabbing}
+.f-chart-viewport .recharts-yAxis{cursor:ns-resize;touch-action:none}
+.f-chart-viewport.is-scaling,.f-chart-viewport.is-scaling .recharts-yAxis{cursor:ns-resize}
 .f-chart-viewport:focus,.f-chart-viewport :focus{outline:none}
 .f-chart-wrap{width:100%;height:24rem;color:#111}
 .f-chart-dot{overflow:visible}

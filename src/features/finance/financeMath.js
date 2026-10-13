@@ -42,7 +42,7 @@ export function budgetTarget(item, income) {
 
 export function financeSummary(state, selectedMonth) {
   const allTime = selectedMonth === null;
-  const transactions = (allTime ? state.transactions : state.transactions.filter((item) => inMonth(item.date, selectedMonth))).filter(item => item.allocationStatus !== 'allocated' && (!item.source || item.providerStatus === 'BOOK'));
+  const transactions = (allTime ? state.transactions : state.transactions.filter((item) => inMonth(item.date, selectedMonth))).filter(item => !['allocated', 'planned', 'cancelled'].includes(item.allocationStatus) && (!item.source || item.providerStatus === 'BOOK'));
   const sum = (type) => transactions.filter((item) => item.type === type).reduce((total, item) => total + item.amount, 0);
   const income = sum('income');
   const expenses = sum('expense');
@@ -52,8 +52,11 @@ export function financeSummary(state, selectedMonth) {
   const saved = sum('savings');
   const budgetAllocated = sum('budget');
   const goalContributions = sum('goal');
-  const outflow = expenses + donations + investments + debtPayments + saved + budgetAllocated + goalContributions;
-  const remaining = income - outflow;
+  const transfers = transactions.filter(item => item.type === 'transfer');
+  const transferIn = transfers.filter(item => item.transferKind === 'external-in').reduce((total, item) => total + item.amount, 0);
+  const transferOut = transfers.filter(item => item.transferKind === 'external-out').reduce((total, item) => total + item.amount, 0);
+  const outflow = expenses + donations + investments + debtPayments + saved + budgetAllocated + goalContributions + transferOut;
+  const remaining = income + transferIn - outflow;
   const savings = saved;
   const budgetMonths = allTime ? Object.keys(state.budgets) : [selectedMonth];
   const budgetPlanned = budgetMonths.reduce((total, month) => {
@@ -61,7 +64,7 @@ export function financeSummary(state, selectedMonth) {
     return total + (state.budgets[month] || []).reduce((sum, item) => sum + budgetTarget(item, monthIncome || state.settings.monthlyIncome), 0);
   }, 0);
   return {
-    income, expenses, donations, investments, debtPayments, remaining, savings, budgetAllocated, goalContributions,
+    income, expenses, donations, investments, debtPayments, remaining, savings, budgetAllocated, goalContributions, transferIn, transferOut,
     savingsRate: income ? Math.round(saved * 10000 / income) : 0,
     budgetPlanned,
     budgetUsed: budgetPlanned ? Math.round(expenses * 10000 / budgetPlanned) : 0,

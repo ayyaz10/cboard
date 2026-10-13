@@ -36,6 +36,16 @@ export function normalizeFinanceState(value) {
   if (!state.budgets || typeof state.budgets !== 'object' || Array.isArray(state.budgets)) state.budgets = {};
   if (!state.openingBalances || typeof state.openingBalances !== 'object' || Array.isArray(state.openingBalances)) state.openingBalances = {};
   state.transactions = state.transactions.filter((item) => item && transactionTypes.includes(item.type) && Number.isSafeInteger(item.amount) && item.amount > 0);
+  // Previous auto deductions recorded virtual Savings/Goal/Budget allocations as
+  // completed cash outflows. Their rule link identifies them safely as reservations.
+  for (const item of state.transactions) {
+    if (item.allocationRuleId && ['savings', 'goal', 'budget'].includes(item.type) && item.allocationStatus === 'completed') {
+      item.legacyAllocationStatus = item.allocationStatus;
+      item.allocationStatus = 'allocated';
+      item.accountingKind = 'allocation';
+      item.allocatedOn ||= item.date;
+    }
+  }
   for (const category of defaultCategories) {
     if (!state.categories.some((item) => item.name === category.name && item.type === category.type)) state.categories.push({ ...category, id: `added-${category.id}`, order: state.categories.length });
   }

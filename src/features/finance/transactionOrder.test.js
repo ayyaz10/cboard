@@ -15,6 +15,15 @@ test('simultaneous allocations follow their income deterministically in history 
   assert.deepEqual(buildCashTimeline(sameTime,'2026-09').slice(1).map(point=>point.transaction.type),['income','savings','donation']);
   applyIncomeAllocations(state,income); assert.equal(state.transactions.length,3);
 });
+
+test('confirmed allocations sort on their actual settlement date', () => {
+  const rows=[
+    {id:'salary',date:'2026-09-01',type:'income',amount:10000},
+    {id:'reserve',date:'2026-09-05',allocatedOn:'2026-09-01',paymentDate:'2026-09-05',type:'savings',amount:1000,allocationStatus:'transferred',sourceIncomeId:'salary'},
+    {id:'later',date:'2026-09-03',type:'expense',amount:500},
+  ];
+  assert.deepEqual(orderedTransactions(rows,false).map(item=>item.id),['salary','later','reserve']);
+});
 test('category, month and title filters produce the correct selected spending', () => {
   const rows=[{id:'a',date:'2026-09-01',type:'expense',title:'Gym',amount:3000,categoryId:'fitness'},{id:'b',date:'2026-09-02',type:'expense',title:'Gym shoes',amount:5000,categoryId:'fitness'},{id:'c',date:'2026-08-01',type:'expense',title:'Gym',amount:3000,categoryId:'fitness'},{id:'d',date:'2026-09-01',type:'expense',title:'Food',amount:1000,categoryId:'groceries'}];
   const selected=filterTransactions(rows,{month:'2026-09',category:'fitness'});

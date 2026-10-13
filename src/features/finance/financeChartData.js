@@ -1,26 +1,9 @@
-import { orderedTransactions } from './transactionOrder.js';
-import { inMonth } from './financeMath.js';
-
-const outflowTypes = new Set(['expense', 'donation', 'investment', 'debt', 'savings', 'budget', 'goal']);
-
-export function transactionCashEffect(transaction) {
-  if (transaction.allocationStatus === 'allocated') return 0;
-  if (transaction.type === 'income') return transaction.amount;
-  if (outflowTypes.has(transaction.type)) return -transaction.amount;
-  return 0;
-}
+import { buildFinanceTimeline, transactionCashEffect } from './financeBalances.js';
+export { transactionCashEffect };
 
 export function buildCashTimeline(transactions, month, openingBalance = 0) {
-  const ordered = orderedTransactions(transactions, false).filter(item => month === null || inMonth(item.date, month));
-  let balance = Number.isSafeInteger(openingBalance) ? openingBalance : 0;
-  const points = [{ index: 0, date: month === null ? (ordered[0]?.date || '') : `${month}-01`, balance, change: 0, transaction: null }];
-
-  for (const transaction of ordered) {
-    const change = transactionCashEffect(transaction);
-    balance += change;
-    points.push({ index: points.length, date: transaction.date, balance, change, transaction });
-  }
-  return points;
+  return buildFinanceTimeline({ transactions, goals: [], goalContributions: [], investments: [], debts: [] }, month, openingBalance)
+    .map(point => ({ ...point, balance: point.actualCash, change: point.change }));
 }
 
 const merchantDomains = [
