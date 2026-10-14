@@ -184,6 +184,7 @@ html[data-theme="midnight"] .finance .f-stat[data-tone="blue"] { background: var
 html[data-theme="midnight"] .finance .f-stat[data-tone="pink"] { background: var(--mid-pink-soft) !important; }
 html[data-theme="midnight"] .finance .f-stat[data-tone="amber"] { background: var(--mid-warning-soft) !important; }
 html[data-theme="midnight"] .finance :is(.f-button,.f-icon,.f-tabs button,.f-mobile-tabs>button,.f-chart-zoom button) { background: var(--mid-raised) !important; color: var(--mid-text) !important; border-color: var(--mid-border-strong) !important; box-shadow: none !important; }
+html[data-theme="midnight"] .finance .f-scope-picker button.is-active { background: var(--mid-accent) !important; color: var(--mid-accent-text) !important; border-color: var(--mid-accent) !important; font-weight: 800; }
 html[data-theme="midnight"] .finance :is(.f-primary,.f-mobile-tab-picker select) { background: var(--mid-accent); color: var(--mid-accent-text); border-color: var(--mid-accent); box-shadow: none; }
 html[data-theme="midnight"] .finance :is(.f-form input,.f-form select,.f-form textarea,.f-input,.f-mobile-tab-picker select) { background-color: var(--surface-primary); color: var(--mid-text); border-color: var(--border-strong); }
 html[data-theme="midnight"] .finance .f-header p,
