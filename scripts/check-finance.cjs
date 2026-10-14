@@ -38,9 +38,17 @@ const assert = require('node:assert/strict');
     await page.getByLabel('Merchant or title').fill('Weekly groceries');
     await page.getByRole('button', { name: 'Add transaction', exact: true }).click();
     await page.getByText('£2,424.50', { exact: true }).first().waitFor();
-    const sections = [['Transactions','Transactions'],['Monthly Budget','Monthly Budget'],['Goals','Savings Goals'],['Investments','Investments'],['Money to Pay Back','Money to Pay Back'],['Donations','Donations'],['Categories','Categories']];
-    for (const [name, heading] of sections) {
-      await page.getByRole('button', { name, exact: true }).click();
+    const sections = [
+      ['transactions','Transactions'],['budget','Monthly Budget'],['goals','Savings Goals'],
+      ['investments','Investments'],['debts','Money to Pay Back'],['donations','Donations'],['categories','Categories'],
+    ];
+    for (const [key, heading] of sections) {
+      if (key === 'transactions' || key === 'goals' || key === 'debts') {
+        const label = key === 'goals' ? 'Funds & goals' : key === 'debts' ? 'Debt' : 'Transactions';
+        await page.getByRole('link', { name: label, exact: true }).click();
+      } else {
+        await page.getByLabel('More Finance sections').selectOption(key);
+      }
       await page.getByRole('heading', { name: heading, exact: true }).first().waitFor();
     }
     await page.reload();

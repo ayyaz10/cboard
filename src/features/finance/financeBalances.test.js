@@ -34,13 +34,13 @@ test('paid donation releases its reserve and decreases cash exactly once', () =>
   assert.equal(timeline[1].actualCash, 95_000);
 });
 
-test('paid debt reduces cash and liability once while preserving net owned value', () => {
+test('unpaid debt does not reduce overall owned; a recorded payment reduces cash once', () => {
   const balances = calculateFinanceBalances(state([
     tx('salary', 'income', 100_000, '2026-09-01'),
     tx('repay', 'debt', 10_000, '2026-09-10', { allocationStatus: 'paid', allocatedOn: '2026-09-02', paymentDate: '2026-09-10' }),
   ], { debts: [{ id: 'loan', original: 50_000, remaining: 40_000, startedOn: '2026-08-01' }], debtPayments: [{ id: 'p1', debtId: 'loan', amount: 10_000, date: '2026-09-10' }] }));
   assert.equal(balances.actualCash, 90_000);
-  assert.equal(balances.overallOwned, 50_000);
+  assert.equal(balances.overallOwned, 90_000);
 });
 
 test('tracked-account transfers preserve total cash; external transfers change it explicitly', () => {
@@ -54,25 +54,27 @@ test('a confirmed investment transfer reduces bank cash and adds the tracked ass
     tx('salary', 'income', 100_000, '2026-09-01'),
     tx('invest', 'investment', 20_000, '2026-09-05', { allocationStatus: 'transferred', allocatedOn: '2026-09-02', paymentDate: '2026-09-05', targetId: 'isa' }),
   ], { investments: [{ id: 'isa', contributed: 20_000, currentValue: 20_000, date: '2026-09-05' }] }));
-  assert.equal(balances.actualCash, 80_000);
+  assert.equal(balances.actualCash, 100_000);
   assert.equal(balances.overallOwned, 100_000);
+  assert.equal(balances.availableCash, 80_000);
 });
 
-test('goal contributions reserve available money and withdrawals release it without changing cash', () => {
+test('unlinked goal side-ledger entries do not change transaction-derived balances', () => {
   const result = buildFinanceTimeline(state([tx('salary', 'income', 100_000, '2026-09-01')], {
     goalContributions: [
       { id: 'g1', goalId: 'holiday', amount: 20_000, kind: 'contribution', date: '2026-09-02' },
       { id: 'g2', goalId: 'holiday', amount: 5_000, kind: 'withdrawal', date: '2026-09-03' },
     ],
   }), null, 0);
-  assert.deepEqual(result.map(point => point.actualCash), [0, 100_000, 100_000, 100_000]);
-  assert.deepEqual(result.map(point => point.availableCash), [0, 100_000, 80_000, 85_000]);
+  assert.equal(result.at(-1).actualCash, 100_000);
+  assert.equal(result.at(-1).availableCash, 100_000);
 });
 
 test('goal spending lowers cash and releases the matching reserve once', () => {
   const result = buildFinanceTimeline(state([
     tx('salary', 'income', 100_000, '2026-09-01'),
-    tx('hotel', 'expense', 5_000, '2026-09-03', { goalId: 'holiday', goalMovement: 'spend' }),
+    tx('fund', 'goal', 20_000, '2026-09-02', { targetId: 'holiday' }),
+    tx('hotel', 'expense', 5_000, '2026-09-03', { goalId: 'holiday', paidFromFundId: 'goal:holiday', goalMovement: 'spend' }),
   ], {
     goalContributions: [
       { id: 'fund', goalId: 'holiday', amount: 20_000, kind: 'contribution', date: '2026-09-02' },
@@ -93,16 +95,16 @@ test('historical snapshots are not projected backward onto dates before the snap
   assert.equal(result[2].overallOwned, 125_000);
 });
 
-test('monthly timeline carries prior reservations but uses the month opening cash only', () => {
+test('monthly timeline carries prior funds and uses one opening balance', () => {
   const result = buildFinanceTimeline(state([
     tx('income', 'income', 100_000, '2026-08-01'),
     tx('reserve', 'savings', 20_000, '2026-08-02', { allocationStatus: 'allocated' }),
     tx('expense', 'expense', 5_000, '2026-09-03'),
-  ]), '2026-09', 80_000);
-  assert.equal(result[0].actualCash, 80_000);
+  ]), '2026-09', 0);
+  assert.equal(result[0].actualCash, 100_000);
   assert.equal(result[0].reservedTotal, 20_000);
-  assert.equal(result.at(-1).actualCash, 75_000);
-  assert.equal(result.at(-1).availableCash, 55_000);
+  assert.equal(result.at(-1).actualCash, 95_000);
+  assert.equal(result.at(-1).availableCash, 75_000);
 });
 
 test('cancelled and planned records do not change cash or reserve values', () => {

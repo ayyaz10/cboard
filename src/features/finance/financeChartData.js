@@ -3,7 +3,7 @@ export { transactionCashEffect };
 
 export function buildCashTimeline(transactions, month, openingBalance = 0) {
   return buildFinanceTimeline({ transactions, goals: [], goalContributions: [], investments: [], debts: [] }, month, openingBalance)
-    .map(point => ({ ...point, balance: point.actualCash, change: point.change }));
+    .map(point => ({ ...point, balance: point.availableCash, change: point.change }));
 }
 
 const merchantDomains = [

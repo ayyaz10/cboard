@@ -1,4 +1,4 @@
-import { orderedTransactions } from './transactionOrder.js';
+import { deriveFinancePosition } from './financeLedger.js';
 
 export const balanceComponents = [
   { id: 'savings', label: 'Savings' },
@@ -105,94 +105,59 @@ function liabilitiesAt(state, date) {
 /** Shared accounting timeline. It starts cash from the selected opening balance and replays
  * dated cash movements and reservations; prior reservations seed a monthly view without
  * reapplying prior cash movements to that month's opening balance. */
-export function buildFinanceTimeline(state, month = null, openingBalance = 0, includeCurrentGoalSnapshot = month === null || month === new Date().toISOString().slice(0, 7)) {
-  const transactions = orderedTransactions(state.transactions || [], false).filter(item => !item.source || item.providerStatus === 'BOOK');
-  const ids = new Set(transactions.map(item => item.id));
-  const events = eventOrder([...transactions.flatMap(transactionEvents), ...goalEvents(state, ids)]);
-  const startDate = month ? `${month}-01` : '';
-  const endDate = month ? `${month}-31` : '9999-12-31';
-  const periodEvents = month ? events.filter(event => event.date >= startDate && event.date <= endDate) : events;
-  const balances = { actualCash: Number.isSafeInteger(openingBalance) ? openingBalance : 0, reserved: zeroComponents(), reservedTotal: 0, availableCash: 0, savingsAsset: 0 };
-  if (month) {
-    // Replay only the pre-period reservation state. The month opening balance already
-    // accounts for prior bank movements, so carry the reserved components separately.
-    const seed = { actualCash: 0, reserved: zeroComponents(), reservedTotal: 0, availableCash: 0, savingsAsset: 0 };
-    for (const event of events) if (event.date < startDate) applyEvent(event, seed);
-    balances.reserved = seed.reserved;
-    balances.savingsAsset = seed.savingsAsset;
-    balances.reservedTotal = seed.reservedTotal;
-    balances.availableCash = balances.actualCash - balances.reservedTotal;
-  }
-  balances.reservedTotal = componentTotal(balances.reserved);
-  balances.availableCash = balances.actualCash - balances.reservedTotal;
-  const initialDate = month ? startDate : (periodEvents[0]?.date || '');
-  const point = (index, date, transaction, change = 0, eventKind = '') => ({
-    index, date, transaction, change, eventKind,
-    actualCash: balances.actualCash,
-    reserved: { ...balances.reserved },
-    reservedTotal: balances.reservedTotal,
-    availableCash: balances.availableCash,
-    overallOwned: balances.actualCash + balances.savingsAsset + ownedAssetsAt(state, date) - liabilitiesAt(state, date),
-  });
-  const points = [point(0, initialDate, null)];
-  for (const event of periodEvents) {
-    const beforeCash = balances.actualCash;
-    applyEvent(event, balances);
-    const cashChange = balances.actualCash - beforeCash;
-    if (event.kind === 'reserve' || event.kind === 'release') balances.availableCash = balances.actualCash - balances.reservedTotal;
-    points.push(point(points.length, event.date, event.transaction, cashChange, event.kind));
-  }
-  if (includeCurrentGoalSnapshot) {
-    const date = new Date().toISOString().slice(0, 10);
-    const snapshotDateIsInPeriod = !month || date.startsWith(month);
-    const currentGoalReserve = (state.goals || []).reduce((sum, goal) => sum + Number(goal.saved || 0), 0);
-    if (snapshotDateIsInPeriod && date >= (points.at(-1)?.date || '')) {
-      const snapshotReserve = Math.max(balances.reserved.goal, currentGoalReserve);
-      balances.reserved.goal = snapshotReserve;
-      balances.reservedTotal = componentTotal(balances.reserved);
-      balances.availableCash = balances.actualCash - balances.reservedTotal;
-      const currentOwned = balances.actualCash + balances.savingsAsset
-        + (state.investments || []).reduce((sum, item) => sum + Number(item.currentValue || 0), 0)
-        - (state.debts || []).reduce((sum, item) => sum + Number(item.remaining || 0), 0);
-      const snapshot = point(points.length, date, null, 0, 'snapshot');
-      snapshot.overallOwned = currentOwned;
-      if (snapshot.reserved.goal !== points.at(-1)?.reserved.goal || snapshot.overallOwned !== points.at(-1)?.overallOwned) points.push(snapshot);
+export function buildFinanceTimeline(state, month = null, openingBalance = 0) {
+  const cutoff = month ? `${month}-31` : '9999-12-31';
+  const position = deriveFinancePosition(state, { asOfDate: cutoff, openingBalance });
+  const start = month ? `${month}-01` : '';
+  const prior = position.points.filter(point => point.date && point.date < start).at(-1);
+  const visible = position.points.filter(point => !month || point.date >= start);
+  const points = month && prior
+    ? [{ ...prior, date: start, transaction: null }, ...visible]
+    : visible;
+  return points.map((point, index) => {
+    const previous = points[index - 1];
+    const funds = point.funds || {};
+    const reserves = point.reserves || {};
+    const reserved = zeroComponents();
+    for (const [key, value] of Object.entries(funds)) {
+      if (key.startsWith('savings:')) reserved.savings += value;
+      else if (key.startsWith('investment:')) reserved.investment += value;
+      else if (key.startsWith('asset:')) reserved.investment += value;
+      else reserved.goal += value;
     }
-  }
-  return points;
+    for (const [key, value] of Object.entries(reserves)) reserved[key] = (reserved[key] || 0) + value;
+    return {
+      index, date: point.date, transaction: point.transaction,
+      change: previous ? point.spendable - previous.spendable : 0,
+      eventKind: point.transaction?._reservePhase ? 'reserve' : point.transaction?._settlementPhase ? 'payment' : point.transaction?.goalMovement === 'release' ? 'release' : 'cash',
+      actualCash: point.totalOwned, reserved, reservedTotal: point.protected,
+      availableCash: point.spendable, overallOwned: point.totalOwned,
+    };
+  });
 }
-
-export function calculateFinanceBalances(state, { month = null, openingBalance = 0, includeCurrentGoalSnapshot = month === null || month === new Date().toISOString().slice(0, 7) } = {}) {
-  const points = buildFinanceTimeline(state, month, openingBalance, includeCurrentGoalSnapshot);
-  const last = points.at(-1);
-  const today = new Date().toISOString().slice(0, 10);
-  const asOfDate = month && month !== today.slice(0, 7) ? `${month}-31` : today;
-  const isCurrentMonth = month === today.slice(0, 7);
-  const investments = (state.investments || []).filter(item => !month || (isCurrentMonth ? (!item.date || item.date <= asOfDate) : (item.date && item.date <= asOfDate))).reduce((sum, item) => sum + Number(item.currentValue || 0), 0);
-  const liabilities = month && month !== today.slice(0, 7) ? liabilitiesAt(state, asOfDate) : (state.debts || []).reduce((sum, item) => sum + Number(item.remaining || 0), 0);
-  const savingsAssets = (state.transactions || []).filter(item => item.type === 'savings' && !['allocated', 'cancelled'].includes(item.allocationStatus) && item.accountingKind !== 'allocation').reduce((sum, item) => sum + item.amount, 0);
-  const reserved = { ...last.reserved };
-  // Goal.saved includes both manual and automatic contributions. Use the larger of its
-  // current balance and transaction-ledger reserves to avoid counting one envelope twice.
-  const transactionGoalReserve = reserved.goal;
-  const goalSaved = includeCurrentGoalSnapshot ? (state.goals || []).reduce((sum, goal) => sum + Number(goal.saved || 0), 0) : 0;
-  reserved.goal = Math.max(transactionGoalReserve, goalSaved);
-  const reservedTotal = componentTotal(reserved);
-  const actualCash = last.actualCash;
+export function calculateFinanceBalances(state, { month = null, openingBalance = 0 } = {}) {
+  const position = deriveFinancePosition(state, { asOfDate: month ? `${month}-31` : '9999-12-31', openingBalance });
+  const reserved = zeroComponents();
+  for (const [key, value] of Object.entries(position.funds)) {
+    if (key.startsWith('savings:')) reserved.savings += value;
+    else if (key.startsWith('investment:')) reserved.investment += value;
+    else if (key.startsWith('asset:')) reserved.investment += value;
+    else reserved.goal += value;
+  }
+  for (const [key, value] of Object.entries(position.reserves)) reserved[key] = (reserved[key] || 0) + value;
+  const timeline = buildFinanceTimeline(state, month, openingBalance);
+  const liabilities = position.debtOutstanding;
   return {
-    actualCash,
+    actualCash: position.totalOwned,
     reserved,
-    reservedTotal,
-    availableCash: actualCash - reservedTotal,
-    overallOwned: includeCurrentGoalSnapshot && (month === null || month === new Date().toISOString().slice(0, 7))
-      ? last.overallOwned
-      : actualCash + (month ? last.savingsAsset : savingsAssets) + investments - liabilities,
-    investments,
+    reservedTotal: position.protected,
+    availableCash: position.spendable,
+    overallOwned: position.totalOwned,
+    investments: 0,
     liabilities,
-    timeline: points,
+    timeline,
   };
 }
-
 export function balanceViewValue(balances, view, included = new Set()) {
   if (view === 'actual') return balances.actualCash;
   if (view === 'overall') return balances.overallOwned;

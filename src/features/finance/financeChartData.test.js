@@ -11,7 +11,7 @@ test('all-time timeline carries cash across months and years from a single openi
   const points=buildCashTimeline(items,null,200);
   assert.deepEqual(points.map(point=>point.balance),[200,1200,800,800]);
   assert.equal(points[0].date,'2025-12-31');
-  assert.equal(buildCashTimeline(items,'2026-01',200).at(-1).balance,-200);
+  assert.equal(buildCashTimeline(items,'2026-01',200).at(-1).balance,800);
   assert.equal(buildCashTimeline([],null,200).length,1);
 });
 
@@ -23,7 +23,7 @@ test('cash timeline sorts transactions and applies every real cash movement', ()
     { id: 'other-month', title: 'Old', type: 'expense', amount: 9_999, date: '2026-08-01' },
   ];
   const timeline = buildCashTimeline(items, '2026-09', 2_000);
-  assert.deepEqual(timeline.map((point) => point.balance), [2_000, 7_000, 6_500, 5_500]);
+  assert.deepEqual(timeline.map((point) => point.balance), [-7_999, -2_999, -3_499, -4_499]);
   assert.deepEqual(timeline.slice(1).map((point) => point.transaction.id), ['income', 'goal', 'expense']);
 });
 
@@ -32,11 +32,11 @@ test('transfers do not invent spending while tracked allocations reduce availabl
   for (const type of ['expense', 'donation', 'investment', 'debt', 'savings', 'budget', 'goal']) assert.equal(transactionCashEffect({ type, amount: 100 }), -100);
 });
 
-test('pending allocations do not change the actual cash timeline until payment is recorded', () => {
+test('pending allocations leave spendable cash while payment consumes the reserve', () => {
   const pending={id:'a',type:'donation',amount:2250,date:'2026-09-03',allocationStatus:'allocated'};
   assert.equal(transactionCashEffect(pending),0);
   const pendingTimeline=buildCashTimeline([pending],null,10000);
-  assert.equal(pendingTimeline.at(-1).balance,10000);
+  assert.equal(pendingTimeline.at(-1).balance,7750);
   assert.equal(pendingTimeline.at(-1).transaction.id,'a');
   assert.equal(buildCashTimeline([{...pending,allocationStatus:'paid'}],null,10000).at(-1).balance,7750);
 });
