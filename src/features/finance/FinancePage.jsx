@@ -112,7 +112,7 @@ function TransactionForm({ data, initial, close, change, busy }) {
 }
 
 function TransactionScope({scope,setScope,overview=false}) {
-  return <div className="f-tabs" role="group" aria-label={overview?'Overview date range':'Transaction date range'}><button type="button" aria-pressed={scope==='month'} onClick={()=>setScope('month')}>By month</button><button type="button" aria-pressed={scope==='all'} onClick={()=>setScope('all')}>{overview?'All time':'All transactions'}</button></div>;
+  return <div className="f-tabs f-scope-picker" role="group" aria-label={overview?'Overview date range':'Transaction date range'}><button type="button" aria-pressed={scope==='month'} onClick={()=>setScope('month')}>By month</button><button type="button" aria-pressed={scope==='all'} onClick={()=>setScope('all')}>{overview?'All time':'All transactions'}</button></div>;
 }
 
 function transactionTimeLabel(createdAt) {
