@@ -27,7 +27,12 @@ function tableRows(html='') {
   ).filter(row=>row.length);
 }
 
-const containsBasisHeaders=row=>row.some(cell=>/\b100\s*g\b/i.test(cell))&&row.some(cell=>/\b30\s*g\b/i.test(cell));
+const hasBasisHeader=row=>{
+  const basisCells=row.filter(cell=>/\b(?:per|por)\s+(?:(?:\d+(?:[.,]\d+)?)\s*(?:g|ml)\b|(?:\d+\s*)?(?:serving|portion|item|pack|slice|scoop|container|pot)\b)|^\s*\d+(?:[.,]\d+)?\s*(?:g|ml)\s*$/i.test(cell));
+  if(basisCells.length>=2)return true;
+  const labels=row.filter(cell=>/\b(?:nutrient|component|category|value)\b/i.test(cell));
+  return basisCells.length===1&&labels.length>=1&&row.length>=2;
+};
 const hasEnergyPair=row=>row.some(cell=>/\bk\s*j\b/i.test(cell))&&row.some(cell=>/\bkcal\b/i.test(cell));
 const isEnergyLabel=value=>/\b(?:energy|calories|calorific\s+value|valor\s+energetic[oa]|energia)\b/i.test(repairEncoding(value).normalize('NFD').replace(/[\u0300-\u036f]/g,''));
 
@@ -48,7 +53,7 @@ export function paddleDocumentToNutritionInput(payload) {
     if(block.block_label==='table') {
       rawText+=content+'\n';
       const rows=tableRows(content);
-      const headerIndex=rows.findIndex(containsBasisHeaders);
+      const headerIndex=rows.findIndex(hasBasisHeader);
       if(headerIndex<0)continue;
       const detection=tableDetections.find(item=>item.label==='table'&&(!block.block_bbox||JSON.stringify(item.coordinate)===JSON.stringify(block.block_bbox)));
       const detectionConfidence=Number.isFinite(detection?.score)?detection.score:null;
@@ -57,17 +62,24 @@ export function paddleDocumentToNutritionInput(payload) {
       // separate region score as evidence instead of misusing it as OCR score.
       const confidence=65;
       const header=meaningfulCells(rows[headerIndex]);
+      const basisHeader=cell=>/\b(?:per|por)\s+(?:(?:\d+(?:[.,]\d+)?)\s*(?:g|ml)\b|(?:\d+\s*)?(?:serving|portion|item|pack|slice|scoop|container|pot)\b)|^\s*\d+(?:[.,]\d+)?\s*(?:g|ml)\s*$/i.test(cell);
+      const firstValueColumn=Math.max(1,header.findIndex((cell,index)=>index>0&&basisHeader(cell)));
+      const categoryColumn=header.findIndex(cell=>/\bnutrient\s+categor(?:y|ies)\b|^categor(?:y|ies)$/i.test(cell));
+      const componentColumn=header.findIndex(cell=>/\b(?:nutrient\s+)?component\b|^nutrient$/i.test(cell));
       // Some VL parses place the energy name in the same cell row as bare
       // column headings. Keep basis discovery on a heading-only line so the
       // nutrition parser never treats a nutrient row as a basis declaration.
       lines.push({text:header.slice(1).join(' | '),source:'paddleocr-vl-table-header',bbox:block.block_bbox||null,confidence,tableDetectionConfidence:detectionConfidence});
-      let shiftedLabel=null,shiftedEnergyHeader=false;
+      let shiftedLabel=null,shiftedEnergyHeader=false,currentCategory='';
       for(const rawRow of rows.slice(headerIndex+1)) {
         const row=meaningfulCells(rawRow);
-        const label=row[0]||'';
-        if(!row.slice(1).some(value=>/[\d]/.test(value)))continue;
+        if(categoryColumn>=0&&row[categoryColumn])currentCategory=row[categoryColumn];
+        const category=categoryColumn>=0?row[categoryColumn]||currentCategory:'';
+        const valueCells=row.slice(firstValueColumn);
+        if(!valueCells.some(value=>/[\d]/.test(value)))continue;
+        const label=componentColumn>=0?row[componentColumn]||'':row.slice(0,firstValueColumn).filter(Boolean).at(-1)||'';
         let selectedLabel=label;
-        if(hasEnergyPair(row.slice(1))) {
+        if(hasEnergyPair(valueCells)) {
           const energyHeader=isEnergyLabel(header[0]);
           const rowLabelIsEnergy=isEnergyLabel(label);
           selectedLabel=energyHeader&&!rowLabelIsEnergy?header[0]:label||header[0]||'Energy';
@@ -79,7 +91,7 @@ export function paddleDocumentToNutritionInput(payload) {
           if(!shiftedLabel)shiftedEnergyHeader=false;
         }
         if(!selectedLabel)continue;
-        lines.push({text:[selectedLabel,...row.slice(1)].filter(Boolean).join(' | '),source:'paddleocr-vl-table-row',bbox:block.block_bbox||null,confidence,tableDetectionConfidence:detectionConfidence,rawCells:row});
+        lines.push({text:[selectedLabel,...valueCells].filter(Boolean).join(' | '),rawLabel:selectedLabel,category,rawCells:row,source:'paddleocr-vl-table-row',bbox:block.block_bbox||null,confidence,tableDetectionConfidence:detectionConfidence});
       }
     } else if(content) rawText+=content+'\n';
   }

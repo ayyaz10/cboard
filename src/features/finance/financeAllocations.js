@@ -2,6 +2,7 @@ import { nextTransactionSequence } from './transactionOrder.js';
 import { id } from './financeData.js';
 import { inMonth, monthKey } from './financeMath.js';
 import { markGoalCompletion } from './financeReports.js';
+import { debtPlanStatus } from './financeDebtPlans.js';
 
 export const allocationTargets = ['savings', 'budget', 'goal', 'investment', 'debt', 'donation'];
 
@@ -42,7 +43,7 @@ export function applyAllocation(state, rule, income, date, sourceIncomeId = '') 
   }
   if (rule.targetType === 'debt') {
     const debt = state.debts.find(x => x.id === rule.targetId);
-    if (!debt || !debt.remaining) return false;
+    if (!debt || !debt.remaining || debtPlanStatus(debt, state.allocationRules, date) !== 'active') return false;
     const applied = Math.min(amount, debt.remaining);
     transaction.amount = applied;
   }
@@ -76,7 +77,7 @@ export function reconcileIncomeAllocations(state, income, operation = 'replace')
 }
 
 export function applyIncomeAllocations(state, incomeTransaction) {
-  for (const rule of (state.allocationRules || []).filter(x => x.active && x.timing === 'income')) {
+  for (const rule of (state.allocationRules || []).filter(x => x.active && x.timing === 'income' && (!x.startedOn || x.startedOn <= incomeTransaction.date))) {
     if (!state.transactions.some(x => x.allocationRuleId === rule.id && x.sourceIncomeId === incomeTransaction.id)) applyAllocation(state, rule, incomeTransaction.amount, incomeTransaction.date, incomeTransaction.id);
   }
   return state;
@@ -86,7 +87,7 @@ export function applyDueMonthlyAllocations(state, date) {
   const month = monthKey(date);
   const day = Number(date.slice(8, 10));
   const income = state.transactions.filter(x => x.type === 'income' && inMonth(x.date, month) && (!x.source || x.providerStatus === 'BOOK')).reduce((sum, x) => sum + x.amount, 0) || state.settings.monthlyIncome;
-  for (const rule of (state.allocationRules || []).filter(x => x.active && x.timing === 'monthly' && day >= Number(x.day || 1))) {
+  for (const rule of (state.allocationRules || []).filter(x => x.active && x.timing === 'monthly' && (!x.startedOn || x.startedOn <= date) && day >= Number(x.day || 1))) {
     if (!state.transactions.some(x => x.allocationRuleId === rule.id && inMonth(x.date, month))) applyAllocation(state, rule, income, date);
   }
   return state;
@@ -122,7 +123,11 @@ export function settleAllocation(state, transactionId, date) {
     if (debt) {
       const paid = Math.min(transaction.amount, debt.remaining);
       debt.remaining -= paid;
-      if (!debt.remaining) debt.status = 'paid';
+      if (!debt.remaining) {
+        debt.status = 'paid';
+        debt.repaymentPlanStatus = 'completed';
+        for (const rule of state.allocationRules || []) if (rule.targetType === 'debt' && rule.targetId === debt.id) rule.active = false;
+      }
       transaction.amount = paid;
       if (!(state.debtPayments || []).some(item => item.transactionId === transaction.id)) {
         state.debtPayments.push({ id: id(), debtId: debt.id, amount: paid, date, allocationRuleId: transaction.allocationRuleId, sourceIncomeId: transaction.sourceIncomeId, transactionId: transaction.id });

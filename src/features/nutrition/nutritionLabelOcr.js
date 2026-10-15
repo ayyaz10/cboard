@@ -1,5 +1,5 @@
 import { createImageOcrSession, prepareOcrImage } from '../../services/ocr/imageOcr.js';
-import { parseNutritionLabel, scoreNutritionCandidate, nutritionBasisConsistency } from './nutritionLabelParser.js';
+import { parseNutritionLabel, scoreNutritionCandidate, nutritionBasisConsistency, nutritionConsistency } from './nutritionLabelParser.js';
 import { nutritionCandidatesAgree, finalizeNutritionCandidates } from './nutritionCandidateSelection.js';
 import { paddleDocumentToNutritionInput } from './nutritionOcrDocument.js';
 import { supabase } from '../../lib/supabaseClient.js';
@@ -39,6 +39,11 @@ function createPaddleSession(onProgress=()=>{}) {
         const normalized=paddleDocumentToNutritionInput(body);
         const parsed=parseNutritionLabel({text:normalized.text,lines:normalized.lines});
         if(!parsed.columns.length)throw new Error('The advanced scanner could not map the table values. Crop the full table and rescan, try basic scan, or enter values manually.');
+        for(const column of parsed.columns)for(const issue of nutritionConsistency(column)){
+          const field=column.nutrients[issue.field];
+          if(field){field.uncertain=true;field.confidence=Math.min(field.confidence??55,55);field.reasons=[...new Set([...(field.reasons||[]),issue.message])];}
+          parsed.warnings.push(issue.message);
+        }
         const basisIssues=nutritionBasisConsistency(parsed.columns);
         parsed.warnings.push(...basisIssues.map(issue=>issue.message));
         onProgress({status:'Checking detected values',progress:1});

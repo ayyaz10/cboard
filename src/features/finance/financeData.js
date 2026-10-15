@@ -1,4 +1,5 @@
 import { transactionTypes } from './financeMath.js';
+import { migrateDebtPlanStatuses } from './financeDebtPlans.js';
 
 export const defaultCategories = [
   ['Salary', 'income', '#c5ff6f'], ['Freelance', 'income', '#9fe3ff'], ['Other income', 'income', '#ffd166'],
@@ -33,6 +34,7 @@ export function normalizeFinanceState(value) {
   for (const key of ['categories', 'transactions', 'budgetPresets', 'goals', 'goalContributions', 'investments', 'debts', 'debtPayments', 'recurring', 'transactionPresets', 'allocationRules']) {
     if (!Array.isArray(state[key])) state[key] = [];
   }
+  migrateDebtPlanStatuses(state.debts, state.allocationRules);
   if (!Array.isArray(state.merchantProfiles)) state.merchantProfiles = [];
   state.merchantProfiles = state.merchantProfiles.filter(item => item && typeof item.id === 'string' && typeof item.displayName === 'string' && Array.isArray(item.aliases) && item.aliases.every(alias => typeof alias === 'string') && (!item.logoData || (typeof item.logoData === 'string' && item.logoData.startsWith('data:image/webp;base64,') && item.logoData.length <= 500000)));
   if (!state.budgets || typeof state.budgets !== 'object' || Array.isArray(state.budgets)) state.budgets = {};

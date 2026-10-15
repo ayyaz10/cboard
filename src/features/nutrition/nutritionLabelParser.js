@@ -1,33 +1,4 @@
-import { NUTRIENTS } from './nutrients.js';
-
-// Labels and OCR spellings are matched only in nutrient-name context.
-const names = [
-  ['saturatedFat', /^(?:(?:of\s+which|de\s+las\s+cuales|dos\s+quais|das\s+quais)\s+)?(?:saturat(?:ed\s+fat|es|e[ds]?)|saturad[ao]s?|lipidos\s+saturados?|sat\.?\s*fat)\b/i],
-  ['monounsaturatedFat', /^(?:mono)?unsaturat(?:ed)?\s+fat\b/i],
-  ['polyunsaturatedFat', /^(?:poly)?unsaturat(?:ed)?\s+fat\b/i],
-  ['transFat', /^trans\s+fat\b/i], ['omega3', /^(?:omega|n-)\s*-?3\b/i], ['omega6', /^(?:omega|n-)\s*-?6\b/i],
-  ['sugars', /^(?:(?:of\s+which|de\s+los\s+cuales|de\s+las\s+cuales|dos\s+quais|das\s+quais)\s+|total\s+)?(?:sugars?|azucares?|acucares?|acares?)\b/i],
-  ['fiber', /^(?:dietary\s+)?(?:f[i1]br[ea]\b|fibra\s+(?:alimentaria|alimentar)\b|fiber\b)/i],
-  ['carbs', /^(?:(?:total\s+)?carb[o0]hydrates?|carbs?|hidratos?\s+de\s+carbono|glucidos?)\b/i],
-  ['protein', /^(?:protein|pr[o0]te[i1]n|pr[o0]te[i1]nas?|prote[i1]na)\b/i],
-  ['fat', /^(?:(?:total\s+)?fat|grasas?|gorduras?|lipidos?)\b/i],
-  ['salt', /^(?:salt|sal)\b/i], ['sodium', /^sodium\b/i],
-  ['potassium', /^potassium\b/i], ['calcium', /^calcium\b/i],
-  ['iron', /^iron\b/i], ['magnesium', /^magnesium\b/i], ['phosphorus', /^phosphorus\b/i], ['zinc', /^zinc\b/i],
-  ['copper', /^copper\b/i], ['manganese', /^manganese\b/i], ['selenium', /^selenium\b/i], ['iodine', /^iodine\b/i],
-  ['cholesterol', /^cholesterol\b/i],
-  ['vitaminB1', /^vit(?:amin)?\.?\s*b\s*1\b|^thiamin\b/i],
-  ['vitaminB2', /^vit(?:amin)?\.?\s*b\s*2\b|^riboflavin\b/i],
-  ['vitaminB3', /^vit(?:amin)?\.?\s*b\s*3\b|^niacin\b/i],
-  ['vitaminB5', /^vit(?:amin)?\.?\s*b\s*5\b|^pantothenic\s+acid\b/i],
-  ['vitaminB6', /^vit(?:amin)?\.?\s*b\s*6\b/i],
-  ['biotin', /^vit(?:amin)?\.?\s*b\s*7\b|^biotin\b/i],
-  ['vitaminB12', /^vit(?:amin)?\.?\s*b\s*12\b/i],
-  ...['A','C','D','E','K'].map(letter => [`vitamin${letter}`, new RegExp(`^vit(?:amin)?\\.?\\s*${letter}\\b`, 'i')]),
-  ['folate', /^(?:folate|folic\s+acid)\b/i],
-  ['energy', /^(?:energy|calories|calorific\s+value|valor\s+energetico|energia)\b/i],
-];
-const normalizeAliasText = text => text.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+import { NUTRIENTS, matchCanonicalNutrientPrefix, normalizeNutrientLabel } from './nutrients.js';
 const units = Object.fromEntries(NUTRIENTS.map(([key, , unit]) => [key, unit]));
 const mass = {g:1, mg:.001, ug:.000001, mcg:.000001};
 const heading = /^\s*(?:nutrition(?:al)?(?:\s+(?:information|facts|values))?|typical\s+values|average\s+values)(?:\s+(?:per|for)\b.*)?\s*:?\s*$/i;
@@ -62,7 +33,7 @@ function findBases(line, serving) {
   }
   // EU wrappers often print bare columns such as "100 g  30 g  %RI".
   // Only accept these as bases on a header-only row, never on nutrient rows.
-  const isNutrientRow=names.some(([,name])=>name.test(normalizeAliasText(line.text)));
+  const isNutrientRow=Boolean(matchCanonicalNutrientPrefix(line.text));
   if (!bases.length && !isNutrientRow) {
     const quantities=[...line.text.matchAll(/(?<![\d.,])(\d+(?:[.,]\d+)?)\s*(g|ml)\b/gi)]
       .filter(match=>!/%[^\d]*$/.test(line.text.slice(0,match.index)));
@@ -123,6 +94,12 @@ function valuesIn(line, offset) {
 }
 
 function amountField(key, value, label) {
+  if(key==='calories')return value.unit==='kcal'||!value.unit&&/^calories$/i.test(label)?['calories','kcal',value.value]:null;
+  if(key==='energyKJ') {
+    if(value.unit==='kj')return ['energyKJ','kJ',value.value];
+    if(value.unit==='kcal')return ['calories','kcal',value.value];
+    return null;
+  }
   if (key==='energy') {
     if (value.unit==='kj') return ['energyKJ','kJ',value.value];
     if (value.unit==='kcal' || (!value.unit && /^calories/i.test(label))) return ['calories','kcal',value.value];
@@ -137,7 +114,7 @@ function amountField(key, value, label) {
 export function parseNutritionLabel(input) {
   const lines=(typeof input==='string' ? input.split(/\r?\n/).map(text=>({text})) : input.lines?.length ? input.lines : String(input.text||'').split(/\r?\n/).map(text=>({text})))
     .map(line=>({...line,text:line.text.trim()})).filter(line=>line.text);
-  const tables=[];let table=null, stopped=false, pendingHeading=false, pendingMicronutrients=false, serving=null;
+  const tables=[],parserWarnings=[];let table=null, stopped=false, pendingHeading=false, pendingMicronutrients=false, serving=null;
   function newTable(bases=[]) {
     table={id:`table-${tables.length+1}`,columns:(bases.length?bases:[{label:'Basis not identified',kind:'unknown',quantity:null,unit:'g',confirmed:false,serving}]).map((basis,i)=>({...basis,id:`table-${tables.length+1}-column-${i+1}`,nutrients:{}})),warnings:[],rows:0};
     tables.push(table);stopped=false;pendingHeading=false;return table;
@@ -162,31 +139,45 @@ export function parseNutritionLabel(input) {
     }
     if (noise.test(line.text)) { stopped=true; continue; }
     if (stopped) continue;
-    const normalizedName=normalizeAliasText(line.text);
-    const name=names.map(([key,pattern])=>({key,match:normalizedName.match(pattern)})).find(item=>item.match);
-    if(!name)continue;
-    const vals=valuesIn(line,name.match[0].length).filter(value=>amountField(name.key,value,name.match[0]));
+    const decorationClean=line.text.replace(/^\s*(?:[↳↓↪➜→•▪◦└├]+|[-*]+)\s*/, '');
+    const decorationOffset=line.text.length-decorationClean.length;
+    const rowUnit=line.rawUnit||line.text.match(/[\dOIlS]+(?:\s*[.,]\s*[\dOIlS]+)*\s*(kcal|kJ|mcg|[ÂµÎ¼u]g|mg|g|ml)\b/i)?.[1];
+    const resolved=line.rawLabel
+      ? matchCanonicalNutrientPrefix(line.rawLabel,{category:line.category,unit:rowUnit})
+      : matchCanonicalNutrientPrefix(decorationClean,{category:line.category,unit:rowUnit});
+    if(!resolved)continue;
+    const key=resolved.nutrientId;
+    const labelEnd=line.rawLabel ? (line.text.indexOf('|')>=0?line.text.indexOf('|')+1:line.text.length) : decorationOffset+resolved.labelEnd;
+    const vals=valuesIn(line,labelEnd).filter(value=>amountField(key,value,resolved.rawLabel));
     if (!vals.length) continue;
+    const valueFields=vals.map(value=>amountField(key,value,resolved.rawLabel)?.[0]);
+    const duplicates=valueFields.filter((field,index)=>field&&valueFields.indexOf(field)!==index);
+    if((table?.columns.length??1)===1&&duplicates.length){
+      const warning=`Could not reliably read the decimal or separate numeric tokens for ${resolved.displayName}. Check this row in the image.`;
+      parserWarnings.push(warning);table?.warnings.push(warning);
+      continue;
+    }
     if (!table || pendingHeading) newTable();
     // Repeated nutrient sets are separate tables, not an opportunity to mix values.
-    const keys=vals.map(value=>amountField(name.key,value,name.match[0])[0]);
+    const keys=vals.map(value=>amountField(key,value,resolved.rawLabel)[0]);
     if(table.rows>=3 && table.columns.every(column=>keys.every(key=>column.nutrients[key])))newTable(table.columns.map(({nutrients,id,...basis})=>basis));
     table.rows++;
     const columns=table.columns;
     for (const [index,value] of vals.entries()) {
-      const [field,unit,amount]=amountField(name.key,value,name.match[0]);
+      const [field,unit,amount]=amountField(key,value,resolved.rawLabel);
       let column;
       if(columns.length===1) column=columns[0];
       else if(value.x!=null && columns.every(col=>col.x!=null)) column=[...columns].sort((a,b)=>Math.abs(value.x-a.x)-Math.abs(value.x-b.x))[0];
       else {
-        const sameField=vals.filter(item=>amountField(name.key,item,name.match[0])[0]===field);
+        const sameField=vals.filter(item=>amountField(key,item,resolved.rawLabel)[0]===field);
         if(sameField.length===columns.length)column=columns[sameField.indexOf(value)];
         else {table.warnings.push(`Could not assign ${field} to a column. Enter it from the image.`);continue;}
       }
       const previous=column.nutrients[field];
-      const missingUnit=!value.unit && !(field==='calories' && /^calories/i.test(name.match[0]));
+      const missingUnit=!value.unit && !(field==='calories' && /^calories/i.test(resolved.rawLabel));
       const reasons=[...(value.repairedCharacters?['OCR confused a letter with a digit. Compare with the image.']:[]),...(value.upperBound?['The label gives an upper limit, not an exact amount.']:[]),...(missingUnit?['The unit was not read. Confirm the amount and unit.']:[]),...(value.confidence<70?['Low OCR confidence. Compare with the image.']:[])];
-      const result={field,value:amount,unit,basis:column.id,rawText:line.text,rawValue:value.raw,x:value.x,confidence:Math.min(value.confidence, value.uncertain||missingUnit?55:100),uncertain:value.uncertain||missingUnit,upperBound:value.upperBound,missingUnit,decimal:value.decimal,reasons,bbox:line.bbox||null};
+      const numericMatch=value.raw.match(/(-?[\dOIlS]+(?:\s*[.,]\s*[\dOIlS]+)*)\s*(kcal|kJ|mcg|[ÂµÎ¼u]g|mg|g|ml)?/i);
+      const result={field,value:amount,unit,basis:column.id,rawText:line.text,rawLabel:line.rawLabel||resolved.rawLabel,normalizedLabel:normalizeNutrientLabel(line.rawLabel||resolved.rawLabel),rawValue:value.raw,rawNumericToken:numericMatch?.[1]?.replace(/\s/g,'')||value.raw,rawUnit:numericMatch?.[2]||value.unit,rawCells:line.rawCells||null,matchedAlias:resolved.matchedAlias,matchType:resolved.matchType,nutrientMatchConfidence:resolved.confidence,x:value.x,confidence:Math.min(value.confidence, value.uncertain||missingUnit?55:100),uncertain:value.uncertain||missingUnit,upperBound:value.upperBound,missingUnit,decimal:value.decimal,reasons,bbox:line.bbox||null};
       if(previous && previous.value!==amount) {previous.uncertain=true;previous.confidence=40;table.warnings.push(`Conflicting ${field} values. Check the image.`);}
       else column.nutrients[field]=result;
     }
@@ -194,7 +185,7 @@ export function parseNutritionLabel(input) {
   const useful=tables.filter(value=>value.columns.some(column=>Object.keys(column.nutrients).length));
   const basisHint=lines.some(line=>/\bper\s+(?:[\dOIl]|serv|port|pack|item)|\b(?:serving|portion)\s+size/i.test(line.text));
   const columns=useful.flatMap(value=>value.columns.map(column=>({...column,tableId:value.id,basisStatus:column.confirmed?'identified':basisHint?'unreadable':'not-found',warnings:[...new Set(value.warnings)]})));
-  return {columns,lines,text:lines.map(line=>line.text).join('\n'),warnings:[...(useful.length>1?['Multiple nutrition tables found. Choose the table and basis for this food.']:[]),...(!columns.length?['No useful nutrition values found. Crop to the label, rescan, or enter values manually.']:[])]};
+  return {columns,lines,text:lines.map(line=>line.text).join('\n'),warnings:[...parserWarnings,...(useful.length>1?['Multiple nutrition tables found. Choose the table and basis for this food.']:[]),...(!columns.length?['No useful nutrition values found. Crop to the label, rescan, or enter values manually.']:[])]};
 }
 
 export function scoreNutritionCandidate(parsed, confidence=0) {
@@ -207,6 +198,12 @@ export function scoreNutritionCandidate(parsed, confidence=0) {
 // an amount by ten or impose a food-specific maximum.
 export function nutritionConsistency(column) {
   const n=column.nutrients,issues=[];
+  if(column.kind==='100g'&&column.unit==='g'){
+    for(const key of ['protein','carbs','fat','fiber','sugars','saturatedFat','monounsaturatedFat','polyunsaturatedFat','transFat','water'])
+      if(n[key]?.value>100)issues.push({field:key,message:`${key} is over 100 g per 100 g, which cannot be right. Check the source row; the value was not changed.`});
+    for(const [key,limit] of [['iron',100],['zinc',100],['copper',100]])
+      if(n[key]?.value>limit)issues.push({field:key,message:`${key} is unusually high per 100 g. Check the source row; the value was not changed.`});
+  }
   const kcal=n.calories?.value;
   if(kcal!=null) {
     for(const [key,factor] of [['fat',9],['protein',4],['carbs',4],['fiber',2]]) {

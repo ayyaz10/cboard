@@ -48,6 +48,18 @@ test('implausible decimal-loss candidate is penalized, never numerically rewritt
  const best={name:'bad',parsed:bad,score:1};finalizeNutritionCandidates(best,[best]);
  assert.equal(best.parsed.columns[0].nutrients.fat.value,54);assert.match(best.parsed.columns[0].nutrients.fat.reasons.join(' '),/calories/);
 });
+test('suspicious per-100g numbers are flagged without guessing a replacement decimal',()=>{
+ const column=parseNutritionLabel('Per 100g\nCalories 143 kcal\nCarbohydrates 729 g\nFat 9519 g\nIron 175 mg\nZinc 129 mg').columns[0];
+ assert.equal(column.nutrients.carbs.value,729);assert.equal(column.nutrients.fat.value,9519);
+ assert.equal(column.nutrients.iron.value,175);assert.equal(column.nutrients.zinc.value,129);
+ const issues=nutritionConsistency(column);
+ for(const key of ['carbs','fat','iron','zinc'])assert.ok(issues.some(issue=>issue.field===key),key);
+});
+test('separate numeric tokens without a visible decimal are not concatenated or silently overwritten',()=>{
+ const result=parseNutritionLabel('Per 100g\nCarbohydrates 0 72 g');
+ assert.equal(result.columns.length,0);
+ assert.match(result.warnings.join(' '),/Could not reliably read the decimal/);
+});
 test('a weak alternate scan does not turn correct fields into generic warnings',()=>{
  const good={name:'original',parsed:parseNutritionLabel(aldiText),score:42};
  const poor={name:'poor',parsed:parseNutritionLabel(aldiText.replace('0.5 g','54 g')),score:24};

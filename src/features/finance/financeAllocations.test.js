@@ -37,6 +37,31 @@ test('goal allocations reserve goal progress while investment balances wait for 
   assert.deepEqual(value.transactions.map(x=>x.amount),[5000,2000,3000]);
 });
 
+test('only a started debt plan can reserve an automatic payment', () => {
+  const value=state();
+  value.debts=[{id:'waiting',remaining:3000,status:'open',repaymentPlanStatus:'not_started'}];
+  value.allocationRules=[{id:'rule',targetType:'debt',targetId:'waiting',mode:'amount',value:2000,timing:'income',active:true}];
+  const income={id:'payday',type:'income',amount:10000,date:'2026-10-16'};value.transactions.push(income);
+  applyIncomeAllocations(value,income);
+  assert.equal(value.transactions.length,1);
+  assert.equal(value.debts[0].remaining,3000);
+});
+
+test('debt automatic reserve is capped at the remaining balance and payoff completes the plan', () => {
+  const value=state();
+  value.debts=[{id:'loan',remaining:800,status:'open',repaymentPlanStatus:'active'}];
+  value.allocationRules=[{id:'rule',targetType:'debt',targetId:'loan',mode:'amount',value:2000,timing:'income',active:true}];
+  const income={id:'payday',type:'income',amount:10000,date:'2026-10-16'};value.transactions.push(income);
+  applyIncomeAllocations(value,income);
+  const payment=value.transactions.find(item=>item.type==='debt');
+  assert.equal(payment.amount,800);
+  assert.equal(settleAllocation(value,payment.id,'2026-10-16'),true);
+  assert.equal(value.debts[0].remaining,0);
+  assert.equal(value.debts[0].status,'paid');
+  assert.equal(value.debts[0].repaymentPlanStatus,'completed');
+  assert.equal(value.allocationRules[0].active,false);
+});
+
 test('settling a savings reserve transfers it without losing total owned money', () => {
   const value=state();
   value.transactions.push({id:'save',type:'savings',amount:2000,date:'2026-09-01',allocationStatus:'allocated'});

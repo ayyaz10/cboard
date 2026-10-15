@@ -45,7 +45,8 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
       if(debugEnabled&&result.provider==='paddleocr-vl'){
         const doc=result.debug?.rawDocument?.layout_det_res;
         const blocks=result.debug?.rawDocument?.parsing_res_list||[];
-        setDiagnostics({engine:result.name,provider:result.debug?.provider,detectedTables:doc?.boxes?.filter(box=>box.label==='table')||[],tableCount:result.debug?.tableCount,rawRows:result.debug?.normalizedRows,rawDocument:result.debug?.rawDocument,rejectedCandidates:blocks.filter(block=>block.block_label!=='table').map(block=>({type:block.block_label,text:block.block_content,bbox:block.block_bbox})),validationErrors:result.debug?.basisIssues||[],finalValues:result.parsed.columns.map(value=>({basis:value.label,values:value.nutrients}))});
+        const mappedRows=result.parsed.columns.flatMap(column=>Object.entries(column.nutrients).map(([canonicalNutrient,field])=>({source:{label:field.rawLabel,rawValue:field.rawNumericToken,rawUnit:field.rawUnit},extracted:{nutrientId:canonicalNutrient,value:field.value,unit:field.unit},normalizedLabel:field.normalizedLabel,matchedAlias:field.matchedAlias,matchType:field.matchType,nutrientMatchConfidence:field.nutrientMatchConfidence,ocrConfidence:field.confidence,bbox:field.bbox,tableCells:field.rawCells})));
+        setDiagnostics({engine:result.name,provider:result.debug?.provider,detectedTables:doc?.boxes?.filter(box=>box.label==='table')||[],tableCount:result.debug?.tableCount,rawRows:result.debug?.normalizedRows,rawDocument:result.debug?.rawDocument,rejectedCandidates:blocks.filter(block=>block.block_label!=='table').map(block=>({type:block.block_label,text:block.block_content,bbox:block.block_bbox})),validationErrors:result.debug?.basisIssues||[],mappedRows,finalValues:result.parsed.columns.map(value=>({basis:value.label,values:value.nutrients}))});
       }else if(debugEnabled)setDiagnostics({selected:result.name,candidates:result.debug?.candidates?.map(({image,...candidate})=>candidate)||[]});
     }catch(err){if(run===job.current){
       const unavailable=mode==='advanced'&&/advanced nutrition scanner is unavailable|failed to fetch|networkerror|load failed/i.test(err.message||'');
@@ -80,6 +81,7 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
     {current && <span className="nscan-current">Current: {display((converted||current)[key])}{!converted?' (existing basis)':''}</span>}
     <label><span className="nscan-sr">Scanned {label} ({unit})</span><input type="number" min="0" step="any" value={column.values[key]??''} placeholder="Unknown" onChange={event=>update({values:{...column.values,[key]:event.target.value===''?null:Number(event.target.value)},nutrients:{...column.nutrients,[key]:{...column.nutrients[key],uncertain:false,confidence:100,reasons:[]}},selected:[...new Set([...column.selected,key])]})}/></label>
     {found && (found.uncertain||found.confidence<70) && <small className="nscan-warning">{found.reasons?.length?[...new Set(found.reasons)].join(' '):'Low OCR confidence. Compare with the image.'}</small>}
+    {found?.rawLabel&&found.rawLabel!==label&&<small className="nscan-source-label">Source label: {found.rawLabel} · matched as {label}</small>}
   </div>;}
   return <section className="nscan" aria-label="Nutrition label scanner">
     {!open?<button type="button" disabled={disabled} onClick={()=>setOpen(true)}>Scan nutrition label</button>:<>

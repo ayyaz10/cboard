@@ -180,3 +180,4 @@ html[data-theme="matrix"] .finance .f-chart-zoom button{border-color:var(--matri
 .finance .f-tabs :is(button,a):hover{background:var(--color-surface-interactive);color:var(--color-text)}
 .finance .f-tabs :is(button[aria-pressed=true],a[aria-current=page]){border-color:var(--color-accent);background:var(--color-accent);color:var(--color-bg);font-weight:800;box-shadow:none}
 .finance .f-scope-picker button.is-active{border-color:#f28a47!important;background:#f28a47!important;color:#160d07!important;font-weight:800}
+.f-debt-more summary,.f-debt-history summary{cursor:pointer;font-weight:700}.f-debt-more summary{display:inline-flex;align-items:center;border:1px solid var(--border-default);border-radius:var(--radius-button);background:var(--surface-elevated);color:var(--color-text);padding:.55rem .8rem}.f-debt-history ul{margin:.65rem 0 0;padding-left:1rem}.f-debt-history li{padding:.25rem 0;font-size:.85rem}

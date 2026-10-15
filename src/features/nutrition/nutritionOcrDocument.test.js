@@ -45,3 +45,31 @@ test('correctly aligned tables keep energy and fat labels on their own rows',()=
   assert.equal(per100.nutrients.fat.value,31);
   assert.equal(serving.nutrients.fat.value,9.3);
 });
+
+test('single-column nutrient-category table preserves screenshot values, decimals, units and explicit zero',()=>{
+  const data=[
+    ['Energy','Calories','143 kcal'],['Macros','Protein','12.56 g'],['','Total Fat','9.51 g'],['','↳ Saturated Fat','3.13 g'],
+    ['','↳ Monounsaturated Fat','3.66 g'],['','↳ Polyunsaturated Fat','1.91 g'],['','↳ Trans Fat','0.04 g'],
+    ['','Total Carbohydrates','0.72 g'],['','↳ Dietary Fibre','0.00 g'],['','↳ Total Sugars','0.37 g'],['','Cholesterol','372 mg'],['','Water','76.15 g'],
+    ['Vitamins','Choline','294.0 mg'],['','Vitamin A (RAE)','140.0 mcg'],['','Vitamin D (D2 + D3)','2.0 mcg'],
+    ['','Vitamin B12 (Cobalamin)','0.89 mcg'],['','Vitamin B9 (Folate)','47.0 mcg'],['','Vitamin B5 (Pantothenic acid)','1.53 mg'],
+    ['','Vitamin B2 (Riboflavin)','0.46 mg'],['','Vitamin E (Alpha-tocopherol)','1.05 mg'],['','Vitamin B1 (Thiamin)','0.04 mg'],
+    ['','Vitamin B3 (Niacin)','0.08 mg'],['','Vitamin K','0.3 mcg'],
+    ['Minerals','Phosphorus','198.0 mg'],['','Sodium','142.0 mg'],['','Potassium','138.0 mg'],['','Calcium','56.0 mg'],
+    ['','Magnesium','12.0 mg'],['','Selenium','31.7 mcg'],['','Iron','1.75 mg'],['','Zinc','1.29 mg'],['','Copper','0.07 mg'],
+  ];
+  const html=`<table><tr><th>Nutrient Category</th><th>Nutrient Component</th><th>Value per 100g</th></tr>${data.map(row=>`<tr>${row.map(cell=>`<td>${cell}</td>`).join('')}</tr>`).join('')}</table>`;
+  const document=paddleDocumentToNutritionInput({document:{parsing_res_list:[{block_label:'table',block_bbox:[0,0,400,900],block_content:html}]}});
+  const result=parseNutritionLabel(document);
+  assert.equal(result.columns.length,1);
+  const column=result.columns[0];
+  assert.equal(column.kind,'100g');assert.equal(column.quantity,100);assert.equal(column.unit,'g');
+  const expected={calories:143,protein:12.56,fat:9.51,saturatedFat:3.13,monounsaturatedFat:3.66,polyunsaturatedFat:1.91,transFat:.04,carbs:.72,fiber:0,sugars:.37,cholesterol:372,water:76.15,choline:294,vitaminA:140,vitaminD:2,vitaminB12:.89,folate:47,vitaminB5:1.53,vitaminB2:.46,vitaminE:1.05,vitaminB1:.04,vitaminB3:.08,vitaminK:.3,phosphorus:198,sodium:142,potassium:138,calcium:56,magnesium:12,selenium:31.7,iron:1.75,zinc:1.29,copper:.07};
+  for(const [key,value] of Object.entries(expected))assert.equal(column.nutrients[key]?.value,value,key);
+  assert.equal(column.nutrients.fiber.value,0,'printed 0.00 is a known zero, not missing');
+  assert.equal(column.nutrients.protein.rawLabel,'Protein');
+  assert.equal(column.nutrients.fiber.rawLabel,'↳ Dietary Fibre');
+  assert.equal(column.nutrients.vitaminB12.rawNumericToken,'0.89');
+  assert.equal(column.nutrients.vitaminB12.rawUnit,'mcg');
+  assert.equal(column.nutrients.vitaminB12.matchedAlias,'vitamin b12 cobalamin');
+});
