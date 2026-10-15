@@ -7,6 +7,8 @@ import { PageShell } from '../../components/layout/PageShell';
 import { AppNavigation } from '../../components/layout/AppNavigation';
 import { useAdaptiveNavigation } from '../../hooks/useAdaptiveNavigation.js';
 import { PrimaryButton } from '../../components/ui/PrimaryButton';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog.jsx';
+import { useConfirmDialog } from '../../hooks/useConfirmDialog.js';
 import {
   getRecipes,
   saveRecipe,
@@ -97,6 +99,7 @@ function RecipesContent({ route, navigationPath }) {
   const [busy, setBusy] = useState(false);
   const ingredientLibrary = useMemo(() => buildIngredientLibrary(recipes, foodCatalog), [recipes, foodCatalog]);
   const dialog = useRef(null);
+  const { confirm: confirmAction, dialog: actionConfirmDialog } = useConfirmDialog();
   const dialogBackdropPointerDown = useRef(false);
   const deleteLock = useRef(false);
   async function refresh() {
@@ -104,28 +107,9 @@ function RecipesContent({ route, navigationPath }) {
     setError('');
     try {
       const [loadedRecipes, loadedFavourites, storedFoodCatalog, loadedMealPlanRefs] = await Promise.all([getRecipes(), getRecipeFavourites(), getFoodCatalog(user.id), getMealPlanFoodReferences()]);
-      const knownNames = new Set(storedFoodCatalog.flatMap(food => [food.name, ...(food.aliases || [])]).map(normalizeFoodName));
-      const backfill = loadedRecipes.flatMap(catalogItemsFromRecipe).filter(item => {
-        if (resolveRecipeFoodCandidate(item, storedFoodCatalog).status !== 'none') return false;
-        const names = [item.name, ...(item.aliases || [])].map(normalizeFoodName);
-        if (names.some(name => knownNames.has(name))) return false;
-        names.forEach(name => knownNames.add(name));
-        return true;
-      }).map(item => {
-        if (item.id && !storedFoodCatalog.some(food => food.id === item.id)) {
-          const { id, ...withoutStaleId } = item;
-          return withoutStaleId;
-        }
-        return item;
-      });
-      let loadedFoodCatalog = storedFoodCatalog;
-      if (backfill.length) {
-        try { loadedFoodCatalog = await upsertFoodCatalogItems(backfill, user.id); }
-        catch (migrationError) { notify.warning(migrationError.message || 'Some recipe foods need duplicate review before they can be added to the shared library.'); }
-      }
-      setFoodCatalog(loadedFoodCatalog);
+      setFoodCatalog(storedFoodCatalog);
       setMealPlanRefs(loadedMealPlanRefs);
-      setRecipes(applyFoodCatalogToRecipes(loadedRecipes, loadedFoodCatalog));
+      setRecipes(applyFoodCatalogToRecipes(loadedRecipes, storedFoodCatalog));
       setFavourites(new Set(loadedFavourites));
     } catch (error) {
       setError(error.message || 'Could not load recipes. Please try again.');
@@ -141,7 +125,7 @@ function RecipesContent({ route, navigationPath }) {
       for (const food of disabling) {
         const canonical = foodCatalog.find(entry => entry.id === food.id);
         const stock = groceries.state.items.find(item => !item.removed && !item.recipeOnly && (item.foodId === food.id || [canonical.name, ...(canonical.aliases || [])].some(name => name.trim().toLocaleLowerCase() === item.name.trim().toLocaleLowerCase())));
-        if (stock && typeof window !== 'undefined' && !window.confirm(`Stop tracking ${canonical.name} in Grocery? Current stock: ${stock.quantity ?? 'unknown'} ${stock.unit}. The stock record will be preserved and reused if you turn tracking on again.`))
+        if (stock && !await confirmAction({ title: `Stop tracking ${canonical.name} in Groceries?`, message: `Current stock: ${stock.quantity ?? 'unknown'} ${stock.unit}. The stock record will be preserved and reused if you turn tracking on again.`, confirmLabel: 'Stop tracking' }))
           throw new Error('Grocery tracking change cancelled.');
       }
     }
@@ -152,11 +136,9 @@ function RecipesContent({ route, navigationPath }) {
   }
   async function saveRecipeFoodsToCatalog(recipeList) {
     const items = recipeList.flatMap(catalogItemsFromRecipe)
-      .filter(item => resolveRecipeFoodCandidate(item, foodCatalog).status !== 'matched');
+      .filter(item => resolveRecipeFoodCandidate(item, foodCatalog).status === 'none');
     if (!items.length) return;
-    const names = [...new Set(items.map(item => item.name))];
-    const trackInGroceries = window.confirm(`Also track ${names.length === 1 ? names[0] : `${names.length} new recipe foods`} in Groceries? These foods will be saved to All Food Items either way. Choose Cancel to keep them out of Groceries.`);
-    await saveMainFoodItems(items.map(item => ({ ...item, groceryTrackingEnabled: trackInGroceries, shoppingListEnabled: trackInGroceries })));
+    await saveMainFoodItems(items.map(item => ({ ...item, groceryTrackingEnabled: false, shoppingListEnabled: false })));
   }
   function recipeUpdated(updated) {
     setRecipes(current => current.map(item => item.slug === updated.slug ? updated : item));
@@ -465,8 +447,7 @@ function RecipesContent({ route, navigationPath }) {
           const reuse = !item.id && findFoodMatches(item, foodCatalog).some(match => match.confidence === 'certain' || match.confidence === 'high');
           const editing = foodCatalog.some(food => food.id === item.id || food.name.trim().toLocaleLowerCase() === item.name.trim().toLocaleLowerCase());
           if (!item.id && !reuse && !editing) {
-            const trackInGroceries = window.confirm(`Also track ${item.name} in Groceries? It will be saved to All Food Items either way. Choose Cancel to keep it out of Groceries.`);
-            item = { ...item, groceryTrackingEnabled: trackInGroceries, shoppingListEnabled: trackInGroceries };
+            item = { ...item, groceryTrackingEnabled: false, shoppingListEnabled: false };
           }
           await saveMainFoodItems([item]);
           notify.success(reuse ? 'Existing food reused' : editing ? 'Food updated' : 'Food added to your library');
@@ -662,7 +643,7 @@ function RecipesContent({ route, navigationPath }) {
                         {formatIngredient(item)}
                       </p>
                     ))}
-                </section>
+    </section>
                 <RecipeAlternatives group={group} />
               </>
             )}
@@ -752,6 +733,7 @@ function RecipesContent({ route, navigationPath }) {
             </>}
           </div>
         </dialog>
+        <ConfirmDialog isOpen={Boolean(actionConfirmDialog)} {...actionConfirmDialog} />
       </section>
     </PageShell>
   );

@@ -5,6 +5,7 @@ import { validateDay } from "../features/diary/diaryData.js";
 import { getFoodCatalog } from './foodCatalogService.js';
 
 const PREFIX = "food-diary:v1:";
+const DIARY_WRITE_TIMEOUT_MS = 30_000;
 export async function getFoodDiary(expectedUserId) {
   const { client, userId } = await getUserScopedClient();
   if (userId !== expectedUserId)
@@ -52,11 +53,19 @@ async function commitDay(day, expectedUserId, deleting = false) {
     }];
   }
   const inventory = reconcileInventory(groceries.state, found.data?.value, next, foodCatalog);
-  const result = await client.rpc('commit_diary_inventory', {
-    p_date: clean.date, p_day: next, p_day_version: day.updatedAt || null,
-    p_grocery: inventory.state, p_grocery_version: groceries.version,
-    p_adjustments: inventory.adjustments,
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), DIARY_WRITE_TIMEOUT_MS);
+  let result;
+  try {
+    result = await client.rpc('commit_diary_inventory', {
+      p_date: clean.date, p_day: next, p_day_version: day.updatedAt || null,
+      p_grocery: inventory.state, p_grocery_version: groceries.version,
+      p_adjustments: inventory.adjustments,
+    }).abortSignal(controller.signal);
+  } catch (error) {
+    if (error?.name === 'AbortError') throw new Error('Saving this meal took too long. Your draft is still here. Check the diary before retrying in case the save completed.');
+    throw error;
+  } finally { clearTimeout(timeout); }
   assertSupabaseResult(result);
   return deleting ? clean.date : { ...clean, updatedAt: result.data, inventoryWarnings: inventory.warnings };
 }

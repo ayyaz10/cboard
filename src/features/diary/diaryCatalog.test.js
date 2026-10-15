@@ -20,3 +20,22 @@ test('unambiguous existing and new diary foods link or enter the catalog normall
   assert.deepEqual(result.newFoods.map(item => item.name), ['Pear']);
   assert.deepEqual(result.reviewFoods, []);
 });
+
+test('40 legacy diary foods and six ambiguous old names never enter current-meal resolution', () => {
+  const legacyMeals = Array.from({ length: 40 }, (_, index) => ({
+    id: `old-${index}`,
+    items: [{ id: `old-food-${index}`, name: `Old food ${index}` }],
+  }));
+  const ambiguous = Array.from({ length: 6 }, (_, index) => ({
+    id: `canonical-${index}`, name: `Old food ${index} prepared`, quantity: 100, unit: 'g',
+  }));
+  const currentMeal = { id: 'today', items: [{ id: 'today-oats', name: 'Oats', quantity: 50 }] };
+
+  const result = prepareDiaryCatalogItems([currentMeal], [...ambiguous, { id: 'oats', name: 'Oats', quantity: 100, unit: 'g' }]);
+
+  assert.equal(legacyMeals.length, 40);
+  assert.equal(result.meals.length, 1);
+  assert.equal(result.meals[0].id, 'today');
+  assert.equal(result.meals[0].items[0].foodId, 'oats');
+  assert.deepEqual(result.reviewFoods, []);
+});

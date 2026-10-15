@@ -9,7 +9,7 @@ import {
   getFoodDiary,
   saveFoodDiary,
 } from "../../services/foodDiaryService";
-import { getPreference } from "../../services/preferenceService";
+import { getPreference, setPreference } from "../../services/preferenceService";
 import { readMealRoutine } from "../recipes/mealPlanData";
 import { RecipeLink } from "../recipes/RecipeComponents";
 import { NutritionTotals } from "./DiaryNutrition";
@@ -45,6 +45,11 @@ import "./foodDiary.css";
 
 const format = (n) =>
   new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(n);
+
+const LEGACY_FOOD_MIGRATION_KEY = 'food-library:legacy-diary-migration:v1';
+function logMealSave(stage, details = {}) {
+  if (import.meta.env.DEV) console.info('[meal-save]', { stage, ...details });
+}
 
 function missingCatalogFoods(days, catalog) {
   const knownNames = new Set(catalog.flatMap(food => [food.name, ...(food.aliases || [])]).map(normalizeFoodName));
@@ -84,6 +89,8 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState(null);
   const [pendingRecipe, setPendingRecipe] = useState(null);
+  const [legacyMigration, setLegacyMigration] = useState(null);
+  const [migrationBusy, setMigrationBusy] = useState(false);
   const [recipeError, setRecipeError] = useState('');
   const [remove, setRemove] = useState(null);
   const [removeDay, setRemoveDay] = useState(null);
@@ -96,6 +103,10 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
   const [view, setView] = useState("day");
   const lock = useRef(false);
   const generation = useRef(0);
+  const foodCatalogRef = useRef(foodCatalog);
+  const recipesRef = useRef(recipes);
+  foodCatalogRef.current = foodCatalog;
+  recipesRef.current = recipes;
   const editorRef = useRef(null);
   const diaryTopRef = useRef(null);
   const mealsRef = useRef(null);
@@ -119,26 +130,24 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
     setLoadError("");
     try {
       const saved = await getFoodDiary(user.id);
-      let catalogForDiary = foodCatalog;
-      if (onFoodCatalogChange) {
-        const { candidates, needsReview } = missingCatalogFoods(saved, foodCatalog);
-        if (candidates.length) {
-          const trackInGroceries = typeof window !== 'undefined' && window.confirm(`Also track ${candidates.length === 1 ? 'this older diary food' : `${candidates.length} older diary foods`} in Groceries? They will be added to All Food Items either way. Choose Cancel to keep them out of Groceries.`);
-          try {
-            catalogForDiary = await onFoodCatalogChange(candidates.map(item => ({ ...item, groceryTrackingEnabled: trackInGroceries, shoppingListEnabled: trackInGroceries })));
-            notify.success(`${candidates.length} older ${candidates.length === 1 ? 'diary food was' : 'diary foods were'} added to All Food Items.`);
-          } catch (migrationError) {
-            notify.error(`Your diary loaded, but older foods could not be added to All Food Items: ${migrationError.message || 'Please try again.'}`);
+      if (id === generation.current) {
+        const catalogForDiary = foodCatalogRef.current;
+        const currentRecipes = recipesRef.current;
+        setDays(saved.map(entry => ({ ...entry, meals: entry.meals.map(meal => ({ ...meal, items: meal.items.map(item => {
+          const recipePart = item.recipeOrigin?.slug && currentRecipes.find(recipe => recipe.slug === item.recipeOrigin.slug)?.ingredients.find(part => part.id === item.recipeOrigin.ingredientId);
+          const candidates = catalogForDiary.filter(food => [food.name, ...(food.aliases || [])].some(name => normalizeFoodName(name) === normalizeFoodName(item.name)));
+          const food = catalogForDiary.find(candidate => candidate.id === item.foodId) || catalogForDiary.find(candidate => candidate.id === recipePart?.foodId) || (candidates.length === 1 ? candidates[0] : null);
+          return food ? { ...item, foodId: item.foodId || food.id, nutritionExcluded: food.nutritionTrackingEnabled === false, groceryTrackingEnabled: food.groceryTrackingEnabled !== false } : item;
+        }) })) })));
+        getPreference(LEGACY_FOOD_MIGRATION_KEY).then(migration => {
+          if (id !== generation.current) return;
+          if (migration?.version === 1 && migration.completedAt) setLegacyMigration(migration.pendingReview?.length ? { candidates: [], needsReview: migration.pendingReview, dismissed: false, completed: true, completedAt: migration.completedAt, migrated: migration.migrated || 0 } : null);
+          else {
+            const { candidates, needsReview } = missingCatalogFoods(saved, foodCatalogRef.current);
+            setLegacyMigration(candidates.length || needsReview.length ? { candidates, needsReview, dismissed: false } : null);
           }
-        }
-        if (needsReview.length) notify.warning(`${needsReview.length} older diary ${needsReview.length === 1 ? 'food needs' : 'foods need'} a duplicate review before it can be added to All Food Items.`);
+        }).catch(() => { /* Migration status must never block diary loading. */ });
       }
-      if (id === generation.current) setDays(saved.map(day => ({ ...day, meals: day.meals.map(meal => ({ ...meal, items: meal.items.map(item => {
-        const recipePart = item.recipeOrigin?.slug && recipes.find(recipe => recipe.slug === item.recipeOrigin.slug)?.ingredients.find(part => part.id === item.recipeOrigin.ingredientId);
-        const candidates = catalogForDiary.filter(food => [food.name, ...(food.aliases || [])].some(name => normalizeFoodName(name) === normalizeFoodName(item.name)));
-        const food = catalogForDiary.find(entry => entry.id === item.foodId) || catalogForDiary.find(entry => entry.id === recipePart?.foodId) || (candidates.length === 1 ? candidates[0] : null);
-        return food ? { ...item, foodId: item.foodId || food.id, nutritionExcluded: food.nutritionTrackingEnabled === false, groceryTrackingEnabled: food.groceryTrackingEnabled !== false } : item;
-      }) })) })));
     } catch (err) {
       if (id === generation.current)
         setLoadError(err.message || "Could not load your diary.");
@@ -151,7 +160,7 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
     return () => {
       generation.current++;
     };
-  }, [user.id, foodCatalog, recipes]);
+  }, [user.id]);
   useEffect(() => {
     const timer = setInterval(() => setToday(localDate()), 30000);
     return () => clearInterval(timer);
@@ -205,72 +214,98 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
       document.removeEventListener("click", guardLink, true);
     };
   }, [draft, routine, pastOpen, confirmDiscard]);
+  async function migrateLegacyDiaryFoods() {
+    if (!legacyMigration || migrationBusy) return;
+    setMigrationBusy(true);
+    try {
+      if (legacyMigration.candidates.length && !onFoodCatalogChange) throw new Error('Food library is unavailable. Try again later.');
+      const pendingReview = [...legacyMigration.needsReview];
+      let migrated = 0;
+      for (const item of legacyMigration.candidates) {
+        try {
+          await onFoodCatalogChange([{ ...item, groceryTrackingEnabled: false, shoppingListEnabled: false }]);
+          migrated++;
+        } catch {
+          pendingReview.push(item.name);
+        }
+      }
+      await setPreference(LEGACY_FOOD_MIGRATION_KEY, {
+        version: 1,
+        completedAt: new Date().toISOString(),
+        migrated,
+        pendingReview: [...new Set(pendingReview)],
+        groceryDecision: 'historical-foods-not-tracked',
+      });
+      setLegacyMigration(pendingReview.length ? { candidates: [], needsReview: [...new Set(pendingReview)], dismissed: false, completed: true, completedAt: new Date().toISOString(), migrated } : null);
+      notify.success(`${migrated} older food${migrated === 1 ? '' : 's'} added to All Food Items. Grocery tracking remains off.${pendingReview.length ? ` ${new Set(pendingReview).size} food${new Set(pendingReview).size === 1 ? '' : 's'} remain in the review queue.` : ''}`);
+    } catch (migrationError) {
+      notify.error(`Today's diary is unaffected. The older-food migration could not be completed: ${migrationError.message || 'Please try again.'}`);
+    } finally { setMigrationBusy(false); }
+  }
+  async function acknowledgeLegacyReviews() {
+    if (!legacyMigration?.completed || migrationBusy) return;
+    setMigrationBusy(true);
+    try {
+      await setPreference(LEGACY_FOOD_MIGRATION_KEY, {
+        version: 1, completedAt: legacyMigration.completedAt, migrated: legacyMigration.migrated,
+        pendingReview: [], groceryDecision: 'historical-foods-not-tracked',
+      });
+      setLegacyMigration(null);
+    } catch (error) { notify.error(`Could not update the old-food review list: ${error.message || 'Please try again.'}`); }
+    finally { setMigrationBusy(false); }
+  }
+  function dismissLegacyMigration() { setLegacyMigration(current => current ? { ...current, dismissed: true } : current); }
   async function persist(next, success) {
     if (lock.current) return false;
     lock.current = true;
     setBusy(true);
     setError("");
     const id = generation.current;
+    let stage = 'validating';
+    logMealSave('start', { dayId: next.date, mealIds: next.meals.map(meal => meal.id) });
     try {
       let prepared = structuredClone(next);
       const catalogResolution = prepareDiaryCatalogItems(prepared.meals, foodCatalog);
       prepared.meals = catalogResolution.meals;
       const { newFoods, reviewFoods } = catalogResolution;
-      let catalogSaveError = '';
-      if (newFoods.length && onFoodCatalogChange) {
-        const names = [...new Set(newFoods.map(item => item.name))];
-        const trackInGroceries = window.confirm(`Also track ${names.length === 1 ? names[0] : `${names.length} new diary foods`} in Groceries? These foods will be saved to All Food Items either way. Choose Cancel to keep them out of Groceries.`);
-        const catalogItems = newFoods.map(item => ({
-          ...(item.foodId || item.source?.foodId ? { id: item.foodId || item.source.foodId } : {}),
-          name: item.name,
-          quantity: item.basis || 100,
-          unit: item.nutritionUnit || 'g',
-          nutrition: item.nutrition || {},
-          nutrientSources: item.nutrientSources || {},
-          source: item.source || { provider: 'Food diary', name: item.name },
-          groceryTrackingEnabled: trackInGroceries,
-          shoppingListEnabled: trackInGroceries,
-        }));
-        try {
-          const savedFoods = await onFoodCatalogChange(catalogItems);
-          prepared.meals = prepared.meals.map(meal => ({
-            ...meal,
-            items: meal.items.map(item => {
-              if (item.foodId) return item;
-              const matches = (savedFoods || []).filter(food => [food.name, ...(food.aliases || [])]
-                .some(name => normalizeFoodName(name) === normalizeFoodName(item.name)));
-              if (matches.length !== 1) return item;
-              const food = matches[0];
-              return { ...item, foodId: food.id,
-                groceryTrackingEnabled: food.groceryTrackingEnabled !== false,
-                nutritionExcluded: food.nutritionTrackingEnabled === false };
-            }),
-          }));
-        } catch (err) {
-          catalogSaveError = err.message || 'Could not save new diary foods to All Food Items.';
-        }
-      }
+      logMealSave('validated', { dayId: prepared.date, unresolvedCurrentFoods: reviewFoods.length });
+      stage = 'diary-write';
+      logMealSave('diary-write:start', { dayId: prepared.date });
       const saved = await saveFoodDiary(
         { ...prepared, updatedAt: day.updatedAt },
         user.id,
       );
+      logMealSave('diary-write:success', { dayId: saved.date, mealIds: saved.meals.map(meal => meal.id) });
       if (id !== generation.current) return false;
       setDays((previous) => [
         ...previous.filter((entry) => entry.date !== saved.date),
         saved,
       ]);
       notify.success(success);
-      const foodsToReview = [...new Set([...reviewFoods, ...(catalogSaveError ? newFoods.map(item => item.name) : [])])];
-      if (foodsToReview.length) notify.warning(`Diary saved. Review ${foodsToReview.join(', ')} in food lookup before adding ${foodsToReview.length === 1 ? 'it' : 'them'} to All Food Items.${catalogSaveError ? ` ${catalogSaveError}` : ''}`);
+      if (newFoods.length && onFoodCatalogChange) {
+        const catalogItems = newFoods.map(item => ({
+          ...(item.foodId || item.source?.foodId ? { id: item.foodId || item.source.foodId } : {}),
+          name: item.name, quantity: item.basis || 100, unit: item.nutritionUnit || 'g',
+          nutrition: item.nutrition || {}, nutrientSources: item.nutrientSources || {},
+          source: item.source || { provider: 'Food Diary', name: item.name },
+          groceryTrackingEnabled: false, shoppingListEnabled: false,
+        }));
+        Promise.resolve().then(() => onFoodCatalogChange(catalogItems)).catch(() =>
+          notify.warning('Meal saved. One or more new foods need review before they can be added to All Food Items; the diary entry is safe.'));
+      }
+      const foodsToReview = [...new Set(reviewFoods)];
+      if (foodsToReview.length) notify.warning(`Meal saved. ${foodsToReview.length} food${foodsToReview.length === 1 ? '' : 's'} in this meal may match existing foods; review them in All Food Items when convenient.`);
       if (saved.inventoryWarnings?.length) notify.warning([...new Set(saved.inventoryWarnings)].join(' '));
+      logMealSave('complete', { dayId: saved.date });
       return true;
     } catch (err) {
+      logMealSave('error', { stage, dayId: next.date, error: err?.message || 'unknown' });
       if (id === generation.current)
         { setError(err.message || "Could not save. Your draft is still here."); notify.error(err.message || 'Could not save diary entry'); }
       return false;
     } finally {
       lock.current = false;
-      if (id === generation.current) setBusy(false);
+      setBusy(false);
     }
   }
   function selectDate(next, scroll = false) {
@@ -307,7 +342,7 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
         { setError(err.message || "Could not delete this diary day."); notify.error(err.message || 'Could not delete diary day'); }
     } finally {
       lock.current = false;
-      if (id === generation.current) setBusy(false);
+      setBusy(false);
     }
   }
   function saveMeal(meal) {
@@ -317,6 +352,8 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
   async function confirmMeal(recipe, selections, share, newRecipe) {
     if (lock.current || !pendingRecipe) return;
     const { meal } = pendingRecipe;
+    let recipeWasSaved = Boolean(pendingRecipe.savedRecipe);
+    logMealSave('recipe-flow:start', { mealId: meal.id, recipeSlug: recipe?.slug || null, newRecipe: Boolean(newRecipe) });
     setRecipeError('');
     let prepared;
     try {
@@ -328,7 +365,7 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
         meals: exists ? day.meals.map(entry => entry.id === meal.id ? meal : entry) : [...day.meals, meal],
         skipped: day.skipped.filter(slot => slot !== meal.meal), complete: false,
       }, 'Meal saved.')) {
-        setRecipeError('Could not save the diary. Your draft is still here; the recipe has not been changed.');
+        setRecipeError("Could not save today's meal. Your draft is still here; the recipe has not changed.");
         return;
       }
       setPendingRecipe(current => ({ ...current, diarySaved: true }));
@@ -338,9 +375,12 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
       setBusy(true);
       try {
         if (!pendingRecipe.savedRecipe) {
+          logMealSave('recipe-update:start', { mealId: meal.id, recipeSlug: recipe?.slug || null });
           const saved = newRecipe ? await saveRecipe(prepared, null, { expectedUserId: user.id }) : await saveDiaryRecipeUpdate(prepared, user.id);
           setPendingRecipe(current => ({ ...current, savedRecipe: saved }));
           onDiaryRecipeUpdated?.(saved);
+          recipeWasSaved = true;
+          logMealSave('recipe-update:success', { mealId: meal.id, recipeSlug: saved.slug });
         }
         if (share && onFoodCatalogChange) {
           const selected = new Set(selections.filter(row => row.selected).map(row => row.id));
@@ -348,8 +388,9 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
         }
         notify.success(`Meal saved and ${prepared.title} ${newRecipe ? 'added to Recipes' : 'updated'}${share ? '. Shared food nutrition updated too' : ''}`);
       } catch (err) {
-        setRecipeError(`Your diary is saved. ${err.message}`);
-        notify.error(`Your diary is saved, but the recipe update failed: ${err.message}`);
+        logMealSave('recipe-update:error', { mealId: meal.id, recipeSlug: recipe?.slug || prepared?.slug || null, error: err?.message || 'unknown' });
+        setRecipeError(recipeWasSaved ? `Your meal and recipe are saved, but shared food nutrition could not be updated: ${err.message}` : `Your diary is saved, but the recipe update failed: ${err.message}`);
+        notify.error(recipeWasSaved ? `Meal and recipe saved, but shared food nutrition could not be updated: ${err.message}` : `Your diary is saved, but the recipe update failed: ${err.message}`);
         return;
       } finally { lock.current = false; setBusy(false); }
     }
@@ -382,7 +423,7 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
       if (id === generation.current) { setError(err.message); notify.error(err.message || 'Could not open saved meal plan'); }
     } finally {
       lock.current = false;
-      if (id === generation.current) setBusy(false);
+      setBusy(false);
     }
   }
   async function importRoutine() {
@@ -454,6 +495,12 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
         </div>
         <RecipeLink to="/recipes/planner/day">Daily Planner</RecipeLink>
       </header>
+      {legacyMigration && !legacyMigration.dismissed && <aside className="diary-legacy-migration" aria-label="Older food library update">
+        <div><strong>{legacyMigration.completed ? 'Older foods needing review' : 'Older diary foods'}</strong><p>{legacyMigration.completed ? `${legacyMigration.needsReview.length} older food${legacyMigration.needsReview.length === 1 ? '' : 's'} could not be matched safely. They remain in diary history and were not added to Groceries.` : `${legacyMigration.candidates.length} can be added to All Food Items; ${legacyMigration.needsReview.length} need duplicate review. This does not affect today's meal saves. Grocery tracking will stay off for migrated foods.`}</p>
+          {legacyMigration.needsReview.length > 0 && <details><summary>Show foods needing review</summary><ul>{legacyMigration.needsReview.map((name, index) => <li key={`${name}-${index}`}>{name}</li>)}</ul></details>}
+        </div>
+        <div className="diary-actions">{legacyMigration.completed ? <><RecipeLink to="/recipes/library/items">Go to food library</RecipeLink><button type="button" disabled={migrationBusy} onClick={acknowledgeLegacyReviews}>Mark review handled</button></> : <button type="button" className="diary-primary" disabled={migrationBusy} onClick={migrateLegacyDiaryFoods}>{migrationBusy ? 'Adding foods…' : 'Add unique foods'}</button>}<button type="button" disabled={migrationBusy} onClick={dismissLegacyMigration}>Review later</button></div>
+      </aside>}
       <nav className="diary-view-tabs" role="tablist" aria-label="Food diary views">
         <button
           type="button"
