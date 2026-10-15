@@ -85,7 +85,7 @@ test('multi-app backup preserves linked identifiers between selected modules', a
 });
 
 test('Finance export, replacement restore, ownership remapping, and round-trip preserve IDs but omit secrets', async () => {
-  const state = { version: 1, settings: { currency: 'GBP', refresh_token: 'never-export-this' }, categories: [], transactions: [{ id: 'tx-stable-1', type: 'donation', amount: 2250, date: '2026-10-05' }], budgets: {}, openingBalances: {}, budgetPresets: [], goals: [], goalContributions: [], investments: [], debts: [], debtPayments: [{ id: 'repay-1', debtId: 'debt-stable-1', amount: 300 }], recurring: [{ id: 'repeat-1', frequency: 'weekly' }], transactionPresets: [], allocationRules: [] };
+  const state = { version: 1, settings: { currency: 'GBP', refresh_token: 'never-export-this' }, categories: [], transactions: [{ id: 'tx-stable-1', type: 'donation', amount: 2250, date: '2026-10-05', merchantId: 'merchant-custom-1' }], merchantProfiles: [{ id: 'merchant-custom-1', displayName: 'Spice of India', aliases: ['Spice India'], normalizedAliases: ['spice of india', 'spice india'], logoType: 'custom', logoData: 'data:image/webp;base64,AA==' }], budgets: {}, openingBalances: {}, budgetPresets: [], goals: [], goalContributions: [], investments: [], debts: [], debtPayments: [{ id: 'repay-1', debtId: 'debt-stable-1', amount: 300 }], recurring: [{ id: 'repeat-1', frequency: 'weekly' }], transactionPresets: [], allocationRules: [] };
   const expected = structuredClone(state); delete expected.settings.refresh_token;
   const client = new FinanceMemoryClient();
   client.rows = [{ user_id: 'source-account', state, updated_at: '2026-10-05T09:00:00Z' }];

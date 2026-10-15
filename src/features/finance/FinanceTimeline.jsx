@@ -1,31 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Area, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { budgetTarget, formatMoney, moneyInput, monthKey, shiftMonth } from './financeMath.js';
-import { merchantLogoUrl, parseOpeningBalance } from './financeChartData.js';
+import { parseOpeningBalance } from './financeChartData.js';
 import { balanceViewValue, calculateFinanceBalances } from './financeBalances.js';
+import { MerchantLogo } from './MerchantLogo.jsx';
 
 const markerTypes = ['income', 'expense', 'savings', 'goal', 'investment', 'donation', 'budget', 'debt', 'transfer'];
 const markerLabels = { income:'Income', expense:'Spending', savings:'Savings', goal:'Goals', investment:'Investments', donation:'Donations', budget:'Budget pots', debt:'Repayments', transfer:'Transfers' };
-const markerSymbols = { income:'↑', expense:'−', savings:'S', goal:'★', investment:'↗', donation:'+', budget:'B', debt:'✓', transfer:'↔' };
 const progressLabels = { savings:'Savings', goals:'Goals', investments:'Investments', donations:'Donations', budgets:'Budgets', debts:'Repayments' };
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 
-function MerchantMark({ transaction, showLogos, compact = false }) {
-  const [failed, setFailed] = useState(false);
-  const logo = showLogos && !failed ? merchantLogoUrl(transaction?.title) : '';
-  return <span className={`f-merchant-mark${compact?' f-merchant-mark-small':''}`} data-type={transaction?.type || 'opening'} aria-hidden="true">
-    <span>{markerSymbols[transaction?.type] || '£'}</span>
-    {logo && <img src={logo} alt="" onError={() => setFailed(true)} />}
-  </span>;
+function MerchantMark({ transaction, showLogos, merchants=[], compact = false }) {
+  return <MerchantLogo transaction={transaction} merchants={merchants} showLogos={showLogos} className={`f-merchant-mark${compact?' f-merchant-mark-small':''}`}/>;
 }
 
-function TimelineDot({ cx, cy, payload, visibleTypes, showLogos, selectTransaction }) {
+function TimelineDot({ cx, cy, payload, visibleTypes, showLogos, merchants, selectTransaction }) {
   const transaction = payload?.transaction;
   if (!transaction || !visibleTypes.has(transaction.type)) return null;
-  return <foreignObject x={cx-17} y={cy-17} width="34" height="34" className="f-chart-dot"><button type="button" className="f-chart-dot-button" title={`Select ${transaction.title}`} aria-label={`Select ${transaction.title}`} onClick={(event)=>{event.stopPropagation();selectTransaction(transaction)}}><MerchantMark transaction={transaction} showLogos={showLogos}/></button></foreignObject>;
+  return <foreignObject x={cx-17} y={cy-17} width="34" height="34" className="f-chart-dot"><button type="button" className="f-chart-dot-button" title={`Select ${transaction.title}`} aria-label={`Select ${transaction.title}`} onClick={(event)=>{event.stopPropagation();selectTransaction(transaction)}}><MerchantMark transaction={transaction} showLogos={showLogos} merchants={merchants}/></button></foreignObject>;
 }
 
-function TimelineTooltip({ active, payload, currency, showLogos }) {
+function TimelineTooltip({ active, payload, currency, showLogos, merchants }) {
   if (!active || !payload?.length) return null;
   const point = payload[0].payload;
   const balanceDetails=<><div className="f-between"><span>Spendable</span><strong>{formatMoney(point.availableCash,currency)}</strong></div><div className="f-between"><span>Protected / reserved</span><strong>{formatMoney(point.reservedTotal,currency)}</strong></div><div className="f-between"><span>Total owned</span><strong>{formatMoney(point.overallOwned,currency)}</strong></div></>;
@@ -36,7 +31,7 @@ function TimelineTooltip({ active, payload, currency, showLogos }) {
   const isReservation=point.eventKind==='reserve';
   const isRelease=point.eventKind==='release';
   return <div className="f-chart-tooltip">
-    <div className="f-chart-tooltip-title"><MerchantMark transaction={transaction} showLogos={showLogos} compact/><div><strong>{transaction.title}</strong><span>{markerLabels[transaction.type] || transaction.type} · {point.date}</span></div></div>
+    <div className="f-chart-tooltip-title"><MerchantMark transaction={transaction} showLogos={showLogos} merchants={merchants} compact/><div><strong>{transaction.title}</strong><span>{markerLabels[transaction.type] || transaction.type} · {point.date}</span></div></div>
     <div className="f-between"><span>{isReservation?'Reserved':isRelease?'Reserve released':'Cash movement'}</span><strong className={!isReservation&&!isRelease&&transaction.type==='income'?'f-positive':''}>{isReservation||isRelease?formatMoney(transaction.amount,currency):`${sign}${formatMoney(Math.abs(point.change),currency)}`}</strong></div>
     {balanceDetails}
   </div>;
@@ -80,6 +75,7 @@ function buildTargetCards(data, month) {
 }
 
 export function FinanceTimeline({ data, month, setMonth, change, transactionScope, setTransactionScope, openTransaction, deleteTransaction }) {
+  const merchants=data.merchantProfiles||[];
   const allTime = transactionScope === 'all';
   const transactions = useMemo(() => data.transactions.filter(item => !item.source || item.providerStatus === 'BOOK'), [data.transactions]);
   const rangeMonth = allTime ? null : month;
@@ -203,14 +199,14 @@ export function FinanceTimeline({ data, month, setMonth, change, transactionScop
   },[timeline.length]);
   async function saveOpening(event){event.preventDefault();try{const amount=parseOpeningBalance(opening);await change(state=>{state.openingBalances||={};state.openingBalances[openingMonth]=amount;return state},'Opening balance saved');setOpeningError('')}catch(error){setOpeningError(error.message)}}
   return <div className="f-timeline-page">
-    <div className="f-tabs" role="group" aria-label="Timeline date range"><button type="button" aria-pressed={!allTime} onClick={()=>setTransactionScope('month')}>By month</button><button type="button" aria-pressed={allTime} onClick={()=>setTransactionScope('all')}>All time</button></div>
+    <div className="f-tabs f-scope-picker" role="group" aria-label="Timeline date range"><button type="button" className={!allTime?'is-active':''} aria-pressed={!allTime} onClick={()=>setTransactionScope('month')}>By month</button><button type="button" className={allTime?'is-active':''} aria-pressed={allTime} onClick={()=>setTransactionScope('all')}>All time</button></div>
     {!allTime&&<div className="f-between f-timeline-month"><div className="f-actions"><button className="f-button" onClick={()=>setMonth(shiftMonth(month,-1))} aria-label="Previous month">←</button><span className="f-month">{new Date(`${month}-15`).toLocaleDateString([],{month:'long',year:'numeric'})}</span><button className="f-button" onClick={()=>setMonth(shiftMonth(month,1))} aria-label="Next month">→</button></div><button className="f-button" onClick={()=>setMonth(monthKey())}>Current month</button></div>}
     <div className="f-between f-timeline-heading"><div><span className="pill">Money movement</span><h2 className="text-3xl font-bold mt-4">Money Timeline</h2><p className="f-help mt-2">See how your spendable money changes over time.</p></div><div className="f-stat" data-tone={endBalance>=0?'blue':'pink'}><strong>{formatMoney(endBalance,currency)}</strong><span>{balanceView==='available'?'Spendable now':'Total owned'} · {allTime?'all time':'selected month'}</span></div></div>
     <section className="f-card f-timeline-card mt-5">
       <div className="f-timeline-controls"><form className="f-opening-form" onSubmit={saveOpening}><label>Opening balance for {openingMonth}<input inputMode="decimal" value={opening} onChange={(event)=>setOpening(event.target.value)} /></label><button className="f-button">Save</button></form><label className="f-logo-toggle"><input type="checkbox" checked={showLogos} onChange={(event)=>setShowLogos(event.target.checked)}/> Show recognised merchant logos</label></div>
       {allTime&&<p className="f-help">Starts with the opening balance for the earliest transaction month ({openingMonth}), then applies every recorded transaction once. Later monthly opening balances are not added again.</p>}
       {openingError&&<p className="f-alert" role="alert">{openingError}</p>}
-      <div className="f-tabs" role="group" aria-label="Timeline balance"><button type="button" aria-pressed={balanceView==='available'} onClick={()=>setBalanceView('available')}>Spendable</button><button type="button" aria-pressed={balanceView==='overall'} onClick={()=>setBalanceView('overall')}>Total owned</button></div>
+      <div className="f-tabs f-scope-picker" role="group" aria-label="Timeline balance"><button type="button" className={balanceView==='available'?'is-active':''} aria-pressed={balanceView==='available'} onClick={()=>setBalanceView('available')}>Spendable</button><button type="button" className={balanceView==='overall'?'is-active':''} aria-pressed={balanceView==='overall'} onClick={()=>setBalanceView('overall')}>Total owned</button></div>
       <details className="f-balance-breakdown"><summary>Current balance breakdown</summary><dl>
         <div><dt>Spendable now</dt><dd>{formatMoney(balances.availableCash,currency)}</dd></div>
         <div><dt>Protected / reserved</dt><dd>{formatMoney(balances.reservedTotal,currency)}</dd></div>
@@ -247,15 +243,15 @@ export function FinanceTimeline({ data, month, setMonth, change, transactionScop
           <XAxis type="number" dataKey="index" domain={[viewport.x0,viewport.x1]} allowDataOverflow ticks={timeline.map((_,index)=>index)} interval="preserveStartEnd" minTickGap={22} tickFormatter={(index)=>timeline[index]?.date!==timeline[index-1]?.date?(allTime?timeline[index]?.date:timeline[index]?.date?.slice(8,10)):''} tick={{fontSize:12,fontWeight:700,fill:'currentColor'}} axisLine={{stroke:'var(--finance-chart-line,#111)'}} tickLine={false}/>
           <YAxis orientation="right" width={74} domain={[viewport.y0,viewport.y1]} allowDataOverflow tickFormatter={(value)=>new Intl.NumberFormat(undefined,{style:'currency',currency,notation:'compact',maximumFractionDigits:1}).format(value/100)} tick={{fontSize:11,fontWeight:700,fill:'currentColor'}} axisLine={{stroke:'var(--finance-chart-line,#111)'}} tickLine={false}/>
           <ReferenceLine y={0} stroke="var(--finance-chart-line,#111)" strokeDasharray="6 4"/>
-          <Tooltip content={<TimelineTooltip currency={currency} showLogos={showLogos}/>} cursor={{stroke:'var(--finance-chart-line,#111)',strokeDasharray:'3 3'}}/>
+          <Tooltip content={<TimelineTooltip currency={currency} showLogos={showLogos} merchants={merchants}/>} cursor={{stroke:'var(--finance-chart-line,#111)',strokeDasharray:'3 3'}}/>
           <Area type="monotoneX" dataKey="balance" stroke="none" fill="url(#financeBalanceFill)" isAnimationActive={false}/>
-          <Line type="monotoneX" dataKey="balance" stroke="var(--finance-balance-line,var(--finance-chart-line,#111))" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" dot={<TimelineDot visibleTypes={visibleTypes} showLogos={showLogos} selectTransaction={(transaction)=>setSelectedTransactionId(transaction.id)}/>} activeDot={{r:7,fill:'var(--finance-chart-fill,var(--f-green))',stroke:'var(--finance-balance-line,var(--finance-chart-line,#111))',strokeWidth:2}} isAnimationActive={false}/>
+          <Line type="monotoneX" dataKey="balance" stroke="var(--finance-balance-line,var(--finance-chart-line,#111))" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" dot={<TimelineDot visibleTypes={visibleTypes} showLogos={showLogos} merchants={merchants} selectTransaction={(transaction)=>setSelectedTransactionId(transaction.id)}/>} activeDot={{r:7,fill:'var(--finance-chart-fill,var(--f-green))',stroke:'var(--finance-balance-line,var(--finance-chart-line,#111))',strokeWidth:2}} isAnimationActive={false}/>
         </ComposedChart></ResponsiveContainer>
         </div>
         </div>
       </div>}
       {selectedTransaction&&<article className="f-chart-selected" aria-live="polite"><div className="f-between"><div><span className="f-tag">Selected transaction</span><h3>{selectedTransaction.title}</h3><p className="f-meta">{markerLabels[selectedTransaction.type]||selectedTransaction.type} &middot; {selectedTransaction.date} &middot; {formatMoney(selectedTransaction.amount,currency)}</p></div><button type="button" className="f-button" aria-label="Close selected transaction actions" onClick={()=>setSelectedTransactionId(null)}>Close</button></div><div className="f-actions mt-3"><button type="button" className="f-primary" onClick={()=>openTransaction(selectedTransaction)}>Open record</button><button type="button" className="f-button danger-action" onClick={()=>deleteTransaction(selectedTransaction)}>Delete</button></div></article>}
-      <p className="f-help">{allTime?'Transaction dates run along the bottom.':'Day of month runs along the bottom.'} Zoom ranges from 25% to 500%. Recognised logos load from the merchant’s own website; failed or unknown logos automatically use a category marker. Transfers between your own accounts do not change available cash.</p>
+      <p className="f-help">{allTime?'Transaction dates run along the bottom.':'Day of month runs along the bottom.'} Zoom ranges from 25% to 500%. Saved merchant logos appear when available; unknown or unavailable logos use a letter badge. Transfers use a transfer marker and do not change available cash.</p>
     </section>
     <section className="mt-6" aria-labelledby="target-progress-heading"><div><h3 id="target-progress-heading" className="text-2xl font-bold">Targets and progress</h3><p className="f-help mt-1">Progress is kept separate from the cash line so percentages and money are never mixed.</p></div>
       <details className="f-filter-fieldset"><summary>Choose which targets to show</summary><div className="f-filter-chips">{Object.entries(progressLabels).map(([key,label])=><label key={key} className="f-filter-chip" data-active={visibleProgress.has(key)}><input type="checkbox" checked={visibleProgress.has(key)} onChange={()=>toggle(setVisibleProgress,visibleProgress,key)}/>{label}</label>)}</div></details>

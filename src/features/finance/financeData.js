@@ -21,7 +21,7 @@ export function initialFinanceState() {
   return {
     version: 1,
     settings: { configured: false, currency: defaultCurrency(), monthlyIncome: 0, budgetStartDay: 1, defaultForeignCurrency: 'PKR', leftoverDestination: 'rollover', leftoverGoalId: '' },
-    categories: structuredClone(defaultCategories), transactions: [], budgets: {}, openingBalances: {}, budgetPresets: [],
+    categories: structuredClone(defaultCategories), transactions: [], merchantProfiles: [], budgets: {}, openingBalances: {}, budgetPresets: [],
     goals: [], goalContributions: [], investments: [], debts: [], debtPayments: [], recurring: [], transactionPresets: [], allocationRules: [],
   };
 }
@@ -33,6 +33,8 @@ export function normalizeFinanceState(value) {
   for (const key of ['categories', 'transactions', 'budgetPresets', 'goals', 'goalContributions', 'investments', 'debts', 'debtPayments', 'recurring', 'transactionPresets', 'allocationRules']) {
     if (!Array.isArray(state[key])) state[key] = [];
   }
+  if (!Array.isArray(state.merchantProfiles)) state.merchantProfiles = [];
+  state.merchantProfiles = state.merchantProfiles.filter(item => item && typeof item.id === 'string' && typeof item.displayName === 'string' && Array.isArray(item.aliases) && item.aliases.every(alias => typeof alias === 'string') && (!item.logoData || (typeof item.logoData === 'string' && item.logoData.startsWith('data:image/webp;base64,') && item.logoData.length <= 500000)));
   if (!state.budgets || typeof state.budgets !== 'object' || Array.isArray(state.budgets)) state.budgets = {};
   if (!state.openingBalances || typeof state.openingBalances !== 'object' || Array.isArray(state.openingBalances)) state.openingBalances = {};
   state.transactions = state.transactions.filter((item) => item && transactionTypes.includes(item.type) && Number.isSafeInteger(item.amount) && item.amount > 0);
