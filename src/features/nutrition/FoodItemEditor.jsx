@@ -72,7 +72,7 @@ export function FoodItemEditor({ catalog, onSave, onClose, initial = null }) {
     </div>}
     {mode === 'lookup' && <NutritionLookup currentNutrition={{...draft.nutrition,nutrientSources:draft.nutrientSources,quantity:draft.quantity,unit:draft.unit,source:draft.source}} name={draft.name} visible active onSelect={label => {
       if(label.source?.provider==='Local nutrition label OCR'){setDraft({...draft,quantity:label.quantity,unit:label.unit,nutrition:cleanNutrients(label),source:label.source});setMode('manual');return;}
-      try { useFood({ name: label.source?.provider === 'FatSecret' ? label.foodName : label.source?.name || draft.name, quantity: label.quantity, unit: label.unit, nutrition: Object.fromEntries(NUTRIENTS.map(([key]) => [key, label[key] ?? null])), nutrientSources: label.nutrientSources, source: label.source }, 'Food lookup'); }
+      try { useFood({ name: label.source?.name || draft.name, quantity: label.quantity, unit: label.unit, nutrition: Object.fromEntries(NUTRIENTS.map(([key]) => [key, label[key] ?? null])), nutrientSources: label.nutrientSources, source: label.source }, 'Food lookup'); }
     catch (err) { notify.error(err.message || 'Could not save food item'); }
     }} />}
     {mode === 'manual' && <form onSubmit={save}>

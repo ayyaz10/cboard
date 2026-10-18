@@ -9,7 +9,6 @@ import { nutrients } from "./groceryData";
 import { searchNaturalFoods, searchCoFIDFoods, naturalPortionNutrition, nutritionForOnePortion, suggestedNaturalPortion } from '../../services/naturalFoods';
 import { mergeNutritionByNutrient } from '../nutrition/sourceAdapters.js';
 import { nutrientKeys } from '../nutrition/nutrients.js';
-import { fatSecretFoodProvider } from '../../services/fatSecretFoodProvider.js';
 
 export function NutritionLookup({ name, active, visible, onSelect, amountUnit, portionMode = 'unit', currentNutrition = null, allowLabelScan = true, scanUnits }) {
   const [mode, setMode] = useState("saved");
@@ -23,15 +22,13 @@ export function NutritionLookup({ name, active, visible, onSelect, amountUnit, p
   const [error, setError] = useState("");
   const [basis, setBasis] = useState({});
   const [portions, setPortions] = useState({});
-  const [fatSecretDetails, setFatSecretDetails] = useState({});
-  const [fatSecretBusy, setFatSecretBusy] = useState('');
   const request = useRef(0);
   const searched = useRef("");
   async function lookup(text, byBarcode = false) {
     const id = ++request.current;
     setBusy(true); setError(""); setResults(null); setBasis({}); setPortions({});
     try {
-      const rows = await (byBarcode ? lookupBarcode(text) : mode === 'natural' ? searchNaturalFoods(text) : mode === 'cofid' ? searchCoFIDFoods(text) : mode === 'fatsecret' ? fatSecretFoodProvider.searchFoods(text) : searchNutrition(text));
+      const rows = await (byBarcode ? lookupBarcode(text) : mode === 'natural' ? searchNaturalFoods(text) : mode === 'cofid' ? searchCoFIDFoods(text) : searchNutrition(text));
       if (id === request.current) setResults(rows);
     } catch (err) {
       if (id === request.current) setError(err.message);
@@ -45,7 +42,7 @@ export function NutritionLookup({ name, active, visible, onSelect, amountUnit, p
     searched.current = "";
   }, [name]);
   useEffect(() => {
-    if (active && ['name', 'natural', 'cofid', 'fatsecret'].includes(mode) && name.trim().length >= 2 && searched.current !== `${mode}:${name}`) {
+    if (active && ['name', 'natural', 'cofid'].includes(mode) && name.trim().length >= 2 && searched.current !== `${mode}:${name}`) {
       searched.current = `${mode}:${name}`;
       lookup(name);
     }
@@ -59,9 +56,8 @@ export function NutritionLookup({ name, active, visible, onSelect, amountUnit, p
     setBusy(false);
     setResults(null);
     setError("");
-    setFatSecretDetails({});
   }
-  const modes = [["saved", "My saved foods"], ["name", "Branded products"], ["natural", "USDA reference foods"], ["cofid", "UK CoFID foods"], ["fatsecret", "FatSecret foods"], ["barcode", "Scan barcode"], ...(allowLabelScan ? [["photo", "Scan nutrition label"]] : [])];
+  const modes = [["saved", "My saved foods"], ["name", "Branded products"], ["natural", "USDA reference foods"], ["cofid", "UK CoFID foods"], ["barcode", "Scan barcode"], ...(allowLabelScan ? [["photo", "Scan nutrition label"]] : [])];
   return <div className="g-nutrition-lookup">
     <label className="g-lookup-source">Food source
       <select aria-label="Food source" value={mode} onChange={event => changeMode(event.target.value)}>
@@ -94,10 +90,10 @@ export function NutritionLookup({ name, active, visible, onSelect, amountUnit, p
         <button type="button" disabled={busy || !barcode.trim()} onClick={() => lookup(barcode, true)}>Look up barcode</button>
       </div>
     </div>}
-    {['name', 'natural', 'cofid', 'fatsecret'].includes(mode) && <>
+    {['name', 'natural', 'cofid'].includes(mode) && <>
 
     <div className="g-tools">
-      <label>{mode === 'natural' || mode === 'cofid' || mode === 'fatsecret' ? 'Generic food name' : 'Product name or brand'}
+      <label>{mode === 'natural' || mode === 'cofid' ? 'Generic food name' : 'Product name or brand'}
         <input value={query} maxLength={120} onChange={(e) => {
           setQuery(e.target.value); setResults(null); setError("");
           request.current += 1; setBusy(false);
@@ -109,40 +105,12 @@ export function NutritionLookup({ name, active, visible, onSelect, amountUnit, p
         {busy ? "Searching..." : "Find nutrition"}
       </button>
     </div>
-    <p className="g-hint">{mode === 'natural' ? 'USDA reference foods: try banana, apple, raw cashews or cooked egg. Match raw/cooked and salted/unsalted. Values describe the edible portion; peel, shells and other refuse are excluded.' : mode === 'cofid' ? 'UK CoFID generic foods: choose the closest preparation match. Composition values are reference values per 100 g or 100 ml.' : mode === 'fatsecret' ? 'FatSecret is an additional reference. Check the food and serving carefully; generic dish values can vary by recipe.' : 'Choose the matching food, brand and preparation (for example, dry or cooked rice). Values are for the product as sold.'}</p>
+    <p className="g-hint">{mode === 'natural' ? 'USDA reference foods: try banana, apple, raw cashews or cooked egg. Match raw/cooked and salted/unsalted. Values describe the edible portion; peel, shells and other refuse are excluded.' : mode === 'cofid' ? 'UK CoFID generic foods: choose the closest preparation match. Composition values are reference values per 100 g or 100 ml.' : 'Choose the matching food, brand and preparation (for example, dry or cooked rice). Values are for the product as sold.'}</p>
     </>}
     {busy && <p role="status">Looking up nutrition...</p>}
     {error && <p role="alert">{error}</p>}
     {results?.length === 0 && <p role="status">{mode === "barcode" ? "No nutrition record found for this barcode. Try another food source or add the food manually." : 'No matching nutrition records found. Try a shorter name (for example, "cheddar") or add the food manually.'}</p>}
     {results?.map((product) => {
-      if (mode === 'fatsecret') {
-        const details = fatSecretDetails[product.providerFoodId];
-        const loadDetails = async () => {
-          setFatSecretBusy(product.providerFoodId); setError('');
-          try {
-            const value = await fatSecretFoodProvider.getFoodDetails(product.providerFoodId);
-            setFatSecretDetails(current => ({ ...current, [product.providerFoodId]: value }));
-          } catch (err) { setError(err.message || 'FatSecret details are temporarily unavailable.'); }
-          finally { setFatSecretBusy(''); }
-        };
-        return <div className="g-nutrition-result" key={product.code}>
-          <strong>{product.name}</strong>
-          <p>{[product.brand, product.foodType, 'FatSecret'].filter(Boolean).join(' / ')}</p>
-          {product.description && <small>{product.description}</small>}
-          {!details && <button type="button" disabled={fatSecretBusy === product.providerFoodId} onClick={loadDetails}>{fatSecretBusy === product.providerFoodId ? 'Loading servings…' : 'View serving nutrition'}</button>}
-          {details && !details.servings.length && <p role="status">No serving details are available.</p>}
-          {details?.servings.map(serving => {
-            const nutrition = Object.fromEntries(nutrientKeys.map(key => [key, serving.nutrition[key] ?? null]));
-            return <article key={serving.providerServingId} className="g-nutrition-result">
-              <strong>{serving.label}</strong>
-              <p>Calories {nutrition.calories ?? 'unknown'} kcal · Protein {nutrition.protein ?? 'unknown'} g · Carbs {nutrition.carbs ?? 'unknown'} g · Fat {nutrition.fat ?? 'unknown'} g</p>
-              <small>{nutrients.map(([key, label, suffix]) => `${label}: ${nutrition[key] == null ? 'unknown' : `${nutrition[key]} ${suffix}`}`).join(' / ')}</small>
-              <p className="g-hint">Preview only. FatSecret values are not added to your CBoard foods or diary.</p>
-            </article>;
-          })}
-          <a href={product.source.url} target="_blank" rel="noreferrer">View FatSecret food</a>
-        </div>;
-      }
       const unit = basis[product.code] || product.nutrition.unit;
       const natural = ['USDA FoodData Central', 'UK CoFID'].includes(product.source.provider);
       const suggestedPortion = suggestedNaturalPortion(product, name, amountUnit);
@@ -189,6 +157,6 @@ export function NutritionLookup({ name, active, visible, onSelect, amountUnit, p
         </div>
       </div>;
     })}
-    <small>{mode === 'fatsecret' ? <>Food search and serving nutrition provided by <a href="https://www.fatsecret.com" target="_blank" rel="noreferrer">FatSecret</a>. FatSecret is a reference; generic dish values can vary by recipe.</> : mode === 'cofid' ? <>Data: <a href="https://www.gov.uk/government/publications/composition-of-foods-integrated-dataset-cofid" target="_blank" rel="noreferrer">UK CoFID 2021</a>, downloaded and indexed locally under the Open Government Licence. Trace markers remain unknown.</> : mode === 'natural' ? <>Data: <a href="https://fdc.nal.usda.gov/download-datasets/" target="_blank" rel="noreferrer">USDA FoodData Central</a>, SR Legacy April 2018 / Foundation April 2026, CC0. This is a downloaded reference dataset, not a live USDA API request. Vitamin A is reported as RAE; salt is left unknown when not supplied.</> : <>Data: <a href="https://world.openfoodfacts.org" target="_blank" rel="noreferrer">Open Food Facts</a> / <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noreferrer">ODbL</a>. Coverage and completeness vary.</>}</small>
+    <small>{mode === 'cofid' ? <>Data: <a href="https://www.gov.uk/government/publications/composition-of-foods-integrated-dataset-cofid" target="_blank" rel="noreferrer">UK CoFID 2021</a>, downloaded and indexed locally under the Open Government Licence. Trace markers remain unknown.</> : mode === 'natural' ? <>Data: <a href="https://fdc.nal.usda.gov/download-datasets/" target="_blank" rel="noreferrer">USDA FoodData Central</a>, SR Legacy April 2018 / Foundation April 2026, CC0. This is a downloaded reference dataset, not a live USDA API request. Vitamin A is reported as RAE; salt is left unknown when not supplied.</> : <>Data: <a href="https://world.openfoodfacts.org" target="_blank" rel="noreferrer">Open Food Facts</a> / <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noreferrer">ODbL</a>. Coverage and completeness vary.</>}</small>
   </div>;
 }

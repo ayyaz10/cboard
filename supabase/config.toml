@@ -292,12 +292,6 @@ enabled = true
 verify_jwt = false
 entrypoint = "./functions/nutrition-search/index.ts"
 
-[functions.fatsecret-foods]
-enabled = true
-# The function verifies the CBoard user and FatSecret account scope internally.
-verify_jwt = false
-entrypoint = "./functions/fatsecret-foods/index.ts"
-
 [functions.nutrition-label]
 enabled = true
 verify_jwt = false

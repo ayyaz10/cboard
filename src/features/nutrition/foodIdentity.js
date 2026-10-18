@@ -52,14 +52,6 @@ function nutritionDifferences(a, b) {
 }
 
 export function scoreFoodMatch(candidate, existing) {
-  const provider = value => String(value?.source?.provider || '').toLowerCase();
-  const providerId = value => String(value?.source?.providerFoodId || value?.source?.code || '');
-  const leftProvider = provider(candidate), rightProvider = provider(existing);
-  const leftProviderId = providerId(candidate), rightProviderId = providerId(existing);
-  if (leftProvider === 'fatsecret' && rightProvider === 'fatsecret' && leftProviderId && rightProviderId)
-    return leftProviderId === rightProviderId
-      ? { score: 100, confidence: 'certain', reasons: ['same FatSecret food ID'], conflict: false }
-      : { score: 0, confidence: 'different-product', reasons: ['different FatSecret food IDs'], conflict: true };
   const aBarcode = barcode(candidate), bBarcode = barcode(existing);
   if (aBarcode && bBarcode) return aBarcode === bBarcode
     ? { score: 100, confidence: 'certain', reasons: ['same valid barcode'], conflict: false }
