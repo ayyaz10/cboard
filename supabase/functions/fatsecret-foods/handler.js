@@ -10,18 +10,6 @@ const number = value => value != null && value !== "" && Number.isFinite(Number(
 const list = value => value == null ? [] : Array.isArray(value) ? value : [value];
 const foodRows = payload => list(payload?.foods_search?.results?.food ?? payload?.foods_search?.food ?? payload?.foods?.food);
 const servingRows = payload => list(payload?.food?.servings?.serving ?? payload?.food?.serving);
-const apiError = payload => {
-  const error = payload?.error;
-  if (error) {
-    const code = error.code ?? payload.error_code;
-    const message = typeof error === "string" ? error : error.message ?? error.error_message;
-    return [code && `FatSecret API error ${code}`, message].filter(Boolean).join(": ").slice(0, 240);
-  }
-  if (payload?.error_code != null || payload?.error_message) {
-    return [`FatSecret API error ${payload.error_code ?? ""}`, payload.error_message].filter(Boolean).join(": ").slice(0, 240);
-  }
-  return null;
-};
 const DETAIL_FIELDS = [
   "calories", "carbohydrate", "protein", "fat", "saturated_fat", "monounsaturated_fat", "polyunsaturated_fat",
   "trans_fat", "cholesterol", "sodium", "potassium", "fiber", "sugar", "vitamin_a", "vitamin_c", "vitamin_d", "calcium", "iron",
@@ -108,8 +96,6 @@ export function createFatSecretHandler({ createClient, env, fetchImpl, now = Dat
       const payload = op === "search"
         ? await callFatSecret(basic ? "foods.search" : "foods/search/v5", { search_expression: query, max_results: 20, page_number: 0 }, scope)
         : await callFatSecret(basic ? "food.get" : "food/v5", { food_id: body.foodId }, scope);
-      const upstreamError = apiError(payload);
-      if (upstreamError) throw Object.assign(new Error(upstreamError), { status: 503 });
       let value;
       if (op === "search") {
         value = { foods: foodRows(payload).slice(0, 20).flatMap(food => {
