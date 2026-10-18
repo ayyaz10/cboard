@@ -20,6 +20,7 @@ export function createNutritionSearchHandler({ createClient, env, fetchImpl, now
       if (error || !data?.user) return json({ error: "Sign in again to look up nutrition." }, 401);
       let body;
       try { body = await request.json(); } catch { return json({ error: "Invalid request" }, 400); }
+      if (body?.provider === "fatsecret") return json({ error: "Use the FatSecret food provider endpoint." }, 400);
       const barcode = body?.barcode;
       if (barcode !== undefined && (typeof barcode !== "string" || !/^(?:\d{8}|\d{12,14})$/.test(barcode)))
         return json({ error: "Enter an 8, 12, 13 or 14 digit barcode." }, 400);

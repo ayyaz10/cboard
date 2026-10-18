@@ -11,6 +11,15 @@ test('latest edit replaces the main food record by normalized name', () => {
   assert.equal(result[0].nutrition.protein, 15);
 });
 
+test('FatSecret food and serving IDs survive canonical save for repeat matching', () => {
+  const food = { name: 'Chicken Biryani', quantity: 250, unit: 'g', nutrition: { calories: 420 }, source: { provider: 'FatSecret', providerFoodId: '1234', providerServingId: '5678', name: 'FatSecret' } };
+  const [saved] = mergeFoodCatalog([], [food]);
+  assert.equal(saved.source.providerFoodId, '1234');
+  assert.equal(saved.source.providerServingId, '5678');
+  assert.equal(mergeFoodCatalog([saved], [{ ...food, name: 'Biryani, Chicken' }]).length, 1);
+  assert.equal(mergeFoodCatalog([saved], [{ ...food, source: { ...food.source, providerFoodId: '9999' } }]).length, 2);
+});
+
 test('reference catalog updates fill missing nutrients without replacing exact label values', () => {
   const labeled = { ...oats, nutrientSources: { protein: { sourceType: 'label', sourceName: 'Package label', confidence: 'high', estimated: false } } };
   const reference = { name: 'Oats', quantity: 100, unit: 'g', nutrition: { protein: 9, calcium: 54 }, nutrientSources: {

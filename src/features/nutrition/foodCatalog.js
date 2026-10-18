@@ -169,6 +169,7 @@ const nutritionSourcePriority = sourceType => {
   const source = String(sourceType || '').toLowerCase();
   if (source.includes('label') || source.includes('manual')) return 100;
   if (source.includes('openfoodfacts')) return 80;
+  if (source.includes('fatsecret')) return 45;
   if (source.includes('cofid') || source.includes('usda')) return 50;
   return 40;
 };
@@ -184,7 +185,7 @@ export function cleanFoodCatalogItem(value) {
     canonicalKey: normalizeFoodName(name),
     aliases: Array.isArray(value?.aliases) ? [...new Set(value.aliases.filter(alias => typeof alias === 'string' && alias.trim() && normalizeFoodText(alias) !== normalizeFoodText(name)).map(alias => alias.trim().slice(0, 300)))].slice(0, 100) : [],
     separateAliases: Array.isArray(value?.separateAliases) ? [...new Set(value.separateAliases.filter(alias => typeof alias === 'string' && alias.trim()).map(alias => alias.trim().slice(0, 300)))].slice(0, 100) : [],
-    barcode: validFoodBarcode(value?.barcode || value?.source?.barcode || value?.source?.code) || '',
+    barcode: validFoodBarcode(value?.barcode || value?.source?.barcode || (value?.source?.provider === 'FatSecret' ? '' : value?.source?.code)) || '',
     sku: String(value?.sku || value?.source?.sku || '').trim().slice(0, 120),
     retailer: String(value?.retailer || value?.source?.retailer || '').trim().slice(0, 120),
     brand: String(value?.brand || value?.source?.brand || '').trim().slice(0, 120),
@@ -196,7 +197,7 @@ export function cleanFoodCatalogItem(value) {
     nutrition: cleanNutrients(value.nutrition),
     nutrientSources: cleanNutrientSources({ ...nutrientSourcesForValues(value.nutrition, value.source), ...(value.nutrientSources || value.nutrition?.nutrientSources || {}) }),
     source: {
-      code: String(value.source?.code || '').slice(0, 100),
+      code: String(value.source?.code || value.source?.providerFoodId || '').slice(0, 100),
       url: String(value.source?.url || '').slice(0, 1000),
       license: String(value.source?.license || '').slice(0, 100),
       provider: String(value.source?.provider || 'Manual').slice(0, 100),
@@ -204,8 +205,10 @@ export function cleanFoodCatalogItem(value) {
       brand: String(value.source?.brand || value.brand || '').slice(0, 120),
       retailer: String(value.source?.retailer || value.retailer || '').slice(0, 120),
       sku: String(value.source?.sku || value.sku || '').slice(0, 120),
-      barcode: validFoodBarcode(value.barcode || value.source?.barcode || value.source?.code),
+      barcode: validFoodBarcode(value.barcode || value.source?.barcode || (value.source?.provider === 'FatSecret' ? '' : value.source?.code)),
       modified: true,
+      ...(value.source?.provider === 'FatSecret' && /^\d{1,20}$/.test(String(value.source?.providerFoodId || value.source?.code || '')) ? { providerFoodId: String(value.source?.providerFoodId || value.source.code) } : {}),
+      ...(value.source?.provider === 'FatSecret' && /^\d{1,20}$/.test(String(value.source?.providerServingId || '')) ? { providerServingId: String(value.source.providerServingId) } : {}),
       ...(cleanLabelBasis(value.source?.labelBasis) ? {labelBasis:cleanLabelBasis(value.source?.labelBasis)} : {}), 
     },
     updatedAt: typeof value.updatedAt === 'string' ? value.updatedAt : new Date().toISOString(),
