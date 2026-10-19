@@ -745,39 +745,46 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
                 </button>
               )}
               {entries.map((meal) => {
-                const itemNutrients = [
-                  ["calories", "kcal", "kcal"],
-                  ["protein", "Protein", "g"],
-                  ["carbs", "Carbs", "g"],
-                  ["fat", "Fat", "g"],
-                  ["fiber", "Fibre", "g"],
-                ];
                 return (
                   <article className="diary-entry" key={meal.id}>
                   <h3>{meal.title}</h3>
-                  <ul className="diary-item-nutrition-list" aria-label={`${meal.title} foods and nutrition`}>
-                    {meal.items.map((item) => {
-                      const nutrition = itemNutrition(item);
-                      return (
-                        <li className="diary-item-nutrition" key={item.id}>
-                          <details className="diary-item-nutrition-details">
-                            <summary className="diary-item-nutrition-heading">
-                              <strong>{item.name}</strong>
-                              <span>{format(item.quantity)} {item.unit}</span>
-                            </summary>
-                            <div className="diary-item-nutrition-values">
-                              {itemNutrients.map(([key, label, unit]) => (
-                                <div key={key} title={label === "kcal" ? "Calories" : label}>
-                                  <span>{label}</span>
-                                  <strong>{nutrition[key] == null ? "—" : format(nutrition[key])}<small>{nutrition[key] == null ? "" : unit}</small></strong>
-                                </div>
-                              ))}
-                            </div>
-                          </details>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                  <details className="diary-food-nutrition-table">
+                    <summary>
+                      <span>Food nutrition</span>
+                      <small>{meal.items.length} food items</small>
+                    </summary>
+                    <div className="diary-food-nutrition-scroll">
+                      <table aria-label={`${meal.title} food nutrition`}>
+                        <thead>
+                          <tr>
+                            <th scope="col">Food</th>
+                            <th scope="col">Portion</th>
+                            <th scope="col">Calories</th>
+                            <th scope="col">Protein</th>
+                            <th scope="col">Carbs</th>
+                            <th scope="col">Fat</th>
+                            <th scope="col">Fibre</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {meal.items.map((item) => {
+                            const nutrition = itemNutrition(item);
+                            return (
+                              <tr key={item.id}>
+                                <th scope="row">{item.name}</th>
+                                <td>{format(item.quantity)} {item.unit}</td>
+                                <td>{nutrition.calories == null ? "—" : `${format(nutrition.calories)} kcal`}</td>
+                                <td>{nutrition.protein == null ? "—" : `${format(nutrition.protein)} g`}</td>
+                                <td>{nutrition.carbs == null ? "—" : `${format(nutrition.carbs)} g`}</td>
+                                <td>{nutrition.fat == null ? "—" : `${format(nutrition.fat)} g`}</td>
+                                <td>{nutrition.fiber == null ? "—" : `${format(nutrition.fiber)} g`}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </details>
                   {meal.notes && <p>{meal.notes}</p>}
                   <NutritionTotals meals={[meal]} compact />
                   <div className="diary-actions">

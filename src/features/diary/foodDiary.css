@@ -1161,80 +1161,75 @@ html[data-theme="midnight"] .food-diary .diary-recipe-confirm .diary-actions { b
   margin-top: 1rem;
   overflow-wrap: anywhere;
 }
-.diary-item-nutrition-list {
-  display: grid;
-  gap: 0.5rem;
+.diary-food-nutrition-table {
   margin: 0.75rem 0 1rem;
-  padding: 0;
-  list-style: none;
-}
-.diary-item-nutrition {
-  min-width: 0;
-  padding: 0.6rem 0.7rem;
   border: 1px solid var(--g-border);
   border-radius: 0.75rem;
   background: var(--g-surface-raised);
 }
-.diary-item-nutrition-details > summary {
+.diary-food-nutrition-table > summary {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   gap: 0.6rem;
   min-width: 0;
-  margin: 0;
-  padding: 0;
+  padding: 0.7rem 0.85rem;
   list-style: none;
+  cursor: pointer;
+  font-weight: 750;
 }
-.diary-item-nutrition-details > summary::-webkit-details-marker {
+.diary-food-nutrition-table > summary::-webkit-details-marker {
   display: none;
 }
-.diary-item-nutrition-details > summary::after {
+.diary-food-nutrition-table > summary::after {
   content: "+";
   flex: 0 0 auto;
   color: var(--g-muted);
   font-weight: 800;
 }
-.diary-item-nutrition-details[open] > summary::after {
+.diary-food-nutrition-table[open] > summary::after {
   content: "−";
 }
-.diary-item-nutrition-heading {
-  cursor: pointer;
-}
-.diary-item-nutrition-details[open] > .diary-item-nutrition-heading {
-  margin-bottom: 0.45rem;
-}
-.diary-item-nutrition-heading strong {
-  min-width: 0;
-  overflow-wrap: anywhere;
-  font-size: 0.9rem;
-}
-.diary-item-nutrition-heading span {
-  flex: 0 0 auto;
+.diary-food-nutrition-table > summary small {
+  margin-left: auto;
   color: var(--g-muted);
-  font-size: 0.78rem;
-}
-.diary-item-nutrition-values {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.25rem;
-}
-.diary-item-nutrition-values > div {
-  display: grid;
-  gap: 0.15rem;
-  min-width: 0;
-}
-.diary-item-nutrition-values span {
-  color: var(--g-muted);
-  font-size: 0.66rem;
-}
-.diary-item-nutrition-values strong {
-  font-size: 0.82rem;
-  overflow-wrap: anywhere;
-}
-.diary-item-nutrition-values small {
-  margin-left: 0.12rem;
-  font-size: 0.65rem;
+  font-size: 0.76rem;
   font-weight: 500;
+}
+.diary-food-nutrition-scroll {
+  overflow-x: auto;
+  border-top: 1px solid var(--g-border);
+}
+.diary-food-nutrition-table table {
+  width: 100%;
+  min-width: 42rem;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+.diary-food-nutrition-table th,
+.diary-food-nutrition-table td {
+  padding: 0.6rem 0.7rem;
+  border-bottom: 1px solid var(--g-border);
+  text-align: right;
+  white-space: nowrap;
+}
+.diary-food-nutrition-table thead th {
+  color: var(--g-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.diary-food-nutrition-table th:first-child,
+.diary-food-nutrition-table td:first-child {
+  text-align: left;
+}
+.diary-food-nutrition-table tbody th {
+  max-width: 15rem;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.diary-food-nutrition-table tbody tr:last-child th,
+.diary-food-nutrition-table tbody tr:last-child td {
+  border-bottom: 0;
 }
 .diary-ingredient-list {
   color: rgb(0 0 0 / 0.65);
