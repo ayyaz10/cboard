@@ -70,7 +70,7 @@ export function FoodItemEditor({ catalog, onSave, onClose, initial = null }) {
       <label>Food JSON<textarea aria-label="Food JSON" rows={10} value={json} onChange={event => setJson(event.target.value)} /></label>
       <button type="button" onClick={() => parse(json)}>Review food JSON</button>
     </div>}
-    {mode === 'lookup' && <NutritionLookup currentNutrition={{...draft.nutrition,nutrientSources:draft.nutrientSources,quantity:draft.quantity,unit:draft.unit,source:draft.source}} name={draft.name} visible active onSelect={label => {
+    {mode === 'lookup' && <NutritionLookup currentNutrition={{...draft.nutrition,nutrientSources:draft.nutrientSources,quantity:draft.quantity,unit:draft.unit,source:draft.source}} name={draft.name} visible active onManual={query => { setDraft(current => ({ ...current, name: query || current.name })); setMode('manual'); }} onSelect={label => {
       if(label.source?.provider==='Local nutrition label OCR'){setDraft({...draft,quantity:label.quantity,unit:label.unit,nutrition:cleanNutrients(label),source:label.source});setMode('manual');return;}
       try { useFood({ name: label.source?.name || draft.name, quantity: label.quantity, unit: label.unit, nutrition: Object.fromEntries(NUTRIENTS.map(([key]) => [key, label[key] ?? null])), nutrientSources: label.nutrientSources, source: label.source }, 'Food lookup'); }
     catch (err) { notify.error(err.message || 'Could not save food item'); }
@@ -79,31 +79,34 @@ export function FoodItemEditor({ catalog, onSave, onClose, initial = null }) {
       <fieldset disabled={busy}>
         <label>Food name<input required maxLength={300} value={draft.name} onChange={event => { setDraft({ ...draft, name: event.target.value }); setDuplicateChoice(''); }} /></label>
         <div className="g-tools">
-          <label>Brand (optional)<input maxLength={120} value={draft.brand || draft.source?.brand || ''} onChange={event => setDraft({ ...draft, brand: event.target.value, source: { ...draft.source, brand: event.target.value } })} /></label>
-          <label>Barcode (optional)<input inputMode="numeric" maxLength={32} value={draft.barcode || draft.source?.barcode || ''} onChange={event => setDraft({ ...draft, barcode: event.target.value, source: { ...draft.source, barcode: event.target.value } })} /></label>
+          <label>Nutrition is for<input required type="number" min="0.0001" step="any" value={draft.quantity} onChange={event => setDraft({ ...draft, quantity: event.target.value === '' ? '' : Number(event.target.value) })} /></label>
+          <label>Unit<select value={draft.unit} onChange={event => setDraft({ ...draft, unit: event.target.value })}>{['g', 'ml', 'pieces', 'servings'].map(unit => <option key={unit}>{unit}</option>)}</select></label>
         </div>
-        <div className="g-tools">
-          <label>Retailer (optional)<input maxLength={120} value={draft.retailer || draft.source?.retailer || ''} onChange={event => setDraft({ ...draft, retailer: event.target.value, source: { ...draft.source, retailer: event.target.value } })} /></label>
-          <label>Retailer SKU (optional)<input maxLength={120} value={draft.sku || draft.source?.sku || ''} onChange={event => setDraft({ ...draft, sku: event.target.value, source: { ...draft.source, sku: event.target.value } })} /></label>
-        </div>
-        <div className="g-tools">
-          <label>Reference quantity<input required type="number" min="0.0001" step="any" value={draft.quantity} onChange={event => setDraft({ ...draft, quantity: event.target.value === '' ? '' : Number(event.target.value) })} /></label>
-          <label>Reference unit<select value={draft.unit} onChange={event => setDraft({ ...draft, unit: event.target.value })}>{['g', 'ml', 'pieces', 'servings'].map(unit => <option key={unit}>{unit}</option>)}</select></label>
-        </div>
-        <p>Every nutrient below describes this reference amount. For a per 100 g label, use 100 g. Recipe quantities remain separate. Blank nutrients stay unknown.</p>
-        <p className="g-hint">Nutrition coverage: {nutritionCoverage(draft.nutrition).percent}% ({nutritionCoverage(draft.nutrition).known}/{nutritionCoverage(draft.nutrition).total} nutrients available). <button type="button" onClick={() => setMode('lookup')}>Complete missing nutrients</button></p>
-        {draft.source?.provider && <p>Source: {draft.source.provider}</p>}
+        <p>Enter the label values for this amount. For values per 100 g, enter 100 and g.</p>
         <NutritionLabelScan disabled={busy} current={{...draft.nutrition,quantity:draft.quantity,unit:draft.unit,source:draft.source}} onApply={label=>setDraft({...draft,quantity:label.quantity,unit:label.unit,nutrition:cleanNutrients(label),source:label.source})}/>
-        <fieldset className="g-tools" aria-label="Food behavior">
-          <legend><strong>Behavior</strong></legend>
-          <label className="g-check"><input type="checkbox" checked={draft.nutritionTrackingEnabled !== false} onChange={event => setDraft({ ...draft, nutritionTrackingEnabled: event.target.checked })}/>Include in nutrition calculations</label>
-          <label className="g-check"><input type="checkbox" checked={draft.groceryTrackingEnabled !== false} onChange={event => setDraft({ ...draft, groceryTrackingEnabled: event.target.checked, shoppingListEnabled: event.target.checked ? draft.shoppingListEnabled !== false : false })}/>Track in Grocery</label>
-          <label className="g-check"><input type="checkbox" disabled={draft.groceryTrackingEnabled === false} checked={draft.groceryTrackingEnabled !== false && draft.shoppingListEnabled !== false} onChange={event => setDraft({ ...draft, shoppingListEnabled: event.target.checked })}/>Auto-add to Shopping List when needed</label>
-          {draft.groceryTrackingEnabled === false && <small>Enable Grocery tracking to use shopping automation. Existing stock will be preserved when tracking is stopped.</small>}
-          {draft.nutritionTrackingEnabled === false && <small>Nutrition excluded. This food remains available in recipes and the diary.</small>}
-        </fieldset>
+        <p className="g-hint">Values are for {draft.quantity || 100} {draft.unit || 'g'}.</p>
         {nutrientFields(NUTRIENTS.slice(0, 5))}
-        <details><summary>More nutrients: vitamins, minerals and other label values</summary>{nutrientFields(NUTRIENTS.slice(5))}</details>
+        <details><summary>More nutrients</summary>{nutrientFields(NUTRIENTS.slice(5))}</details>
+        <details className="g-food-advanced"><summary>More food details</summary>
+          <p className="g-hint">Nutrition coverage: {nutritionCoverage(draft.nutrition).percent}% ({nutritionCoverage(draft.nutrition).known}/{nutritionCoverage(draft.nutrition).total} nutrients). <button type="button" onClick={() => setMode('lookup')}>Find missing values</button></p>
+          {draft.source?.provider && <p>Source: {draft.source.provider}</p>}
+          <div className="g-tools">
+            <label>Brand (optional)<input maxLength={120} value={draft.brand || draft.source?.brand || ''} onChange={event => setDraft({ ...draft, brand: event.target.value, source: { ...draft.source, brand: event.target.value } })} /></label>
+            <label>Barcode (optional)<input inputMode="numeric" maxLength={32} value={draft.barcode || draft.source?.barcode || ''} onChange={event => setDraft({ ...draft, barcode: event.target.value, source: { ...draft.source, barcode: event.target.value } })} /></label>
+          </div>
+          <div className="g-tools">
+            <label>Retailer (optional)<input maxLength={120} value={draft.retailer || draft.source?.retailer || ''} onChange={event => setDraft({ ...draft, retailer: event.target.value, source: { ...draft.source, retailer: event.target.value } })} /></label>
+            <label>Retailer SKU (optional)<input maxLength={120} value={draft.sku || draft.source?.sku || ''} onChange={event => setDraft({ ...draft, sku: event.target.value, source: { ...draft.source, sku: event.target.value } })} /></label>
+          </div>
+          <fieldset className="g-tools" aria-label="Food behavior">
+            <legend><strong>Food settings</strong></legend>
+            <label className="g-check"><input type="checkbox" checked={draft.nutritionTrackingEnabled !== false} onChange={event => setDraft({ ...draft, nutritionTrackingEnabled: event.target.checked })}/>Include in nutrition calculations</label>
+            <label className="g-check"><input type="checkbox" checked={draft.groceryTrackingEnabled !== false} onChange={event => setDraft({ ...draft, groceryTrackingEnabled: event.target.checked, shoppingListEnabled: event.target.checked ? draft.shoppingListEnabled !== false : false })}/>Track in Grocery</label>
+            <label className="g-check"><input type="checkbox" disabled={draft.groceryTrackingEnabled === false} checked={draft.groceryTrackingEnabled !== false && draft.shoppingListEnabled !== false} onChange={event => setDraft({ ...draft, shoppingListEnabled: event.target.checked })}/>Auto-add to Shopping List when needed</label>
+            {draft.groceryTrackingEnabled === false && <small>Enable Grocery tracking to use shopping automation. Existing stock will be preserved when tracking is stopped.</small>}
+            {draft.nutritionTrackingEnabled === false && <small>Nutrition excluded. This food remains available in recipes and the diary.</small>}
+          </fieldset>
+        </details>
         {!initial && reviewMatches.length > 0 && <section className="rounded-xl border-2 border-black bg-[#fff8dd] p-3" aria-label="Possible existing foods">
           <h3 className="font-bold">Possible existing food found</h3>
           {reviewMatches.map(match => <div key={match.food.id} className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-black/20 pt-2 text-sm"><p><strong>{match.food.name}</strong> · {match.reasons.join('; ')}</p><button type="button" onClick={async () => { try { await onSave({ ...match.food, reuseExisting: true }); notify.info('Existing food reused'); onClose(); } catch (err) { notify.error(err.message || 'Could not reuse this food'); } }}>Use existing</button></div>)}

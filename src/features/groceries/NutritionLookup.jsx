@@ -1,162 +1,250 @@
 import { useSavedFoods } from '../nutrition/useSavedFoods';
 import { findSavedFoods, savedFoodNutrition } from '../nutrition/savedFoods.js';
-import { useEffect, useRef, useState } from "react";
-import { searchNutrition, lookupBarcode } from "../../services/nutritionLookup";
-import { BarcodeScanner } from "./BarcodeScanner";
+import { normalizeFoodName } from '../nutrition/foodCatalog.js';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { searchNutrition, lookupBarcode } from '../../services/nutritionLookup';
+import { BarcodeScanner } from './BarcodeScanner';
 import { BarcodeImage } from './BarcodeImage';
-import { NutritionLabel } from "./NutritionLabel";
-import { nutrients } from "./groceryData";
+import { NutritionLabel } from './NutritionLabel';
+import { nutrients } from './groceryData';
 import { searchNaturalFoods, searchCoFIDFoods, naturalPortionNutrition, nutritionForOnePortion, suggestedNaturalPortion } from '../../services/naturalFoods';
 import { mergeNutritionByNutrient } from '../nutrition/sourceAdapters.js';
 import { nutrientKeys } from '../nutrition/nutrients.js';
 
-export function NutritionLookup({ name, active, visible, onSelect, amountUnit, portionMode = 'unit', currentNutrition = null, allowLabelScan = true, scanUnits }) {
-  const [mode, setMode] = useState("saved");
-  const savedFoods = useSavedFoods(visible && mode === 'saved');
-  const [barcode, setBarcode] = useState("");
-  const [scanning, setScanning] = useState(false);
-  const [query, setQuery] = useState(name);
-  const savedMatches = findSavedFoods(savedFoods.library, query, 24).filter(entry => savedFoodNutrition(entry.item));
-  const [results, setResults] = useState(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [basis, setBasis] = useState({});
-  const [portions, setPortions] = useState({});
-  const request = useRef(0);
-  const searched = useRef("");
-  async function lookup(text, byBarcode = false) {
-    const id = ++request.current;
-    setBusy(true); setError(""); setResults(null); setBasis({}); setPortions({});
-    try {
-      const rows = await (byBarcode ? lookupBarcode(text) : mode === 'natural' ? searchNaturalFoods(text) : mode === 'cofid' ? searchCoFIDFoods(text) : searchNutrition(text));
-      if (id === request.current) setResults(rows);
-    } catch (err) {
-      if (id === request.current) setError(err.message);
-    } finally {
-      if (id === request.current) setBusy(false);
-    }
-  }
-  useEffect(() => {
-    setQuery(name); setResults(null); setError(""); setBusy(false); setScanning(false); setBarcode("");
-    request.current += 1;
-    searched.current = "";
-  }, [name]);
-  useEffect(() => {
-    if (active && ['name', 'natural', 'cofid'].includes(mode) && name.trim().length >= 2 && searched.current !== `${mode}:${name}`) {
-      searched.current = `${mode}:${name}`;
-      lookup(name);
-    }
-  }, [active, name, mode]);
-  useEffect(() => () => { request.current += 1; }, []);
-  useEffect(() => { if (!visible) setScanning(false); }, [visible]);
-  function changeMode(nextMode) {
-    request.current++;
-    setMode(nextMode);
-    setScanning(false);
-    setBusy(false);
-    setResults(null);
-    setError("");
-  }
-  const modes = [["saved", "My saved foods"], ["name", "Branded products"], ["natural", "USDA reference foods"], ["cofid", "UK CoFID foods"], ["barcode", "Scan barcode"], ...(allowLabelScan ? [["photo", "Scan nutrition label"]] : [])];
-  return <div className="g-nutrition-lookup">
-    <label className="g-lookup-source">Food source
-      <select aria-label="Food source" value={mode} onChange={event => changeMode(event.target.value)}>
-        {modes.map(([key, title]) => <option key={key} value={key}>{title}</option>)}
-      </select>
-    </label>
-    {mode === 'saved' && <>
-      <label>Search saved foods
-        <input value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') event.preventDefault(); }} />
-      </label>
-      {savedFoods.loading && <p role="status">Loading saved foods...</p>}
-      {savedFoods.error && <p role="alert">{savedFoods.error}</p>}
-      <div className="g-saved-foods">
-        {savedMatches.map(entry => <button key={entry.key} type="button" onClick={() => onSelect(savedFoodNutrition(entry.item))}>
-          <strong>{entry.item.name}</strong>
-          <small>{entry.origins.slice(0, 2).join(' / ')} / Per {entry.item.basis} {entry.item.nutritionUnit}</small>
-          <small>{nutrients.map(([key, label, suffix]) => `${label}: ${entry.item.nutrition[key] == null ? 'unknown' : `${entry.item.nutrition[key]} ${suffix}`}`).join(' / ')}</small>
-        </button>)}
-      </div>
-      {!savedFoods.loading && query.trim().length >= 2 && !savedMatches.length && <p role="status">No saved food matches. Choose another food source above to search branded or reference foods.</p>}
-      {query.trim().length < 2 && <p className="g-hint">Type at least two characters to find a saved food.</p>}
-    </>}
-    {mode === "photo" && <NutritionLabel basisUnits={scanUnits} key={name} current={currentNutrition} onSelect={onSelect} />}
-    {mode === "barcode" && <div>
-      {scanning && visible && <BarcodeScanner onClose={() => setScanning(false)} onCode={(code) => { setScanning(false); setBarcode(code); lookup(code, true); }} />}
-      {!scanning && <button type="button" onClick={() => setScanning(true)}>Start camera</button>}
-      <BarcodeImage onCode={code => { setScanning(false); setBarcode(code); lookup(code, true); }} />
-      <div className="g-tools">
-        <label>Barcode number<input inputMode="numeric" value={barcode} onChange={(e) => { request.current++; setBusy(false); setResults(null); setBarcode(e.target.value); }} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); lookup(barcode, true); } }} /></label>
-        <button type="button" disabled={busy || !barcode.trim()} onClick={() => lookup(barcode, true)}>Look up barcode</button>
-      </div>
-    </div>}
-    {['name', 'natural', 'cofid'].includes(mode) && <>
+const externalSources = [
+  ['branded', searchNutrition],
+  ['USDA', searchNaturalFoods],
+  ['CoFID', searchCoFIDFoods],
+];
 
-    <div className="g-tools">
-      <label>{mode === 'natural' || mode === 'cofid' ? 'Generic food name' : 'Product name or brand'}
-        <input value={query} maxLength={120} onChange={(e) => {
-          setQuery(e.target.value); setResults(null); setError("");
-          request.current += 1; setBusy(false);
-        }} onKeyDown={(e) => {
-          if (e.key === "Enter") { e.preventDefault(); lookup(query); }
-        }} />
-      </label>
-      <button type="button" disabled={busy || query.trim().length < 2} onClick={() => lookup(query)}>
-        {busy ? "Searching..." : "Find nutrition"}
-      </button>
+function sourceBadge(product) {
+  const provider = product.source?.provider || '';
+  if (provider === 'Saved food') return 'Saved';
+  if (provider.includes('USDA')) return 'USDA';
+  if (provider.includes('CoFID')) return 'CoFID';
+  if (provider.includes('Food Facts')) return 'Branded';
+  return provider || 'Saved';
+}
+
+function compactNutrition(product, portion = null) {
+  const natural = ['USDA FoodData Central', 'UK CoFID'].includes(product.source?.provider);
+  const unit = product.nutrition.unit || product.unit || 'g';
+  const factor = natural && portion ? portion.grams / (product.nutrition.quantity || 100) : 1;
+  const values = [
+    ['calories', 'kcal'], ['protein', 'P'], ['carbs', 'C'], ['fat', 'F'], ['fiber', 'Fibre'],
+  ];
+  return values.filter(([key]) => Number.isFinite(product.nutrition[key])).map(([key, label]) => {
+    const value = Number((product.nutrition[key] * factor).toFixed(1));
+    return key === 'calories' ? `${Math.round(value)} kcal` : `${label} ${value}${key === 'fiber' ? ' g' : 'g'}`;
+  }).join(' · ') || `Nutrition per ${product.nutrition.quantity || 100} ${unit}`;
+}
+
+function productValues(product, amountUnit, portionMode, portionIndex) {
+  const natural = ['USDA FoodData Central', 'UK CoFID'].includes(product.source?.provider);
+  const unit = product.nutrition.unit || product.unit || 'g';
+  const portion = natural && portionIndex !== '' ? product.portions?.[Number(portionIndex)] : null;
+  const selected = naturalPortionNutrition({
+    ...product.nutrition,
+    nutrientSources: product.nutrientSources || product.nutrition.nutrientSources,
+    unit,
+    source: { ...product.source, name: [product.name, product.brand].filter(Boolean).join(' · '), fetchedAt: new Date().toISOString() },
+  }, portion || null);
+  return portionMode === 'weight' || (natural && !portion) ? selected : nutritionForOnePortion(selected);
+}
+
+export function FoodPicker({ name = '', active, visible, onSelect, onManual, onClose, amountUnit, portionMode = 'unit', currentNutrition = null, allowLabelScan = true, scanUnits }) {
+  const savedFoods = useSavedFoods(visible);
+  const inputRef = useRef(null);
+  const inputId = useId();
+  const request = useRef(0);
+  const [query, setQuery] = useState(name);
+  const [results, setResults] = useState([]);
+  const [barcodeResults, setBarcodeResults] = useState([]);
+  const [searching, setSearching] = useState(false);
+  const [remoteError, setRemoteError] = useState(false);
+  const [barcodeOpen, setBarcodeOpen] = useState(false);
+  const [labelOpen, setLabelOpen] = useState(false);
+  const [barcode, setBarcode] = useState('');
+  const [barcodeBusy, setBarcodeBusy] = useState(false);
+  const [barcodeError, setBarcodeError] = useState('');
+  const [portionChoices, setPortionChoices] = useState({});
+  const [retryKey, setRetryKey] = useState(0);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  useEffect(() => { setQuery(name || ''); }, [name]);
+  useEffect(() => {
+    if (!visible || !active || window.matchMedia?.('(pointer: coarse)').matches) return;
+    const timer = window.setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 60);
+    return () => window.clearTimeout(timer);
+  }, [visible, active]);
+
+  const localMatches = useMemo(() => {
+    const recent = [...savedFoods.library].sort((left, right) => {
+      const leftDate = left.origins.filter((origin) => /^\d{4}-\d{2}-\d{2}$/.test(origin)).sort().at(-1) || '';
+      const rightDate = right.origins.filter((origin) => /^\d{4}-\d{2}-\d{2}$/.test(origin)).sort().at(-1) || '';
+      return rightDate.localeCompare(leftDate) || left.item.name.localeCompare(right.item.name);
+    });
+    const found = query.trim() ? findSavedFoods(savedFoods.library, query, 24) : recent.slice(0, 8);
+    return found.map((entry) => ({
+      ...entry.item,
+      nutrition: savedFoodNutrition(entry.item),
+      code: `saved:${entry.key}`,
+      source: { ...entry.item.source, provider: 'Saved food', name: entry.item.name },
+      _saved: true,
+      _origins: entry.origins,
+    })).filter((food) => food.nutrition);
+  }, [savedFoods.library, query]);
+
+  useEffect(() => {
+    const id = ++request.current;
+    const text = query.trim();
+    setResults([]);
+    setRemoteError(false);
+    if (text.length < 2) { setSearching(false); return; }
+    setSearching(true);
+    const timer = window.setTimeout(async () => {
+      const seen = new Set(localMatches.map((food) => normalizeFoodName(food.name)));
+      let failed = false;
+      await Promise.all(externalSources.map(async ([, search]) => {
+        try {
+          const found = await search(text);
+          if (id !== request.current) return;
+          const fresh = found.filter((food) => {
+            const key = normalizeFoodName(food.name);
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+          if (fresh.length) setResults((previous) => [...previous, ...fresh]);
+        } catch { failed = true; }
+      }));
+      if (id !== request.current) return;
+      setRemoteError(failed);
+      setSearching(false);
+    }, 280);
+    return () => { window.clearTimeout(timer); request.current += 1; };
+  }, [query, retryKey, localMatches]);
+
+  function chooseBarcodeResult(product) {
+    if (product) onSelect(productValues(product, amountUnit, portionMode, ''));
+  }
+
+  async function searchCode(code) {
+    setBarcode(code);
+    setBarcodeError('');
+    setBarcodeBusy(true);
+    try {
+      const found = await lookupBarcode(code);
+      if (!found.length) throw new Error('No food found for that barcode. Try the label scan or add it manually.');
+      setBarcodeResults(found);
+      setBarcodeOpen(false);
+      setQuery('');
+    } catch (error) { setBarcodeError(error.message || 'Barcode lookup failed.'); }
+    finally { setBarcodeBusy(false); }
+  }
+
+  function choose(product) {
+    if (product._saved) { onSelect(product.nutrition); return; }
+    onSelect(productValues(product, amountUnit, portionMode, portionChoices[product.code] ?? suggestedNaturalPortion(product, name, amountUnit)));
+  }
+
+  function enrich(product) {
+    const reference = productValues(product, amountUnit, 'weight', '');
+    const quantity = Number(currentNutrition?.quantity ?? currentNutrition?.basis);
+    if (!(quantity > 0) || currentNutrition?.unit !== reference.unit) return;
+    const factor = quantity / reference.quantity;
+    const scaled = { ...reference, quantity, ...Object.fromEntries(nutrientKeys.map((key) => [key, reference[key] == null ? null : reference[key] * factor])) };
+    const merged = mergeNutritionByNutrient(currentNutrition, scaled, { currentSource: currentNutrition.source, incomingSources: scaled.nutrientSources });
+    onSelect({ ...currentNutrition, ...merged.nutrition, nutrientSources: merged.nutrientSources, quantity, unit: currentNutrition.unit, source: { ...currentNutrition.source, referenceSource: reference.source } });
+  }
+
+  const canEnrich = (product) => ['USDA FoodData Central', 'UK CoFID'].includes(product.source?.provider)
+    && currentNutrition && currentNutrition.unit === (product.nutrition.unit || product.unit || 'g')
+    && nutrientKeys.some((key) => currentNutrition[key] == null && product.nutrition[key] != null);
+
+  const showRecent = !query.trim() && localMatches.length > 0;
+  const otherResults = barcodeResults.length ? barcodeResults : results;
+  const visibleResults = [...localMatches, ...otherResults];
+  const titleForManual = query.trim() || name.trim();
+  const handleKeyDown = (event) => {
+    if (event.key === 'Escape') {
+      if (barcodeOpen || labelOpen) { setBarcodeOpen(false); setLabelOpen(false); }
+      else onClose?.();
+    }
+    if (event.key === 'ArrowDown' && visibleResults.length) { event.preventDefault(); setActiveIndex((index) => Math.min(index < 0 ? 0 : index + 1, visibleResults.length - 1)); }
+    if (event.key === 'ArrowUp' && visibleResults.length) { event.preventDefault(); setActiveIndex((index) => Math.max(index < 0 ? visibleResults.length - 1 : index - 1, 0)); }
+    if (event.key === 'Enter' && visibleResults.length) { event.preventDefault(); choose(visibleResults[activeIndex < 0 ? 0 : Math.min(activeIndex, visibleResults.length - 1)]); }
+  };
+
+  return <div className="g-food-picker" aria-label="Food picker">
+    <div className="g-food-picker-top">
+      <label className="g-food-search-label" htmlFor={inputId}>Search foods</label>
+      <input ref={inputRef} id={inputId} type="search" autoComplete="off" placeholder="Search foods..." value={query} onChange={(event) => { setQuery(event.target.value); setActiveIndex(-1); setBarcodeOpen(false); setBarcodeResults([]); }} onKeyDown={handleKeyDown} />
+      <div className="g-food-picker-actions">
+        <button type="button" onClick={() => { setBarcodeOpen((open) => !open); setLabelOpen(false); }}>Scan barcode</button>
+        {onManual && <button type="button" onClick={() => onManual(titleForManual)}>Add manually</button>}
+        {allowLabelScan && <button type="button" onClick={() => { setLabelOpen((open) => !open); setBarcodeOpen(false); }}>Scan nutrition label</button>}
+      </div>
     </div>
-    <p className="g-hint">{mode === 'natural' ? 'USDA reference foods: try banana, apple, raw cashews or cooked egg. Match raw/cooked and salted/unsalted. Values describe the edible portion; peel, shells and other refuse are excluded.' : mode === 'cofid' ? 'UK CoFID generic foods: choose the closest preparation match. Composition values are reference values per 100 g or 100 ml.' : 'Choose the matching food, brand and preparation (for example, dry or cooked rice). Values are for the product as sold.'}</p>
+    {barcodeOpen && <div className="g-picker-tool">
+      {visible && <BarcodeScanner onClose={() => setBarcodeOpen(false)} onCode={searchCode} />}
+      <BarcodeImage onCode={searchCode} />
+      <label>Barcode number<input inputMode="numeric" value={barcode} onChange={(event) => setBarcode(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); searchCode(barcode); } }} /></label>
+      <button type="button" disabled={barcodeBusy || !barcode.trim()} onClick={() => searchCode(barcode)}>{barcodeBusy ? 'Looking up...' : 'Look up barcode'}</button>
+      {barcodeError && <p role="alert">{barcodeError}</p>}
+    </div>}
+    {labelOpen && <div className="g-picker-tool"><NutritionLabel basisUnits={scanUnits} key={name} current={currentNutrition} onSelect={onSelect} /></div>}
+
+    {!query.trim() && <div className="g-food-result-group">
+      <h3>{showRecent ? 'Recent foods' : 'My foods'}</h3>
+      {savedFoods.loading && <p role="status">Loading saved foods...</p>}
+      {localMatches.map((product, index) => <ResultRow key={product.code} product={product} active={index === activeIndex} onChoose={() => choose(product)} />)}
+      {!savedFoods.loading && !localMatches.length && <p className="g-food-empty">Type to search foods. Your saved foods will appear here.</p>}
+    </div>}
+    {(query.trim().length >= 2 || barcodeResults.length > 0) && <>
+      <div className="g-food-result-group">
+        {localMatches.length > 0 && <h3>My foods</h3>}
+        {localMatches.map((product, index) => <ResultRow key={product.code} product={product} active={index === activeIndex} onChoose={() => choose(product)} />)}
+      </div>
+      <div className="g-food-result-group">
+        {otherResults.length > 0 && <h3>{barcodeResults.length ? 'Barcode result' : 'Other results'}</h3>}
+        {otherResults.map((product, index) => <ResultRow key={`${product.source?.provider}:${product.code}`} product={product} active={localMatches.length + index === activeIndex} portionChoices={portionChoices} onPortion={(value) => setPortionChoices((previous) => ({ ...previous, [product.code]: value }))} onChoose={() => choose(product)} onEnrich={canEnrich(product) ? () => enrich(product) : null} amountUnit={amountUnit} />)}
+        {!barcodeResults.length && searching && <p className="g-picker-status" role="status">Searching other foods...</p>}
+        {remoteError && <p className="g-picker-status" role="status">Some online results could not load. <button type="button" onClick={() => setRetryKey((value) => value + 1)}>Retry</button></p>}
+        {!searching && !localMatches.length && !otherResults.length && !remoteError && <p className="g-food-empty">No foods found for “{query.trim()}”.</p>}
+        {query.trim() && onManual && <button type="button" className="g-food-add-query" onClick={() => onManual(query.trim())}>+ Add “{query.trim()}” manually</button>}
+      </div>
+      {otherResults.length > 0 && <small className="g-food-attribution">Sources: {otherResults.some((food) => food.source?.provider === 'Open Food Facts') && <><a href="https://world.openfoodfacts.org" target="_blank" rel="noreferrer">Open Food Facts</a> (ODbL) · </>}{otherResults.some((food) => food.source?.provider === 'USDA FoodData Central') && <><a href="https://fdc.nal.usda.gov/" target="_blank" rel="noreferrer">USDA FoodData Central</a> (CC0) · </>}{otherResults.some((food) => food.source?.provider === 'UK CoFID') && <><a href="https://www.gov.uk/government/publications/composition-of-foods-integrated-dataset-cofid" target="_blank" rel="noreferrer">UK CoFID</a> (OGL).</>}</small>}
     </>}
-    {busy && <p role="status">Looking up nutrition...</p>}
-    {error && <p role="alert">{error}</p>}
-    {results?.length === 0 && <p role="status">{mode === "barcode" ? "No nutrition record found for this barcode. Try another food source or add the food manually." : 'No matching nutrition records found. Try a shorter name (for example, "cheddar") or add the food manually.'}</p>}
-    {results?.map((product) => {
-      const unit = basis[product.code] || product.nutrition.unit;
-      const natural = ['USDA FoodData Central', 'UK CoFID'].includes(product.source.provider);
-      const suggestedPortion = suggestedNaturalPortion(product, name, amountUnit);
-      const portionIndex = Object.hasOwn(portions, product.code) ? portions[product.code] : suggestedPortion;
-      const portion = product.portions?.[portionIndex];
-      const allowPortion = !amountUnit || !/^(g|grams?|kg|kilograms?|mg|ml|millilitres?|milliliters?|l|litres?|liters?|oz|lb)$/i.test(amountUnit.trim());
-      const displayScale = natural && allowPortion && portion ? portion.grams / product.nutrition.quantity : 1;
-      const currentQuantity = Number(currentNutrition?.quantity ?? currentNutrition?.basis);
-      const currentUnit = currentNutrition?.unit || currentNutrition?.nutritionUnit;
-      const canEnrich = natural && currentNutrition && currentUnit === unit && currentQuantity > 0 && nutrientKeys.some(key => currentNutrition[key] == null);
-      return <div className="g-nutrition-result" key={product.code}>
-        <strong>{product.name}</strong>
-        <p>{[product.brand, product.pack].filter(Boolean).join(" / ")}</p>
-        <small>{nutrients.map(([key, label, suffix]) => `${label}: ${product.nutrition[key] == null ? "unknown" : `${Number((product.nutrition[key] * displayScale).toFixed(2))} ${suffix}`}`).join(" / ")}</small>
-        <p>{natural && allowPortion && portion ? `Per 1 ${portion.label} (~${Number(portion.grams.toFixed(2))} g edible portion)` : `Per 100 ${unit || "g or ml (choose below)"}`}</p>
-        {!natural && <label>Nutrition basis (auto-selected; change if needed)
-          <select value={unit || ""} onChange={(e) => setBasis({ ...basis, [product.code]: e.target.value })}>
-            <option value="">Choose g or ml</option><option value="g">100 g</option><option value="ml">100 ml</option>
-          </select>
-        </label>}
-        {natural && allowPortion && product.portions.length > 0 && <label>{amountUnit ? `Portion used for one ${amountUnit}` : 'Portion size (estimated)'}
-          <select value={portionIndex} onChange={(event) => setPortions({ ...portions, [product.code]: event.target.value })}>
-            <option value="">Use weighed grams</option>
-            {product.portions.map((value, index) => <option key={index} value={index}>{value.label} (~{Number(value.grams.toFixed(2))} g per unit)</option>)}
-          </select>
-        </label>}
-        {natural && <p className="g-hint">{portion ? `Estimated portion: ${portion.label}, ${portion.grams} g. Your actual food may weigh more or less.` : 'Use an actual edible weight for the best portion calculation. Available source portions are shown above.'} Nutrients not reported by this source stay unknown.</p>}
-        <div className="g-actions">
-          <button type="button" disabled={!unit} onClick={() => {
-            const selected = naturalPortionNutrition({ ...product.nutrition, nutrientSources: product.nutrientSources, unit, source: { ...product.source, name: [product.name, product.brand].filter(Boolean).join(' · '), fetchedAt: new Date().toISOString() } }, allowPortion ? portion : null);
-            onSelect(portionMode === 'weight' || (natural && !portion) ? selected : nutritionForOnePortion(selected));
-            setResults(null);
-          }}>Use these values</button>
-          {canEnrich && <button type="button" disabled={!unit} onClick={() => {
-            const selected = naturalPortionNutrition({ ...product.nutrition, nutrientSources: product.nutrientSources, unit, source: { ...product.source, name: product.name, fetchedAt: new Date().toISOString() } }, null);
-            const factor = currentQuantity / selected.quantity;
-            const reference = { ...selected, quantity: currentQuantity,
-              ...Object.fromEntries(nutrientKeys.map(key => [key, selected[key] == null ? null : selected[key] * factor])) };
-            const merged = mergeNutritionByNutrient(currentNutrition, reference, { currentSource: currentNutrition.source, incomingSources: reference.nutrientSources });
-            onSelect({ ...currentNutrition, ...merged.nutrition, nutrientSources: merged.nutrientSources, quantity: currentNutrition.quantity || currentNutrition.basis || reference.quantity, unit: currentNutrition.unit || currentNutrition.nutritionUnit || reference.unit, source: { ...currentNutrition.source, referenceSource: reference.source } });
-            setResults(null);
-          }}>Fill missing nutrients from reference</button>}
-          <a href={product.source.url} target="_blank" rel="noreferrer">{natural ? 'View USDA food' : 'View product'}</a>
-        </div>
-      </div>;
-    })}
-    <small>{mode === 'cofid' ? <>Data: <a href="https://www.gov.uk/government/publications/composition-of-foods-integrated-dataset-cofid" target="_blank" rel="noreferrer">UK CoFID 2021</a>, downloaded and indexed locally under the Open Government Licence. Trace markers remain unknown.</> : mode === 'natural' ? <>Data: <a href="https://fdc.nal.usda.gov/download-datasets/" target="_blank" rel="noreferrer">USDA FoodData Central</a>, SR Legacy April 2018 / Foundation April 2026, CC0. This is a downloaded reference dataset, not a live USDA API request. Vitamin A is reported as RAE; salt is left unknown when not supplied.</> : <>Data: <a href="https://world.openfoodfacts.org" target="_blank" rel="noreferrer">Open Food Facts</a> / <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noreferrer">ODbL</a>. Coverage and completeness vary.</>}</small>
+    {savedFoods.error && <p className="g-picker-status" role="status">{savedFoods.error}</p>}
+    {savedFoods.loading && query.trim() && !localMatches.length && <p className="g-picker-status" role="status">Checking your saved foods...</p>}
   </div>;
+}
+
+export const NutritionLookup = FoodPicker;
+
+function ResultRow({ product, onChoose, onEnrich, amountUnit, portionChoices, onPortion, active = false }) {
+  const natural = ['USDA FoodData Central', 'UK CoFID'].includes(product.source?.provider);
+  const portions = natural && product.portions?.length ? product.portions : [];
+  const suggested = suggestedNaturalPortion(product, product.name, amountUnit);
+  const selectedPortion = portionChoices?.[product.code] ?? suggested;
+  const chosenPortion = selectedPortion !== '' ? portions[Number(selectedPortion)] : null;
+  const detailFactor = natural && chosenPortion ? chosenPortion.grams / (product.nutrition.quantity || 100) : 1;
+  const visibleNutrients = nutrients.filter(([key]) => Number.isFinite(product.nutrition?.[key]));
+  const quantity = product.nutrition?.quantity || 100;
+  const unit = product.nutrition?.unit || product.unit || 'g';
+  return <article className={`g-food-result${active ? ' is-active' : ''}`}>
+    <button type="button" className="g-food-result-main" onClick={onChoose} aria-label={`Use ${product.name}, ${compactNutrition(product)}`}>
+      <strong>{product.name}</strong>
+      <span>{compactNutrition(product, selectedPortion !== '' ? portions[Number(selectedPortion)] : null)}</span>
+      <small>{sourceBadge(product)} · {chosenPortion ? `per 1 ${chosenPortion.label}` : `per ${quantity} ${unit}`}</small>
+    </button>
+    {portions.length > 0 && <label className="g-food-portion">Portion
+      <select value={selectedPortion} onChange={(event) => onPortion(event.target.value)}>
+        <option value="">Use weighed amount</option>
+        {portions.map((portion, index) => <option key={`${portion.label}:${index}`} value={index}>{portion.label} (~{Number(portion.grams.toFixed(1))} g)</option>)}
+      </select>
+    </label>}
+    {onEnrich && <button type="button" className="g-food-add-query" onClick={onEnrich}>Fill missing nutrition values</button>}
+    {visibleNutrients.length > 5 && <details className="g-food-more"><summary>More nutrition</summary><dl>{visibleNutrients.slice(5).map(([key, label, suffix = '']) => <div key={key}><dt>{label}</dt><dd>{Number((product.nutrition[key] * detailFactor).toFixed(1))} {suffix}</dd></div>)}</dl></details>}
+  </article>;
 }

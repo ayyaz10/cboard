@@ -1051,6 +1051,33 @@ html[data-theme="midnight"] .food-diary .diary-recipe-confirm .diary-actions { b
   border-radius: 1rem;
   min-width: 0;
 }
+.diary-lookup-dialog {
+  width: min(48rem, calc(100% - 2rem));
+  max-width: none;
+  max-height: min(86dvh, 60rem);
+  overflow: auto;
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--g-border);
+  border-radius: 1rem;
+  background: var(--color-surface, #fffdf8);
+  color: var(--color-text, #17251b);
+  box-shadow: 0 20px 90px #0006;
+}
+.diary-lookup-dialog::backdrop { background: rgb(8 12 10 / .66); backdrop-filter: blur(2px); }
+.diary-lookup-dialog .diary-lookup { border: 0; padding: 1.15rem; }
+.diary-lookup-dialog .g-food-picker-top { position: sticky; top: 0; z-index: 3; padding: .35rem 0 .55rem; background: var(--color-surface, #fffdf8); }
+@media (max-width: 640px) {
+  .diary-lookup-dialog {
+    width: 100%;
+    max-height: 92dvh;
+    height: min(92dvh, 60rem);
+    margin: auto 0 0;
+    border-radius: 1rem 1rem 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+    overscroll-behavior: contain;
+  }
+}
 .diary-foods,
 .diary-meal-sections {
   display: grid;

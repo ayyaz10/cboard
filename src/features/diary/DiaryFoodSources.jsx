@@ -9,6 +9,7 @@ import { Panel } from '../../components/ui/Card.jsx';
 import { Dialog } from '../../components/ui/Dialog.jsx';
 import { IconButton } from '../../components/ui/IconButton.jsx';
 import { NutritionLabelScan } from '../nutrition/NutritionLabelScan.jsx';
+import { NutritionLookup } from '../groceries/NutritionLookup.jsx';
 import { cleanNutrients, nutrientKeys, nutrientSourcesForValues } from '../nutrition/nutrients.js';
 
 const SOURCE_CARDS = [
@@ -56,7 +57,7 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
   const sourcePositions = useRef(null);
   const [confirmApply, setConfirmApply] = useState(false);
   const [applyError, setApplyError] = useState('');
-  const [alternativeQuery, setAlternativeQuery] = useState('');
+  const [alternativePickerOpen, setAlternativePickerOpen] = useState(false);
   const [alternativeName, setAlternativeName] = useState('');
   const [alternativeNutrition, setAlternativeNutrition] = useState(null);
   const [productMessage, setProductMessage] = useState('');
@@ -200,7 +201,7 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
       }
       return next;
     });
-    setAlternativeNutrition(null); setAlternativeName(''); setAlternativeQuery(''); setProductMessage('');
+    setAlternativeNutrition(null); setAlternativeName(''); setProductMessage('');
   }
   function chooseMode(nextMode) {
     setMode(nextMode);
@@ -230,7 +231,7 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
     setCustomPercentDraft(value);
   }
   function closeAdjustments() {
-    setAdjusting(false); setOverrides({}); setAmountDrafts({}); setCustomPercentDraft(null); setExpandedFood(''); setConfirmApply(false); setApplyError(''); setAlternativeNutrition(null); setAlternativeName(''); setAlternativeQuery(''); setProductMessage('');
+    setAdjusting(false); setOverrides({}); setAmountDrafts({}); setCustomPercentDraft(null); setExpandedFood(''); setConfirmApply(false); setApplyError(''); setAlternativeNutrition(null); setAlternativeName(''); setAlternativePickerOpen(false); setProductMessage('');
   }
   async function applyChanges() {
     if (!changed || disabled) return;
@@ -241,7 +242,7 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
       else setApplyError('Could not apply these changes. Your diary is unchanged; try again.');
     } catch (error) { setApplyError(error.message || 'Could not save these diary changes.'); }
   }
-  function openAdjustments(key) { setAdjusting(true); setSelectedNutrient(key); setOverrides({}); setAmountDrafts({}); setCustomPercentDraft(null); setExpandedFood(''); setApplyError(''); setAlternativeNutrition(null); setAlternativeName(''); setAlternativeQuery(''); setProductMessage(''); }
+  function openAdjustments(key) { setAdjusting(true); setSelectedNutrient(key); setOverrides({}); setAmountDrafts({}); setCustomPercentDraft(null); setExpandedFood(''); setApplyError(''); setAlternativeNutrition(null); setAlternativeName(''); setAlternativePickerOpen(false); setProductMessage(''); }
   function selectAdjustmentNutrient(key) {
     if (!adjusting) { openAdjustments(key); return; }
     setSelectedNutrient(key);
@@ -264,7 +265,7 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
       {adjusting && <Panel className="diary-simulation-panel" aria-label="Food quantity simulation">
         <header className="diary-simulation-heading">
           <div><Badge variant="accent">Preview only</Badge><h3>{date === today ? 'Today' : dateLabel(date, today)} — what if?</h3><p>Try amounts without changing your diary. Each entry keeps its logged unit and nutrition snapshot.</p><label>Analyze food sources for<select className="ui-control" value={selectedNutrient} onChange={event => selectAdjustmentNutrient(event.target.value)}>{NUTRIENTS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label></div>
-          <div className="diary-simulation-actions"><Button size="sm" disabled={!changed} onClick={() => { setOverrides({}); setAmountDrafts({}); setAlternativeNutrition(null); setAlternativeName(''); setAlternativeQuery(''); setProductMessage(''); }}>Reset all</Button><IconButton label="Close simulation" onClick={closeAdjustments}>×</IconButton></div>
+          <div className="diary-simulation-actions"><Button size="sm" disabled={!changed} onClick={() => { setOverrides({}); setAmountDrafts({}); setAlternativeNutrition(null); setAlternativeName(''); setAlternativePickerOpen(false); setProductMessage(''); }}>Reset all</Button><IconButton label="Close simulation" onClick={closeAdjustments}>×</IconButton></div>
         </header>
 
         <div className="diary-simulation-quick-summary" aria-label="Simulated daily totals">{TARGET_KEYS.map(key => <div key={key}><span>{nutrientMeta.get(key).label}</span><strong>{key === 'calories' ? `${format(simulatedTotals[key].value)} kcal` : `${format(simulatedTotals[key].value)} g`}</strong><small>{format(simulation.deltas[key])}{key === 'calories' ? ' kcal' : ' g'} change</small></div>)}</div>
@@ -343,8 +344,11 @@ export function DiaryFoodSources({ meals, goals, date, today, disabled = false, 
           <section className="diary-simulation-product" aria-label="Change product or nutrition">
             <div className="diary-simulation-impact-heading"><strong>Change product / nutrition</strong><span>Simulation only</span></div>
             <p>Current basis: per {selectedFood.entries[0].basis} {selectedFood.entries[0].nutritionUnit}. Product and quantity can be changed independently.</p>
-            <label>Choose alternative food<input className="ui-control" type="search" value={alternativeQuery} onChange={event => setAlternativeQuery(event.target.value)} placeholder="Search saved foods" /></label>
-            {foodCatalog.filter(food => !alternativeQuery || [food.name, ...(food.aliases || [])].some(name => name.toLocaleLowerCase().includes(alternativeQuery.toLocaleLowerCase()))).slice(0, 8).map(food => <Button key={food.id} size="sm" onClick={() => applyNutritionToFood(selectedFood, { name: food.name, foodId: food.id, basis: food.quantity, unit: food.unit, nutrition: food.nutrition, nutrientSources: food.nutrientSources, source: food.source })}>{food.name} · per {food.quantity} {food.unit}</Button>)}
+            <Button size="sm" aria-expanded={alternativePickerOpen} onClick={() => setAlternativePickerOpen(value => !value)}>{alternativePickerOpen ? 'Close food search' : 'Choose alternative food'}</Button>
+            {alternativePickerOpen && <NutritionLookup name="" amountUnit={selectedFood.entries[0].nutritionUnit} portionMode="weight" allowLabelScan={false} active visible onClose={() => setAlternativePickerOpen(false)} onSelect={nutrition => {
+              applyNutritionToFood(selectedFood, { name: nutrition.source?.name || selectedFood.name, basis: nutrition.quantity, unit: nutrition.unit, nutrition, nutrientSources: nutrition.nutrientSources, source: nutrition.source });
+              setAlternativePickerOpen(false);
+            }} />}
             <label>Simulated product name<input className="ui-control" value={alternativeName} onChange={event => { setAlternativeName(event.target.value); if (alternativeNutrition) applyNutritionToFood(selectedFood, { ...alternativeNutrition, name: event.target.value }); }} placeholder={selectedFood.name} /></label>
             <details><summary>Enter alternative nutrition manually</summary>
               {(() => {

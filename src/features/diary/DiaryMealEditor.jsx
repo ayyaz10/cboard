@@ -1,7 +1,7 @@
 import { NutritionLabelScan } from '../nutrition/NutritionLabelScan';
 import { cleanNutrients } from '../nutrition/nutrients.js';
 import { NutritionTotals } from "./DiaryNutrition";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { NutritionLookup } from "../groceries/NutritionLookup";
 import { NUTRIENTS } from "../nutrition/nutrients";
@@ -85,6 +85,7 @@ export function DiaryMealEditor({
   const [portions, setPortions] = useState(1);
   const [individual, setIndividual] = useState(false);
   const [lookup, setLookup] = useState(null);
+  const pickerDialog = useRef(null);
   const [openFood, setOpenFood] = useState(null);
   const [manualId, setManualId] = useState(null);
   const [nutritionOpen, setNutritionOpen] = useState({});
@@ -96,6 +97,9 @@ export function DiaryMealEditor({
   const reduceMotion = useReducedMotion();
   const recipe = recipes.find((item) => item.slug === slug);
   const wholeRecipe = Boolean(recipe && !(recipe.servings > 0) && (recipe.productNutrition || recipe.nutritionFromIngredients || individual));
+  useLayoutEffect(() => {
+    if (lookup && pickerDialog.current && !pickerDialog.current.open) pickerDialog.current.showModal();
+  }, [lookup]);
   useEffect(() => {
     onDraftChange(draft);
   }, [draft, onDraftChange]);
@@ -153,9 +157,9 @@ export function DiaryMealEditor({
     setOpenFood(selectedId);
     setLookup(null);
   }
-  function addManualFood() {
+  function addManualFood(name = '') {
     if (draft.items.length >= 100 || manualId) return;
-    const item = { ...foodItem({ quantity: 100, unit: "g" }), name: '' };
+    const item = { ...foodItem({ quantity: 100, unit: "g" }), name };
     setManualId(item.id);
     setDraft(current => ({ ...current, items: [...current.items, item] }));
     setOpenFood(item.id);
@@ -561,7 +565,7 @@ export function DiaryMealEditor({
             </section>
           </details>}
           <section className="diary-add-food" aria-label="Add foods to this meal">
-            <div className="diary-section-heading"><h3>Add food</h3><span>Choose a saved or reference food, or add one manually.</span></div>
+            <div className="diary-section-heading"><h3>Add food</h3></div>
             <div className="diary-actions diary-add-methods">
               <button
                 type="button"
@@ -569,20 +573,13 @@ export function DiaryMealEditor({
                 disabled={draft.items.length >= 100}
                 onClick={toggleNewFoodLookup}
               >
-                Find a food
-              </button>
-              <button
-                type="button"
-                className="diary-manual-food-button"
-                disabled={draft.items.length >= 100 || Boolean(manualId)}
-                onClick={addManualFood}
-              >
-                Add manually
+                Add food
               </button>
             </div>
           </section>
           {lookup && (
-            <section className="diary-lookup" aria-label="Find food">
+            <dialog ref={pickerDialog} className="diary-lookup-dialog" aria-label={lookup === 'new' ? 'Add food' : 'Replace ingredient'} onCancel={(event) => { event.preventDefault(); setLookup(null); }} onClick={(event) => { if (event.target === pickerDialog.current) setLookup(null); }}>
+              <section className="diary-lookup">
               <div className="diary-actions">
                 <h3>
                   {lookup === "new" ? "Add food" : "Replace this ingredient"}
@@ -590,10 +587,6 @@ export function DiaryMealEditor({
                 <button type="button" onClick={() => setLookup(null)}>
                   Close food lookup
                 </button>
-              </div>
-              <div className="diary-actions diary-lookup-manual">
-                <p>Choose a saved food, branded product or reference food. You can enter a food manually too.</p>
-                {lookup === "new" && <button type="button" disabled={draft.items.length >= 100 || Boolean(manualId)} onClick={addManualFood}>Add manually</button>}
               </div>
               <NutritionLookup
                 currentNutrition={lookup!=='new'?(()=>{const item=draft.items.find(value=>value.id===lookup);return item?{...item.nutrition,nutrientSources:item.nutrientSources,quantity:item.basis,unit:item.nutritionUnit,source:item.source}:null;})():null}
@@ -606,9 +599,12 @@ export function DiaryMealEditor({
                 active
                 visible
                 allowLabelScan={false}
+                onClose={() => setLookup(null)}
+                onManual={lookup === 'new' && !manualId && draft.items.length < 100 ? addManualFood : undefined}
                 onSelect={selectFood}
               />
-            </section>
+              </section>
+            </dialog>
           )}
           <div className="diary-foods">
             {draft.items.map(renderFood)}
@@ -637,8 +633,7 @@ export function DiaryMealEditor({
             </label>
           </details>
           <div className="diary-actions diary-add-methods diary-add-methods-bottom" aria-label="Add another food">
-            <button type="button" className="diary-find-food-button" disabled={draft.items.length >= 100} onClick={toggleNewFoodLookup}>Find a food</button>
-            <button type="button" className="diary-manual-food-button" disabled={draft.items.length >= 100 || Boolean(manualId)} onClick={addManualFood}>Add manually</button>
+            <button type="button" className="diary-find-food-button" disabled={draft.items.length >= 100} onClick={toggleNewFoodLookup}>Add another food</button>
           </div>
           <div className="diary-actions diary-editor-footer">
             <button
