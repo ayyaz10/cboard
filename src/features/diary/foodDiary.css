@@ -1175,12 +1175,32 @@ html[data-theme="midnight"] .food-diary .diary-recipe-confirm .diary-actions { b
   border-radius: 0.75rem;
   background: var(--g-surface-raised);
 }
-.diary-item-nutrition-heading {
+.diary-item-nutrition-details > summary {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 0.6rem;
   min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.diary-item-nutrition-details > summary::-webkit-details-marker {
+  display: none;
+}
+.diary-item-nutrition-details > summary::after {
+  content: "+";
+  flex: 0 0 auto;
+  color: var(--g-muted);
+  font-weight: 800;
+}
+.diary-item-nutrition-details[open] > summary::after {
+  content: "−";
+}
+.diary-item-nutrition-heading {
+  cursor: pointer;
+}
+.diary-item-nutrition-details[open] > .diary-item-nutrition-heading {
   margin-bottom: 0.45rem;
 }
 .diary-item-nutrition-heading strong {

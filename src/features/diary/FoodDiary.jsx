@@ -760,18 +760,20 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
                       const nutrition = itemNutrition(item);
                       return (
                         <li className="diary-item-nutrition" key={item.id}>
-                          <div className="diary-item-nutrition-heading">
-                            <strong>{item.name}</strong>
-                            <span>{format(item.quantity)} {item.unit}</span>
-                          </div>
-                          <div className="diary-item-nutrition-values">
-                            {itemNutrients.map(([key, label, unit]) => (
-                              <div key={key} title={label === "kcal" ? "Calories" : label}>
-                                <span>{label}</span>
-                                <strong>{nutrition[key] == null ? "—" : format(nutrition[key])}<small>{nutrition[key] == null ? "" : unit}</small></strong>
-                              </div>
-                            ))}
-                          </div>
+                          <details className="diary-item-nutrition-details">
+                            <summary className="diary-item-nutrition-heading">
+                              <strong>{item.name}</strong>
+                              <span>{format(item.quantity)} {item.unit}</span>
+                            </summary>
+                            <div className="diary-item-nutrition-values">
+                              {itemNutrients.map(([key, label, unit]) => (
+                                <div key={key} title={label === "kcal" ? "Calories" : label}>
+                                  <span>{label}</span>
+                                  <strong>{nutrition[key] == null ? "—" : format(nutrition[key])}<small>{nutrition[key] == null ? "" : unit}</small></strong>
+                                </div>
+                              ))}
+                            </div>
+                          </details>
                         </li>
                       );
                     })}
