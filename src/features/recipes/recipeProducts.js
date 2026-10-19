@@ -16,7 +16,7 @@ export function normalizeProducts(value, recipe) {
     return { quantity: item.quantity, unit: item.unit, nutrition: {
       quantity: nutrition.quantity, unit: item.unit,
       ...cleanNutrients(nutrition), nutrientSources: cleanNutrientSources(nutrition.nutrientSources),
-      source: { ...(cleanLabelBasis(source?.labelBasis) ? {labelBasis:cleanLabelBasis(source?.labelBasis)} : {}), name: text(source.name), provider: text(source.provider), code: text(source.code), fetchedAt: text(source.fetchedAt), modified: source.modified === true, estimatedPortion: source.estimatedPortion === true, portionDescription: text(source.portionDescription) },
+      source: { ...(cleanLabelBasis(source?.labelBasis) ? {labelBasis:cleanLabelBasis(source?.labelBasis)} : {}), ...(source?.sourceType?{sourceType:text(source.sourceType)}:{}), ...(source?.ocrProvider?{ocrProvider:text(source.ocrProvider)}:{}), ...(source?.ocrModel?{ocrModel:text(source.ocrModel)}:{}), name: text(source.name), provider: text(source.provider), code: text(source.code), fetchedAt: text(source.fetchedAt), modified: source.modified === true, estimatedPortion: source.estimatedPortion === true, portionDescription: text(source.portionDescription) },
     } };
   });
   return { basis: value.basis, items };

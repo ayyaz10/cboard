@@ -103,3 +103,34 @@ export function paddleDocumentToNutritionInput(payload) {
   }
   return {lines,text:lines.map(line=>line.text).join('\n'),rawText:rawText.trim(),tableCount:tableBlocks.length,document};
 }
+
+/** Adapt the provider-neutral OCR.Space document to CBoard's parser line shape. */
+export function ocrSpaceDocumentToNutritionInput(document) {
+  const pages=Array.isArray(document?.pages)?document.pages:[];
+  const lines=pages.flatMap(page=>{
+    const sourceLines=Array.isArray(page?.lines)?page.lines:[];
+    const words=sourceLines.flatMap(line=>(Array.isArray(line?.words)?line.words:[])
+      .filter(word=>word?.bbox&&Number.isFinite(word.bbox.y0)&&Number.isFinite(word.bbox.y1))
+      .map(word=>({text:String(word.text||''),confidence:word.confidence??null,bbox:word.bbox})));
+    if(!words.length)return sourceLines.map(line=>({text:String(line?.text||'').trim(),words:[],bbox:line?.bbox||null,confidence:line?.confidence??null,source:'ocr-space'})).filter(line=>line.text);
+
+    // OCR.Space can split a table row into separate overlay lines by column.
+    // Rejoin words on the same visual baseline so CBoard's existing parser
+    // can associate labels and values using their x coordinates.
+    const heights=words.map(word=>word.bbox.y1-word.bbox.y0).filter(height=>height>0).sort((a,b)=>a-b);
+    const tolerance=(heights[Math.floor(heights.length/2)]||16)*.65;
+    const groups=[];
+    for(const word of words.sort((a,b)=>(a.bbox.y0+a.bbox.y1)-(b.bbox.y0+b.bbox.y1)||a.bbox.x0-b.bbox.x0)){
+      const center=(word.bbox.y0+word.bbox.y1)/2;
+      let group=groups.find(candidate=>Math.abs(candidate.center-center)<=tolerance);
+      if(!group){group={center,words:[]};groups.push(group);}
+      group.words.push(word);group.center=group.words.reduce((sum,item)=>sum+(item.bbox.y0+item.bbox.y1)/2,0)/group.words.length;
+    }
+    return groups.map(group=>{
+      const rowWords=group.words.sort((a,b)=>a.bbox.x0-b.bbox.x0);
+      return {text:rowWords.map(word=>word.text).join(' '),words:rowWords,bbox:{x0:Math.min(...rowWords.map(word=>word.bbox.x0)),y0:Math.min(...rowWords.map(word=>word.bbox.y0)),x1:Math.max(...rowWords.map(word=>word.bbox.x1)),y1:Math.max(...rowWords.map(word=>word.bbox.y1))},confidence:null,source:'ocr-space'};
+    }).filter(line=>line.text);
+  });
+  const rawText=pages.map(page=>String(page?.rawText||'')).filter(Boolean).join('\n');
+  return {lines,text:lines.length?lines.map(line=>line.text).join('\n'):rawText,rawText,tableCount:pages.filter(page=>page?.tableData).length,document};
+}

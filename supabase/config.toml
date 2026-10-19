@@ -297,6 +297,12 @@ enabled = true
 verify_jwt = false
 entrypoint = "./functions/nutrition-label/index.ts"
 
+[functions.nutrition-ocr]
+enabled = true
+# Authentication is checked with auth.getUser inside the function.
+verify_jwt = false
+entrypoint = "./functions/nutrition-ocr/index.ts"
+
 [functions.parse-finance]
 enabled = true
 verify_jwt = false

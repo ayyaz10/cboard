@@ -17,7 +17,7 @@ export function currentAtBasis(current, basis) {
 }
 
 // Unchecked values are retained on the new basis only when the units are compatible.
-export function applyNutritionReview(current, column, selected, {clearIncompatible=false}={}) {
+export function applyNutritionReview(current, column, selected, {clearIncompatible=false,ocrProvider='local-tesseract',ocrModel=''}={}) {
   if(!column.confirmed || !Number.isFinite(column.quantity) || column.quantity<=0 || !['g','ml','pieces','servings'].includes(column.unit))throw new Error('Confirm the nutrition basis and a quantity greater than zero.');
   const values=column.values || Object.fromEntries(Object.entries(column.nutrients||{}).map(([key,item])=>[key,item.value]));
   const keys=nutrientKeys.filter(key=>selected.includes(key));
@@ -27,6 +27,7 @@ export function applyNutritionReview(current, column, selected, {clearIncompatib
   if(retained.length && !converted && !clearIncompatible)throw new Error('The existing values use a different unit. Confirm clearing incompatible values, or keep the existing nutrition.');
   const nutrition=cleanNutrients(converted || {});
   for(const key of keys){const value=values[key];if(value!=null&&(!Number.isFinite(value)||value<0))throw new Error('Nutrition must be a non-negative number, or blank.');nutrition[key]=value??null;}
-  return {...nutrition,quantity:column.quantity,unit:column.unit,source:{...current?.source,provider:'Local nutrition label OCR',modified:true,
+  const providerName=ocrProvider==='ocr-space'?'Cloud nutrition label OCR':'Local nutrition label OCR';
+  return {...nutrition,quantity:column.quantity,unit:column.unit,source:{...current?.source,provider:providerName,sourceType:'nutrition_label_ocr',ocrProvider,ocrModel:String(ocrModel||'').slice(0,100),modified:true,
     name:`Reviewed label: ${column.label}`,labelBasis:cleanLabelBasis({...column,servingQuantity:column.serving?.quantity,servingUnit:column.serving?.unit,servingDescription:column.serving?.description})}};
 }

@@ -111,10 +111,10 @@ test('150g recipe amount scales per-100g nutrition without changing the label',(
  assert.equal(nutrition.calories,300);assert.equal(nutrition.protein,30);assert.equal(cleaned.calories,200);assert.equal(cleaned.quantity,100);
 });
 test('reviewed basis, serving size and energy survive existing catalog/diary/ingredient cleaners',()=>{
- const column=first('Per serving (40g)\nEnergy 420kJ / 100kcal\nProtein 8g');const label=applyNutritionReview(null,column,Object.keys(column.nutrients));
+ const column=first('Per serving (40g)\nEnergy 420kJ / 100kcal\nProtein 8g');const label=applyNutritionReview(null,column,Object.keys(column.nutrients),{ocrProvider:'ocr-space',ocrModel:'2'});
  const catalog=cleanFoodCatalogItem({name:'Existing food',quantity:40,unit:'g',nutrition:label,source:label.source});
  const diary=validateItem({id:'same-id',name:'Existing food',quantity:150,unit:'g',basis:40,nutritionUnit:'g',nutrition:label,source:label.source});
- for(const source of [catalog.source,diary.source,cleanIngredientLabel(label).source])assert.equal(source.labelBasis.servingQuantity,40);
+ for(const source of [catalog.source,diary.source,cleanIngredientLabel(label).source]){assert.equal(source.labelBasis.servingQuantity,40);assert.equal(source.sourceType,'nutrition_label_ocr');assert.equal(source.ocrProvider,'ocr-space');assert.equal(source.ocrModel,'2');}
  assert.equal(catalog.nutrition.energyKJ,420);assert.equal(diary.id,'same-id');
 });
 test('nutrition preprocessing preserves table geometry and falls back on a borderless screenshot',()=>{

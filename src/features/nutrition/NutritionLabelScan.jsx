@@ -18,6 +18,7 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
   const [columns,setColumns]=useState([]),[active,setActive]=useState(''),[warnings,setWarnings]=useState([]),[raw,setRaw]=useState('');
   const [clearIncompatible,setClearIncompatible]=useState(false);
   const [diagnostics,setDiagnostics]=useState(null);
+  const [ocrSource,setOcrSource]=useState({provider:'local-tesseract',model:''});
   useEffect(()=>{
     const dialog=imageDialog.current;
     if(!dialog)return;
@@ -28,9 +29,9 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
   const column=columns.find(value=>value.id===active);
   const converted=column?currentAtBasis(current,column):null;
   function stop(){job.current++;session.current?.dispose();session.current=null;setBusy(false);setProgress(null);}
-  function discard(){stop();setOpen(false);setShowImage(false);setColumns([]);setRaw('');setDiagnostics(null);setError('');setBasicMode(false);setFallbackMessage('');fileRef.current=null;if(urlRef.current)URL.revokeObjectURL(urlRef.current);urlRef.current=null;setPhoto('');}
+  function discard(){stop();setOpen(false);setShowImage(false);setColumns([]);setRaw('');setDiagnostics(null);setOcrSource({provider:'local-tesseract',model:''});setError('');setBasicMode(false);setFallbackMessage('');fileRef.current=null;if(urlRef.current)URL.revokeObjectURL(urlRef.current);urlRef.current=null;setPhoto('');}
   useEffect(()=>()=>{job.current++;session.current?.dispose();if(urlRef.current)URL.revokeObjectURL(urlRef.current);},[]);
-  async function scan(file=fileRef.current,nextRotation=rotation,nextCrop=crop,mode=basicMode?'basic':'advanced') {
+  async function scan(file=fileRef.current,nextRotation=rotation,nextCrop=crop,mode=basicMode?'basic':'cloud') {
     if(!file)return;
     const run=++job.current;setBusy(true);setError('');setProgress({status:'Loading scanner',progress:0});setColumns([]);setRaw('');setDiagnostics(null);setWarnings([]);
     try {
@@ -39,22 +40,25 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
       // One live session reports progress across rescans; disposal suppresses late updates.
       const result=await session.current.scan(file,nextRotation,{crop:nextCrop,debug:debugEnabled});
       if(run!==job.current)return;
+      setOcrSource({provider:result.provider==='ocr-space'?'ocr-space':'local-tesseract',model:result.name||''});
       const next=result.parsed.columns.length?result.parsed.columns.map(reviewColumn):[blankColumn()];
       setColumns(next);setActive(next[0].id);setWarnings(result.parsed.warnings);setRaw(result.parsed.text);setClearIncompatible(false);
       if (result.parsed.columns.length) notify.info('Nutrition label scanned. Review the values before applying.');
-      if(debugEnabled&&result.provider==='paddleocr-vl'){
-        const doc=result.debug?.rawDocument?.layout_det_res;
-        const blocks=result.debug?.rawDocument?.parsing_res_list||[];
+      if(debugEnabled&&result.provider==='ocr-space'){
+        const doc=result.debug?.rawDocument;
         const mappedRows=result.parsed.columns.flatMap(column=>Object.entries(column.nutrients).map(([canonicalNutrient,field])=>({source:{label:field.rawLabel,rawValue:field.rawNumericToken,rawUnit:field.rawUnit},extracted:{nutrientId:canonicalNutrient,value:field.value,unit:field.unit},normalizedLabel:field.normalizedLabel,matchedAlias:field.matchedAlias,matchType:field.matchType,nutrientMatchConfidence:field.nutrientMatchConfidence,ocrConfidence:field.confidence,bbox:field.bbox,tableCells:field.rawCells})));
-        setDiagnostics({engine:result.name,provider:result.debug?.provider,detectedTables:doc?.boxes?.filter(box=>box.label==='table')||[],tableCount:result.debug?.tableCount,rawRows:result.debug?.normalizedRows,rawDocument:result.debug?.rawDocument,rejectedCandidates:blocks.filter(block=>block.block_label!=='table').map(block=>({type:block.block_label,text:block.block_content,bbox:block.block_bbox})),validationErrors:result.debug?.basisIssues||[],mappedRows,finalValues:result.parsed.columns.map(value=>({basis:value.label,values:value.nutrients}))});
+        setDiagnostics({engine:result.name,provider:result.debug?.provider,timings:result.debug?.timings,processingStatus:result.debug?.processingStatus,detectedTables:result.debug?.tableCount||0,tableCount:result.debug?.tableCount,rawRows:result.debug?.normalizedRows,rawText:doc?.pages?.map(page=>page.rawText).join('\n'),rawDocument:doc,rejectedCandidates:[],validationErrors:result.debug?.basisIssues||[],mappedRows,finalValues:result.parsed.columns.map(value=>({basis:value.label,values:value.nutrients}))});
       }else if(debugEnabled)setDiagnostics({selected:result.name,candidates:result.debug?.candidates?.map(({image,...candidate})=>candidate)||[]});
     }catch(err){if(run===job.current){
-      const unavailable=mode==='advanced'&&/advanced nutrition scanner is unavailable|failed to fetch|networkerror|load failed/i.test(err.message||'');
+      const cancelled=/cancelled/i.test(err.message||'');
+      const unavailable=mode==='cloud'&&!cancelled;
       session.current?.dispose();session.current=null;
       if(unavailable&&fileRef.current){
         setBasicMode(true);
-        setFallbackMessage('The advanced OCR service is unavailable. CBoard switched to the local basic scanner. Start the nutrition OCR service to use PaddleOCR-VL.');
-        notify.info('Advanced OCR unavailable. Trying the local basic scanner.');
+        const reason=/429|limit|quota/i.test(err.message||'')?'Cloud OCR is temporarily limited.':/401|403|auth|key not configured/i.test(err.message||'')?'Cloud OCR could not authenticate.':'Cloud OCR could not complete this scan.';
+        setFallbackMessage(`${reason} CBoard is trying the local scanner.`);
+        if(import.meta.env.DEV)console.info('OCR.Space unavailable:',err.message||'request failed');
+        notify.info('Cloud OCR unavailable. Trying the local scanner.');
         void scan(file,nextRotation,nextCrop,'basic');
       }else{
         setError(err.message||'Could not scan this label. Try a clearer image.');
@@ -63,7 +67,7 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
     }}
     finally{if(run===job.current){setBusy(false);setProgress(null);}}
   }
-  function upload(file){if(!file)return;try{validateOcrImage(file);}catch(err){setError(err.message);return;}setError('');setFallbackMessage('');setBasicMode(false);fileRef.current=file;if(urlRef.current)URL.revokeObjectURL(urlRef.current);urlRef.current=URL.createObjectURL(file);setPhoto(urlRef.current);setRotation(0);const full={left:0,top:0,right:100,bottom:100};setCrop(full);void scan(file,0,full,'advanced');}
+  function upload(file){if(!file)return;try{validateOcrImage(file);}catch(err){setError(err.message);return;}setError('');setFallbackMessage('');setBasicMode(false);fileRef.current=file;if(urlRef.current)URL.revokeObjectURL(urlRef.current);urlRef.current=URL.createObjectURL(file);setPhoto(urlRef.current);setRotation(0);const full={left:0,top:0,right:100,bottom:100};setCrop(full);void scan(file,0,full,'cloud');}
   function tryBasicScan(){setBasicMode(true);void scan(fileRef.current,rotation,crop,'basic');}
   function pasteImage(event){
     if(busy||disabled)return;
@@ -86,7 +90,7 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
   return <section className="nscan" aria-label="Nutrition label scanner">
     {!open?<button type="button" disabled={disabled} onClick={()=>setOpen(true)}>Scan nutrition label</button>:<>
       <div className="nscan-actions"><strong id={`${id}-title`}>Nutrition label scan</strong><button type="button" onClick={discard}>Close scanner</button></div>
-      <p>Scan on this device. Include the column headings and serving size. For small, glossy or wrinkled packages, crop tightly around the full nutrition table and rescan. JPEG, PNG or WEBP, up to 15 MB. Review before applying; the image is temporary.</p>
+      <p>CBoard tries secure cloud OCR first and switches to the local scanner if needed. Cloud scan processes this temporary image with OCR.Space. Include the column headings and serving size. JPEG, PNG or WEBP, up to 15 MB. Review before applying; the image is not saved.</p>
       <div className="nscan-actions">
         <label>Upload nutrition label<input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy||disabled} onChange={event=>{upload(event.target.files?.[0]);event.target.value='';}}/></label>
         <label>Take nutrition photo<input type="file" capture="environment" accept="image/jpeg,image/png,image/webp" disabled={busy||disabled} onChange={event=>{upload(event.target.files?.[0]);event.target.value='';}}/></label>
@@ -109,7 +113,7 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
         <p>Crop bounds are percentages of the original image. Keep every heading for the columns you want to read.</p>
         <div className="nscan-grid">{['left','top','right','bottom'].map(edge=><label key={edge}>Crop {edge} (%)<input type="number" min="0" max="100" disabled={busy} value={crop[edge]} onChange={event=>setCrop({...crop,[edge]:Number(event.target.value)})}/></label>)}
         <label>Scan rotation<select value={rotation} disabled={busy} onChange={event=>setRotation(Number(event.target.value))}>{[0,90,180,270].map(value=><option key={value} value={value}>{value}°</option>)}</select></label></div>
-        <button type="button" disabled={busy||disabled} onClick={()=>scan()}>Rescan label</button>
+        <button type="button" disabled={busy||disabled} onClick={()=>{setBasicMode(false);void scan(fileRef.current,rotation,crop,'cloud');}}>Rescan label</button>
         </details>
       </>}
       {busy&&<div role="status"><p>{progress?.status}{progress?.pass?` · pass ${progress.pass}`:''}</p><progress max="1" value={progress?.progress||0}/><button type="button" onClick={stop}>Cancel scan</button></div>}
@@ -133,7 +137,7 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
         <details><summary>Add missing nutrient values</summary><div className="nscan-grid">{NUTRIENTS.filter(([key])=>column.values[key]==null&&current?.[key]==null&&!column.selected.includes(key)).map(([key,label,unit])=>field(key,label,unit))}</div></details>
         {current&&!converted&&NUTRIENTS.some(([key])=>current[key]!=null&&!column.selected.includes(key))&&<label className="nscan-check"><input type="checkbox" checked={clearIncompatible} onChange={event=>setClearIncompatible(event.target.checked)}/>Clear unchecked existing values that cannot be converted to this basis</label>}
         <p>Check highlighted values and units against the image. Applying fills the editor; save the food or recipe normally.</p>
-        <button type="button" disabled={disabled||!column.confirmed||!column.selected.length} onClick={()=>{try{onApply(applyNutritionReview(current,column,column.selected,{clearIncompatible}));discard();}catch(err){setError(err.message);}}}>Apply nutrition</button>
+        <button type="button" disabled={disabled||!column.confirmed||!column.selected.length} onClick={()=>{try{onApply(applyNutritionReview(current,column,column.selected,{clearIncompatible,ocrProvider:ocrSource.provider,ocrModel:ocrSource.model}));discard();}catch(err){setError(err.message);}}}>Apply nutrition</button>
         <details><summary>Extracted text (temporary)</summary><pre>{raw}</pre></details>
         {debugEnabled&&diagnostics&&<details><summary>Development OCR diagnostics</summary><pre>{JSON.stringify(diagnostics,null,2)}</pre></details>}
       </div>}
