@@ -575,6 +575,14 @@ export function DiaryMealEditor({
               >
                 Add food
               </button>
+              <button
+                type="button"
+                className="diary-manual-food-button"
+                disabled={draft.items.length >= 100 || Boolean(manualId)}
+                onClick={() => addManualFood()}
+              >
+                Add manually
+              </button>
             </div>
           </section>
           {lookup && (
