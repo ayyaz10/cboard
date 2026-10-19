@@ -34,6 +34,7 @@ import {
   emptyDay,
   localDate,
   mealMatchesSearch,
+  itemNutrition,
   newMeal,
   recipeItems,
   shiftDate,
@@ -744,32 +745,37 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
                 </button>
               )}
               {entries.map((meal) => {
-                const ingredientText = (item) =>
-                  `${format(item.quantity)} ${item.unit} ${item.name}`;
-                const previewItems = meal.items.slice(0, 3);
-                const remainingItems = meal.items.length - previewItems.length;
+                const itemNutrients = [
+                  ["calories", "kcal", "kcal"],
+                  ["protein", "Protein", "g"],
+                  ["carbs", "Carbs", "g"],
+                  ["fat", "Fat", "g"],
+                  ["fiber", "Fibre", "g"],
+                ];
                 return (
                   <article className="diary-entry" key={meal.id}>
                   <h3>{meal.title}</h3>
-                  {remainingItems > 0 ? (
-                    <details className="diary-ingredients">
-                      <summary>
-                        <span>
-                          {previewItems.map((item) => item.name).join(" · ")} · +{remainingItems} more
-                        </span>
-                        <strong>View ingredients</strong>
-                      </summary>
-                      <ul>
-                        {meal.items.map((item) => (
-                          <li key={item.id}>{ingredientText(item)}</li>
-                        ))}
-                      </ul>
-                    </details>
-                  ) : (
-                    <p className="diary-ingredient-list">
-                      {meal.items.map(ingredientText).join(" · ")}
-                    </p>
-                  )}
+                  <ul className="diary-item-nutrition-list" aria-label={`${meal.title} foods and nutrition`}>
+                    {meal.items.map((item) => {
+                      const nutrition = itemNutrition(item);
+                      return (
+                        <li className="diary-item-nutrition" key={item.id}>
+                          <div className="diary-item-nutrition-heading">
+                            <strong>{item.name}</strong>
+                            <span>{format(item.quantity)} {item.unit}</span>
+                          </div>
+                          <div className="diary-item-nutrition-values">
+                            {itemNutrients.map(([key, label, unit]) => (
+                              <div key={key} title={label === "kcal" ? "Calories" : label}>
+                                <span>{label}</span>
+                                <strong>{nutrition[key] == null ? "—" : format(nutrition[key])}<small>{nutrition[key] == null ? "" : unit}</small></strong>
+                              </div>
+                            ))}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
                   {meal.notes && <p>{meal.notes}</p>}
                   <NutritionTotals meals={[meal]} compact />
                   <div className="diary-actions">

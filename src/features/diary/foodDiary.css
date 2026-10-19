@@ -1161,6 +1161,61 @@ html[data-theme="midnight"] .food-diary .diary-recipe-confirm .diary-actions { b
   margin-top: 1rem;
   overflow-wrap: anywhere;
 }
+.diary-item-nutrition-list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0.75rem 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+.diary-item-nutrition {
+  min-width: 0;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--g-border);
+  border-radius: 0.75rem;
+  background: var(--g-surface-raised);
+}
+.diary-item-nutrition-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.6rem;
+  min-width: 0;
+  margin-bottom: 0.45rem;
+}
+.diary-item-nutrition-heading strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.9rem;
+}
+.diary-item-nutrition-heading span {
+  flex: 0 0 auto;
+  color: var(--g-muted);
+  font-size: 0.78rem;
+}
+.diary-item-nutrition-values {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.25rem;
+}
+.diary-item-nutrition-values > div {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.diary-item-nutrition-values span {
+  color: var(--g-muted);
+  font-size: 0.66rem;
+}
+.diary-item-nutrition-values strong {
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+.diary-item-nutrition-values small {
+  margin-left: 0.12rem;
+  font-size: 0.65rem;
+  font-weight: 500;
+}
 .diary-ingredient-list {
   color: rgb(0 0 0 / 0.65);
 }
