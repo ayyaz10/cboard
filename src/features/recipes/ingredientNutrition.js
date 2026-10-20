@@ -8,7 +8,7 @@ export function cleanIngredientLabel(label) {
   return { ...cleanNutrients(label), nutrientSources: cleanNutrientSources(label.nutrientSources), quantity: label.quantity, unit: label.unit,
     amountPerUnit: Number.isFinite(label.amountPerUnit) && label.amountPerUnit > 0 ? label.amountPerUnit : null,
     recipeUnit: typeof label.recipeUnit === 'string' ? label.recipeUnit.slice(0, 80) : '',
-    source: { ...(cleanLabelBasis(label.source?.labelBasis) ? {labelBasis:cleanLabelBasis(label.source.labelBasis)} : {}), ...(label.source?.sourceType?{sourceType:String(label.source.sourceType).slice(0,80)}:{}), ...(label.source?.ocrProvider?{ocrProvider:String(label.source.ocrProvider).slice(0,80)}:{}), ...(label.source?.ocrModel?{ocrModel:String(label.source.ocrModel).slice(0,100)}:{}), recipeOnly: label.source?.recipeOnly === true, name: String(label.source?.name || '').slice(0, 500), foodName: String(label.source?.foodName || '').slice(0, 300), foodId: String(label.source?.foodId || '').slice(0, 150), provider: String(label.source?.provider || 'Label').slice(0, 100), code: /^\d+$/.test(label.source?.code || '') ? String(label.source.code).slice(0, 30) : '', estimatedPortion: label.source?.estimatedPortion === true, portionDescription: String(label.source?.portionDescription || '').slice(0, 200) },
+    source: { ...(cleanLabelBasis(label.source?.labelBasis) ? {labelBasis:cleanLabelBasis(label.source.labelBasis)} : {}), ...(label.source?.sourceType?{sourceType:String(label.source.sourceType).slice(0,80)}:{}), ...(label.source?.ocrProvider?{ocrProvider:String(label.source.ocrProvider).slice(0,80)}:{}), ...(label.source?.ocrModel?{ocrModel:String(label.source.ocrModel).slice(0,100)}:{}), recipeOnly: label.source?.recipeOnly === true, recipeFoodEdited: label.source?.recipeFoodEdited === true, name: String(label.source?.name || '').slice(0, 500), foodName: String(label.source?.foodName || '').slice(0, 300), foodId: String(label.source?.foodId || '').slice(0, 150), provider: String(label.source?.provider || 'Label').slice(0, 100), code: /^\d+$/.test(label.source?.code || '') ? String(label.source.code).slice(0, 30) : '', estimatedPortion: label.source?.estimatedPortion === true, portionDescription: String(label.source?.portionDescription || '').slice(0, 200) },
   };
 }
 export function ingredientLabelAmount(item) {
@@ -29,7 +29,17 @@ export function ingredientLabelNutrition(item) {
 }
 export function updateIngredientField(item, key, value) {
   const next = { ...item, [key]: value };
-  if (key === 'nutrition') { delete next.nutritionLabel; delete next.foodId; }
+  if (key === 'nutrition' && item.foodId && item.nutritionLabel?.source?.foodId === item.foodId) {
+    const amount = ingredientLabelAmount(item);
+    const label = item.nutritionLabel;
+    if (amount > 0) {
+      const updated = { ...label, source: { ...label.source, recipeFoodEdited: true } };
+      for (const nutrient of macroKeys) updated[nutrient] = value?.[nutrient] == null ? null : value[nutrient] * label.quantity / amount;
+      next.nutritionLabel = cleanIngredientLabel(updated);
+      next.nutrition = ingredientLabelNutrition(next);
+    } else { delete next.nutritionLabel; delete next.foodId; }
+  }
+  else if (key === 'nutrition') { delete next.nutritionLabel; delete next.foodId; }
   else if (next.nutritionLabel) next.nutrition = ingredientLabelNutrition(next);
   else if (key === 'amount' || key === 'unit') {
     const before = initialProductAmount({ amount: item.amount, unit: 'pieces' }, 'pieces');

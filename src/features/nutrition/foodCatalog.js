@@ -192,6 +192,7 @@ export function cleanFoodCatalogItem(value) {
     brand: String(value?.brand || value?.source?.brand || '').trim().slice(0, 120),
     quantity,
     unit,
+    ...(Number.isFinite(Number(value?.perPiece)) && Number(value.perPiece) > 0 && ['g', 'ml'].includes(unit) ? { perPiece: Number(value.perPiece) } : {}),
     groceryTrackingEnabled: value?.groceryTrackingEnabled !== false,
     shoppingListEnabled: value?.groceryTrackingEnabled === false ? false : value?.shoppingListEnabled !== false,
     nutritionTrackingEnabled: value?.nutritionTrackingEnabled !== false,
@@ -239,6 +240,8 @@ export function mergeFoodCatalog(current = [], updates = []) {
     }
     const previous = items.get(clean.id);
     if (previous) {
+      if (update?.perPiece === undefined && previous.perPiece !== undefined) clean.perPiece = previous.perPiece;
+      else if (update?.perPiece === null) delete clean.perPiece;
       for (const key of ['groceryTrackingEnabled', 'shoppingListEnabled', 'nutritionTrackingEnabled'])
         if (update?.[key] === undefined) clean[key] = previous[key] !== false;
       if (!explicitId) {
@@ -274,6 +277,7 @@ export function catalogItemsFromDiaryMeal(meal) {
     name: item.name,
     quantity: item.basis,
     unit: item.nutritionUnit,
+    ...(Number.isFinite(item.perPiece) && item.perPiece > 0 && ['g', 'ml'].includes(item.nutritionUnit) ? { perPiece: item.perPiece } : {}),
     nutrition: item.nutrition,
     nutrientSources: item.nutrientSources,
     source: item.source,
@@ -282,13 +286,13 @@ export function catalogItemsFromDiaryMeal(meal) {
 
 export function catalogItemFromRecipeIngredient(item) {
   const label = item?.nutritionLabel;
-  if (item?.foodId && (!label || label.source?.foodId === item.foodId)) return null;
+  if (item?.foodId && (!label || label.source?.foodId !== item.foodId || label.source?.recipeFoodEdited !== true)) return null;
   const name = recipeFoodName(item.name);
   const unit = ['g', 'ml', 'pieces', 'servings'].includes(label?.unit) ? label.unit : 'g';
   const quantity = Number.isFinite(Number(label?.quantity)) && Number(label.quantity) > 0 ? Number(label.quantity) : 100;
   return { ...(item.foodId || label?.source?.foodId ? { id: item.foodId || label.source.foodId } : {}), name,
     ...(normalizeFoodText(name) !== normalizeFoodText(item.name) ? { aliases: [item.name] } : {}),
-    quantity, unit, nutrition: label || {}, nutrientSources: label?.nutrientSources || {},
+    quantity, unit, ...(label?.recipeUnit === 'pieces' && Number.isFinite(label.amountPerUnit) && label.amountPerUnit > 0 && ['g', 'ml'].includes(unit) ? { perPiece: label.amountPerUnit } : {}), nutrition: label || {}, nutrientSources: label?.nutrientSources || {},
     source: label?.source || { provider: 'Recipe ingredient', name } };
 }
 
@@ -308,6 +312,7 @@ export function diaryItemFromCatalog(current, catalogItem) {
     groceryTrackingEnabled: catalogItem.groceryTrackingEnabled !== false,
     basis: catalogItem.quantity,
     nutritionUnit: catalogItem.unit,
+    perPiece: Number.isFinite(catalogItem.perPiece) && catalogItem.perPiece > 0 && ['g', 'ml'].includes(catalogItem.unit) ? catalogItem.perPiece : null,
     unit: current.unit === current.nutritionUnit ? catalogItem.unit : current.unit,
     nutrition: { ...catalogItem.nutrition },
     nutrientSources: { ...catalogItem.nutrientSources },
@@ -316,7 +321,9 @@ export function diaryItemFromCatalog(current, catalogItem) {
 }
 
 export function ingredientFromCatalog(current, catalogItem) {
-  const nutritionLabel = { ...catalogItem.nutrition, nutrientSources: catalogItem.nutrientSources, quantity: catalogItem.quantity, unit: catalogItem.unit, source: { ...catalogItem.source, foodId: catalogItem.id, foodName: catalogItem.name } };
+  const nutritionLabel = { ...catalogItem.nutrition, nutrientSources: catalogItem.nutrientSources, quantity: catalogItem.quantity, unit: catalogItem.unit,
+    ...(current.unit === 'pieces' && Number.isFinite(catalogItem.perPiece) && catalogItem.perPiece > 0 && ['g', 'ml'].includes(catalogItem.unit) ? { amountPerUnit: catalogItem.perPiece, recipeUnit: 'pieces' } : {}),
+    source: { ...catalogItem.source, foodId: catalogItem.id, foodName: catalogItem.name } };
   const hasRecipeNutrition = Object.values(current.nutrition || {}).some(value => Number.isFinite(value));
   const nutritionOverride = current.nutritionOverride === true || !current.foodId && !current.nutritionLabel && hasRecipeNutrition;
   const next = { ...current, foodId: catalogItem.id, name: current.name || catalogItem.name, nutritionLabel, nutrientSources: catalogItem.nutrientSources,

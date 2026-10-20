@@ -136,7 +136,9 @@ function RecipesContent({ route, navigationPath }) {
   }
   async function saveRecipeFoodsToCatalog(recipeList) {
     const items = recipeList.flatMap(catalogItemsFromRecipe)
-      .filter(item => resolveRecipeFoodCandidate(item, foodCatalog).status === 'none');
+      .filter(item => item.id
+        ? foodCatalog.some(food => food.id === item.id)
+        : resolveRecipeFoodCandidate(item, foodCatalog).status === 'none');
     if (!items.length) return;
     await saveMainFoodItems(items.map(item => ({ ...item, groceryTrackingEnabled: false, shoppingListEnabled: false })));
   }
@@ -449,15 +451,15 @@ function RecipesContent({ route, navigationPath }) {
             return !manage ? <RecipeLink key={item} to="/recipes/manage">Manage recipes</RecipeLink> : null;
           })}
         </nav>
-        {addingFood && <FoodItemEditor initial={typeof addingFood==='object'?addingFood:null} catalog={foodCatalog} onClose={() => setAddingFood(false)} onSave={async item => {
+        {addingFood && <FoodItemEditor initial={typeof addingFood==='object'?addingFood:null} duplicate={addingFood?.duplicateDraft === true} catalog={foodCatalog} onClose={() => setAddingFood(false)} onSave={async item => {
           if (item.reuseExisting) { notify.info('Existing food reused'); return; }
           const reuse = !item.id && findFoodMatches(item, foodCatalog).some(match => match.confidence === 'certain' || match.confidence === 'high');
           const editing = foodCatalog.some(food => food.id === item.id || food.name.trim().toLocaleLowerCase() === item.name.trim().toLocaleLowerCase());
-          if (!item.id && !reuse && !editing) {
+          if (!item.id && !reuse && !editing && !item.allowDuplicate) {
             item = { ...item, groceryTrackingEnabled: false, shoppingListEnabled: false };
           }
           await saveMainFoodItems([item]);
-          notify.success(reuse ? 'Existing food reused' : editing ? 'Food updated' : 'Food added to your library');
+          notify.success(item.allowDuplicate ? 'Food duplicated in your library' : reuse ? 'Existing food reused' : editing ? 'Food updated' : 'Food added to your library');
         }} />}
         {favouriteError && <p role="alert" className="rounded-xl border-2 border-black bg-[#ffe0de] p-3 text-sm font-semibold">{favouriteError}</p>}
         <p role="status" className="sr-only">{favouriteNotice}</p>
@@ -510,7 +512,7 @@ function RecipesContent({ route, navigationPath }) {
                 }}
               />
             ) : null}
-            {!error && foods && <FoodLibrary library={ingredientLibrary} recipes={recipes} foodCatalog={foodCatalog} mealPlans={mealPlanRefs} onAdd={() => setAddingFood(true)} onEdit={id=>setAddingFood(foodCatalog.find(item=>item.id===id)||true)} onDeleteFoods={deleteFoods} onDeleteRecipeIngredients={deleteRecipeOnlyIngredients} onMergeFoods={mergeFoods} />}
+            {!error && foods && <FoodLibrary library={ingredientLibrary} recipes={recipes} foodCatalog={foodCatalog} mealPlans={mealPlanRefs} onAdd={() => setAddingFood(true)} onEdit={id=>setAddingFood(foodCatalog.find(item=>item.id===id)||true)} onDuplicate={id => { const food = foodCatalog.find(item => item.id === id); if (food) setAddingFood({ ...structuredClone(food), id: undefined, name: `${food.name} (copy)`, duplicateDraft: true }); }} onDeleteFoods={deleteFoods} onDeleteRecipeIngredients={deleteRecipeOnlyIngredients} onMergeFoods={mergeFoods} />}
             {!error && planning && <DailyMealPlanner recipes={recipes} nutritionGoals={nutritionGoals} />}
             {!error && diary && <FoodDiary recipes={recipes} nutritionGoals={nutritionGoals} foodCatalog={foodCatalog} onFoodCatalogChange={saveMainFoodItems} onDiaryRecipeUpdated={updated => setRecipes(current => [updated, ...current.filter(item => item.slug !== updated.slug)])} />}
             {!error && (home || manage) && (

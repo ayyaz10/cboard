@@ -133,7 +133,7 @@ export function validateItem(item) {
     unit: item.unit,
     basis: item.basis,
     nutritionUnit: item.nutritionUnit,
-    perPiece: item.unit !== item.nutritionUnit ? item.perPiece : null,
+    perPiece: ['g', 'ml'].includes(item.nutritionUnit) && positive(item.perPiece) ? item.perPiece : null,
     nutrition,
     nutrientSources: cleanNutrientSources({ ...nutrientSourcesForValues(nutrition, item.source), ...(item.nutrientSources || item.nutrition?.nutrientSources || {}) }),
     source: {

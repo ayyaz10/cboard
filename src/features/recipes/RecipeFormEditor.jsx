@@ -224,7 +224,7 @@ function ItemEditor({ item, onChange, groups, visible, ingredientLibrary, isIngr
           <p className="text-sm">{label.source.name || item.name} Â· {label.source.provider}. Label values per {label.quantity} {label.unit}.</p>
           {label.source.estimatedPortion && <p className="text-sm">Estimated USDA portion: {label.source.portionDescription}. Replace the weight below with your measured edible weight if available.</p>}
           {initialProductAmount(item, label.unit) === '' && <Field label={`${label.unit} in one ${item.unit || 'recipe unit'} (edible amount)`} type="number" min="0.001" step="any" value={label.recipeUnit === String(item.unit || '').trim().toLowerCase() ? label.amountPerUnit : ''} onChange={(value) => {
-            const next = { ...item, nutritionLabel: { ...label, source: { ...label.source, estimatedPortion: false }, amountPerUnit: value === '' ? null : Number(value), recipeUnit: String(item.unit || '').trim().toLowerCase() } };
+            const next = { ...item, nutritionLabel: { ...label, source: { ...label.source, estimatedPortion: false, ...(item.foodId && label.source?.foodId === item.foodId ? { recipeFoodEdited: true } : {}) }, amountPerUnit: value === '' ? null : Number(value), recipeUnit: String(item.unit || '').trim().toLowerCase() } };
             next.nutrition = ingredientLabelNutrition(next); onChange(next);
           }} />}
           <p className="text-sm" role="status">{ingredientLabelAmount(item) == null ? 'Confirm the edible weight or volume of one recipe unit. The API cannot reliably infer the weight of your banana, handful or cup.' : `${ingredientLabelAmount(item)} ${label.unit} used / ${label.quantity} ${label.unit} on the label. The nutrition fields below are calculated for the amount above.`}</p>
@@ -547,7 +547,7 @@ export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary 
           </div>}
         </> : <p className="text-sm text-black/70">Choose an ingredient below with â€œUse as main ingredientâ€ to enable proportional scaling. Existing recipes are left unanchored until you choose.</p>}
       </section>
-      {!editing && <details className="rounded-2xl border-2 border-black bg-white p-4" open>
+      <details className="rounded-2xl border-2 border-black bg-white p-4" open={!editing}>
         <summary className="cursor-pointer text-xl font-bold">Recipe nutrition</summary>
         <p className="text-sm text-black/70">
           {recipe.nutritionFromIngredients ? 'Calculated from ingredient and sauce quantities. Shows the whole recipe until a serving count is set, then per serving; alternatives are not included.' : 'Enter macros manually or use food lookup inside an ingredient to calculate from ingredients. Item nutrition describes the full amount listed for that ingredient.'}
@@ -562,7 +562,7 @@ export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary 
         </details>
         <div className="mt-3"><Macros value={nutritionDisplay.nutrition} onChange={(value) => set('nutrition', value)} /></div>
         {recipe.nutritionFromIngredients && nutritionDisplay.partialKeys.length > 0 && <p className="mt-3 text-sm font-semibold">Some nutrient totals are partial because they are missing from one or more ingredients.</p>}
-      </details>}
+      </details>
       <Items
         title="Ingredients"
         items={recipe.ingredients ?? []}

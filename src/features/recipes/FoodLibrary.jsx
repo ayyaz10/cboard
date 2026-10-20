@@ -8,7 +8,7 @@ import { notify } from '../../lib/notifications.js';
 
 const formatNutrient = value => Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
-export function FoodLibrary({ library, recipes, foodCatalog = [], mealPlans = [], onAdd, onEdit, onDeleteFoods, onDeleteRecipeIngredients, onMergeFoods }) {
+export function FoodLibrary({ library, recipes, foodCatalog = [], mealPlans = [], onAdd, onEdit, onDuplicate, onDeleteFoods, onDeleteRecipeIngredients, onMergeFoods }) {
   const [query, setQuery] = useState('');
   const [source, setSource] = useState('all');
   const [behavior, setBehavior] = useState('all');
@@ -129,6 +129,7 @@ export function FoodLibrary({ library, recipes, foodCatalog = [], mealPlans = []
     <summary onClick={event => { event.preventDefault(); setOpenActionKey(current => current === entry.key ? null : entry.key); }} className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full border-2 border-black bg-white hover:bg-[#c5ff6f]" aria-label={`Actions for ${entry.item.name}`} title="Food actions"><span aria-hidden="true" className="flex gap-0.5"><i className="h-1 w-1 rounded-full bg-black"/><i className="h-1 w-1 rounded-full bg-black"/><i className="h-1 w-1 rounded-full bg-black"/></span></summary>
     <div className="absolute right-0 top-12 z-20 grid min-w-36 gap-1 rounded-xl border-2 border-black bg-white p-2 shadow-[3px_3px_0_#111]">
       <button type="button" className="rounded-lg px-3 py-2 text-left text-sm font-bold hover:bg-[#edffd5]" onClick={() => { setOpenActionKey(null); onEdit(entry.food.id); }}>Edit food</button>
+      <button type="button" className="rounded-lg px-3 py-2 text-left text-sm font-bold hover:bg-[#edffd5]" onClick={() => { setOpenActionKey(null); onDuplicate(entry.food.id); }}>Duplicate food</button>
       <button type="button" className="danger-action rounded-lg px-3 py-2 text-left text-sm font-bold" onClick={() => { setOpenActionKey(null); requestDelete([entry.food.id]); }}>Delete food</button>
     </div>
   </details> : <details data-food-action-menu className="relative inline-block" open={openActionKey === entry.key}>

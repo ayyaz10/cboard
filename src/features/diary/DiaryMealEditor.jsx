@@ -295,7 +295,9 @@ export function DiaryMealEditor({
                         onChange={(event) =>
                           changeItem(item.id, {
                             unit: event.target.value,
-                            perPiece: null,
+                            quantity: event.target.value === 'pieces' && item.unit !== 'pieces' ? 1 : event.target.value === item.nutritionUnit && item.unit === 'pieces' && item.perPiece > 0 ? item.quantity * item.perPiece : item.quantity,
+                            perPiece: item.perPiece,
+                            source: { ...item.source, modified: true },
                           })
                         }
                       >
@@ -320,6 +322,7 @@ export function DiaryMealEditor({
                           onChange={(event) =>
                             changeItem(item.id, {
                               perPiece: number(event.target.value),
+                              source: { ...item.source, modified: true },
                             })
                           }
                         />

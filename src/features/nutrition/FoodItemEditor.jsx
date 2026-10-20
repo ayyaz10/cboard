@@ -9,7 +9,7 @@ import { findFoodMatches } from './foodCatalog.js';
 import '../groceries/groceries.css';
 
 const example = { name: "McDonald's burger", quantity: 1, unit: 'pieces', nutrition: { calories: null, protein: null, carbs: null, fat: null, fiber: null } };
-export function FoodItemEditor({ catalog, onSave, onClose, initial = null }) {
+export function FoodItemEditor({ catalog, onSave, onClose, initial = null, duplicate = false }) {
   const dialog = useRef(null), lock = useRef(false);
   const [mode, setMode] = useState('manual');
   const [draft, setDraft] = useState(() => initial ? structuredClone(initial) : { name: '', quantity: 1, unit: 'pieces', nutrition: {}, groceryTrackingEnabled: true, shoppingListEnabled: true, nutritionTrackingEnabled: true, source: { provider: 'Manual' } });
@@ -22,7 +22,10 @@ export function FoodItemEditor({ catalog, onSave, onClose, initial = null }) {
   useEffect(() => { dialog.current.showModal(); }, []);
   useEffect(() => { if (dialog.current) dialog.current.scrollTop = 0; }, [mode]);
   function useFood(food, provider) {
-    setDraft({ ...(initial?.id ? { id: initial.id } : {}), ...validateFoodItem(food), groceryTrackingEnabled: food.groceryTrackingEnabled ?? initial?.groceryTrackingEnabled ?? true, shoppingListEnabled: food.shoppingListEnabled ?? initial?.shoppingListEnabled ?? true, nutritionTrackingEnabled: food.nutritionTrackingEnabled ?? initial?.nutritionTrackingEnabled ?? true, nutrientSources: food.nutrientSources || food.nutrition?.nutrientSources || {}, barcode: food.barcode || food.source?.barcode || food.source?.code || '', sku: food.sku || food.source?.sku || '', retailer: food.retailer || food.source?.retailer || '', brand: food.brand || food.source?.brand || '', source: { provider, ...food.source } });
+    const cleaned = validateFoodItem(food);
+    setDraft({ ...(initial?.id ? { id: initial.id } : {}), ...cleaned,
+      ...(cleaned.perPiece == null && cleaned.unit === draft.unit && ['g', 'ml'].includes(cleaned.unit) && draft.perPiece > 0 ? { perPiece: draft.perPiece } : {}),
+      groceryTrackingEnabled: food.groceryTrackingEnabled ?? initial?.groceryTrackingEnabled ?? true, shoppingListEnabled: food.shoppingListEnabled ?? initial?.shoppingListEnabled ?? true, nutritionTrackingEnabled: food.nutritionTrackingEnabled ?? initial?.nutritionTrackingEnabled ?? true, nutrientSources: food.nutrientSources || food.nutrition?.nutrientSources || {}, barcode: food.barcode || food.source?.barcode || food.source?.code || '', sku: food.sku || food.source?.sku || '', retailer: food.retailer || food.source?.retailer || '', brand: food.brand || food.source?.brand || '', source: { provider, ...food.source } });
     setMode('manual');
   }
   async function ai() {
@@ -45,13 +48,13 @@ export function FoodItemEditor({ catalog, onSave, onClose, initial = null }) {
     if (lock.current) return;
     if (!initial && reviewMatches.length && !duplicateChoice) { notify.error('Review the possible existing food, or choose Create separately.'); return; }
     lock.current = true; setBusy(true);
-    try { await onSave({ ...(initial?.id ? { id: initial.id } : {}), ...validateFoodItem(draft), groceryTrackingEnabled: draft.groceryTrackingEnabled !== false, shoppingListEnabled: draft.groceryTrackingEnabled === false ? false : draft.shoppingListEnabled !== false, nutritionTrackingEnabled: draft.nutritionTrackingEnabled !== false, nutrientSources: draft.nutrientSources, barcode: draft.barcode, sku: draft.sku, retailer: draft.retailer, brand: draft.brand, source: draft.source, ...(duplicateChoice === 'separate' ? { allowDuplicate: true } : {}) }); onClose(); }
+    try { await onSave({ ...(initial?.id ? { id: initial.id } : {}), ...validateFoodItem(draft), groceryTrackingEnabled: draft.groceryTrackingEnabled !== false, shoppingListEnabled: draft.groceryTrackingEnabled === false ? false : draft.shoppingListEnabled !== false, nutritionTrackingEnabled: draft.nutritionTrackingEnabled !== false, nutrientSources: draft.nutrientSources, barcode: draft.barcode, sku: draft.sku, retailer: draft.retailer, brand: draft.brand, source: draft.source, ...(duplicate || duplicateChoice === 'separate' ? { allowDuplicate: true } : {}) }); onClose(); }
     catch (err) { notify.error(err.message || 'Could not save food item'); }
     finally { lock.current = false; setBusy(false); }
   }
   const nutrientFields = rows => <div className="g-nutrition-grid">{rows.map(([key, label, unit]) => <label key={key}>{label} ({unit})<input type="number" min="0" step="any" value={draft.nutrition[key] ?? ''} onChange={event => setDraft({ ...draft, nutrition: { ...draft.nutrition, [key]: event.target.value === '' ? null : Number(event.target.value) }, nutrientSources: { ...draft.nutrientSources, ...(event.target.value === '' ? { [key]: undefined } : { [key]: { sourceType: 'manual', sourceId: '', sourceName: 'Manual edit', confidence: 'high', estimated: false } }) } })} />{draft.nutrientSources?.[key] && <small>{draft.nutrientSources[key].sourceName || draft.nutrientSources[key].sourceType}{draft.nutrientSources[key].estimated ? ' · reference estimate' : ''}{draft.nutrientSources[key].derived ? ' · derived' : ''}</small>}</label>)}</div>;
   return <dialog ref={dialog} className="g-dialog groceries" aria-labelledby="food-item-title" onCancel={event => { event.preventDefault(); if (!busy) onClose(); }} onClick={event => { if (event.target === dialog.current && !busy) onClose(); }}>
-    <div className="g-between"><h2 id="food-item-title">{initial ? 'Edit food item' : 'Add food item'}</h2><button type="button" aria-label="Close popup" disabled={busy} onClick={onClose}>×</button></div>
+    <div className="g-between"><h2 id="food-item-title">{duplicate ? 'Duplicate food item' : initial?.id ? 'Edit food item' : 'Add food item'}</h2><button type="button" aria-label="Close popup" disabled={busy} onClick={onClose}>×</button></div>
     <p>Save a single food to your shared library. Search for it later in Food Diary, Recipes or Groceries. No recipe is created.</p>
     <div className="g-actions">{[['manual', 'Manual'], ['ai', 'AI text'], ['json', 'JSON'], ['lookup', 'Open Food Facts / barcode']].map(([key, label]) => <button type="button" key={key} disabled={busy} aria-pressed={mode === key} onClick={() => setMode(key)}>{label}</button>)}</div>
     {mode === 'ai' && <div>
@@ -71,7 +74,7 @@ export function FoodItemEditor({ catalog, onSave, onClose, initial = null }) {
       <button type="button" onClick={() => parse(json)}>Review food JSON</button>
     </div>}
     {mode === 'lookup' && <NutritionLookup currentNutrition={{...draft.nutrition,nutrientSources:draft.nutrientSources,quantity:draft.quantity,unit:draft.unit,source:draft.source}} name={draft.name} visible active onManual={query => { setDraft(current => ({ ...current, name: query || current.name })); setMode('manual'); }} onSelect={label => {
-      if(label.source?.provider==='Local nutrition label OCR'){setDraft({...draft,quantity:label.quantity,unit:label.unit,nutrition:cleanNutrients(label),source:label.source});setMode('manual');return;}
+      if(label.source?.provider==='Local nutrition label OCR'){setDraft({...draft,quantity:label.quantity,unit:label.unit,...(label.unit===draft.unit?{}:{perPiece:null}),nutrition:cleanNutrients(label),source:label.source});setMode('manual');return;}
       try { useFood({ name: label.source?.name || draft.name, quantity: label.quantity, unit: label.unit, nutrition: Object.fromEntries(NUTRIENTS.map(([key]) => [key, label[key] ?? null])), nutrientSources: label.nutrientSources, source: label.source }, 'Food lookup'); }
     catch (err) { notify.error(err.message || 'Could not save food item'); }
     }} />}
@@ -80,10 +83,14 @@ export function FoodItemEditor({ catalog, onSave, onClose, initial = null }) {
         <label>Food name<input required maxLength={300} value={draft.name} onChange={event => { setDraft({ ...draft, name: event.target.value }); setDuplicateChoice(''); }} /></label>
         <div className="g-tools">
           <label>Nutrition is for<input required type="number" min="0.0001" step="any" value={draft.quantity} onChange={event => setDraft({ ...draft, quantity: event.target.value === '' ? '' : Number(event.target.value) })} /></label>
-          <label>Unit<select value={draft.unit} onChange={event => setDraft({ ...draft, unit: event.target.value })}>{['g', 'ml', 'pieces', 'servings'].map(unit => <option key={unit}>{unit}</option>)}</select></label>
+          <label>Unit<select value={draft.unit} onChange={event => setDraft({ ...draft, unit: event.target.value, ...(event.target.value === draft.unit ? {} : { perPiece: null }) })}>{['g', 'ml', 'pieces', 'servings'].map(unit => <option key={unit}>{unit}</option>)}</select></label>
         </div>
+        {['g', 'ml'].includes(draft.unit) && <>
+          <label>{draft.unit} per piece (optional)<input type="number" min="0.001" max="1000000" step="any" value={draft.perPiece ?? ''} onChange={event => setDraft({ ...draft, perPiece: event.target.value === '' ? null : Number(event.target.value) })} placeholder={`e.g. 50 ${draft.unit}`} /></label>
+          <p className="g-hint">Used when logging this food as pieces. Nutrition is scaled from the basis above. For different sizes, save separate foods such as “Medium egg” and “Large egg” with their own piece weight.</p>
+        </>}
         <p>Enter the label values for this amount. For values per 100 g, enter 100 and g.</p>
-        <NutritionLabelScan disabled={busy} current={{...draft.nutrition,quantity:draft.quantity,unit:draft.unit,source:draft.source}} onApply={label=>setDraft({...draft,quantity:label.quantity,unit:label.unit,nutrition:cleanNutrients(label),source:label.source})}/>
+        <NutritionLabelScan disabled={busy} current={{...draft.nutrition,quantity:draft.quantity,unit:draft.unit,source:draft.source}} onApply={label=>setDraft({...draft,quantity:label.quantity,unit:label.unit,...(label.unit===draft.unit?{}:{perPiece:null}),nutrition:cleanNutrients(label),source:label.source})}/>
         <p className="g-hint">Values are for {draft.quantity || 100} {draft.unit || 'g'}.</p>
         {nutrientFields(NUTRIENTS.slice(0, 5))}
         <details><summary>More nutrients</summary>{nutrientFields(NUTRIENTS.slice(5))}</details>

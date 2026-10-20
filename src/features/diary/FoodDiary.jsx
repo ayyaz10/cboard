@@ -283,6 +283,16 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
         saved,
       ]);
       notify.success(success);
+      const linkedUpdates = catalogItemsFromDiaryMeal({
+        items: prepared.meals.flatMap(meal => meal.items).filter(item => item.foodId && item.source?.modified),
+      });
+      if (linkedUpdates.length && onFoodCatalogChange) {
+        try {
+          await onFoodCatalogChange(linkedUpdates);
+        } catch (catalogError) {
+          notify.warning(`Meal saved, but the shared food item could not be updated: ${catalogError.message || 'Please try again.'}`);
+        }
+      }
       if (newFoods.length && onFoodCatalogChange) {
         const catalogItems = newFoods.map(item => ({
           ...(item.foodId || item.source?.foodId ? { id: item.foodId || item.source.foodId } : {}),
@@ -772,12 +782,12 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
                             return (
                               <tr key={item.id}>
                                 <th scope="row">{item.name}</th>
-                                <td>{format(item.quantity)} {item.unit}</td>
-                                <td>{nutrition.calories == null ? "—" : `${format(nutrition.calories)} kcal`}</td>
-                                <td>{nutrition.protein == null ? "—" : `${format(nutrition.protein)} g`}</td>
-                                <td>{nutrition.carbs == null ? "—" : `${format(nutrition.carbs)} g`}</td>
-                                <td>{nutrition.fat == null ? "—" : `${format(nutrition.fat)} g`}</td>
-                                <td>{nutrition.fiber == null ? "—" : `${format(nutrition.fiber)} g`}</td>
+                                <td data-label="Portion">{format(item.quantity)} {item.unit}</td>
+                                <td data-label="Calories">{nutrition.calories == null ? "—" : `${format(nutrition.calories)} kcal`}</td>
+                                <td data-label="Protein">{nutrition.protein == null ? "—" : `${format(nutrition.protein)} g`}</td>
+                                <td data-label="Carbs">{nutrition.carbs == null ? "—" : `${format(nutrition.carbs)} g`}</td>
+                                <td data-label="Fat">{nutrition.fat == null ? "—" : `${format(nutrition.fat)} g`}</td>
+                                <td data-label="Fibre">{nutrition.fiber == null ? "—" : `${format(nutrition.fiber)} g`}</td>
                               </tr>
                             );
                           })}
