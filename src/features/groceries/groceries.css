@@ -305,6 +305,18 @@ html[data-theme="matrix"] .groceries .g-stats button {
   border-radius: 12px;
   margin-bottom: 15px;
 }
+.g-modal-alert {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  border: 2px solid #a83a33;
+  color: #5b1d14;
+  box-shadow: 0 4px 16px #0005;
+}
+html[data-theme="midnight"] .g-dialog .g-modal-alert {
+  background: #4a1d1b;
+  color: #fff4f2;
+}
 .g-dialog {
   padding: 25px;
   border: 1px solid #17251b;

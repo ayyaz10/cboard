@@ -31,6 +31,7 @@ import {
   setGroceryImage,
 } from "./groceryData";
 import { NutritionLookup } from "./NutritionLookup";
+import { notify } from '../../lib/notifications.js';
 import "./groceries.css";
 
 function Thumbnail({ item, image }) {
@@ -154,7 +155,7 @@ function Modal({ title, close, children, error }) {
         </button>
       </div>
       {error && (
-        <p role="alert" className="g-alert">
+        <p role="alert" className="g-alert g-modal-alert">
           {error}
         </p>
       )}
@@ -408,7 +409,7 @@ export function Groceries() {
           </button>
         </header>
         <DailyNutritionTargets controller={nutritionGoals} />
-        {error && (
+        {error && !modal && (
           <div role="alert" className="g-alert">
             {error}{" "}
             <button disabled={busy} onClick={reload}>
@@ -984,12 +985,11 @@ export function Groceries() {
           </Modal>
         )}
         {(modal === "edit" || modal === "editShop") && edit && (
-          <Modal error={error} title={edit.name} close={() => setModal(null)}>
+          <Modal error={error} title={edit.name} close={() => { setModal(null); setError(''); }}>
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
-                if (
-                  await change((s) => {
+                const saved = await change((s) => {
                     if (!edit.name.trim() || !edit.category.trim())
                       throw new Error("Enter an item name and category.");
                     if (modal === "editShop" && !(edit.quantity > 0))
@@ -1000,19 +1000,22 @@ export function Groceries() {
                     validateNutrition(edit.nutrition);
                     const key = modal === "edit" ? "items" : "shopping";
                     const previous = s[key].find((i) => i.id === edit.id);
-                    if (
-                      s[key].some(
-                        (i) =>
-                          i.id !== edit.id &&
-                          normalizeName(i.name) === normalizeName(edit.name),
-                      )
-                    )
-                      throw new Error("An item with that name already exists.");
+                    if (!previous) throw new Error("This item is no longer available. Reload groceries and try again.");
+                    const nameChanged = previous && normalizeName(previous.name) !== normalizeName(edit.name);
+                    if (nameChanged && s[key].some((i) =>
+                      i.id !== edit.id && !i.removed && !i.recipeOnly &&
+                      normalizeName(i.name) === normalizeName(edit.name),
+                    )) throw new Error("An item with that name already exists.");
                     const cleanEdit = {
                       ...edit,
                       name: edit.name.trim(),
                       category: edit.category.trim(),
+                      quantity: edit.quantity == null || edit.quantity === "" ? null : Number(edit.quantity),
                     };
+                    if (!units.includes(cleanEdit.unit))
+                      throw new Error("Choose a supported stock unit.");
+                    if (cleanEdit.quantity != null && (!Number.isFinite(cleanEdit.quantity) || cleanEdit.quantity < 0))
+                      throw new Error("Enter a valid stock quantity.");
                     delete cleanEdit.image;
                     s[key] = s[key].map((i) =>
                       i.id === edit.id
@@ -1029,9 +1032,11 @@ export function Groceries() {
                       setGroceryImage(s, cleanEdit.name, edit.image || null);
                     }
                     return s;
-                  })
-                )
+                  }, `${edit.name.trim()} saved`);
+                if (saved) {
                   setModal(null);
+                  notify.success(`${edit.name.trim()} saved as ${edit.quantity ?? 'quantity not set'} ${edit.unit}`);
+                }
               }}
             >
               <label>
