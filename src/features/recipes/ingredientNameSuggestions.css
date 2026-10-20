@@ -1,0 +1,47 @@
+/* Keep saved-food autocomplete readable in both light and dark themes. */
+.ingredient-name-suggestions .ingredient-name-suggestion {
+  color: #172017;
+}
+
+.ingredient-name-suggestions .ingredient-name-suggestion span:first-child {
+  color: #172017;
+}
+
+.ingredient-name-suggestions .ingredient-name-suggestion span:last-child {
+  color: #465246;
+}
+
+.ingredient-name-suggestions .ingredient-name-suggestion[aria-selected='true'] {
+  background-color: #d8efc6;
+  color: #172017;
+  box-shadow: inset 3px 0 0 #4a7d32;
+}
+
+.ingredient-name-suggestions .ingredient-name-suggestion[aria-selected='true'] span {
+  color: #172017;
+}
+
+html[data-theme='midnight'] .ingredient-name-suggestions {
+  border-color: #707b70 !important;
+  background-color: #111511 !important;
+  box-shadow: 4px 4px 0 #000 !important;
+}
+
+html[data-theme='midnight'] .ingredient-name-suggestions .ingredient-name-suggestion,
+html[data-theme='midnight'] .ingredient-name-suggestions .ingredient-name-suggestion span {
+  color: #f3f6f0 !important;
+}
+
+html[data-theme='midnight'] .ingredient-name-suggestions .ingredient-name-suggestion {
+  background-color: #171d18 !important;
+}
+
+html[data-theme='midnight'] .ingredient-name-suggestions .ingredient-name-suggestion:hover:not([aria-selected='true']) {
+  background-color: #263126 !important;
+}
+
+html[data-theme='midnight'] .ingredient-name-suggestions .ingredient-name-suggestion[aria-selected='true'],
+html[data-theme='midnight'] .ingredient-name-suggestions .ingredient-name-suggestion[aria-selected='true'] span {
+  background-color: #315b37 !important;
+  color: #fff !important;
+}

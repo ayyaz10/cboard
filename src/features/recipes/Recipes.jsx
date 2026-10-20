@@ -140,10 +140,17 @@ function RecipesContent({ route, navigationPath }) {
     if (!items.length) return;
     await saveMainFoodItems(items.map(item => ({ ...item, groceryTrackingEnabled: false, shoppingListEnabled: false })));
   }
-  function recipeUpdated(updated) {
+  async function recipeUpdated(updated, { source = 'recipe' } = {}) {
     setRecipes(current => current.map(item => item.slug === updated.slug ? updated : item));
-    notify.success('Recipe updated');
-    saveRecipeFoodsToCatalog([updated]).catch(error => notify.error(error.message || 'Recipe saved, but the food library could not be updated.'));
+    try {
+      await saveRecipeFoodsToCatalog([updated]);
+    } catch (error) {
+      const message = error.message || 'The food library could not be updated.';
+      if (source === 'ingredient') notify.warning(`Ingredient saved, but ${message}`);
+      else notify.error(`Recipe saved, but ${message}`);
+      return;
+    }
+    notify.success(source === 'ingredient' ? 'Ingredient saved' : 'Recipe updated');
   }
   useEffect(() => {
     refresh();

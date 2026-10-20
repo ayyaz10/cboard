@@ -17,6 +17,7 @@ import { recipeNutritionDisplay, prepareIngredientEditor } from './ingredientNut
 import { removeRecipeIngredient, saveRecipeIngredientNutrition } from '../../services/recipeService.js';
 import { findRecipeFoodMatches, resolveRecipeFoodCandidate } from '../nutrition/foodCatalog.js';
 import { NutritionLookup } from '../groceries/NutritionLookup.jsx';
+import { notify } from '../../lib/notifications.js';
 
 export const secondaryButton =
   'inline-flex items-center justify-center rounded-full border-2 border-black bg-white px-4 py-2 text-sm font-bold text-black transition hover:-translate-y-px focus-visible:outline-offset-4 disabled:opacity-50';
@@ -157,11 +158,13 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
   const [unit, setUnit] = useState(item.unit);
   const [lookupOpen, setLookupOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [dirty, setDirty] = useState(false);
   const [error, setError] = useState('');
   const [removeConfirmation, setRemoveConfirmation] = useState(false);
   function changeIngredientName(value) {
     const normalized = normalizeRecipeIngredient({ name: value, amount: amount === '' ? null : Number(amount), unit });
     setName(normalized.name);
+    setDirty(true);
     if (amount === '' && normalized.amount != null) setAmount(String(normalized.amount));
     if (!unit && normalized.unit) setUnit(normalized.unit);
   }
@@ -175,21 +178,40 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
     setName(selectedName || name);
     setNutritionLabel(nextLabel);
     setValues(ingredientLabelNutrition({ amount: Number(amount), unit, nutritionLabel: nextLabel }));
+    setDirty(true);
     setLookupOpen(false);
     setError('');
   }
   async function save() {
+    if (busy) return;
     setBusy(true);
     setError('');
     try {
       const saved = await saveRecipeIngredientNutrition(recipe, index, values, { name, amount: Number(amount), unit, ...(nutritionLabel?{nutritionLabel}: {}) });
-      onSaved?.(saved);
+      if (onSaved) await onSaved(saved, { source: 'ingredient' });
+      else notify.success('Ingredient changes saved');
+      setDirty(false);
       setEditing(false);
     } catch (saveError) {
       setError(saveError.message || 'Could not save ingredient nutrition. Please try again.');
     } finally {
       setBusy(false);
     }
+  }
+  function toggleEditor() {
+    if (!editing) {
+      setName(item.name);
+      setValues(item.nutrition || {});
+      setNutritionLabel(item.nutritionLabel || null);
+      setAmount(editableAmount);
+      setUnit(item.unit);
+      setError('');
+      setDirty(false);
+      setEditing(true);
+      return;
+    }
+    if (dirty) save();
+    else setEditing(false);
   }
   async function removeIngredient() {
     setBusy(true);
@@ -217,11 +239,12 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
         ) : (
           <button
             type="button"
+            disabled={busy}
             className="group mt-0.5 flex min-h-9 max-w-full items-center gap-1.5 text-left text-xs leading-5 text-black/65 transition hover:text-black focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2"
             aria-label={`${editing ? 'Close' : 'Edit'} ingredient ${formatIngredient(item)}`}
             aria-expanded={editing}
             title="Edit ingredient name and nutrition"
-            onClick={() => { setName(item.name); setValues(item.nutrition || {}); setNutritionLabel(item.nutritionLabel || null); setAmount(editableAmount); setUnit(item.unit); setError(''); setEditing((value) => !value); }}
+            onClick={toggleEditor}
           >
             <span>{ingredientNutritionSummary(item)}</span>
             <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 transition-transform group-hover:scale-110">
@@ -270,26 +293,26 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
       </div>}
       <div className="grid grid-cols-2 gap-2"><label>Amount<input className="field-input" type="number" min="0.0001" step="any" value={amount ?? ''} onChange={event => {
         const next = updateIngredientField({ amount, unit, nutrition: values, nutritionLabel }, 'amount', event.target.value);
-        setAmount(event.target.value); setValues(next.nutrition);
-      }} /></label><label>Unit<input className="field-input" value={unit} onChange={event => { const next = updateIngredientField({ amount, unit, nutrition: values, nutritionLabel }, 'unit', event.target.value); setUnit(event.target.value); setValues(next.nutrition); }} /></label></div>
+        setAmount(event.target.value); setValues(next.nutrition); setDirty(true);
+      }} /></label><label>Unit<input className="field-input" value={unit} onChange={event => { const next = updateIngredientField({ amount, unit, nutrition: values, nutritionLabel }, 'unit', event.target.value); setUnit(event.target.value); setValues(next.nutrition); setDirty(true); }} /></label></div>
       <NutritionLabelScan disabled={busy} current={ingredientScanCurrent({amount,unit,nutrition:values,nutritionLabel})} onApply={label=>{
-        const next=cleanIngredientLabel(label);setNutritionLabel(next);setValues(ingredientLabelNutrition({amount:Number(amount),unit,nutritionLabel:next}));
+        const next=cleanIngredientLabel(label);setNutritionLabel(next);setValues(ingredientLabelNutrition({amount:Number(amount),unit,nutritionLabel:next}));setDirty(true);
       }}/>
       {nutritionLabel && <p className="text-xs">Label: per {nutritionLabel.quantity} {nutritionLabel.unit}. Values below are calculated for the recipe amount.</p>}
       {nutritionLabel && initialProductAmount({amount,unit},nutritionLabel.unit)==='' && <label>{nutritionLabel.unit} per recipe unit<input className="field-input" type="number" min="0.0001" step="any" value={nutritionLabel.amountPerUnit??''} onChange={event=>{
-        const next={...nutritionLabel,amountPerUnit:Number(event.target.value)||null,recipeUnit:String(unit).trim().toLowerCase()};setNutritionLabel(next);setValues(ingredientLabelNutrition({amount:Number(amount),unit,nutritionLabel:next}));
+        const next={...nutritionLabel,amountPerUnit:Number(event.target.value)||null,recipeUnit:String(unit).trim().toLowerCase()};setNutritionLabel(next);setValues(ingredientLabelNutrition({amount:Number(amount),unit,nutritionLabel:next}));setDirty(true);
       }}/></label>}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         {ingredientNutrients.map(([key, label, unit]) => <label key={key} className="space-y-1 text-xs font-semibold">
           <span className="block">{label} ({unit})</span>
-          <input className="field-input" type="number" min="0" step="any" value={values[key] ?? ''} onChange={(event) => {setNutritionLabel(null);setValues((current) => ({ ...current, [key]: event.target.value === '' ? null : Number(event.target.value) }));}} />
+          <input className="field-input" type="number" min="0" step="any" value={values[key] ?? ''} onChange={(event) => {setNutritionLabel(null);setValues((current) => ({ ...current, [key]: event.target.value === '' ? null : Number(event.target.value) }));setDirty(true);}} />
         </label>)}
       </div>
       <p className="text-xs text-black/60">Values are for the full ingredient amount shown above.</p>
       {error && <p role="alert" className="text-sm font-semibold">{error}</p>}
       <div className="flex flex-wrap gap-2">
         <button type="button" className={secondaryButton} disabled={busy || !name.trim()} onClick={save}>{busy ? 'Saving…' : 'Save changes'}</button>
-        <button type="button" className={secondaryButton} disabled={busy} onClick={() => { setError(''); setEditing(false); }}>Cancel</button>
+        <button type="button" className={secondaryButton} disabled={busy} onClick={() => { setError(''); setDirty(false); setEditing(false); }}>Cancel</button>
       </div>
     </fieldset>}
   </li>;

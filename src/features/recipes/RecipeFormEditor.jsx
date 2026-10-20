@@ -11,6 +11,7 @@ import { normalizeRecipeIngredient } from '../../../supabase/functions/_shared/r
 import { formatScaledQuantity, recipeScaleMetadata, scaleRecipe } from './recipeScaling.js';
 import { notify } from '../../lib/notifications.js';
 import '../groceries/groceries.css';
+import './ingredientNameSuggestions.css';
 
 export const emptyRecipe = () => ({
   title: '',
@@ -98,14 +99,14 @@ function IngredientNameField({ value, onChange, onSelect, library }) {
         else if (event.key === 'Escape') setOpen(false);
       }}
     />
-    {show && <div id={listId} role="listbox" className="absolute z-20 mt-1 max-h-72 w-full min-w-64 overflow-y-auto rounded-xl border-2 border-black bg-white p-1 shadow-[4px_4px_0_#000]">
+    {show && <div id={listId} role="listbox" className="ingredient-name-suggestions absolute z-20 mt-1 max-h-72 w-full min-w-64 overflow-y-auto rounded-xl border-2 border-black bg-white p-1 shadow-[4px_4px_0_#000]">
       {matches.map((entry, index) => <button
         id={`${listId}-${index}`}
         key={entry.key}
         type="button"
         role="option"
         aria-selected={active === index}
-        className={`block w-full rounded-lg px-3 py-2 text-left text-black ${active === index ? 'bg-[#e8f7d8]' : 'bg-white hover:bg-black/5'}`}
+        className={`ingredient-name-suggestion block w-full rounded-lg px-3 py-2 text-left text-black ${active === index ? 'bg-[#e8f7d8]' : 'bg-white hover:bg-black/5'}`}
         onMouseDown={(event) => event.preventDefault()}
         onMouseEnter={() => setActive(index)}
         onClick={() => choose(entry)}
