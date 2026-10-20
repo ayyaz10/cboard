@@ -5,7 +5,7 @@ import { cleanIngredientLabel, ingredientLabelNutrition, ingredientLabelAmount }
 import { NUTRIENTS } from '../nutrition/nutrients.js';
 import { updateIngredientField } from './ingredientNutrition.js';
 import { RecipeHealthReview } from './RecipeHealthReview';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getAppHref, navigateTo } from '../../app/useRoute';
 import { formatIngredient } from './recipeData';
 import { RecipeSource } from './RecipeSource';
@@ -161,6 +161,8 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState('');
   const [removeConfirmation, setRemoveConfirmation] = useState(false);
+  const editorRef = useRef(null);
+  const saving = useRef(false);
   function changeIngredientName(value) {
     const normalized = normalizeRecipeIngredient({ name: value, amount: amount === '' ? null : Number(amount), unit });
     setName(normalized.name);
@@ -183,7 +185,8 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
     setError('');
   }
   async function save() {
-    if (busy) return;
+    if (saving.current) return;
+    saving.current = true;
     setBusy(true);
     setError('');
     try {
@@ -195,9 +198,18 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
     } catch (saveError) {
       setError(saveError.message || 'Could not save ingredient nutrition. Please try again.');
     } finally {
+      saving.current = false;
       setBusy(false);
     }
   }
+  useEffect(() => {
+    if (!editing || !dirty || busy) return;
+    const saveOnOutsideClick = event => {
+      if (!editorRef.current?.contains(event.target)) void save();
+    };
+    document.addEventListener('pointerdown', saveOnOutsideClick, true);
+    return () => document.removeEventListener('pointerdown', saveOnOutsideClick, true);
+  }, [editing, dirty, busy, save]);
   function toggleEditor() {
     if (!editing) {
       setName(item.name);
@@ -260,7 +272,9 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
         <RecipeLink to={`/recipes/${recipe.slug}/alternatives/${item.alternativeGroup}`}>Alternatives →</RecipeLink>
       ))}
     </div>
-    {editing && <fieldset disabled={busy} className="mt-3 space-y-3 border-t-2 border-black/15 pt-3">
+    {editing && <fieldset ref={editorRef} disabled={busy} onBlur={event => {
+      if (!event.currentTarget.contains(event.relatedTarget)) void save();
+    }} className="mt-3 space-y-3 border-t-2 border-black/15 pt-3">
       <legend className="sr-only">Edit ingredient name and nutrition for {formatIngredient(item)}</legend>
       <div className="flex justify-end">
         <button type="button" className={`${secondaryButton} danger-action`} disabled={busy || recipe.ingredients.length <= 1} onClick={() => setRemoveConfirmation(true)}>
