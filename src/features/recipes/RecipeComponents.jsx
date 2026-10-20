@@ -16,6 +16,7 @@ import { initialProductAmount } from './recipeProducts.js';
 import { recipeNutritionDisplay, prepareIngredientEditor } from './ingredientNutrition.js';
 import { saveRecipeIngredientNutrition } from '../../services/recipeService.js';
 import { findRecipeFoodMatches, resolveRecipeFoodCandidate } from '../nutrition/foodCatalog.js';
+import { NutritionLookup } from '../groceries/NutritionLookup.jsx';
 
 export const secondaryButton =
   'inline-flex items-center justify-center rounded-full border-2 border-black bg-white px-4 py-2 text-sm font-bold text-black transition hover:-translate-y-px focus-visible:outline-offset-4 disabled:opacity-50';
@@ -154,6 +155,7 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
   const [nutritionLabel,setNutritionLabel] = useState(item.nutritionLabel || null);
   const [amount, setAmount] = useState(editableAmount);
   const [unit, setUnit] = useState(item.unit);
+  const [lookupOpen, setLookupOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   function changeIngredientName(value) {
@@ -161,6 +163,19 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
     setName(normalized.name);
     if (amount === '' && normalized.amount != null) setAmount(String(normalized.amount));
     if (!unit && normalized.unit) setUnit(normalized.unit);
+  }
+  function useFoodNutrition(label) {
+    const nextLabel = cleanIngredientLabel(label);
+    if (!nextLabel) {
+      setError('This food result does not include nutrition in a supported unit.');
+      return;
+    }
+    const selectedName = String(label.source?.foodName || label.source?.name || name).trim().slice(0, 200);
+    setName(selectedName || name);
+    setNutritionLabel(nextLabel);
+    setValues(ingredientLabelNutrition({ amount: Number(amount), unit, nutritionLabel: nextLabel }));
+    setLookupOpen(false);
+    setError('');
   }
   async function save() {
     setBusy(true);
@@ -210,6 +225,21 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
     {editing && <fieldset disabled={busy} className="mt-3 space-y-3 border-t-2 border-black/15 pt-3">
       <legend className="sr-only">Edit ingredient name and nutrition for {formatIngredient(item)}</legend>
       <label>Food / ingredient name<input className="field-input" type="text" maxLength={200} required value={name} onChange={event => changeIngredientName(event.target.value)} placeholder="Enter food name" /></label>
+      <button type="button" className={secondaryButton} aria-expanded={lookupOpen} onClick={() => setLookupOpen(open => !open)}>
+        {lookupOpen ? 'Close food search' : 'Find food & replace nutrition'}
+      </button>
+      {lookupOpen && <div className="max-h-[30rem] min-w-0 overflow-y-auto overscroll-contain rounded-xl border border-black/20 p-2" aria-label="Food search to replace ingredient nutrition">
+        <NutritionLookup
+          name={name}
+          amountUnit={unit}
+          portionMode="weight"
+          allowLabelScan={false}
+          active
+          visible
+          onClose={() => setLookupOpen(false)}
+          onSelect={useFoodNutrition}
+        />
+      </div>}
       <div className="grid grid-cols-2 gap-2"><label>Amount<input className="field-input" type="number" min="0.0001" step="any" value={amount ?? ''} onChange={event => {
         const next = updateIngredientField({ amount, unit, nutrition: values, nutritionLabel }, 'amount', event.target.value);
         setAmount(event.target.value); setValues(next.nutrition);
