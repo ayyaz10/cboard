@@ -46,6 +46,32 @@ export async function saveRecipeIngredientNutrition(recipe, ingredientIndex, nut
   return { ...clean, image: found.data.value.image || null, updatedAt: result.data.updated_at };
 }
 
+export async function removeRecipeIngredient(recipe, ingredientIndex) {
+  const { client, userId } = await getUserScopedClient();
+  const key = `${PREFIX}${recipe.slug}`;
+  const found = await client.from('user_tool_preferences').select('value,updated_at')
+    .eq('user_id', userId).eq('key', key).single();
+  assertSupabaseResult(found);
+  if (!recipe.updatedAt || found.data.updated_at !== recipe.updatedAt)
+    throw new Error('This recipe changed in another tab. Reload it before removing an ingredient.');
+  const stored = prepareIngredientEditor(found.data.value.recipe);
+  if (!Number.isInteger(ingredientIndex) || ingredientIndex < 0 || ingredientIndex >= stored.ingredients.length)
+    throw new Error('That ingredient is no longer available. Reload the recipe and try again.');
+  if (stored.ingredients.length <= 1)
+    throw new Error('A recipe must keep at least one ingredient.');
+  const removed = stored.ingredients[ingredientIndex];
+  const draft = { ...stored, ingredients: stored.ingredients.filter((_, index) => index !== ingredientIndex), nutritionFromIngredients: true };
+  if (draft.scaling?.anchorIngredientId === removed.id) delete draft.scaling;
+  const clean = validateRecipe(draft);
+  const updatedAt = new Date().toISOString();
+  const result = await client.from('user_tool_preferences').update({
+    value: { ...found.data.value, recipe: clean }, updated_at: updatedAt,
+  }).eq('user_id', userId).eq('key', key).eq('updated_at', found.data.updated_at).select('updated_at').maybeSingle();
+  assertSupabaseResult(result);
+  if (!result.data) throw new Error('This recipe changed while removing the ingredient. Reload it and try again.');
+  return { ...clean, image: found.data.value.image || null, updatedAt: result.data.updated_at };
+}
+
 export async function saveRecipeProducts(recipe, productNutrition, servings) {
   const { client, userId } = await getUserScopedClient();
   const key = `${PREFIX}${recipe.slug}`;

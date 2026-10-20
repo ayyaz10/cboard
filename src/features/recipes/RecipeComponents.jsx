@@ -14,7 +14,7 @@ import { RecipeMasonryGrid, useRecipeCardGrid } from './RecipeCardView';
 import { RecipeFavouriteButton } from './RecipeFavouriteButton';
 import { initialProductAmount } from './recipeProducts.js';
 import { recipeNutritionDisplay, prepareIngredientEditor } from './ingredientNutrition.js';
-import { saveRecipeIngredientNutrition } from '../../services/recipeService.js';
+import { removeRecipeIngredient, saveRecipeIngredientNutrition } from '../../services/recipeService.js';
 import { findRecipeFoodMatches, resolveRecipeFoodCandidate } from '../nutrition/foodCatalog.js';
 import { NutritionLookup } from '../groceries/NutritionLookup.jsx';
 
@@ -158,6 +158,7 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
   const [lookupOpen, setLookupOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [removeConfirmation, setRemoveConfirmation] = useState(false);
   function changeIngredientName(value) {
     const normalized = normalizeRecipeIngredient({ name: value, amount: amount === '' ? null : Number(amount), unit });
     setName(normalized.name);
@@ -188,6 +189,20 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
       setError(saveError.message || 'Could not save ingredient nutrition. Please try again.');
     } finally {
       setBusy(false);
+    }
+  }
+  async function removeIngredient() {
+    setBusy(true);
+    setError('');
+    try {
+      const updated = await removeRecipeIngredient(recipe, index);
+      onSaved?.(updated);
+      setEditing(false);
+    } catch (removeError) {
+      setError(removeError.message || 'Could not remove this ingredient. Please try again.');
+    } finally {
+      setBusy(false);
+      setRemoveConfirmation(false);
     }
   }
   return <li className="min-w-0 self-start rounded-xl border-2 border-black bg-white px-3 py-2.5">
@@ -224,6 +239,19 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
     </div>
     {editing && <fieldset disabled={busy} className="mt-3 space-y-3 border-t-2 border-black/15 pt-3">
       <legend className="sr-only">Edit ingredient name and nutrition for {formatIngredient(item)}</legend>
+      <div className="flex justify-end">
+        <button type="button" className={`${secondaryButton} danger-action`} disabled={busy || recipe.ingredients.length <= 1} onClick={() => setRemoveConfirmation(true)}>
+          Remove ingredient
+        </button>
+      </div>
+      {recipe.ingredients.length <= 1 && <p className="text-xs text-black/60">A recipe must keep at least one ingredient.</p>}
+      {removeConfirmation && <div role="alertdialog" aria-label="Confirm ingredient removal" className="space-y-2 rounded-xl border-2 border-black/20 p-3">
+        <p>Remove {formatIngredient(item)} from this recipe?</p>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={secondaryButton} onClick={() => setRemoveConfirmation(false)}>Cancel</button>
+          <button type="button" className={`${secondaryButton} danger-action`} onClick={removeIngredient}>Confirm remove</button>
+        </div>
+      </div>}
       <label>Food / ingredient name<input className="field-input" type="text" maxLength={200} required value={name} onChange={event => changeIngredientName(event.target.value)} placeholder="Enter food name" /></label>
       <button type="button" className={secondaryButton} aria-expanded={lookupOpen} onClick={() => setLookupOpen(open => !open)}>
         {lookupOpen ? 'Close food search' : 'Find food & replace nutrition'}
