@@ -47,7 +47,7 @@ function Field({ label, value, onChange, multiline = false, ...props }) {
 
 function Macros({ value = {}, onChange }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+    <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 7rem), 1fr))' }}>
       {NUTRIENTS.map(([key, label, unit]) => [key, `${label} (${unit})`]).map(([key, label]) => (
         <Field
           key={key}
@@ -105,7 +105,7 @@ function IngredientNameField({ value, onChange, onSelect, library }) {
         type="button"
         role="option"
         aria-selected={active === index}
-        className={`block w-full rounded-lg px-3 py-2 text-left ${active === index ? 'bg-[#e8f7d8]' : 'bg-white hover:bg-black/5'}`}
+        className={`block w-full rounded-lg px-3 py-2 text-left text-black ${active === index ? 'bg-[#e8f7d8]' : 'bg-white hover:bg-black/5'}`}
         onMouseDown={(event) => event.preventDefault()}
         onMouseEnter={() => setActive(index)}
         onClick={() => choose(entry)}
@@ -139,18 +139,20 @@ function ItemEditor({ item, onChange, groups, visible, ingredientLibrary, isIngr
   }
   return (
     <div className="space-y-3">
-      <div className="grid gap-3 sm:grid-cols-[minmax(12rem,2fr)_minmax(7rem,1fr)_minmax(7rem,1fr)]">
-        <IngredientNameField
-          value={item.name}
-          onChange={(value) => set('name', value)}
-          library={ingredientLibrary}
-          onSelect={(stored) => {
-            const next = applyStoredIngredient(item, stored);
-            onChange(next, { calculateNutrition: hasStoredNutrition(next) });
-            setLookup(false);
-            setNutritionOpen(hasStoredNutrition(next));
-          }}
-        />
+      <div className="grid min-w-0 grid-cols-2 gap-3">
+        <div className="col-span-2 min-w-0">
+          <IngredientNameField
+            value={item.name}
+            onChange={(value) => set('name', value)}
+            library={ingredientLibrary}
+            onSelect={(stored) => {
+              const next = applyStoredIngredient(item, stored);
+              onChange(next, { calculateNutrition: hasStoredNutrition(next) });
+              setLookup(false);
+              setNutritionOpen(hasStoredNutrition(next));
+            }}
+          />
+        </div>
         <Field
           label="Amount"
           value={item.amount}
