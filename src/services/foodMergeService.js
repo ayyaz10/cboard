@@ -21,13 +21,15 @@ export async function mergeFoodRecords({ keepId, mergeIds, nutritionSourceId, be
   const { client, userId } = await getUserScopedClient();
   if (expectedUserId && userId !== expectedUserId) throw new Error('Your account changed. Reload before merging foods.');
   if (!Array.isArray(mergeIds) || !mergeIds.length || new Set([keepId, ...mergeIds]).size !== mergeIds.length + 1) throw new Error('Select one canonical food and at least one different food to merge.');
-  const [catalogResult, recipeRows, groceryResult] = await Promise.all([
+  const [catalogResult, recipeRows, groceryResult, financeResult] = await Promise.all([
     client.from('user_tool_preferences').select('value,updated_at').eq('user_id', userId).eq('key', CATALOG_KEY).maybeSingle(),
     readAllRecipes(client, userId),
     client.from('user_tool_preferences').select('value,updated_at').eq('user_id', userId).eq('key', GROCERY_KEY).maybeSingle(),
+    client.from('finance_workspaces').select('state,updated_at').eq('user_id',userId).maybeSingle(),
   ]);
   assertSupabaseResult(catalogResult);
   assertSupabaseResult(groceryResult);
+  assertSupabaseResult(financeResult);
   const catalogRow = catalogResult.data;
   const catalog = mergeFoodCatalog([], Array.isArray(catalogRow?.value?.items) ? catalogRow.value.items : []);
   const selectedIds = new Set([keepId, ...mergeIds]);
@@ -44,6 +46,9 @@ export async function mergeFoodRecords({ keepId, mergeIds, nutritionSourceId, be
     rewrittenRows.push({ user_id: userId, key: row.key, value: { ...row.value, recipe: validateRecipe(recalculated) }, updated_at: new Date().toISOString() });
   }
   const groceryRewrite = groceryResult.data ? mergeFoodNamesInGroceryState(groceryResult.data.value, selectedFoods, keptFood) : { changed: false };
+  const financeState = financeResult.data?.state ? structuredClone(financeResult.data.state) : null;
+  let financeChanged=false;
+  for(const transaction of financeState?.transactions||[]) for(const item of transaction.receipt?.items||[]) if(mergeIds.includes(item.canonicalFoodId)) { item.canonicalFoodId=keptFood.id; item.rememberFoodMapping=false; financeChanged=true; }
   const expectedVersions = new Map([[CATALOG_KEY, catalogRow?.updated_at || null]]);
   for (const row of rewrittenRows) expectedVersions.set(row.key, recipeRows.find(source => source.key === row.key)?.updated_at || null);
   if (groceryRewrite.changed) expectedVersions.set(GROCERY_KEY, groceryResult.data?.updated_at || null);
@@ -52,6 +57,12 @@ export async function mergeFoodRecords({ keepId, mergeIds, nutritionSourceId, be
   const actualVersions = new Map(latestVersions.data.map(row => [row.key, row.updated_at || null]));
   if ([...expectedVersions].some(([key, version]) => (actualVersions.get(key) || null) !== version))
     throw new Error('Food, recipe, or grocery data changed while preparing the merge. Reload and try again.');
+  if(financeChanged){
+    const updated_at=new Date().toISOString();let query=client.from('finance_workspaces').update({state:financeState,updated_at}).eq('user_id',userId);
+    query=financeResult.data.updated_at?query.eq('updated_at',financeResult.data.updated_at):query.is('updated_at',null);
+    const rewritten=await query.select('updated_at').maybeSingle();assertSupabaseResult(rewritten);
+    if(!rewritten.data)throw new Error('Receipt links changed while merging foods. Reload and try again.');
+  }
   const payload = [
     ...rewrittenRows,
     { user_id: userId, key: CATALOG_KEY, value: { version: 1, items: nextCatalog }, updated_at: new Date().toISOString() },

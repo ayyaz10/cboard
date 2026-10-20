@@ -1,5 +1,6 @@
 import { getUserScopedClient, assertSupabaseResult } from './supabaseCrud.js';
 import { cleanFoodCatalogItem, mergeFoodCatalog, normalizeFoodText, parseFoodQuantityPrefix, findFoodMatches, resolveRecipeFoodCandidate } from '../features/nutrition/foodCatalog.js';
+import { unlinkDeletedFoodFromGroceryState } from '../features/nutrition/foodMergeData.js';
 
 const KEY = 'food-catalog:v1';
 
@@ -25,7 +26,7 @@ export async function getFoodCatalog(expectedUserId) {
   const stored = Array.isArray(result.data?.value?.items) ? result.data.value.items : [];
   const migrated = stored.some(item => typeof item?.id !== 'string' || !item.id.trim() ||
     item.groceryTrackingEnabled === undefined || item.shoppingListEnabled === undefined || item.nutritionTrackingEnabled === undefined ||
-    item.groceryTrackingEnabled === false && item.shoppingListEnabled !== false);
+    item.receiptMappings === undefined || item.groceryTrackingEnabled === false && item.shoppingListEnabled !== false);
   const items = mergeFoodCatalog([], stored);
   if (migrated) {
     await writeCatalog(client, userId, items, result.data);
@@ -96,6 +97,58 @@ export async function upsertFoodCatalogItems(items, expectedUserId) {
   return merged;
 }
 
+export async function saveReceiptFoodMappings(mappings, expectedUserId) {
+  const valid = [...new Map((mappings || []).filter(item => item && typeof item.foodId === 'string' && typeof item.productCode === 'string' && /^\d{5,8}$/.test(item.productCode) && typeof item.retailer === 'string' && item.retailer.trim() && typeof item.alias === 'string' && item.alias.trim())
+    .map(item => [`${item.foodId}:${normalizeFoodText(item.retailer)}:${item.productCode}`, { foodId:item.foodId, retailer:item.retailer.trim().slice(0,120), productCode:item.productCode, alias:item.alias.trim().slice(0,300) }])).values()];
+  if (!valid.length) return;
+  const { client, userId } = await getUserScopedClient();
+  if (expectedUserId && userId !== expectedUserId) throw new Error('Your account changed. Reload before saving receipt food links.');
+  const found = await client.from('user_tool_preferences').select('value,updated_at').eq('user_id', userId).eq('key', KEY).maybeSingle();
+  assertSupabaseResult(found);
+  const current = mergeFoodCatalog([], Array.isArray(found.data?.value?.items) ? found.data.value.items : []);
+  for (const mapping of valid) {
+    const food = current.find(item => item.id === mapping.foodId);
+    if (!food) throw new Error('A selected food was removed. Reload the food library and choose it again.');
+    const conflict=current.find(item=>item.id!==food.id&&(item.receiptMappings||[]).some(existing=>existing.productCode===mapping.productCode&&normalizeFoodText(existing.retailer)===normalizeFoodText(mapping.retailer)));
+    if(conflict)throw new Error(`${mapping.retailer} product ${mapping.productCode} is already linked to ${conflict.name}. Choose that food or resolve the saved mapping first.`);
+    food.receiptMappings = [...new Map([...(food.receiptMappings || []), { retailer:mapping.retailer, productCode:mapping.productCode, alias:mapping.alias }]
+      .map(entry => [`${normalizeFoodText(entry.retailer)}:${entry.productCode}`, entry])).values()].slice(-200);
+  }
+  await writeCatalog(client, userId, current, found.data);
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('food-catalog-changed'));
+  return current;
+}
+
+async function rewriteReceiptFoodReferences(client,userId,idMap) {
+  const found = await client.from('finance_workspaces').select('state,updated_at').eq('user_id',userId).maybeSingle();
+  assertSupabaseResult(found);
+  if (!found.data?.state || !Array.isArray(found.data.state.transactions)) return false;
+  const state = structuredClone(found.data.state);let changed=false;
+  for (const transaction of state.transactions) for (const item of transaction.receipt?.items || []) {
+    if (!Object.hasOwn(idMap,item.canonicalFoodId)) continue;
+    item.canonicalFoodId = idMap[item.canonicalFoodId] || null;
+    item.rememberFoodMapping = false;changed=true;
+  }
+  if (!changed) return false;
+  const updated_at = new Date().toISOString();let query = client.from('finance_workspaces').update({state,updated_at}).eq('user_id',userId);
+  query = found.data.updated_at ? query.eq('updated_at',found.data.updated_at) : query.is('updated_at',null);
+  const saved = await query.select('updated_at').maybeSingle();
+  assertSupabaseResult(saved);
+  if (!saved.data) throw new Error('Finance receipts changed in another tab. Reload and retry the food change.');
+  return true;
+}
+
+async function unlinkGroceryFoodReferences(client,userId,foodIds) {
+  const found=await client.from('user_tool_preferences').select('value,updated_at').eq('user_id',userId).eq('key','groceries:v1').maybeSingle();
+  assertSupabaseResult(found);if(!found.data?.value)return false;
+  const rewritten=unlinkDeletedFoodFromGroceryState(found.data.value,foodIds);if(!rewritten.changed)return false;
+  const updated_at=new Date().toISOString();let query=client.from('user_tool_preferences').update({value:rewritten.state,updated_at}).eq('user_id',userId).eq('key','groceries:v1');
+  query=found.data.updated_at?query.eq('updated_at',found.data.updated_at):query.is('updated_at',null);
+  const saved=await query.select('updated_at').maybeSingle();assertSupabaseResult(saved);
+  if(!saved.data)throw new Error('Grocery links changed in another tab. Reload and retry the food change.');
+  return true;
+}
+
 export async function deleteFoodCatalogItems(ids, expectedUserId) {
   if (!Array.isArray(ids) || !ids.length || ids.some(id => typeof id !== 'string' || !id.trim()))
     throw new Error('Select one or more valid food items to delete.');
@@ -108,6 +161,8 @@ export async function deleteFoodCatalogItems(ids, expectedUserId) {
   const remaining = current.filter(item => !deleting.has(item.id));
   const removed = current.length - remaining.length;
   if (removed) {
+    await rewriteReceiptFoodReferences(client,userId,Object.fromEntries([...deleting].map(id=>[id,null])));
+    await unlinkGroceryFoodReferences(client,userId,deleting);
     await writeCatalog(client, userId, remaining, found.data);
     if (typeof window !== 'undefined') window.dispatchEvent(new Event('food-catalog-changed'));
   }

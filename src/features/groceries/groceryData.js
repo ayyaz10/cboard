@@ -85,6 +85,7 @@ export function normalizeGroceryState(value) {
   state.items = Array.isArray(state.items) ? state.items : fallback.items;
   state.wishlist = Array.isArray(state.wishlist) ? state.wishlist : [];
   state.shopping = Array.isArray(state.shopping) ? state.shopping : [];
+  state.receiptPurchaseLedger = state.receiptPurchaseLedger && typeof state.receiptPurchaseLedger === 'object' ? state.receiptPurchaseLedger : {};
   state.settings = { ...fallback.settings, ...(state.settings || {}) };
   state.imageLibrary =
     state.imageLibrary && typeof state.imageLibrary === "object"
@@ -183,6 +184,8 @@ const aliases = {
   pack: "packs",
   can: "cans",
   bottle: "bottles",
+  each: "pieces",
+  unit: "pieces",
 };
 export const canonicalUnit = (unit) => aliases[unit?.toLowerCase()] || unit;
 export function convert(amount, from, to) {

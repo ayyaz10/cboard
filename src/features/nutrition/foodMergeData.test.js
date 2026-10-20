@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeFoodNamesInGroceryState, mergeFoodReferencesInRecipe } from './foodMergeData.js';
+import { mergeFoodNamesInGroceryState, mergeFoodReferencesInRecipe, unlinkDeletedFoodFromGroceryState } from './foodMergeData.js';
 import { applyFoodCatalogToRecipes, mergeCanonicalFoods } from './foodCatalog.js';
 
 const originalFoods = [
@@ -36,4 +36,18 @@ test('merge updates active grocery names but preserves grocery quantities and nu
   assert.deepEqual(result.state.items[0], { id: 'stock-1', name: 'Coriander Powder', quantity: 20, nutrition: { calories: 60 }, foodId: 'canonical', trackingDisabled: false });
   assert.equal(result.state.shopping[0].quantity, 2);
   assert.equal(grocery.items[0].name, '1 tbsp coriander powder');
+});
+
+test('merge retargets receipt stock events and directly linked inventory records',()=>{
+  const grocery={items:[{id:'stock-x',name:'Store label name',foodId:'duplicate',quantity:4,unit:'pieces'}],shopping:[],receiptPurchaseLedger:{'tx:item':{transactionId:'tx',receiptItemId:'item',foodId:'duplicate',stockItemId:'stock-x',stockAmount:2,stockUnit:'pieces'}}};
+  const result=mergeFoodNamesInGroceryState(grocery,originalFoods,{...originalFoods[0],name:'Coriander Powder'});
+  assert.equal(result.changed,true);assert.equal(result.state.items[0].foodId,'canonical');assert.equal(result.state.receiptPurchaseLedger['tx:item'].foodId,'canonical');
+});
+
+test('deleting a canonical food unlinks receipts and Grocery IDs but preserves historical quantities and names',()=>{
+  const grocery={items:[{id:'stock-x',name:'Store label name',foodId:'duplicate',quantity:4,unit:'pieces'}],shopping:[{id:'shop-x',name:'Store label name',foodId:'duplicate',quantity:2,unit:'pieces'}],receiptPurchaseLedger:{'tx:item':{transactionId:'tx',foodId:'duplicate',stockItemId:'stock-x',stockAmount:2,stockUnit:'pieces'}}};
+  const result=unlinkDeletedFoodFromGroceryState(grocery,['duplicate']);
+  assert.equal(result.changed,true);assert.equal(result.state.items[0].foodId,undefined);assert.equal(result.state.items[0].quantity,4);assert.equal(result.state.items[0].name,'Store label name');
+  assert.equal(result.state.shopping[0].foodId,undefined);assert.equal(result.state.shopping[0].quantity,2);assert.equal(result.state.receiptPurchaseLedger['tx:item'].foodId,null);
+  assert.equal(grocery.items[0].foodId,'duplicate');
 });

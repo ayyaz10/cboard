@@ -144,6 +144,7 @@ export function mergeCanonicalFoods(foods = [], keepId, mergeIds = [], nutrition
   const behaviorSource = selected.find(food => food.id === behaviorSourceId) || keep;
   return cleanFoodCatalogItem({ ...keep, name: canonicalName,
     aliases: [...new Set([...selected.flatMap(food => [food.name, ...(food.aliases || [])]), ...(keep.aliases || [])])].filter(name => normalizeFoodText(name) !== normalizeFoodText(canonicalName)),
+    receiptMappings: [...new Map(selected.flatMap(food => food.receiptMappings || []).map(mapping => [`${normalizeFoodText(mapping.retailer)}:${mapping.productCode}`, mapping])).values()],
     nutrition, nutrientSources,
     groceryTrackingEnabled: behaviorSource.groceryTrackingEnabled,
     shoppingListEnabled: behaviorSource.shoppingListEnabled,
@@ -184,6 +185,7 @@ export function cleanFoodCatalogItem(value) {
     canonicalKey: normalizeFoodName(name),
     aliases: Array.isArray(value?.aliases) ? [...new Set(value.aliases.filter(alias => typeof alias === 'string' && alias.trim() && normalizeFoodText(alias) !== normalizeFoodText(name)).map(alias => alias.trim().slice(0, 300)))].slice(0, 100) : [],
     separateAliases: Array.isArray(value?.separateAliases) ? [...new Set(value.separateAliases.filter(alias => typeof alias === 'string' && alias.trim()).map(alias => alias.trim().slice(0, 300)))].slice(0, 100) : [],
+    receiptMappings: Array.isArray(value?.receiptMappings) ? value.receiptMappings.filter(mapping => mapping && typeof mapping === 'object' && typeof mapping.productCode === 'string' && /^\d{5,8}$/.test(mapping.productCode) && typeof mapping.retailer === 'string' && mapping.retailer.trim()).map(mapping => ({ retailer: mapping.retailer.trim().slice(0,120), productCode: mapping.productCode, alias: String(mapping.alias || '').trim().slice(0,300) })).slice(0,200) : [],
     barcode: validFoodBarcode(value?.barcode || value?.source?.barcode || value?.source?.code) || '',
     sku: String(value?.sku || value?.source?.sku || '').trim().slice(0, 120),
     retailer: String(value?.retailer || value?.source?.retailer || '').trim().slice(0, 120),
@@ -259,6 +261,7 @@ export function mergeFoodCatalog(current = [], updates = []) {
       }
       clean.aliases = [...new Set([...(previous.aliases || []), ...(clean.aliases || []), ...(normalizeFoodText(previous.name) !== normalizeFoodText(clean.name) ? [previous.name] : [])])].filter(alias => normalizeFoodText(alias) !== normalizeFoodText(clean.name));
       clean.separateAliases = [...new Set([...(previous.separateAliases || []), ...(clean.separateAliases || [])])];
+      clean.receiptMappings = [...new Map([...(previous.receiptMappings || []), ...(clean.receiptMappings || [])].map(mapping => [`${normalizeFoodText(mapping.retailer)}:${mapping.productCode}`, mapping])).values()].slice(0,200);
     }
     items.set(clean.id, clean);
   }

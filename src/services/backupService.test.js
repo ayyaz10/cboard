@@ -163,3 +163,15 @@ test('food library backups preserve independent nutrition, Grocery and shopping 
   const restored = parsed.modules.find(module => module.moduleId === 'foodLibrary').data.rows[0].value.items[0];
   assert.deepEqual([restored.nutritionTrackingEnabled, restored.groceryTrackingEnabled, restored.shoppingListEnabled], [true, false, false]);
 });
+
+test('finance, receipt product links, redacted OCR text, grocery purchase ledger, and product mappings survive backup parsing',async()=>{
+  const finance={workspace:{state:{transactions:[{id:'tx-1',type:'expense',amount:886,receipt:{version:2,rawText:'ALDI STORES\n[redacted]',items:[{id:'item-1',canonicalFoodId:'food-oats',retailerProductCode:'335763',packSize:1,packUnit:'kg'}]}}]},updated_at:'2026-10-20T00:00:00Z'}};
+  const grocery={rows:[{key:'groceries:v1',value:{items:[{id:'stock-1',foodId:'food-oats',quantity:1500,unit:'g'}],receiptPurchaseLedger:{'tx-1:item-1':{transactionId:'tx-1',receiptItemId:'item-1',foodId:'food-oats',stockItemId:'stock-1',stockAmount:1000,stockUnit:'g'}}}}]};
+  const foodLibrary={rows:[{key:'food-catalog:v1',value:{version:1,items:[{id:'food-oats',name:'Oats',quantity:100,unit:'g',receiptMappings:[{retailer:'ALDI STORES',productCode:'335763',alias:'OATS PORRIDGE'}]}]}}]};
+  const recipes={rows:[]},foodDiary={rows:[]};
+  const parsed=await parseBackupFile(await asFile(await backupFor(['finance','recipes','grocery','foodDiary','foodLibrary'],{finance,recipes,grocery,foodDiary,foodLibrary})));
+  assert.equal(parsed.modules.find(module=>module.moduleId==='finance').data.workspace.state.transactions[0].receipt.items[0].canonicalFoodId,'food-oats');
+  assert.equal(parsed.modules.find(module=>module.moduleId==='finance').data.workspace.state.transactions[0].receipt.rawText,'ALDI STORES\n[redacted]');
+  assert.equal(parsed.modules.find(module=>module.moduleId==='grocery').data.rows[0].value.receiptPurchaseLedger['tx-1:item-1'].stockAmount,1000);
+  assert.equal(parsed.modules.find(module=>module.moduleId==='foodLibrary').data.rows[0].value.items[0].receiptMappings[0].productCode,'335763');
+});

@@ -73,7 +73,7 @@ test('food audit reports exact, quantity-normalized, fuzzy, barcode and SKU matc
 test('merge keeps canonical identity, preserves aliases, and exposes nutrition conflicts', () => {
   const foods = [
     { id: 'a', name: 'Coriander Powder', quantity: 100, unit: 'g', nutrition: { calories: 300, protein: null }, source: { provider: 'Manual' } },
-    { id: 'b', name: '1 tbsp coriander powder', quantity: 100, unit: 'g', nutrition: { calories: 295, protein: 10 }, source: { provider: 'OCR' } },
+    { id: 'b', name: '1 tbsp coriander powder', quantity: 100, unit: 'g', nutrition: { calories: 295, protein: 10 }, receiptMappings:[{retailer:'ALDI STORES',productCode:'339817',alias:'CUT CORIANDER'}], source: { provider: 'OCR' } },
   ];
   assert.deepEqual(foodNutritionConflicts(foods), ['calories']);
   const merged = mergeCanonicalFoods(foods, 'a', ['b'], 'b');
@@ -82,6 +82,7 @@ test('merge keeps canonical identity, preserves aliases, and exposes nutrition c
   assert.deepEqual(merged.aliases, ['1 tbsp coriander powder']);
   assert.equal(merged.nutrition.calories, 295);
   assert.equal(merged.nutrition.protein, 10);
+  assert.deepEqual(merged.receiptMappings,[{retailer:'ALDI STORES',productCode:'339817',alias:'CUT CORIANDER'}]);
 });
 
 test('food behavior defaults preserve existing behavior and invalid shopping automation is inactive', () => {

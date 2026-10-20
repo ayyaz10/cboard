@@ -1,7 +1,9 @@
 // OCR-independent UK receipt heuristics. Money is always integer minor units.
 export const normalizedName = value => String(value || '').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 export const redactPaymentData = value => String(value || '').replace(/(?:\d[ -]?){13,19}/g, '[redacted]');
-const noise = /\b(?:vat\s*(?:no|number|reg)|tel|telephone|phone|www|https|cashier|operator|receipt\s*(?:no|number|#)|transaction|terminal|loyalty|clubcard|nectar|points|visa|mastercard|amex|debit|credit|card|auth(?:orisation|orization)?|approved|contactless|thank\s*you|opening\s*hours|cash\s*(?:tendered|paid)|change|payment|aid|tid|mid|pin|postcode|store\s*(?:no|number)|served by)\b/i;
+// Do not match bare "auth": Aldi product names beginning "AUTH" are real
+// products, while the complete authorization words are receipt metadata.
+const noise = /\b(?:vat\s*(?:no|number|reg)|tel|telephone|phone|www|https|cashier|operator|receipt\s*(?:no|number|#)|transaction|terminal|loyalty|clubcard|nectar|points|visa|mastercard|amex|debit|credit|card|auth(?:orisation|ization)|approved|contactless|thank\s*you|opening\s*hours|cash\s*(?:tendered|paid)|change|payment|aid|tid|mid|pin|postcode|store\s*(?:no|number)|served by)\b/i;
 const address = /\b(?:street|road|avenue|lane|postcode)\b|\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/i;
 const moneyEnd = /(?:[£€$]\s*)?(-?\d+(?:,\d{3})*[.,]\d{2})(?:\s*(?:[A-D*&]|[14][A-D]))?\s*[|;:]?\s*$/i;
 const number = value => Number(value.replace(',', '.'));
@@ -35,32 +37,36 @@ function itemLine(rawText) {
   const price = rawText.match(moneyEnd);
   if (!price) return null;
   let name = rawText.slice(0, price.index).trim();
-  let quantity = null, unit = '', unitPrice = null;
+  let quantity = null, unit = '', unitPrice = null, packSize = null, packUnit = '';
   const weighted = name.match(/(\d+(?:[.,]\d+)?)\s*(kg|g|ml|l)\b(?:\s*@\s*[£€$]?\s*(\d+[.,]\d{2})\s*\/\s*(kg|g|ml|l))?/i);
   const counted = name.match(/(\d+(?:[.,]\d+)?)\s*[x@×]\s*[£€$]?\s*(\d+[.,]\d{2})/i);
   const pattern = weighted || counted;
   if (weighted) {
-    quantity = number(weighted[1]); unit = weighted[2].toLowerCase();
+    const printedSize = number(weighted[1]), printedUnit = weighted[2].toLowerCase();
     if (weighted[3]) {
+      quantity = printedSize; unit = printedUnit;
       unitPrice = minor(weighted[3]);
       const base = { kg: 1000, g: 1, l: 1000, ml: 1 };
       const priceUnit = weighted[4].toLowerCase();
       if (unit !== priceUnit) { quantity = quantity * base[unit] / base[priceUnit]; unit = priceUnit; }
-    }
+    } else { packSize = printedSize; packUnit = printedUnit; }
   } else if (counted) { quantity = number(counted[1]); unitPrice = minor(counted[2]); }
   if (pattern) name = `${name.slice(0, pattern.index)} ${name.slice(pattern.index + pattern[0].length)}`.trim();
   name = name.replace(/\s+/g, ' ');
   if (!/[a-z]/i.test(name)) return null;
-  return { rawText: redactPaymentData(rawText), name, normalizedName: normalizedName(name), quantity, unit, unitPrice, lineTotal: minor(price[1]) };
+  return { rawText: redactPaymentData(rawText), name, normalizedName: normalizedName(name), quantity, unit, unitPrice, lineTotal: minor(price[1]), packSize, packUnit };
 }
 
 export function parseReceipt(input) {
   const text = typeof input === 'string' ? input : input?.text || '';
   const sources = Array.isArray(input?.lines) ? input.lines : String(text || '').slice(0, 100000).split(/\r?\n/).map(text => ({ text }));
-  const sourceLines = sources.filter(line => line.text?.trim()).slice(0, 2000);
+  const meaningfulSources = sources.filter(line => line.text?.trim());
+  const sourceLines = meaningfulSources.slice(0, 2000);
   const rawLines = sourceLines.map(line => line.text.trim().replace(/\s+/g, ' '));
   const lines = rawLines.map(normalizeReceiptPrice);
-  const result = { merchantName: '', date: receiptDate(lines.join('\n')), time: '', currency: '', subtotal: null, tax: null, discounts: null, total: null, items: [] };
+  const rawSourceText = typeof input === 'string' ? input : input?.rawText || text || sources.map(line=>line.text).join('\n');
+  const result = { merchantName: '', date: receiptDate(lines.join('\n')), time: '', currency: '', subtotal: null, tax: null, discounts: null, total: null, items: [], unresolvedLines: [], classifiedLines: [],
+    rawText:redactPaymentData(String(rawSourceText).slice(0,100000)), unprocessedLineCount:Math.max(0,meaningfulSources.length-sourceLines.length) };
   result.time = lines.join('\n').match(/\b(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?\b/)?.[0]?.slice(0, 5) || '';
   result.currency = /£|\bGBP\b/.test(text) ? 'GBP' : /€|\bEUR\b/.test(text) ? 'EUR' : /\bUSD\b/.test(text) ? 'USD' : '';
   const known = lines.slice(0, 8).find(line => /\b(?:tesco|asda|aldi|lidl|sainsbury'?s|morrisons|iceland|farmfoods)\b/i.test(line) && !moneyEnd.test(line));
@@ -71,6 +77,13 @@ export function parseReceipt(input) {
   let afterTotal = false, rank = -1, paymentAmount = null;
   result.itemCount = null;
   result.confidence = { merchant: result.merchantName ? 85 : 0, date: result.date ? 90 : 0, total: 0 };
+  const markLine = (index, type, confidence = 70, itemIndex = null) => {
+    const source = sourceLines[index];
+    if (!source) return;
+    result.classifiedLines[index] = { lineIndex: Number.isInteger(source.lineIndex) ? source.lineIndex : index,
+      rawText: redactPaymentData(String(source.text || '')).slice(0, 1000), type, confidence: Math.max(0, Math.min(100, confidence)),
+      bbox: source.bbox && typeof source.bbox === 'object' ? source.bbox : null, ...(itemIndex == null ? {} : { itemIndex }) };
+  };
   const addItem = (item, index) => {
     const line = sourceLines[index];
     const code = item.name.match(/^(\d{5,8})\s+(.+)$/);
@@ -78,7 +91,9 @@ export function parseReceipt(input) {
     item.name = item.name.replace(/\s+(?:[=~°*:'"|+©]\s*)+$/g,'').trim();
     item.rawName = item.name;
     item.normalizedName = normalizedName(item.name);
-    item.rawText = redactPaymentData(rawLines[index]);
+    item.rawText = redactPaymentData(String(line?.text || rawLines[index]));
+    item.lineIndex = Number.isInteger(line.lineIndex) ? line.lineIndex : index;
+    item.bbox = line.bbox && typeof line.bbox === 'object' ? line.bbox : null;
     const nameWords = line.words?.filter(word => /[a-z]{2}/i.test(word.text) && !moneyEnd.test(word.text)) || [];
     const priceWords = line.words?.filter(word => moneyEnd.test(normalizeReceiptPrice(word.text))) || [];
     const mean = words => words.length ? words.reduce((sum, word) => sum + (word.confidence ?? 50), 0) / words.length : line.confidence ?? 65;
@@ -97,6 +112,11 @@ export function parseReceipt(input) {
       } else { item.quantity = null; item.unitPrice = null; item.confidence.quantity = 0; item.confidence.unitPrice = 0; }
     }
     result.items.push(item);
+    markLine(index, 'PRODUCT_ITEM', item.confidence.name, result.items.length - 1);
+    if (quantity) {
+      markLine(index - 1, 'PRODUCT_ITEM', 95, result.items.length - 1);
+      if (/^\d+\s*[xÃ—]$/i.test(lines[index - 2] || '')) markLine(index - 2, 'PRODUCT_ITEM', 95, result.items.length - 1);
+    }
   };
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index];
@@ -105,35 +125,49 @@ export function parseReceipt(input) {
     const nextPrice = lines[index + 1]?.match(/^[£€$]?\s*(\d+[.,]\d{2})$/);
     const amount = price ? minor(price[1]) : nextPrice ? minor(nextPrice[1]) : null;
     const count = line.match(/\b(\d+)\s+[iItT]tems?\b/i);
-    if (count) { result.itemCount = Number(count[1]); afterTotal = true; continue; }
-    if (/^[a-z]\s+[iItT]tems?\b/i.test(line)) { result.itemCountUncertain = true; afterTotal = true; continue; }
-    if (/\b(?:card\s*sales|amount\s*paid)\b/i.test(line)) { if (amount != null) paymentAmount = amount; afterTotal = true; continue; }
+    if (count) { result.itemCount = Number(count[1]); afterTotal = true; markLine(index, 'FOOTER', 95); continue; }
+    if (/^[a-z]\s+[iItT]tems?\b/i.test(line)) { result.itemCountUncertain = true; afterTotal = true; markLine(index, 'FOOTER', 55); continue; }
+    if (/\b(?:card\s*sales|amount\s*paid)\b/i.test(line)) { if (amount != null) paymentAmount = amount; afterTotal = true; markLine(index, 'PAYMENT', 95); continue; }
     if (/\bnet\b.*\bvat\b|\bvat\b.*\bnet\b|\d[.,]\d+\s*%/i.test(line)) {
       const tax = line.match(/\bvat\s+(\d+[.,]\d{2})/i); if (tax) result.tax = minor(tax[1]);
+      markLine(index, 'TAX', 85);
       if (result.items.length) afterTotal = true;
       continue;
     }
-    if (/^(?:sub\s*total|net total)\b/i.test(label)) { result.subtotal = amount; continue; }
-    if (/^(?:total\s*)?(?:vat|tax)\b/i.test(label)) { if (!/\d|%/.test(label)) result.tax = amount; continue; }
-    if (/^(?:total\s+)?(?:discounts?|coupons?|savings?|promotion|multibuy)\b/i.test(label)) { if (amount !== null) result.discounts = /^total/i.test(label) ? Math.abs(amount) : (result.discounts || 0) + Math.abs(amount); continue; }
+    if (/^(?:sub\s*total|net total)\b/i.test(label)) { result.subtotal = amount; markLine(index, 'SUBTOTAL', 85); continue; }
+    if (/^(?:total\s*)?(?:vat|tax)\b/i.test(label)) { if (!/\d|%/.test(label)) result.tax = amount; markLine(index, 'TAX', 85); continue; }
+    if (/^(?:total\s+)?(?:discounts?|coupons?|savings?|promotion|multibuy)\b/i.test(label)) { if (amount !== null) result.discounts = /^total/i.test(label) ? Math.abs(amount) : (result.discounts || 0) + Math.abs(amount); markLine(index, 'DISCOUNT', 85); continue; }
     if (totalLabel(label)) {
       const priority = /^balance/i.test(label) ? 0 : /grand|due|paid|to pay/i.test(label) ? 2 : 1;
       if (amount !== null && priority >= rank) { result.total = amount; rank = priority; result.confidence.total = 85; }
-      afterTotal = true; continue;
+      afterTotal = true; markLine(index, 'TOTAL', result.confidence.total || 70); continue;
     }
     // Corrupted/letter-spaced totals just above item count or payment are footer,
     // even when the word cannot be recovered. Payment can corroborate the amount.
-    if (price && !codeLine.test(line) && /^(?:[\da]\s+[iItT]tems?|card\s*sales)\b/i.test(lines[index + 1] || '') && /\b[tToO][a-z]?\b/.test(label)) { afterTotal = true; continue; }
-    if (afterTotal || (aldi && firstProduct >= 0 && index < firstProduct) || line === result.merchantName || metadata(line) || receiptDate(line) || /^(?:cash|tender|vat|tax|rate|net|gross|you saved)\b|^[A-Z]?\s*\d+(?:[.,]\d+)?\s*%/i.test(line) || /(?:\d[ -]?){13,19}/.test(line) || /^[\d\s*#-]+$/.test(line)) continue;
+    if (price && !codeLine.test(line) && /^(?:[\da]\s+[iItT]tems?|card\s*sales)\b/i.test(lines[index + 1] || '') && /\b[tToO][a-z]?\b/.test(label)) { afterTotal = true; markLine(index, 'TOTAL', 50); continue; }
+    if (line === result.merchantName) { markLine(index, 'MERCHANT', 85); continue; }
+    if (/^(?:GBP|EUR|USD|CAD|AUD|INR|PKR)$/i.test(line)) { markLine(index, 'CURRENCY', 95); continue; }
+    if (address.test(line) || (result.merchantName && index < firstProduct && /^[A-Z][\p{L}' -]{2,35}$/u.test(line) && !/^(?:GBP|EUR|USD)$/i.test(line))) { markLine(index, 'ADDRESS', 70); continue; }
+    if (receiptDate(line) || /\b(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?\b/.test(line)) { markLine(index, 'DATE_TIME', 90); continue; }
+    if (afterTotal) {
+      const footerText = /\b(?:thank\s*you|card\s*number|visa|debit|merchant\s*id|terminal\s*id|eft|cashier|authori[sz]ation|approved|contactless|vat|net|gross|items?)\b/i.test(line);
+      const possibleProduct = /[a-z]{2}/i.test(line) && moneyEnd.test(line);
+      markLine(index, possibleProduct && !footerText ? 'UNRESOLVED_CANDIDATE' : 'FOOTER', possibleProduct ? (sourceLines[index].confidence ?? 40) : 70);
+      continue;
+    }
+    if ((aldi && firstProduct >= 0 && index < firstProduct) || metadata(line) || /^(?:cash|tender|vat|tax|rate|net|gross|you saved)\b|^[A-Z]?\s*\d+(?:[.,]\d+)?\s*%/i.test(line) || /(?:\d[ -]?){13,19}/.test(line) || /^[\d\s*#-]+$/.test(line)) { markLine(index, /payment|card|visa|debit|credit/i.test(line) ? 'PAYMENT' : 'FOOTER', 70); continue; }
     // Common two-line layout: product name followed by quantity/weight and prices.
     const next = lines[index + 1];
     if (!price && /[a-z]/i.test(line) && next && /^\d+(?:[.,]\d+)?\s*(?:[x@×]|kg\b|g\b|ml\b|l\b)/i.test(next)) {
       const item = itemLine(`${line} ${next}`);
-      if (item) { addItem(item, index); result.items.at(-1).rawText = redactPaymentData(`${rawLines[index]}\n${rawLines[index + 1]}`); index++; continue; }
+      if (item) { addItem(item, index); result.items.at(-1).rawText = redactPaymentData(`${sourceLines[index].text}\n${sourceLines[index + 1].text}`); markLine(index + 1, 'PRODUCT_ITEM', result.items.at(-1).confidence.name, result.items.length - 1); index++; continue; }
     }
     const item = itemLine(line);
     if (item && /[a-z]{2}/i.test(item.name) && !totalLabel(item.name) && (!aldi || firstProduct < 0 || codeLine.test(line))) addItem(item, index);
+    else if (!result.classifiedLines[index]) markLine(index, 'UNRESOLVED_CANDIDATE', sourceLines[index].confidence ?? 35);
   }
+  result.classifiedLines = result.classifiedLines.map((entry, index) => entry || { lineIndex: Number.isInteger(sourceLines[index]?.lineIndex) ? sourceLines[index].lineIndex : index, rawText: redactPaymentData(String(sourceLines[index]?.text || '')).slice(0, 1000), type: 'UNRESOLVED_CANDIDATE', confidence: 25, bbox: sourceLines[index]?.bbox || null });
+  result.unresolvedLines = result.classifiedLines.filter(line => line.type === 'UNRESOLVED_CANDIDATE');
   if (result.total == null && paymentAmount != null) { result.total = paymentAmount; result.confidence.total = 75; }
   result.totalConfirmed = result.total != null && paymentAmount === result.total;
   if (result.totalConfirmed) result.confidence.total = 98;
@@ -143,7 +177,10 @@ export function parseReceipt(input) {
 export function receiptWarnings(receipt, total = receipt.total) {
   const warnings = [];
   if (total == null) warnings.push('Receipt total is missing. Enter it before saving.');
+  const overflow = receipt.unprocessedLineCount || receipt.classifiedLineOverflow || 0;
+  if (overflow) warnings.push(`${overflow} receipt line${overflow === 1 ? '' : 's'} exceeded the review limit and were not parsed. Use a shorter or clearer scan.`);
   if (!receipt.items.length) warnings.push("We could read the receipt, but couldn't reliably identify the items. Review the extracted text or add items manually.");
+  if (receipt.unresolvedLines?.length) warnings.push(`${receipt.unresolvedLines.length} receipt line${receipt.unresolvedLines.length === 1 ? '' : 's'} need review because CBoard could not safely classify them.`);
   if (receipt.items.some(item => item.quantity == null)) warnings.push('Some quantities are unclear. Leave them blank or correct them.');
   if (receipt.items.some(item => item.lineTotal == null)) warnings.push('Some items have no price.');
   if (receipt.itemCountUncertain && receipt.itemCount == null) warnings.push('The printed item count was unclear. Compare the product lines and quantities with the receipt.');
@@ -155,4 +192,22 @@ export function receiptWarnings(receipt, total = receipt.total) {
   if (new Set(names).size < names.length) warnings.push('Repeated item lines detected. Check whether these are separate purchases.');
   if (receipt.items.some(item => item.quantity != null && item.unitPrice != null && item.lineTotal != null && Math.abs(Math.round(item.quantity * item.unitPrice) - item.lineTotal) > 1)) warnings.push('Some quantities × unit prices do not match their line totals.');
   return warnings;
+}
+
+export function reconcileReceipt(receipt, total = receipt.total) {
+  const items = Array.isArray(receipt?.items) ? receipt.items : [];
+  const computedItemsTotal = items.reduce((sum, item) => sum + (Number.isSafeInteger(item.lineTotal) ? item.lineTotal : 0), 0);
+  const computedUnitCount = items.reduce((sum, item) => sum + (Number.isFinite(item.quantity) && item.quantity > 0 ? item.quantity : 1), 0);
+  const declaredItemCount = Number.isSafeInteger(receipt?.itemCount) ? receipt.itemCount : null;
+  return {
+    computedItemsTotal,
+    total: Number.isSafeInteger(total) ? total : null,
+    totalDifference: Number.isSafeInteger(total) ? computedItemsTotal - total : null,
+    productLineCount: items.length,
+    computedUnitCount,
+    declaredItemCount,
+    itemCountMatches: declaredItemCount == null ? null : declaredItemCount === items.length || declaredItemCount === computedUnitCount,
+    unresolvedLineCount: receipt?.unresolvedLines?.length || 0,
+    complete: items.length > 0 && Number.isSafeInteger(total) && Math.abs(computedItemsTotal - total) <= 1 && !(receipt?.unresolvedLines?.length) && !(receipt?.unprocessedLineCount || receipt?.classifiedLineOverflow),
+  };
 }
