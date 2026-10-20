@@ -1,4 +1,4 @@
-import { NutritionLabelScan } from '../nutrition/NutritionLabelScan';
+﻿import { NutritionLabelScan } from '../nutrition/NutritionLabelScan';
 import { ingredientScanCurrent } from '../nutrition/nutritionScanAdapters.js';
 import { NUTRIENTS } from '../nutrition/nutrients.js';
 import { secondaryButton } from './RecipeComponents';
@@ -113,7 +113,7 @@ function IngredientNameField({ value, onChange, onSelect, library }) {
       >
         <span className="block font-bold">{entry.item.name}</span>
         <span className="block text-xs font-normal text-black/65">
-          {[entry.item.amount, entry.item.unit, entry.item.nutritionLabel?.source?.name || (hasStoredNutrition(entry.item) ? 'saved nutrition' : ''), entry.recipeTitles.join(', ')].filter((part) => part !== '' && part != null).join(' · ')}
+          {[entry.item.amount, entry.item.unit, entry.item.nutritionLabel?.source?.name || (hasStoredNutrition(entry.item) ? 'saved nutrition' : ''), entry.recipeTitles.join(', ')].filter((part) => part !== '' && part != null).join(' Â· ')}
         </span>
       </button>)}
     </div>}
@@ -159,7 +159,7 @@ function ItemEditor({ item, onChange, groups, visible, ingredientLibrary, isIngr
           value={item.amount}
           readOnly={isAnchor}
           title={isAnchor ? 'Set the main ingredient amount in Recipe scaling below.' : undefined}
-          placeholder="60, ½ or 5–10"
+          placeholder="60, Â½ or 5â€“10"
           onChange={(value) =>
             set(
               'amount',
@@ -178,13 +178,6 @@ function ItemEditor({ item, onChange, groups, visible, ingredientLibrary, isIngr
           onChange={(value) => set('unit', value)}
         />
       </div>
-      <Field
-        label="Note"
-        value={item.note}
-        onChange={(value) => set('note', value)}
-      />
-      <Field label="Preparation" value={item.preparation} placeholder="Chopped, grated" onChange={value => onChange({ ...item, preparation: value })} />
-      <Field label="Group / stage" value={item.group} placeholder="Marinade, sauce, garnish" onChange={value => onChange({ ...item, group: value })} />
       <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm font-semibold">
         {isIngredient && <label className="flex items-center gap-2"><input type="checkbox" checked={isAnchor} onChange={event => onSetAnchor?.(event.target.checked ? item.id : '')} />Use as main ingredient</label>}
         <label className="flex items-center gap-2"><input type="checkbox" checked={item.scaleEnabled !== false} onChange={event => onChange({ ...item, scaleEnabled: event.target.checked ? undefined : false })} />Scale with recipe</label>
@@ -228,14 +221,13 @@ function ItemEditor({ item, onChange, groups, visible, ingredientLibrary, isIngr
         {visible && <NutritionLabelScan current={ingredientScanCurrent(item)} onApply={useLabel}/>}
         {visible && lookup && <div className="max-h-[34rem] min-w-0 overflow-y-auto overscroll-contain pr-1" aria-label="Food nutrition search results"><NutritionLookup allowLabelScan={false} name={item.name || ''} amountUnit={item.unit} portionMode="weight" active visible onSelect={useLabel} /></div>}
         {label && <>
-          <p className="text-sm">{label.source.name || item.name} · {label.source.provider}. Label values per {label.quantity} {label.unit}.</p>
+          <p className="text-sm">{label.source.name || item.name} Â· {label.source.provider}. Label values per {label.quantity} {label.unit}.</p>
           {label.source.estimatedPortion && <p className="text-sm">Estimated USDA portion: {label.source.portionDescription}. Replace the weight below with your measured edible weight if available.</p>}
           {initialProductAmount(item, label.unit) === '' && <Field label={`${label.unit} in one ${item.unit || 'recipe unit'} (edible amount)`} type="number" min="0.001" step="any" value={label.recipeUnit === String(item.unit || '').trim().toLowerCase() ? label.amountPerUnit : ''} onChange={(value) => {
             const next = { ...item, nutritionLabel: { ...label, source: { ...label.source, estimatedPortion: false }, amountPerUnit: value === '' ? null : Number(value), recipeUnit: String(item.unit || '').trim().toLowerCase() } };
             next.nutrition = ingredientLabelNutrition(next); onChange(next);
           }} />}
           <p className="text-sm" role="status">{ingredientLabelAmount(item) == null ? 'Confirm the edible weight or volume of one recipe unit. The API cannot reliably infer the weight of your banana, handful or cup.' : `${ingredientLabelAmount(item)} ${label.unit} used / ${label.quantity} ${label.unit} on the label. The nutrition fields below are calculated for the amount above.`}</p>
-          <p className="text-sm">Changing the amount recalculates automatically. Renaming the ingredient keeps these values; choose a different food result to replace them. Editing a nutrition number switches this ingredient to manual values.</p>
         </>}
       </div>
       <details ref={nutritionDetails} open={nutritionOpen} onToggle={(event) => setNutritionOpen(event.currentTarget.open)}>
@@ -248,21 +240,27 @@ function ItemEditor({ item, onChange, groups, visible, ingredientLibrary, isIngr
           />
         </div>
       </details>
+      <Field label="Note" value={item.note} onChange={(value) => set('note', value)} />
+      <Field label="Preparation" value={item.preparation} placeholder="Chopped, grated" onChange={value => onChange({ ...item, preparation: value })} />
+      <Field label="Group / stage" value={item.group} placeholder="Marinade, sauce, garnish" onChange={value => onChange({ ...item, group: value })} />
     </div>
   );
 }
 
-function ItemRow({ title, item, index, items, onChange, groups, ingredientLibrary, isIngredient = false, anchorId, onSetAnchor }) {
+function ItemRow({ title, item, index, items, onChange, groups, ingredientLibrary, isIngredient = false, anchorId, onSetAnchor, dragging, dragOver, onMove, onDragStart, onDragEnd, onDragOver, onDrop }) {
   const normalizedItem = typeof item === 'string' ? { name: item } : item;
   const [open, setOpen] = useState(!normalizedItem?.name);
 
   return (
     <details
-      className="min-w-0 self-start rounded-xl border-2 border-black bg-white p-3"
+      className={`recipe-item-row min-w-0 self-start rounded-xl border-2 border-black bg-white p-3${dragging ? ' is-dragging' : ''}${dragOver ? ' is-drag-over' : ''}`}
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
+      onDragOver={event => onDragOver(event, index)}
+      onDrop={event => onDrop(event, index)}
     >
       <summary className="cursor-pointer font-bold">
+        <span className="recipe-item-drag-handle" draggable aria-label={`Drag to reorder ${normalizedItem.name || title.slice(0, -1).toLowerCase()}`} title="Drag to reorder" onDragStart={event => onDragStart(event, index)} onDragEnd={onDragEnd}>â ¿</span>{' '}
         <span className="text-black/55">{index + 1}.</span>{' '}
         {normalizedItem.name || `New ${title.toLowerCase()}`}
         {(normalizedItem.amount != null || normalizedItem.unit) && (
@@ -273,6 +271,10 @@ function ItemRow({ title, item, index, items, onChange, groups, ingredientLibrar
           </span>
         )}
       </summary>
+      <div className="flex justify-end gap-1 pt-2">
+        <button type="button" className="recipe-item-move" aria-label={`Move ${normalizedItem.name || title.slice(0, -1).toLowerCase()} up`} title="Move up" disabled={index === 0} onClick={() => onMove(index, -1)}>â†‘</button>
+        <button type="button" className="recipe-item-move" aria-label={`Move ${normalizedItem.name || title.slice(0, -1).toLowerCase()} down`} title="Move down" disabled={index === items.length - 1} onClick={() => onMove(index, 1)}>â†“</button>
+      </div>
       <div className="mt-3 space-y-3">
         <div className="flex justify-end">
           <button
@@ -315,9 +317,48 @@ function useDesktopColumns() {
 
 function Items({ title, items, onChange, groups, ingredientLibrary, isIngredient = false, anchorId, onSetAnchor }) {
   const desktop = useDesktopColumns();
+  const [draggingIndex, setDraggingIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+  const moveItem = (sourceIndex, targetIndex, after = false) => {
+    if (!Number.isInteger(sourceIndex) || !Number.isInteger(targetIndex) || sourceIndex === targetIndex) return;
+    const next = [...items];
+    const [source] = next.splice(sourceIndex, 1);
+    // Recompute the target position after removing the source row.
+    const targetAfterRemoval = next.findIndex(item => item === items[targetIndex]);
+    if (targetAfterRemoval < 0) return;
+    next.splice(targetAfterRemoval + Number(after), 0, source);
+    onChange(next);
+  };
+  const moveBy = (index, offset) => {
+    const target = index + offset;
+    if (target < 0 || target >= items.length) return;
+    const next = [...items];
+    const [item] = next.splice(index, 1);
+    next.splice(target, 0, item);
+    onChange(next);
+  };
+  const handleDragStart = (event, index) => {
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', String(index));
+    setDraggingIndex(index);
+  };
+  const handleDragEnd = () => { setDraggingIndex(null); setDragOverIndex(null); };
+  const handleDragOver = (event, index) => {
+    if (draggingIndex == null) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    setDragOverIndex(index);
+  };
+  const handleDrop = (event, targetIndex) => {
+    event.preventDefault();
+    const sourceIndex = draggingIndex ?? Number(event.dataTransfer.getData('text/plain'));
+    const bounds = event.currentTarget.getBoundingClientRect();
+    moveItem(sourceIndex, targetIndex, event.clientY >= bounds.top + bounds.height / 2);
+    handleDragEnd();
+  };
   const itemRow = (item, index) => (
     <ItemRow
-      key={index}
+      key={item.id || `${item.name || title}-${index}`}
       title={title}
       item={item}
       index={index}
@@ -328,6 +369,13 @@ function Items({ title, items, onChange, groups, ingredientLibrary, isIngredient
       isIngredient={isIngredient}
       anchorId={anchorId}
       onSetAnchor={onSetAnchor}
+      dragging={draggingIndex === index}
+      dragOver={dragOverIndex === index}
+      onMove={moveBy}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
     />
   );
   return (
@@ -420,7 +468,7 @@ export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary 
         <h2 className="text-2xl font-bold">Recipe details</h2>
         <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
           <Field label="Recipe title" required value={recipe.title} onChange={(value) => set('title', value)} />
-          <Field label="Meal type" required value={recipe.mealType} placeholder="Breakfast, Lunch…" onChange={(value) => set('mealType', value)} />
+          <Field label="Meal type" required value={recipe.mealType} placeholder="Breakfast, Lunchâ€¦" onChange={(value) => set('mealType', value)} />
         </div>
         <Field
           label="Description"
@@ -467,7 +515,7 @@ export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary 
         {anchor ? <>
           <p className="text-sm text-black/70">Scaling uses the saved base amounts each time. Changing the main ingredient sets a new base without changing recipe quantities.</p>
           <div className="grid gap-3 sm:grid-cols-2">
-            <p className="self-center"><strong>Main ingredient:</strong> {anchor.name} · Base amount {recipe.scaling.baseQuantities[anchor.id]?.amount} {recipe.scaling.baseQuantities[anchor.id]?.unit}</p>
+            <p className="self-center"><strong>Main ingredient:</strong> {anchor.name} Â· Base amount {recipe.scaling.baseQuantities[anchor.id]?.amount} {recipe.scaling.baseQuantities[anchor.id]?.unit}</p>
             <Field label={`New ${anchor.name} amount (${anchor.unit || 'unit'})`} type="number" min="0" step="any" value={scaleTarget} onChange={setScaleTarget} />
           </div>
           <label className="flex items-center gap-2 font-semibold"><input type="checkbox" checked={scaleOthers} onChange={event => setScaleOthers(event.target.checked)} />Scale other ingredients proportionally</label>
@@ -476,13 +524,13 @@ export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary 
           {scalingError && <p role="alert" className="text-sm font-semibold text-red-800">{scalingError}</p>}
           {scalingPreview && <>
             <div className="space-y-1 rounded-xl border border-black/20 p-3">
-              <h3 className="font-bold">Scaling preview · {scalingPreview.factor === 0 ? '0×' : `${formatScaledQuantity(scalingPreview.factor)}×`}</h3>
+              <h3 className="font-bold">Scaling preview Â· {scalingPreview.factor === 0 ? '0Ã—' : `${formatScaledQuantity(scalingPreview.factor)}Ã—`}</h3>
               {allIngredients.map(item => {
                 const updated = [...scalingPreview.recipe.ingredients, ...scalingPreview.recipe.sauces].find(row => row.id === item.id) || item;
                 const show = value => [value.amount, value.unit].filter(part => part != null && part !== '').join(' ') || 'Not specified';
-                return <p key={item.id} className="text-sm">{item.name}: {show(item)} → {show(updated)}{item.scaleEnabled === false ? ' · Keep fixed' : ''}</p>;
+                return <p key={item.id} className="text-sm">{item.name}: {show(item)} â†’ {show(updated)}{item.scaleEnabled === false ? ' Â· Keep fixed' : ''}</p>;
               })}
-              <p className="pt-2 text-sm font-semibold">Nutrition {nutritionDisplay.wholeRecipe ? 'for the whole recipe' : 'per serving'}: {nutritionDisplay.nutrition.calories ?? '—'} → {recipeNutritionDisplay(scalingPreview.recipe).nutrition.calories ?? '—'} kcal</p>
+              <p className="pt-2 text-sm font-semibold">Nutrition {nutritionDisplay.wholeRecipe ? 'for the whole recipe' : 'per serving'}: {nutritionDisplay.nutrition.calories ?? 'â€”'} â†’ {recipeNutritionDisplay(scalingPreview.recipe).nutrition.calories ?? 'â€”'} kcal</p>
               {scalingPreview.warnings.map(warning => <p key={warning} role="status" className="text-sm font-semibold text-amber-900">{warning}</p>)}
             </div>
             <div className="flex flex-wrap gap-2">
@@ -493,13 +541,13 @@ export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary 
           </>}
           {confirmScaling && <div role="alertdialog" aria-modal="true" aria-labelledby="scale-confirm-title" className="space-y-3 rounded-xl border-2 border-black bg-[#fffdf8] p-4">
             <h3 id="scale-confirm-title" className="text-lg font-bold">Scale recipe?</h3>
-            <p>{anchor.name}: {recipe.scaling.baseQuantities[anchor.id]?.amount} {anchor.unit} → {formatScaledQuantity(Number(scaleTarget))} {anchor.unit}. {scalingPreview.scaledCount} other ingredients will be adjusted proportionally.</p>
+            <p>{anchor.name}: {recipe.scaling.baseQuantities[anchor.id]?.amount} {anchor.unit} â†’ {formatScaledQuantity(Number(scaleTarget))} {anchor.unit}. {scalingPreview.scaledCount} other ingredients will be adjusted proportionally.</p>
             {Number(scaleTarget) === 0 && <p className="font-semibold">This sets scalable ingredient quantities to zero. Confirm to apply.</p>}
             <div className="flex gap-2"><button type="button" className={secondaryButton} onClick={() => setConfirmScaling(false)}>Cancel</button><button type="button" className={secondaryButton} onClick={applyScaling}>Scale ingredients</button></div>
           </div>}
-        </> : <p className="text-sm text-black/70">Choose an ingredient below with “Use as main ingredient” to enable proportional scaling. Existing recipes are left unanchored until you choose.</p>}
+        </> : <p className="text-sm text-black/70">Choose an ingredient below with â€œUse as main ingredientâ€ to enable proportional scaling. Existing recipes are left unanchored until you choose.</p>}
       </section>
-      <details className="rounded-2xl border-2 border-black bg-white p-4" open>
+      {!editing && <details className="rounded-2xl border-2 border-black bg-white p-4" open>
         <summary className="cursor-pointer text-xl font-bold">Recipe nutrition</summary>
         <p className="text-sm text-black/70">
           {recipe.nutritionFromIngredients ? 'Calculated from ingredient and sauce quantities. Shows the whole recipe until a serving count is set, then per serving; alternatives are not included.' : 'Enter macros manually or use food lookup inside an ingredient to calculate from ingredients. Item nutrition describes the full amount listed for that ingredient.'}
@@ -514,7 +562,7 @@ export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary 
         </details>
         <div className="mt-3"><Macros value={nutritionDisplay.nutrition} onChange={(value) => set('nutrition', value)} /></div>
         {recipe.nutritionFromIngredients && nutritionDisplay.partialKeys.length > 0 && <p className="mt-3 text-sm font-semibold">Some nutrient totals are partial because they are missing from one or more ingredients.</p>}
-      </details>
+      </details>}
       <Items
         title="Ingredients"
         items={recipe.ingredients ?? []}

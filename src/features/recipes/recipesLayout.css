@@ -46,6 +46,35 @@ html[data-theme='matrix'] .recipe-page-shell > .recipe-shortcuts {
 
 .recipe-mobile-add { display: none; }
 
+.recipe-item-drag-handle {
+  display: inline-block;
+  margin-right: 0.2rem;
+  color: #777;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.recipe-item-drag-handle:active { cursor: grabbing; }
+.recipe-item-move {
+  min-width: 2rem;
+  min-height: 1.8rem;
+  border: 1px solid #777;
+  border-radius: 0.35rem;
+  background: #fff;
+  color: #111;
+  font-weight: 700;
+}
+.recipe-item-move:not(:disabled) { background: color-mix(in srgb, var(--g-accent, #f28a3c) 13%, #fff); }
+.recipe-item-move:disabled { opacity: 0.4; }
+.recipe-item-row.is-dragging { opacity: 0.55; }
+.recipe-item-row.is-drag-over { outline: 2px solid var(--color-accent, #f28a3c); outline-offset: -2px; }
+
+html[data-theme='matrix'] .recipe-item-move {
+  border-color: var(--matrix-border);
+  background: var(--matrix-surface);
+  color: var(--matrix-text);
+}
+
 @media (max-width: 47.99rem) {
   .recipe-page-shell { padding-bottom: calc(10rem + env(safe-area-inset-bottom)); }
   .recipe-mobile-add { display: none; }
