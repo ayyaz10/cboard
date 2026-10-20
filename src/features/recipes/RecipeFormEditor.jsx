@@ -260,7 +260,7 @@ function ItemRow({ title, item, index, items, onChange, groups, ingredientLibrar
       onDrop={event => onDrop(event, index)}
     >
       <summary className="cursor-pointer font-bold">
-        <span className="recipe-item-drag-handle" draggable aria-label={`Drag to reorder ${normalizedItem.name || title.slice(0, -1).toLowerCase()}`} title="Drag to reorder" onDragStart={event => onDragStart(event, index)} onDragEnd={onDragEnd}>â ¿</span>{' '}
+        <span className="recipe-item-drag-handle" draggable aria-label={`Drag to reorder ${normalizedItem.name || title.slice(0, -1).toLowerCase()}`} title="Drag to reorder" onDragStart={event => onDragStart(event, index)} onDragEnd={onDragEnd}><svg aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><circle cx="5" cy="3" r="1.25"/><circle cx="11" cy="3" r="1.25"/><circle cx="5" cy="8" r="1.25"/><circle cx="11" cy="8" r="1.25"/><circle cx="5" cy="13" r="1.25"/><circle cx="11" cy="13" r="1.25"/></svg></span>{' '}
         <span className="text-black/55">{index + 1}.</span>{' '}
         {normalizedItem.name || `New ${title.toLowerCase()}`}
         {(normalizedItem.amount != null || normalizedItem.unit) && (
@@ -272,8 +272,8 @@ function ItemRow({ title, item, index, items, onChange, groups, ingredientLibrar
         )}
       </summary>
       <div className="flex justify-end gap-1 pt-2">
-        <button type="button" className="recipe-item-move" aria-label={`Move ${normalizedItem.name || title.slice(0, -1).toLowerCase()} up`} title="Move up" disabled={index === 0} onClick={() => onMove(index, -1)}>â†‘</button>
-        <button type="button" className="recipe-item-move" aria-label={`Move ${normalizedItem.name || title.slice(0, -1).toLowerCase()} down`} title="Move down" disabled={index === items.length - 1} onClick={() => onMove(index, 1)}>â†“</button>
+        <button type="button" className="recipe-item-move" aria-label={`Move ${normalizedItem.name || title.slice(0, -1).toLowerCase()} up`} title="Move up" disabled={index === 0} onClick={() => onMove(index, -1)}><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 13V3M4 7l4-4 4 4"/></svg></button>
+        <button type="button" className="recipe-item-move" aria-label={`Move ${normalizedItem.name || title.slice(0, -1).toLowerCase()} down`} title="Move down" disabled={index === items.length - 1} onClick={() => onMove(index, 1)}><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3v10m4-4-4 4-4-4"/></svg></button>
       </div>
       <div className="mt-3 space-y-3">
         <div className="flex justify-end">
