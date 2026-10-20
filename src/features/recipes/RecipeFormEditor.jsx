@@ -271,6 +271,15 @@ function ItemRow({ title, item, index, items, onChange, groups, ingredientLibrar
         )}
       </summary>
       <div className="mt-3 space-y-3">
+        <div className="flex justify-end">
+          <button
+            type="button"
+            className={`${secondaryButton} danger-action`}
+            onClick={() => onChange(items.filter((_, i) => i !== index))}
+          >
+            Remove {isIngredient ? 'ingredient' : title.slice(0, -1).toLowerCase()} #{index + 1}
+          </button>
+        </div>
         <ItemEditor
           item={normalizedItem}
           groups={groups}
@@ -283,13 +292,6 @@ function ItemRow({ title, item, index, items, onChange, groups, ingredientLibrar
             onChange(items.map((current, i) => (i === index ? next : current)), options)
           }
         />
-        <button
-          type="button"
-          className={secondaryButton}
-          onClick={() => onChange(items.filter((_, i) => i !== index))}
-        >
-          Remove {title.toLowerCase()} #{index + 1}
-        </button>
       </div>
     </details>
   );
