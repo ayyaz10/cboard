@@ -119,7 +119,7 @@ function TransactionForm({ data, initial, close, change, busy }) {
       const existing=initial?.id?data.transactions.find(item=>item.id===initial.id):null;
       const priorGoalId=existing?.type==='expense'?(existing.goalId||((existing.paidFromFundId||'').startsWith('goal:')?existing.paidFromFundId.slice(5):'')):'';
       const available=goalId?Number(data.goals.find(goal=>goal.id===goalId)?.saved||0):Number(fundBalances[form.paidFromFundId]||0);
-      const restored=priorGoalId===goalId?Number(existing.amount||0):0;
+      const restored=existing&&priorGoalId===goalId?Number(existing.amount||0):0;
       if(form.type==='expense'&&form.paidFromFundId&&available+restored<amount)throw new Error('That fund does not have enough recorded balance for this expense.');
       if(form.type==='transfer'&&form.transferKind==='internal'&&form.fromFundId===form.toFundId)throw new Error('Choose two different places for this transfer.');
       if(form.type==='transfer'&&form.fromFundId&&(fundBalances[form.fromFundId]||0)<amount)throw new Error('The selected fund does not have enough recorded balance.');

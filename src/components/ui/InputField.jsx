@@ -48,7 +48,7 @@ export function InputField({
       ) : null}
 
       {error ? (
-        <p id={errorId} className="mt-2 text-sm font-semibold leading-6 text-[#b42318]">
+        <p id={errorId} role="alert" className="mt-2 text-sm font-semibold leading-6 text-[#b42318]">
           {error}
         </p>
       ) : null}
