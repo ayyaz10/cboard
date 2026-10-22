@@ -3,33 +3,37 @@ import { reconcileInventory } from '../features/groceries/inventory.js';
 import { getUserScopedClient, assertSupabaseResult } from "./supabaseCrud";
 import { validateDay } from "../features/diary/diaryData.js";
 import { getFoodCatalog } from './foodCatalogService.js';
+import { createSingleFlightByKey } from '../utils/singleFlight.js';
 
 const PREFIX = "food-diary:v1:";
 const DIARY_WRITE_TIMEOUT_MS = 30_000;
+const loadDiaryOnce = createSingleFlightByKey();
 export async function getFoodDiary(expectedUserId) {
   const { client, userId } = await getUserScopedClient();
   if (userId !== expectedUserId)
     throw new Error("Your account changed. Reload the diary.");
-  const rows = [];
-  for (let from = 0; ; from += 100) {
-    const result = await client
-      .from("user_tool_preferences")
-      .select("key,value,updated_at")
-      .eq("user_id", userId)
-      .like("key", `${PREFIX}%`)
-      .order("key")
-      .range(from, from + 99);
-    assertSupabaseResult(result);
-    rows.push(...result.data);
-    if (result.data.length < 100) break;
-  }
-  return rows.map((row) => {
-    const day = validateDay(row.value);
-    if (row.key !== `${PREFIX}${day.date}`)
-      throw new Error(
-        "A diary date is invalid. Your saved records have not been changed.",
-      );
-    return { ...day, updatedAt: row.updated_at };
+  return loadDiaryOnce(userId, async () => {
+    const rows = [];
+    for (let from = 0; ; from += 100) {
+      const result = await client
+        .from("user_tool_preferences")
+        .select("key,value,updated_at")
+        .eq("user_id", userId)
+        .like("key", `${PREFIX}%`)
+        .order("key")
+        .range(from, from + 99);
+      assertSupabaseResult(result);
+      rows.push(...result.data);
+      if (result.data.length < 100) break;
+    }
+    return rows.map((row) => {
+      const day = validateDay(row.value);
+      if (row.key !== `${PREFIX}${day.date}`)
+        throw new Error(
+          "A diary date is invalid. Your saved records have not been changed.",
+        );
+      return { ...day, updatedAt: row.updated_at };
+    });
   });
 }
 async function commitDay(day, expectedUserId, deleting = false) {

@@ -325,3 +325,9 @@ enabled = true
 # the caller with auth.getUser inside the handler.
 verify_jwt = false
 entrypoint = "./functions/banking/index.ts"
+
+[functions.username-login]
+enabled = true
+# Username lookup and password verification are handled by the function using Auth.
+verify_jwt = false
+entrypoint = "./functions/username-login/index.ts"

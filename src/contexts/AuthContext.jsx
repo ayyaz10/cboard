@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { isSupabaseConfigured, requireSupabase, supabase } from '../lib/supabaseClient';
-import { getCurrentProfile, normalizeUsername, resolveLoginEmail, saveCurrentProfile } from '../services/profileService';
+import { getCurrentProfile, normalizeUsername, saveCurrentProfile } from '../services/profileService';
 
 const AuthContext = createContext(null);
 const AUTH_BOOT_TIMEOUT_MS = 45000;
@@ -149,11 +149,23 @@ export function AuthProvider({ children }) {
       async signIn(identifier, password) {
         setAuthError('');
         const client = requireSupabase();
-        const email = await resolveLoginEmail(identifier);
-        const { error } = await client.auth.signInWithPassword({
-          email,
-          password,
-        });
+        let error;
+        if (identifier.trim().includes('@')) {
+          ({ error } = await client.auth.signInWithPassword({ email: identifier.trim(), password }));
+        } else {
+          const { data, error: functionError } = await client.functions.invoke('username-login', {
+            body: { username: normalizeUsername(identifier), password },
+          });
+          if (functionError) {
+            error = functionError.context?.status === 401
+              ? { message: 'Invalid login credentials', code: 'invalid_credentials' }
+              : functionError;
+          } else if (!data?.access_token || !data?.refresh_token) {
+            error = { message: 'Invalid login credentials', code: 'invalid_credentials' };
+          } else {
+            ({ error } = await client.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token }));
+          }
+        }
 
         if (error) {
           const friendly = error.code === 'email_not_confirmed'

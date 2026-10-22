@@ -268,7 +268,7 @@ export async function fetchAllTransactions(config, accountIdValue, fetchImpl, fr
 }
 
 async function sync({ admin, userId, connectionId, config, fetchImpl }) {
-  const { data: connection, error } = await admin.from('bank_connections').select('*').eq('id', connectionId).eq('user_id', userId).maybeSingle();
+  const { data: connection, error } = await admin.from('bank_connections').select('id,session_id,consent_valid_until,status,sync_lock_until').eq('id', connectionId).eq('user_id', userId).maybeSingle();
   if (error || !connection || connection.status === 'disconnected') throw Object.assign(new Error('Bank connection not found.'), { status: 404 });
   if (!connection.session_id) throw Object.assign(new Error('Bank reconnection is required.'), { status: 401 });
   const now = new Date().toISOString();
@@ -289,7 +289,7 @@ async function sync({ admin, userId, connectionId, config, fetchImpl }) {
       await admin.from('bank_connections').update({ status: nextStatus, consent_valid_until: session.access?.valid_until || connection.consent_valid_until, sync_lock_until: null, last_error: nextStatus === 'reconnect_required' ? 'Bank access needs to be reconnected.' : 'Bank session is not authorized.' }).eq('id', connection.id);
       return { error: 'Reconnect your bank to continue syncing.' };
     }
-    const { data: accounts, error: accountError } = await admin.from('bank_accounts').select('*').eq('connection_id', connection.id).eq('user_id', userId).eq('active', true);
+    const { data: accounts, error: accountError } = await admin.from('bank_accounts').select('id,provider_account_id,provider_account_uid').eq('connection_id', connection.id).eq('user_id', userId).eq('active', true);
     if (accountError) throw accountError;
     for (const account of accounts || []) {
       const overlap = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);

@@ -4,31 +4,35 @@ import { linkRecipeInventory } from '../features/groceries/inventory.js';
 import { getFoodCatalog } from './foodCatalogService.js';
 import { resolveRecipeIngredients } from '../features/nutrition/foodCatalog.js';
 import { getUserScopedClient, assertSupabaseResult } from "./supabaseCrud";
+import { createSingleFlightByKey } from '../utils/singleFlight.js';
 import {
   initialState,
   normalizeGroceryState,
 } from "../features/groceries/groceryData";
 const key = "groceries:v1";
+const loadGroceriesOnce = createSingleFlightByKey();
 export async function loadGroceries() {
   const { client, userId } = await getUserScopedClient();
-  const result = await client
-    .from("user_tool_preferences")
-    .select("value,updated_at")
-    .eq("user_id", userId)
-    .eq("key", key)
-    .maybeSingle();
-  assertSupabaseResult(result);
-  const [recipes, days, foodCatalog] = await Promise.all([getRecipes(), getFoodDiary(userId), getFoodCatalog(userId)]);
-  const loaded = result.data
-    ? {
-        state: normalizeGroceryState(result.data.value),
-        version: result.data.updated_at,
-        userId,
-      }
-    : { state: initialState(), version: null, userId };
-  const resolvedRecipes = recipes.map(recipe => resolveRecipeIngredients(recipe, foodCatalog).recipe);
-  loaded.state = linkRecipeInventory(loaded.state, resolvedRecipes, days, foodCatalog);
-  return loaded;
+  return loadGroceriesOnce(userId, async () => {
+    const result = await client
+      .from("user_tool_preferences")
+      .select("value,updated_at")
+      .eq("user_id", userId)
+      .eq("key", key)
+      .maybeSingle();
+    assertSupabaseResult(result);
+    const [recipes, days, foodCatalog] = await Promise.all([getRecipes(userId), getFoodDiary(userId), getFoodCatalog(userId)]);
+    const loaded = result.data
+      ? {
+          state: normalizeGroceryState(result.data.value),
+          version: result.data.updated_at,
+          userId,
+        }
+      : { state: initialState(), version: null, userId };
+    const resolvedRecipes = recipes.map(recipe => resolveRecipeIngredients(recipe, foodCatalog).recipe);
+    loaded.state = linkRecipeInventory(loaded.state, resolvedRecipes, days, foodCatalog);
+    return loaded;
+  });
 }
 export async function saveGroceries(state, version, expectedUserId) {
   const { client, userId } = await getUserScopedClient();

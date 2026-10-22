@@ -118,11 +118,9 @@ export function useTraining(userId) {
     })();
     const online = () => sync();
     window.addEventListener("online", online);
-    const timer = setInterval(sync, 30000);
     return () => {
       cancelled = true;
       alive.current = false;
-      clearInterval(timer);
       window.removeEventListener("online", online);
     };
   }, [userId, sync]);

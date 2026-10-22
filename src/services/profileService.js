@@ -4,16 +4,6 @@ import { getProfileInitials, isValidUsername, MAX_AVATAR_BYTES, normalizeUsernam
 const AVATAR_BUCKET = 'profile-avatars';
 export { getProfileInitials, isValidUsername, MAX_AVATAR_BYTES, normalizeUsername, validateAvatarFile } from './profileValidation.js';
 
-export async function resolveLoginEmail(identifier) {
-  const client = requireSupabase();
-  const trimmedIdentifier = identifier.trim();
-  if (trimmedIdentifier.includes('@')) return trimmedIdentifier;
-  const { data, error } = await client.rpc('resolve_login_email', { login_identifier: normalizeUsername(trimmedIdentifier) });
-  if (error) throw new Error('We could not verify those sign-in details. Check your connection and try again.');
-  if (!data) throw new Error('We could not sign in with those details. Check your email or username and password.');
-  return data;
-}
-
 async function makeAvatar(file) {
   const validation = validateAvatarFile(file);
   if (validation) throw new Error(validation);

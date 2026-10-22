@@ -1,8 +1,10 @@
 import { getUserScopedClient, assertSupabaseResult } from './supabaseCrud.js';
+import { createSingleFlightByKey } from '../utils/singleFlight.js';
 import { cleanFoodCatalogItem, mergeFoodCatalog, normalizeFoodText, parseFoodQuantityPrefix, findFoodMatches, resolveRecipeFoodCandidate } from '../features/nutrition/foodCatalog.js';
 import { unlinkDeletedFoodFromGroceryState } from '../features/nutrition/foodMergeData.js';
 
 const KEY = 'food-catalog:v1';
+const loadCatalogOnce = createSingleFlightByKey();
 
 async function writeCatalog(client, userId, items, previous) {
   const payload = { value: { version: 1, items }, updated_at: new Date().toISOString() };
@@ -21,17 +23,17 @@ async function writeCatalog(client, userId, items, previous) {
 export async function getFoodCatalog(expectedUserId) {
   const { client, userId } = await getUserScopedClient();
   if (expectedUserId && userId !== expectedUserId) throw new Error('Your account changed. Reload your food library.');
-  const result = await client.from('user_tool_preferences').select('value,updated_at').eq('user_id', userId).eq('key', KEY).maybeSingle();
-  assertSupabaseResult(result);
-  const stored = Array.isArray(result.data?.value?.items) ? result.data.value.items : [];
-  const migrated = stored.some(item => typeof item?.id !== 'string' || !item.id.trim() ||
-    item.groceryTrackingEnabled === undefined || item.shoppingListEnabled === undefined || item.nutritionTrackingEnabled === undefined ||
-    item.receiptMappings === undefined || item.groceryTrackingEnabled === false && item.shoppingListEnabled !== false);
-  const items = mergeFoodCatalog([], stored);
-  if (migrated) {
-    await writeCatalog(client, userId, items, result.data);
-  }
-  return items;
+  return loadCatalogOnce(userId, async () => {
+    const result = await client.from('user_tool_preferences').select('value,updated_at').eq('user_id', userId).eq('key', KEY).maybeSingle();
+    assertSupabaseResult(result);
+    const stored = Array.isArray(result.data?.value?.items) ? result.data.value.items : [];
+    const migrated = stored.some(item => typeof item?.id !== 'string' || !item.id.trim() ||
+      item.groceryTrackingEnabled === undefined || item.shoppingListEnabled === undefined || item.nutritionTrackingEnabled === undefined ||
+      item.receiptMappings === undefined || item.groceryTrackingEnabled === false && item.shoppingListEnabled !== false);
+    const items = mergeFoodCatalog([], stored);
+    if (migrated) await writeCatalog(client, userId, items, result.data);
+    return items;
+  });
 }
 
 export async function upsertFoodCatalogItems(items, expectedUserId) {

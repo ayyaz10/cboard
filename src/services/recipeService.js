@@ -7,9 +7,11 @@ import {
 import { isRecipeImage } from '../features/recipes/recipeImage';
 import { requireSupabase } from '../lib/supabaseClient';
 import { normalizeRecipeIngredient } from '../../supabase/functions/_shared/recipeIngredient.js';
+import { createSingleFlightByKey } from '../utils/singleFlight.js';
 
 const PREFIX = 'recipe:v1:';
 const FAVOURITE_PREFIX = 'recipe-favourite:v1:';
+const loadRecipesOnce = createSingleFlightByKey();
 
 export async function saveRecipeIngredientNutrition(recipe, ingredientIndex, nutrition, quantity = {}) {
   const { client, userId } = await getUserScopedClient();
@@ -192,26 +194,29 @@ export async function generateRecipeImage(title) {
 
 // One row per recipe reuses CBoard's existing user-scoped JSONB persistence.
 // The existing (user_id, key) unique constraint also protects concurrent imports.
-export async function getRecipes() {
+export async function getRecipes(expectedUserId) {
   const { client, userId } = await getUserScopedClient();
-  const rows = [];
-  for (let from = 0; ; from += 100) {
-    const result = await client
-      .from('user_tool_preferences')
-      .select('key,value,updated_at')
-      .eq('user_id', userId)
-      .like('key', `${PREFIX}%`)
-      .order('key')
-      .range(from, from + 99);
-    assertSupabaseResult(result);
-    rows.push(...result.data);
-    if (result.data.length < 100) break;
-  }
-  return rows.map((row) => ({
-    ...validateRecipe(row.value.recipe),
-    image: isRecipeImage(row.value.image) ? row.value.image : null,
-    updatedAt: row.updated_at,
-  }));
+  if (expectedUserId && userId !== expectedUserId) throw new Error('Your account changed. Reload recipes.');
+  return loadRecipesOnce(userId, async () => {
+    const rows = [];
+    for (let from = 0; ; from += 100) {
+      const result = await client
+        .from('user_tool_preferences')
+        .select('key,value,updated_at')
+        .eq('user_id', userId)
+        .like('key', `${PREFIX}%`)
+        .order('key')
+        .range(from, from + 99);
+      assertSupabaseResult(result);
+      rows.push(...result.data);
+      if (result.data.length < 100) break;
+    }
+    return rows.map((row) => ({
+      ...validateRecipe(row.value.recipe),
+      image: isRecipeImage(row.value.image) ? row.value.image : null,
+      updatedAt: row.updated_at,
+    }));
+  });
 }
 
 export async function saveRecipe(recipe, image, { edit = false, expectedUserId } = {}) {

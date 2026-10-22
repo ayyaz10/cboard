@@ -19,7 +19,7 @@ export function useSavedFoods(enabled = true) {
     if (!enabled || !user?.id) return;
     let cancelled = false;
     setState({ library: [], loading: true, error: '' });
-    Promise.allSettled([getRecipes(), getFoodDiary(user.id), getFoodCatalog(user.id), loadGroceries()]).then(results => {
+    Promise.allSettled([getRecipes(user.id), getFoodDiary(user.id), getFoodCatalog(user.id), loadGroceries()]).then(results => {
       if (cancelled) return;
       const values = results.map(result => result.status === 'fulfilled' ? result.value : undefined);
       setState({

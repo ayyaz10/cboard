@@ -106,7 +106,7 @@ function RecipesContent({ route, navigationPath }) {
     setLoading(true);
     setError('');
     try {
-      const [loadedRecipes, loadedFavourites, storedFoodCatalog, loadedMealPlanRefs] = await Promise.all([getRecipes(), getRecipeFavourites(), getFoodCatalog(user.id), getMealPlanFoodReferences()]);
+      const [loadedRecipes, loadedFavourites, storedFoodCatalog, loadedMealPlanRefs] = await Promise.all([getRecipes(user.id), getRecipeFavourites(), getFoodCatalog(user.id), getMealPlanFoodReferences()]);
       setFoodCatalog(storedFoodCatalog);
       setMealPlanRefs(loadedMealPlanRefs);
       setRecipes(applyFoodCatalogToRecipes(loadedRecipes, storedFoodCatalog));
@@ -273,7 +273,7 @@ function RecipesContent({ route, navigationPath }) {
     setBusy(true);
     try {
       const deletedSlugs = new Set(recipeCleanup.recipes.map(item => item.slug));
-      const remainingRecipes = (await getRecipes()).filter(item => !deletedSlugs.has(item.slug));
+      const remainingRecipes = (await getRecipes(user.id)).filter(item => !deletedSlugs.has(item.slug));
       const latestMealPlanRefs = await getMealPlanFoodReferences();
       const analysis = classifyFoodDeletion(recipeCleanup.foods.map(item => item.id), { catalog: foodCatalog, recipes: remainingRecipes, mealPlans: latestMealPlanRefs });
       const safeIds = analysis.safe.map(item => item.food.id);
@@ -293,7 +293,7 @@ function RecipesContent({ route, navigationPath }) {
     }
   }
   async function deleteFoods(ids) {
-    const [latestRecipes, latestMealPlanRefs] = await Promise.all([getRecipes(), getMealPlanFoodReferences()]);
+    const [latestRecipes, latestMealPlanRefs] = await Promise.all([getRecipes(user.id), getMealPlanFoodReferences()]);
     const analysis = classifyFoodDeletion(ids, { catalog: foodCatalog, recipes: latestRecipes, mealPlans: latestMealPlanRefs });
     if (analysis.inUse.length) throw new Error('One or more selected foods are now used by a recipe. Reload the food list and try again.');
     const count = await deleteFoodCatalogItems(analysis.safe.map(item => item.food.id), user.id);
@@ -304,7 +304,7 @@ function RecipesContent({ route, navigationPath }) {
     notify.success(`${count} food${count === 1 ? '' : 's'} deleted`);
   }
   async function deleteRecipeOnlyIngredients(keys) {
-    const latestRecipes = await getRecipes();
+    const latestRecipes = await getRecipes(user.id);
     const result = removeRecipeOnlyIngredients(latestRecipes, keys);
     const changed = result.recipes.filter((recipe, index) => recipe !== latestRecipes[index]);
     if (!changed.length) throw new Error('Those ingredients changed or were already removed. Reload the food list.');
@@ -321,7 +321,7 @@ function RecipesContent({ route, navigationPath }) {
   }
   async function mergeFoods({ keepId, mergeIds, nutritionSourceId, behaviorSourceId }) {
     const result = await mergeFoodRecords({ keepId, mergeIds, nutritionSourceId, behaviorSourceId, expectedUserId: user.id });
-    const refreshedRecipes = await getRecipes();
+    const refreshedRecipes = await getRecipes(user.id);
     setFoodCatalog(result.catalog);
     setRecipes(applyFoodCatalogToRecipes(refreshedRecipes, result.catalog));
     notify.success(`${result.mergedCount} duplicate food${result.mergedCount === 1 ? '' : 's'} merged`);
@@ -491,7 +491,7 @@ function RecipesContent({ route, navigationPath }) {
                   navigateTo('/recipes');
                 }}
                 getSlugs={async () =>
-                  (await getRecipes()).map((item) => item.slug)
+                  (await getRecipes(user.id)).map((item) => item.slug)
                 }
                 onAiCreated={async (created, imageWarning = '') => {
                   const linked = resolveRecipeIngredients(created, foodCatalog);

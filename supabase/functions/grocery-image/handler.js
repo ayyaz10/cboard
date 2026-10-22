@@ -57,7 +57,7 @@ export function createGroceryImageHandler({ createClient, env, fetchImpl }) {
       async function getJob() {
         const { data, error } = await db
           .from("grocery_image_jobs")
-          .select("*")
+          .select("status,generation_id,url,updated_at")
           .eq("user_id", userId)
           .eq("name", cacheKey)
           .maybeSingle();

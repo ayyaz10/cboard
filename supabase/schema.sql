@@ -351,7 +351,7 @@ as $$
   end;
 $$;
 
-grant execute on function public.resolve_login_email(text) to anon, authenticated;
+revoke all on function public.resolve_login_email(text) from public, anon, authenticated;
 
 drop policy if exists "profiles_select_own" on public.profiles;
 create policy "profiles_select_own" on public.profiles
