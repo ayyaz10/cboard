@@ -3,6 +3,7 @@ import { id } from './financeData.js';
 import { inMonth, monthKey } from './financeMath.js';
 import { markGoalCompletion } from './financeReports.js';
 import { debtPlanStatus } from './financeDebtPlans.js';
+import { refreshDonationTargetStatus } from './donationAnalytics.js';
 
 export const allocationTargets = ['savings', 'budget', 'goal', 'investment', 'debt', 'donation'];
 
@@ -15,6 +16,7 @@ function amountFor(rule, income) {
 }
 
 function allocationTitle(rule, state) {
+  if (rule.targetType === 'donation' && rule.donationTargetId) return `Donation target: ${state.donationTargets?.find(x => x.id === rule.donationTargetId)?.name || rule.name}`;
   if (rule.targetType === 'goal') return `Goal: ${state.goals.find(x => x.id === rule.targetId)?.title || rule.name}`;
   if (rule.targetType === 'investment') return `Investment: ${state.investments.find(x => x.id === rule.targetId)?.name || rule.name}`;
   if (rule.targetType === 'debt') return `Payment to ${state.debts.find(x => x.id === rule.targetId)?.name || rule.name}`;
@@ -22,11 +24,18 @@ function allocationTitle(rule, state) {
 }
 
 export function applyAllocation(state, rule, income, date, sourceIncomeId = '') {
-  const amount = amountFor(rule, income);
+  let amount = amountFor(rule, income);
   if (!amount || amount < 0) return false;
+  const donationTarget = rule.targetType === 'donation' && rule.donationTargetId ? (state.donationTargets || []).find(item => item.id === rule.donationTargetId) : null;
+  if (donationTarget) {
+    const settledReservations=new Set(state.transactions.filter(item=>item.type==='expense'&&item.linkedReservationId).map(item=>item.linkedReservationId));
+    const attributed = state.transactions.filter(item => item.linkedDonationTargetId === donationTarget.id && (!item.source || item.providerStatus === 'BOOK') && !['cancelled','planned'].includes(item.allocationStatus) && !(item.type==='donation'&&settledReservations.has(item.id))).reduce((sum, item) => sum + item.amount, 0);
+    amount = Math.min(amount, Math.max(0, donationTarget.targetAmount - attributed));
+    if (!amount) { rule.active = false; donationTarget.status = 'completed'; donationTarget.completedAt ||= date; return false; }
+  }
   const previousTime = Math.max(0, ...state.transactions.map(item => Date.parse(item.createdAt) || 0));
   const now = new Date(Math.max(Date.now(), previousTime + 1)).toISOString();
-  const transaction = { id: id(), sequence: nextTransactionSequence(state), title: allocationTitle(rule, state), amount, type: rule.targetType, targetId: rule.targetId || '', categoryId: rule.categoryId || '', date, note: rule.note || 'Automatic income allocation', paymentMethod: '', createdAt: now, updatedAt: now, allocationRuleId: rule.id, sourceIncomeId, allocationStatus: 'allocated', accountingKind: 'allocation', allocatedOn: date };
+  const transaction = { id: id(), sequence: nextTransactionSequence(state), title: allocationTitle(rule, state), amount, type: rule.targetType, targetId: rule.targetId || '', categoryId: rule.categoryId || '', donationCategoryId: donationTarget?.categoryId || rule.donationCategoryId || '', linkedDonationTargetId: donationTarget?.id || '', date, note: rule.note || 'Automatic income allocation', paymentMethod: '', createdAt: now, updatedAt: now, allocationRuleId: rule.id, sourceIncomeId, allocationStatus: 'allocated', accountingKind: 'allocation', allocatedOn: date };
   if (rule.targetType === 'goal') {
     const goal = state.goals.find(x => x.id === rule.targetId);
     if (!goal) return false;
@@ -49,6 +58,11 @@ export function applyAllocation(state, rule, income, date, sourceIncomeId = '') 
   }
   if (rule.targetType === 'donation') transaction.allocationStatus = 'allocated';
   state.transactions.push(transaction);
+  if (donationTarget) {
+    const settledReservations=new Set(state.transactions.filter(item=>item.type==='expense'&&item.linkedReservationId).map(item=>item.linkedReservationId));
+    const newTotal = state.transactions.filter(item => item.linkedDonationTargetId === donationTarget.id && (!item.source || item.providerStatus === 'BOOK') && !['cancelled','planned'].includes(item.allocationStatus) && !(item.type==='donation'&&settledReservations.has(item.id))).reduce((sum, item) => sum + item.amount, 0);
+    if (newTotal >= donationTarget.targetAmount) { donationTarget.status = 'completed'; donationTarget.completedAt ||= date; rule.active = false; }
+  }
   return true;
 }
 
@@ -73,6 +87,7 @@ export function reconcileIncomeAllocations(state, income, operation = 'replace')
     record.sourceIncomeId = '';
   }
   if (!deleting) applyIncomeAllocations(state, income);
+  refreshDonationTargetStatus(state, income.date);
   return { protectedCount: protectedRecords.length };
 }
 
@@ -96,6 +111,17 @@ export function applyDueMonthlyAllocations(state, date) {
 export function settleAllocation(state, transactionId, date) {
   const transaction = state.transactions.find(item => item.id === transactionId);
   if (!transaction || transaction.allocationStatus !== 'allocated') return false;
+  if (transaction.type === 'donation') {
+    if (transaction.settlementTransactionId && state.transactions.some(item => item.id === transaction.settlementTransactionId)) return false;
+    const financeCategory = (state.categories || []).find(category => category.type === 'donation' && !category.archived);
+    const payment = { id: id(), sequence: nextTransactionSequence(state), title: transaction.title || 'Donation', amount: transaction.amount, type: 'expense', categoryId: financeCategory?.id || '', financeGroup: 'donation', donationCategoryId: transaction.donationCategoryId || '', linkedDonationTargetId: transaction.linkedDonationTargetId || '', linkedReservationId: transaction.id, date, paymentDate: date, note: transaction.note || 'Paid from Donation Reserve', paymentMethod: transaction.paymentMethod || '', createdAt: new Date().toISOString() };
+    transaction.paymentDate = date;
+    transaction.settlementTransactionId = payment.id;
+    transaction.updatedAt = payment.createdAt;
+    state.transactions.push(payment);
+    refreshDonationTargetStatus(state, date);
+    return true;
+  }
   transaction.allocatedOn ||= transaction.date;
   transaction.paymentDate = date;
   transaction.date = date;

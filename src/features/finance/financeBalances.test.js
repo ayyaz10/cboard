@@ -34,6 +34,17 @@ test('paid donation releases its reserve and decreases cash exactly once', () =>
   assert.equal(timeline[1].actualCash, 95_000);
 });
 
+test('an Expense paid from Donation Reserve releases protected cash without deducting spendable twice', () => {
+  const balances=calculateFinanceBalances(state([
+    tx('salary','income',100_000,'2026-10-01'),
+    tx('reserve','donation',50_000,'2026-10-02',{allocationStatus:'allocated'}),
+    tx('gift','expense',50_000,'2026-10-10',{financeGroup:'donation',linkedReservationId:'reserve'}),
+  ]));
+  assert.equal(balances.actualCash,50_000);
+  assert.equal(balances.reserved.donation,0);
+  assert.equal(balances.availableCash,50_000);
+});
+
 test('unpaid debt does not reduce overall owned; a recorded payment reduces cash once', () => {
   const balances = calculateFinanceBalances(state([
     tx('salary', 'income', 100_000, '2026-09-01'),

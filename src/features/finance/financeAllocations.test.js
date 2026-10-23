@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyDueMonthlyAllocations, applyIncomeAllocations, reconcileIncomeAllocations, settleAllocation } from './financeAllocations.js';
+import { financeSummary } from './financeMath.js';
+import { deriveFinancePosition } from './financeLedger.js';
 
 function state() {
   return { settings:{monthlyIncome:300000}, transactions:[], allocationRules:[], goals:[], goalContributions:[], investments:[], debts:[], debtPayments:[] };
@@ -104,4 +106,63 @@ test('monthly rules run once on or after their selected day', () => {
   applyDueMonthlyAllocations(value,'2026-09-20');
   applyDueMonthlyAllocations(value,'2026-09-26');
   assert.equal(value.transactions.length,1);
+});
+
+test('donation target allocations are capped at the remaining target and stop when reached', () => {
+  const value=state();
+  value.donationTargets=[{id:'school',name:'School fund',categoryId:'education',targetAmount:5000,active:true,status:'active'}];
+  value.allocationRules=[{id:'target-rule',name:'School fund',targetType:'donation',donationTargetId:'school',donationCategoryId:'education',mode:'amount',value:3000,timing:'income',active:true}];
+  const first={id:'pay-1',type:'income',amount:10000,date:'2026-10-01'};
+  const second={id:'pay-2',type:'income',amount:10000,date:'2026-10-15'};
+  value.transactions.push(first,second);
+  applyIncomeAllocations(value,first);
+  applyIncomeAllocations(value,first);
+  applyIncomeAllocations(value,second);
+  const reserves=value.transactions.filter(item=>item.type==='donation');
+  assert.deepEqual(reserves.map(item=>item.amount),[3000,2000]);
+  assert.ok(reserves.every(item=>item.allocationStatus==='allocated'&&item.donationCategoryId==='education'&&item.linkedDonationTargetId==='school'));
+  assert.equal(value.donationTargets[0].status,'completed');
+  assert.equal(value.allocationRules[0].active,false);
+});
+
+test('a donation income percentage reserves money once and does not count it as paid', () => {
+  const value=state();
+  value.settings={monthlyIncome:0};
+  value.budgets={};
+  const income={id:'payday',type:'income',amount:200000,date:'2026-10-01'};
+  value.transactions.push(income);
+  value.allocationRules=[{id:'give',targetType:'donation',donationCategoryId:'education',mode:'percent',value:500,timing:'income',active:true}];
+  applyIncomeAllocations(value,income);
+  applyIncomeAllocations(value,income);
+  const allocation=value.transactions.find(item=>item.allocationRuleId==='give');
+  assert.equal(allocation.amount,10000);
+  assert.equal(allocation.allocationStatus,'allocated');
+  assert.equal(allocation.donationCategoryId,'education');
+  assert.equal(financeSummary(value,'2026-10').donations,0);
+  const position=deriveFinancePosition(value);
+  assert.equal(position.reserves.donation,10000);
+  assert.equal(position.totalOwned,200000);
+});
+
+test('paying a donation reserve creates one Expense transaction and releases the reserve once', () => {
+  const value=state();
+  value.settings={monthlyIncome:0};
+  value.budgets={};
+  value.categories=[{id:'donation-group',type:'donation'}];
+  value.donationCategories=[{id:'education',name:'Education'}];
+  value.transactions=[
+    {id:'salary',type:'income',amount:10000,date:'2026-10-01'},
+    {id:'reserve',type:'donation',amount:5000,date:'2026-10-02',allocatedOn:'2026-10-02',allocationStatus:'allocated',donationCategoryId:'education',linkedDonationTargetId:'target'},
+  ];
+  assert.equal(settleAllocation(value,'reserve','2026-10-10'),true);
+  const payment=value.transactions.find(item=>item.linkedReservationId==='reserve');
+  assert.equal(payment.type,'expense');
+  assert.equal(payment.financeGroup,'donation');
+  assert.equal(payment.amount,5000);
+  assert.equal(value.transactions.find(item=>item.id==='reserve').allocationStatus,'allocated');
+  assert.equal(value.transactions.filter(item=>item.type==='expense'&&item.financeGroup==='donation').length,1);
+  assert.equal(financeSummary(value,'2026-10').donations,5000);
+  const position=deriveFinancePosition(value);
+  assert.equal(position.reserves.donation,0);
+  assert.equal(position.totalOwned,5000);
 });

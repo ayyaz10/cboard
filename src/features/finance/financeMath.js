@@ -44,9 +44,10 @@ export function financeSummary(state, selectedMonth) {
   const allTime = selectedMonth === null;
   const transactions = (allTime ? state.transactions : state.transactions.filter((item) => inMonth(item.date, selectedMonth))).filter(item => !['allocated', 'planned', 'cancelled'].includes(item.allocationStatus) && (!item.source || item.providerStatus === 'BOOK'));
   const sum = (type) => transactions.filter((item) => item.type === type).reduce((total, item) => total + item.amount, 0);
+  const donationCategoryIds = new Set((state.categories || []).filter(category => category.type === 'donation').map(category => category.id));
   const income = sum('income');
-  const expenses = sum('expense');
-  const donations = sum('donation');
+  const expenses = transactions.filter(item => item.type === 'expense' && item.financeGroup !== 'donation' && !donationCategoryIds.has(item.categoryId)).reduce((total,item)=>total+item.amount,0);
+  const donations = transactions.filter(item => item.type === 'donation' || (item.type === 'expense' && (item.financeGroup === 'donation' || donationCategoryIds.has(item.categoryId)))).reduce((total,item)=>total+item.amount,0);
   const investments = sum('investment');
   const debtPayments = sum('debt');
   const saved = sum('savings');

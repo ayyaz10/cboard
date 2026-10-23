@@ -13,6 +13,10 @@ export const defaultCategories = [
   ['Savings', 'savings', '#c5ff6f'], ['Budget pot', 'budget', '#ffd166'], ['Goal contribution', 'goal', '#9fe3ff'],
 ].map(([name, type, color], index) => ({ id: `default-${index}`, name, type, color, icon: '', archived: false, order: index }));
 
+export const defaultDonationCategories = [
+  { id: 'donation-default-general', name: 'General Charity', description: '', icon: '', archived: false, createdAt: '2026-01-01T00:00:00.000Z' },
+];
+
 export function defaultCurrency() {
   const region = (navigator.language || 'en-GB').split('-')[1];
   return ({ GB: 'GBP', US: 'USD', CA: 'CAD', AU: 'AUD', EU: 'EUR', IN: 'INR', PK: 'PKR' })[region] || 'GBP';
@@ -22,7 +26,7 @@ export function initialFinanceState() {
   return {
     version: 1,
     settings: { configured: false, currency: defaultCurrency(), monthlyIncome: 0, budgetStartDay: 1, defaultForeignCurrency: 'PKR', leftoverDestination: 'rollover', leftoverGoalId: '' },
-    categories: structuredClone(defaultCategories), transactions: [], merchantProfiles: [], budgets: {}, openingBalances: {}, budgetPresets: [],
+    categories: structuredClone(defaultCategories), donationCategories: structuredClone(defaultDonationCategories), donationTargets: [], transactions: [], merchantProfiles: [], budgets: {}, openingBalances: {}, budgetPresets: [],
     goals: [], goalContributions: [], investments: [], debts: [], debtPayments: [], recurring: [], transactionPresets: [], allocationRules: [],
   };
 }
@@ -31,7 +35,7 @@ export function normalizeFinanceState(value) {
   const fallback = initialFinanceState();
   if (!value || typeof value !== 'object') return fallback;
   const state = { ...fallback, ...structuredClone(value), settings: { ...fallback.settings, ...(value.settings || {}) } };
-  for (const key of ['categories', 'transactions', 'budgetPresets', 'goals', 'goalContributions', 'investments', 'debts', 'debtPayments', 'recurring', 'transactionPresets', 'allocationRules']) {
+  for (const key of ['categories', 'donationCategories', 'donationTargets', 'transactions', 'budgetPresets', 'goals', 'goalContributions', 'investments', 'debts', 'debtPayments', 'recurring', 'transactionPresets', 'allocationRules']) {
     if (!Array.isArray(state[key])) state[key] = [];
   }
   migrateDebtPlanStatuses(state.debts, state.allocationRules);
@@ -52,6 +56,19 @@ export function normalizeFinanceState(value) {
   }
   for (const category of defaultCategories) {
     if (!state.categories.some((item) => item.name === category.name && item.type === category.type)) state.categories.push({ ...category, id: `added-${category.id}`, order: state.categories.length });
+  }
+  for (const category of defaultDonationCategories) {
+    if (!state.donationCategories.some(item => item.id === category.id || item.name.trim().toLowerCase() === category.name.toLowerCase())) state.donationCategories.push(structuredClone(category));
+  }
+  const generalDonationCategoryId = state.donationCategories.find(item => item.id === defaultDonationCategories[0].id)?.id || state.donationCategories.find(item => item.name.trim().toLowerCase() === defaultDonationCategories[0].name.toLowerCase())?.id || '';
+  for (const rule of state.allocationRules) if (rule.targetType === 'donation' && !rule.donationCategoryId) rule.donationCategoryId = generalDonationCategoryId;
+  for (const transaction of state.transactions) {
+    const financeCategory = state.categories.find(category => category.id === transaction.categoryId);
+    const isDonation = transaction.type === 'donation' || (transaction.type === 'expense' && (transaction.financeGroup === 'donation' || financeCategory?.type === 'donation'));
+    if (isDonation && !transaction.donationCategoryId) transaction.donationCategoryId = generalDonationCategoryId;
+    const allocationRule = state.allocationRules.find(rule => rule.id === transaction.allocationRuleId);
+    if (isDonation && allocationRule?.targetType === 'donation' && allocationRule.donationCategoryId) transaction.donationCategoryId ||= allocationRule.donationCategoryId;
+    if (transaction.type === 'expense' && financeCategory?.type === 'donation') transaction.financeGroup = 'donation';
   }
   return state;
 }

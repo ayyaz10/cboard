@@ -21,7 +21,7 @@ function goalFor(transaction, goals) {
   return goals.find(item => labelKey(item.title) === title);
 }
 
-function movement(transaction, funds, reserves, owned, cash, stateGoals, stateInvestments) {
+function movement(transaction, funds, reserves, owned, cash, stateGoals, stateInvestments, stateTransactions) {
   const amount = money(transaction.amount);
   const status = transaction.allocationStatus || '';
   const type = transaction.type;
@@ -39,6 +39,11 @@ function movement(transaction, funds, reserves, owned, cash, stateGoals, stateIn
     return { owned, cash };
   }
   if (type === 'expense') {
+    const reservation = transaction.linkedReservationId && stateTransactions.find(item => item.id === transaction.linkedReservationId && item.type === 'donation' && item.allocationStatus === 'allocated');
+    if (reservation) {
+      reserves.donation = Math.max(0, (reserves.donation || 0) - amount);
+      return { owned: owned - amount, cash };
+    }
     const rawFundId = transaction.paidFromFundId || transaction.goalId;
     const fundId = rawFundId && Object.hasOwn(funds, rawFundId) ? rawFundId : rawFundId && Object.hasOwn(funds, `goal:${rawFundId}`) ? `goal:${rawFundId}` : '';
     if (fundId) funds[fundId] -= amount;
@@ -88,18 +93,19 @@ export function deriveFinancePosition(state, { asOfDate = '9999-12-31', openingB
   const reserves = { donation: 0, debt: 0, budget: 0 };
   let owned = money(openingBalance), spendable = money(openingBalance);
   let income = 0, expenses = 0, donationsPaid = 0, debtPaid = 0, movedToFunds = 0;
+  const donationCategoryIds = new Set((state.categories || []).filter(category => category.type === 'donation').map(category => category.id));
   const point = (date, transaction) => ({ date, spendable: owned - sum(Object.values(funds)) - sum(Object.values(reserves)), protected: sum(Object.values(funds)) + sum(Object.values(reserves)), totalOwned: owned, funds: { ...funds }, reserves: { ...reserves }, transaction });
   const points = [point(events[0]?.date || '', null)];
   for (const transaction of events) {
     const amount = money(transaction.amount), status = transaction.allocationStatus || '';
     if (!transaction._reservePhase) {
       if (transaction.type === 'income') income += amount;
-      if (transaction.type === 'expense') expenses += amount;
-      if (transaction.type === 'donation' && status !== 'allocated') donationsPaid += amount;
+      if (transaction.type === 'expense' && transaction.financeGroup !== 'donation' && !donationCategoryIds.has(transaction.categoryId)) expenses += amount;
+      if ((transaction.type === 'donation' && status !== 'allocated') || (transaction.type === 'expense' && (transaction.financeGroup === 'donation' || donationCategoryIds.has(transaction.categoryId)))) donationsPaid += amount;
       if (transaction.type === 'debt' && status !== 'allocated') debtPaid += amount;
       if (FUND_TYPES.has(transaction.type) && transaction.goalMovement !== 'spend') movedToFunds += amount;
     }
-    const next = movement(transaction, funds, reserves, owned, spendable, state.goals || [], state.investments || []);
+    const next = movement(transaction, funds, reserves, owned, spendable, state.goals || [], state.investments || [], state.transactions || []);
     owned = next.owned;
     spendable = next.cash;
     points.push(point(transaction.date, transaction));

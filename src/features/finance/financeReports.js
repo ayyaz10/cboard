@@ -1,4 +1,5 @@
 import { financeSummary, monthKey, shiftMonth } from './financeMath.js';
+import { donationTransactions } from './donationAnalytics.js';
 
 function goalCompletionDate(goal, contributions = []) {
   if (goal.completedAt) return String(goal.completedAt).slice(0, 10);
@@ -55,7 +56,7 @@ export function monthlyFinanceReport(state, month) {
     investmentActivity: transactionActivity('investment'),
     investmentPositions: (state.investments || []).filter((item) => item.date?.slice(0, 7) === month),
     debtActivity: transactionActivity('debt'),
-    donationActivity: transactionActivity('donation'),
+    donationActivity: donationTransactions(state).filter(item => item.date?.slice(0, 7) === month && (!item.source || item.providerStatus === 'BOOK')),
   };
 }
 

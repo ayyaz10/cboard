@@ -34,6 +34,14 @@ test('monthly report separates spending, saving and investing and lists achieved
   assert.deepEqual(report.achievedGoals.map((goal) => goal.title), ['Holiday']);
 });
 
+test('paid Expense transactions classified as Donation appear in donation activity and totals', () => {
+  const value={settings:{monthlyIncome:0},budgets:{},categories:[],transactions:[{id:'gift',type:'expense',amount:3000,date:'2026-10-08',financeGroup:'donation',donationCategoryId:'education'}],goals:[],goalContributions:[],investments:[],debts:[],debtPayments:[]};
+  const report=monthlyFinanceReport(value,'2026-10');
+  assert.equal(report.expenses,0);
+  assert.equal(report.donations,3000);
+  assert.equal(report.donationActivity[0].id,'gift');
+});
+
 test('monthly history includes empty months between the first record and current month', () => {
   assert.deepEqual(monthlyFinanceReports(state, '2026-09').map((report) => report.month), ['2026-09', '2026-08', '2026-07', '2026-06']);
 });

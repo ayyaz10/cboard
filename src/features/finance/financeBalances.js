@@ -81,6 +81,7 @@ function applyEvent(event, balances) {
     if (transaction.type === 'savings' && transaction.allocationStatus === 'transferred') balances.savingsAsset += transaction.amount;
   } else if (kind === 'cash' || kind === 'transfer') {
     balances.actualCash += transactionCashEffect(transaction);
+    if (transaction.type === 'expense' && transaction.linkedReservationId) balances.reserved.donation = Math.max(0, balances.reserved.donation - transaction.amount);
     if (transaction.type === 'savings' && !['allocated', 'cancelled'].includes(transaction.allocationStatus) && transaction.accountingKind !== 'allocation') balances.savingsAsset += transaction.amount;
   }
   balances.reservedTotal = componentTotal(balances.reserved);
