@@ -125,10 +125,15 @@ html[data-theme="matrix"] .finance .f-tabs a[aria-current=page]{border-color:var
 .f-merchant-chips{display:flex;gap:.4rem;flex-wrap:wrap}
 .f-merchant-chips button{display:inline-flex;align-items:center;gap:.4rem}
 .f-merchant-chips .f-merchant-avatar{width:1.4rem;height:1.4rem}
-.f-transaction-history-suggestions{display:grid;gap:.45rem;padding:.75rem;border:2px solid #111;border-radius:.8rem;background:#fff8dd}
-.f-transaction-history-suggestions .f-help{margin:0;font-weight:700}
-.f-transaction-history-suggestions button{display:flex;align-items:center;justify-content:space-between;gap:.6rem;flex-wrap:wrap;text-align:left}
-.f-transaction-history-suggestions button small{opacity:.7}
+.f-transaction-entry{display:grid;gap:.55rem;min-width:0}
+.f-transaction-history-suggestions{display:grid;gap:.4rem;min-width:0;padding:.65rem;border:1px solid var(--color-border,#383838);border-radius:var(--radius-card,.65rem);background:var(--color-surface-raised,#111);color:var(--color-text,#f0efed);box-shadow:var(--shadow-sm,0 1px 2px #0008)}
+.f-transaction-history-suggestions .f-help{display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin:0 .15rem .15rem;color:var(--color-text,#f0efed);font-size:.76rem;font-weight:750}
+.f-transaction-history-suggestions .f-help span{color:var(--color-text-muted,#858481);font-size:.7rem;font-weight:500;text-align:right}
+.finance .f-transaction-history-suggestions .f-button{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"title category" "details details";align-items:center;gap:.15rem .65rem;width:100%;min-width:0;padding:.55rem .7rem;border:1px solid var(--color-border,#383838);border-radius:var(--radius-sm,.45rem);background:var(--color-surface-interactive,#171717);color:var(--color-text,#f0efed);text-align:left;transition:border-color .15s,background-color .15s,transform .15s}
+.finance .f-transaction-history-suggestions .f-button:hover{border-color:var(--color-accent,#f28a47);background:var(--color-surface,#0a0a0a);transform:translateY(-1px)}
+.f-transaction-history-suggestions button strong{grid-area:title;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.85rem}
+.f-transaction-history-suggestions button span{grid-area:details;color:var(--color-text-secondary,#b5b4b1);font-size:.72rem;line-height:1.35}
+.f-transaction-history-suggestions button small{grid-area:category;max-width:9rem;overflow:hidden;color:var(--color-text-muted,#858481);font-size:.68rem;text-overflow:ellipsis;white-space:nowrap;text-align:right}
 .f-merchant-inline-preview{width:3rem;height:3rem;object-fit:contain;border:1px solid var(--color-border);border-radius:.5rem;background:#fff;padding:.2rem}
 .f-merchant-layout{display:grid;grid-template-columns:minmax(16rem,.75fr) minmax(0,1.25fr);gap:1rem;align-items:start}
 .f-merchant-filter{grid-template-columns:minmax(0,1fr) minmax(10rem,.4fr);margin:0 0 1rem}
