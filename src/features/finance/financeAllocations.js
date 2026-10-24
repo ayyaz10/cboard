@@ -35,7 +35,8 @@ export function applyAllocation(state, rule, income, date, sourceIncomeId = '') 
   }
   const previousTime = Math.max(0, ...state.transactions.map(item => Date.parse(item.createdAt) || 0));
   const now = new Date(Math.max(Date.now(), previousTime + 1)).toISOString();
-  const transaction = { id: id(), sequence: nextTransactionSequence(state), title: allocationTitle(rule, state), amount, type: rule.targetType, targetId: rule.targetId || '', categoryId: rule.categoryId || '', donationCategoryId: donationTarget?.categoryId || rule.donationCategoryId || '', linkedDonationTargetId: donationTarget?.id || '', date, note: rule.note || 'Automatic income allocation', paymentMethod: '', createdAt: now, updatedAt: now, allocationRuleId: rule.id, sourceIncomeId, allocationStatus: 'allocated', accountingKind: 'allocation', allocatedOn: date };
+  const merchant=state.merchantProfiles?.find(item=>item.id===rule.merchantId);
+  const transaction = { id: id(), sequence: nextTransactionSequence(state), title: allocationTitle(rule, state), amount, type: rule.targetType, targetId: rule.targetId || '', categoryId: rule.categoryId || '', donationCategoryId: donationTarget?.categoryId || rule.donationCategoryId || '', linkedDonationTargetId: donationTarget?.id || '', merchantId:merchant?.id||null, resolvedMerchantName:merchant?.displayName||'', date, note: rule.note || 'Automatic income allocation', paymentMethod: '', createdAt: now, updatedAt: now, allocationRuleId: rule.id, sourceIncomeId, allocationStatus: 'allocated', accountingKind: 'allocation', allocatedOn: date };
   if (rule.targetType === 'goal') {
     const goal = state.goals.find(x => x.id === rule.targetId);
     if (!goal) return false;
