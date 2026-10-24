@@ -50,6 +50,15 @@ test('legacy paid donations receive a stable starter category on normalization',
   assert.equal(donationSummary(state,'2026-10').categories[0].id,'donation-default-general');
 });
 
+test('an expense carrying a donation category syncs to Donations and finance totals', () => {
+  const state=normalizeFinanceState({transactions:[{id:'gift-expense',type:'expense',amount:2500,date:'2026-10-02',categoryId:'default-4',donationCategoryId:'donation-default-general'}]});
+  assert.equal(state.transactions[0].financeGroup,'donation');
+  assert.equal(donationSummary(state,'2026-10').donated,2500);
+  const summary=financeSummary(state,'2026-10');
+  assert.equal(summary.expenses,0);
+  assert.equal(summary.donations,2500);
+});
+
 test('an Expense under the Donation finance category is a donation and reduces owned money once', () => {
   const state=initialFinanceState();
   state.settings.configured=true;

@@ -64,11 +64,12 @@ export function normalizeFinanceState(value) {
   for (const rule of state.allocationRules) if (rule.targetType === 'donation' && !rule.donationCategoryId) rule.donationCategoryId = generalDonationCategoryId;
   for (const transaction of state.transactions) {
     const financeCategory = state.categories.find(category => category.id === transaction.categoryId);
-    const isDonation = transaction.type === 'donation' || (transaction.type === 'expense' && (transaction.financeGroup === 'donation' || financeCategory?.type === 'donation'));
+    const donationCategory = state.donationCategories.find(category => category.id === transaction.donationCategoryId);
+    const isDonation = transaction.type === 'donation' || (transaction.type === 'expense' && (transaction.financeGroup === 'donation' || financeCategory?.type === 'donation' || Boolean(donationCategory)));
     if (isDonation && !transaction.donationCategoryId) transaction.donationCategoryId = generalDonationCategoryId;
     const allocationRule = state.allocationRules.find(rule => rule.id === transaction.allocationRuleId);
     if (isDonation && allocationRule?.targetType === 'donation' && allocationRule.donationCategoryId) transaction.donationCategoryId ||= allocationRule.donationCategoryId;
-    if (transaction.type === 'expense' && financeCategory?.type === 'donation') transaction.financeGroup = 'donation';
+    if (transaction.type === 'expense' && isDonation) transaction.financeGroup = 'donation';
   }
   return state;
 }
