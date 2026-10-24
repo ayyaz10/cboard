@@ -60,12 +60,16 @@ function breakdown(transactions, categories) {
   return [...categoryMap.values()].filter(row => row.amount > 0).sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name));
 }
 
-export function donationSummary(state, month) {
+export function donationSummary(state, month, incomeMonth = month) {
   const all = donationTransactions(state).filter(item => !item.source || item.providerStatus === 'BOOK');
   const selected = month ? all.filter(item => inMonth(item.date, month)) : all;
+  const incomeTransactions = (state.transactions || []).filter(item => item.type === 'income' && !['allocated', 'planned', 'cancelled'].includes(item.allocationStatus) && (!item.source || item.providerStatus === 'BOOK'));
   const categories = state.donationCategories || [];
   const lifetime = all.reduce((sum, item) => sum + item.amount, 0);
   const donated = selected.reduce((sum, item) => sum + item.amount, 0);
+  const incomeLifetime = incomeTransactions.reduce((sum, item) => sum + item.amount, 0);
+  const income = (month ? incomeTransactions.filter(item => inMonth(item.date, month)) : incomeTransactions).reduce((sum, item) => sum + item.amount, 0);
+  const monthlyIncome = (incomeMonth ? incomeTransactions.filter(item => inMonth(item.date, incomeMonth)) : incomeTransactions).reduce((sum, item) => sum + item.amount, 0);
   const position = deriveFinancePosition(state);
   const reserved = Number(position.reserves?.donation || 0);
   const targets = (state.donationTargets || []).filter(target => target.active !== false);
@@ -73,6 +77,9 @@ export function donationSummary(state, month) {
     month,
     donated,
     lifetime,
+    income,
+    monthlyIncome,
+    incomeLifetime,
     transactionCount: selected.length,
     transactions: [...selected].sort((a, b) => b.date.localeCompare(a.date) || String(b.createdAt || '').localeCompare(String(a.createdAt || ''))),
     categories: breakdown(selected, categories),

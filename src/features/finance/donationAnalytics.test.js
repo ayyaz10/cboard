@@ -25,6 +25,25 @@ test('monthly donation totals and category totals use paid ledger transactions o
   assert.deepEqual(donationSummary(state,'2026-10').categories.map(row=>[row.name,row.amount]),[['General Charity',7000],['Education Support',3000]]);
 });
 
+test('donation dashboard reports selected-month and all-time recorded income', () => {
+  const state=initialFinanceState();
+  state.transactions=[
+    {id:'salary-oct',type:'income',amount:250000,date:'2026-10-01'},
+    {id:'bonus-oct',type:'income',amount:30000,date:'2026-10-20'},
+    {id:'salary-sep',type:'income',amount:240000,date:'2026-09-01'},
+    {id:'pending-bank-income',type:'income',amount:90000,date:'2026-10-15',source:'bank',providerStatus:'PDNG'},
+  ];
+  const october=donationSummary(state,'2026-10');
+  assert.equal(october.income,280000);
+  assert.equal(october.incomeLifetime,520000);
+  const allTime=donationSummary(state,null);
+  assert.equal(allTime.income,520000);
+  assert.equal(allTime.monthlyIncome,520000);
+  assert.equal(allTime.incomeLifetime,520000);
+  const allTimeView=donationSummary(state,null,'2026-10');
+  assert.equal(allTimeView.monthlyIncome,280000);
+});
+
 test('legacy paid donations receive a stable starter category on normalization', () => {
   const state=normalizeFinanceState({transactions:[{id:'legacy',type:'donation',amount:1250,date:'2026-10-01'}]});
   assert.equal(state.transactions[0].donationCategoryId,'donation-default-general');
