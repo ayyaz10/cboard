@@ -11,7 +11,9 @@ function runFinanceAutomations(state, date = today()) {
   let changed = false;
   const month = date.slice(0, 7);
   const day = Number(date.slice(8, 10));
-  const dueMonthly = (state.allocationRules || []).some(rule => rule.active && rule.timing === 'monthly' && (!rule.startedOn || rule.startedOn <= date) && day >= Number(rule.day || 1) && !state.transactions.some(item => item.allocationRuleId === rule.id && item.date?.slice(0, 7) === month));
+  const dueMonthly = (state.allocationRules || []).some(rule => rule.active && rule.timing === 'monthly' && (!rule.startedOn || rule.startedOn <= date) && day >= Number(rule.day || 1) && (rule.targetType === 'donation'
+    ? !(state.donationAccruals || []).some(item => item.executionKey === `${rule.id}:monthly:${month}`)
+    : !state.transactions.some(item => item.allocationRuleId === rule.id && item.date?.slice(0, 7) === month)));
   if (dueMonthly) { applyDueMonthlyAllocations(state, date); changed = true; }
 
   if ((state.recurring || []).some(item => !item.paused && item.mode === 'auto' && item.nextDate <= date)) {

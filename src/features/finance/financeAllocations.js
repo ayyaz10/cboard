@@ -4,6 +4,7 @@ import { inMonth, monthKey } from './financeMath.js';
 import { markGoalCompletion } from './financeReports.js';
 import { debtPlanStatus } from './financeDebtPlans.js';
 import { refreshDonationTargetStatus } from './donationAnalytics.js';
+import { accrueDonation, reconcileDonationIncome } from './donationAccounting.js';
 
 export const allocationTargets = ['savings', 'budget', 'goal', 'investment', 'debt', 'donation'];
 
@@ -26,6 +27,20 @@ function allocationTitle(rule, state) {
 export function applyAllocation(state, rule, income, date, sourceIncomeId = '') {
   let amount = amountFor(rule, income);
   if (!amount || amount < 0) return false;
+  if (rule.targetType === 'donation') {
+    const executionKey = sourceIncomeId ? `${rule.id}:${sourceIncomeId}` : `${rule.id}:monthly:${monthKey(date)}`;
+    if ((state.donationAccruals || []).some(item => item.executionKey === executionKey)) return false;
+    const target = rule.donationTargetId ? (state.donationTargets || []).find(item => item.id === rule.donationTargetId) : null;
+    if (target) {
+      const linkedPaid = state.transactions.filter(item => item.type === 'expense' && item.donationCategoryId === target.categoryId && item.linkedDonationTargetId === target.id).reduce((sum, item) => sum + item.amount, 0);
+      const linkedDue = (state.donationAccruals || []).filter(item => item.linkedDonationTargetId === target.id && item.status !== 'reversed').reduce((sum, item) => sum + Math.max(0, item.accruedAmount - item.paidAmount), 0);
+      amount = Math.min(amount, Math.max(0, target.targetAmount - linkedPaid - linkedDue));
+      if (!amount) { rule.active = false; target.status = 'completed'; target.completedAt ||= date; return false; }
+    }
+    const created = accrueDonation(state, { categoryId: rule.donationCategoryId || target?.categoryId || '', amount, effectiveDate: date, sourceType: sourceIncomeId ? 'income_percentage' : 'adjustment', linkedIncomeTransactionId: sourceIncomeId, automationRuleId: rule.id, linkedDonationTargetId: target?.id || '', note: rule.note || rule.name || '', executionKey });
+    if (target && linkedDueForTarget(state, target.id) >= target.targetAmount) { target.status = 'completed'; target.completedAt ||= date; rule.active = false; }
+    return created;
+  }
   const donationTarget = rule.targetType === 'donation' && rule.donationTargetId ? (state.donationTargets || []).find(item => item.id === rule.donationTargetId) : null;
   if (donationTarget) {
     const settledReservations=new Set(state.transactions.filter(item=>item.type==='expense'&&item.linkedReservationId).map(item=>item.linkedReservationId));
@@ -57,7 +72,6 @@ export function applyAllocation(state, rule, income, date, sourceIncomeId = '') 
     const applied = Math.min(amount, debt.remaining);
     transaction.amount = applied;
   }
-  if (rule.targetType === 'donation') transaction.allocationStatus = 'allocated';
   state.transactions.push(transaction);
   if (donationTarget) {
     const settledReservations=new Set(state.transactions.filter(item=>item.type==='expense'&&item.linkedReservationId).map(item=>item.linkedReservationId));
@@ -67,10 +81,15 @@ export function applyAllocation(state, rule, income, date, sourceIncomeId = '') 
   return true;
 }
 
+function linkedDueForTarget(state, targetId) {
+  return (state.donationAccruals || []).filter(item => item.linkedDonationTargetId === targetId && item.status !== 'reversed').reduce((sum, item) => sum + Math.max(0, item.accruedAmount - item.paidAmount), 0);
+}
+
 // Reconcile only the generated records owned by this income. Stable IDs keep
 // manually-created transactions and unrelated allocations untouched.
 export function reconcileIncomeAllocations(state, income, operation = 'replace') {
   const deleting = operation === 'delete' || operation === true;
+  reconcileDonationIncome(state, income, deleting ? 'delete' : 'replace');
   const linked = state.transactions.filter(x => x.sourceIncomeId === income.id && x.allocationRuleId);
   const protectedRecords = linked.filter(x => ['paid','completed','transferred'].includes(x.allocationStatus) && !['allocated','cancelled'].includes(x.allocationStatus));
   const protectedIds = new Set(protectedRecords.map(x => x.id));
@@ -94,6 +113,11 @@ export function reconcileIncomeAllocations(state, income, operation = 'replace')
 
 export function applyIncomeAllocations(state, incomeTransaction) {
   for (const rule of (state.allocationRules || []).filter(x => x.active && x.timing === 'income' && (!x.startedOn || x.startedOn <= incomeTransaction.date))) {
+    if (rule.targetType === 'donation') {
+      const executionKey = `${rule.id}:${incomeTransaction.id}`;
+      if (!(state.donationAccruals || []).some(item => item.executionKey === executionKey)) applyAllocation(state, rule, incomeTransaction.amount, incomeTransaction.date, incomeTransaction.id);
+      continue;
+    }
     if (!state.transactions.some(x => x.allocationRuleId === rule.id && x.sourceIncomeId === incomeTransaction.id)) applyAllocation(state, rule, incomeTransaction.amount, incomeTransaction.date, incomeTransaction.id);
   }
   return state;
@@ -104,6 +128,11 @@ export function applyDueMonthlyAllocations(state, date) {
   const day = Number(date.slice(8, 10));
   const income = state.transactions.filter(x => x.type === 'income' && inMonth(x.date, month) && (!x.source || x.providerStatus === 'BOOK')).reduce((sum, x) => sum + x.amount, 0) || state.settings.monthlyIncome;
   for (const rule of (state.allocationRules || []).filter(x => x.active && x.timing === 'monthly' && (!x.startedOn || x.startedOn <= date) && day >= Number(x.day || 1))) {
+    if (rule.targetType === 'donation') {
+      const executionKey = `${rule.id}:monthly:${month}`;
+      if (!(state.donationAccruals || []).some(item => item.executionKey === executionKey)) applyAllocation(state, rule, income, date);
+      continue;
+    }
     if (!state.transactions.some(x => x.allocationRuleId === rule.id && inMonth(x.date, month))) applyAllocation(state, rule, income, date);
   }
   return state;

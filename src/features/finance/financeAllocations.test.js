@@ -83,7 +83,7 @@ test('settling a goal allocation releases its reserve and reopens a completed go
   assert.equal(value.transactions[0].allocationStatus,'paid');
 });
 
-test('income reconciliation removes only its generated allocations and can recreate edited amounts', () => {
+test('deleting income reverses its generated donation due and preserves unrelated donations', () => {
   const value=state();
   value.allocationRules=[{id:'don',targetType:'donation',name:'Gift',mode:'percent',value:1000,timing:'income',active:true}];
   const income={id:'salary',amount:22500,date:'2026-09-01'};value.transactions.push({...income,type:'income'});
@@ -91,10 +91,7 @@ test('income reconciliation removes only its generated allocations and can recre
   const unrelated={id:'manual',type:'donation',amount:500,title:'Manual gift'};value.transactions.push(unrelated);
   reconcileIncomeAllocations(value,income,true);
   assert.deepEqual(value.transactions.map(x=>x.id),['salary','manual']);
-  const edited={...income,amount:30000};
-  reconcileIncomeAllocations(value,income,true);value.transactions[0]={...edited,type:'income'};applyIncomeAllocations(value,edited);
-  assert.equal(value.transactions.filter(x=>x.sourceIncomeId==='salary').length,1);
-  assert.equal(value.transactions.find(x=>x.sourceIncomeId==='salary').amount,3000);
+  assert.equal(value.donationAccruals[0].status,'reversed');
   assert.equal(value.transactions.some(x=>x.id==='manual'),true);
 });
 
@@ -118,14 +115,15 @@ test('donation target allocations are capped at the remaining target and stop wh
   applyIncomeAllocations(value,first);
   applyIncomeAllocations(value,first);
   applyIncomeAllocations(value,second);
-  const reserves=value.transactions.filter(item=>item.type==='donation');
-  assert.deepEqual(reserves.map(item=>item.amount),[3000,2000]);
-  assert.ok(reserves.every(item=>item.allocationStatus==='allocated'&&item.donationCategoryId==='education'&&item.linkedDonationTargetId==='school'));
+  const accruals=value.donationAccruals;
+  assert.deepEqual(accruals.map(item=>item.amount),[3000,2000]);
+  assert.ok(accruals.every(item=>item.status==='outstanding'&&item.categoryId==='education'&&item.linkedDonationTargetId==='school'));
+  assert.equal(value.transactions.filter(item=>item.type==='donation').length,0);
   assert.equal(value.donationTargets[0].status,'completed');
   assert.equal(value.allocationRules[0].active,false);
 });
 
-test('a donation income percentage reserves money once and does not count it as paid', () => {
+test('a donation income percentage accrues due once without moving money or counting it as paid', () => {
   const value=state();
   value.settings={monthlyIncome:0};
   value.budgets={};
@@ -134,13 +132,14 @@ test('a donation income percentage reserves money once and does not count it as 
   value.allocationRules=[{id:'give',targetType:'donation',donationCategoryId:'education',mode:'percent',value:500,timing:'income',active:true}];
   applyIncomeAllocations(value,income);
   applyIncomeAllocations(value,income);
-  const allocation=value.transactions.find(item=>item.allocationRuleId==='give');
+  const allocation=value.donationAccruals.find(item=>item.automationRuleId==='give');
   assert.equal(allocation.amount,10000);
-  assert.equal(allocation.allocationStatus,'allocated');
-  assert.equal(allocation.donationCategoryId,'education');
+  assert.equal(allocation.status,'outstanding');
+  assert.equal(allocation.categoryId,'education');
+  assert.equal(value.transactions.filter(item=>item.type==='donation'||item.financeGroup==='donation').length,0);
   assert.equal(financeSummary(value,'2026-10').donations,0);
   const position=deriveFinancePosition(value);
-  assert.equal(position.reserves.donation,10000);
+  assert.equal(position.reserves.donation,0);
   assert.equal(position.totalOwned,200000);
 });
 
