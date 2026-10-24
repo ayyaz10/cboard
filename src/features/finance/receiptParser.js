@@ -5,13 +5,13 @@ export const redactPaymentData = value => String(value || '').replace(/(?:\d[ -]
 // products, while the complete authorization words are receipt metadata.
 const noise = /\b(?:vat\s*(?:no|number|reg)|tel|telephone|phone|www|https|cashier|operator|receipt\s*(?:no|number|#)|transaction|terminal|loyalty|clubcard|nectar|points|visa|mastercard|amex|debit|credit|card|auth(?:orisation|ization)|approved|contactless|thank\s*you|opening\s*hours|cash\s*(?:tendered|paid)|change|payment|aid|tid|mid|pin|postcode|store\s*(?:no|number)|served by)\b/i;
 const address = /\b(?:street|road|avenue|lane|postcode)\b|\b[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}\b/i;
-const moneyEnd = /(?:[£€$]\s*)?(-?\d+(?:,\d{3})*[.,]\d{2})(?:\s*(?:[A-D*&]|[14][A-D]))?\s*[|;:]?\s*$/i;
+const moneyEnd = /(?:[£€$]\s*)?(-?\d+(?:,\d{3})*[.,]\d{2})(?:\s*-?\s*(?:[A-DZ*&]|[14][A-D]))?\s*[|;:]?\s*$/i;
 const number = value => Number(value.replace(',', '.'));
 const minor = value => Math.round(Number(value.replace(/,(?=\d{3}(?:\D|$))/g, '').replace(',', '.')) * 100);
 
 // Only repair a decimal-shaped amount at the price end of a line, never names.
 export function normalizeReceiptPrice(line) {
-  return line.replace(/(^|\s)([£€$]?\s*-?[\dOIlS]+[.,][\dOIlS]{2})(?=\s*(?:[A-D*])?\s*$)/g, (whole, gap, value) =>
+  return line.replace(/(^|\s)([£€$]?\s*-?[\dOIlS]+[.,][\dOIlS]{2})(?=\s*-?\s*(?:[A-DZ*])?\s*$)/g, (whole, gap, value) =>
     /\d/.test(value) ? gap + value.replace(/O/g, '0').replace(/[Il]/g, '1').replace(/S/g, '5') : whole);
 }
 const compactLabel = value => value.toLowerCase().replace(/[1|]/g,'l').replace(/[^a-z]/g, '');
@@ -57,6 +57,29 @@ function itemLine(rawText) {
   return { rawText: redactPaymentData(rawText), name, normalizedName: normalizedName(name), quantity, unit, unitPrice, lineTotal: minor(price[1]), packSize, packUnit };
 }
 
+function costcoItemPairs(lines, merchantName) {
+  const details = [], names = [];
+  const detailPattern = /^(\d{4,8})\s+(\d+(?:[.,]\d+)?)\s*[xÃ—]\s*(\d+(?:,\d{3})*[.,]\d{2})\s+(\d+(?:,\d{3})*[.,]\d{2})\s*-?\s*[A-Z]\s*$/i;
+  const blockedName = /please\s+keep|warehouse|edinburgh|\b(?:reg|registration|awrs|individual|receipt|subtotal|total|costco|gbp)\b/i;
+  lines.forEach((line, index) => {
+    const detail = line.match(detailPattern);
+    if (detail) {
+      details.push({ index, code: detail[1], quantity: number(detail[2]), unitPrice: minor(detail[3]), lineTotal: minor(detail[4]) });
+      return;
+    }
+    if (line === merchantName || moneyEnd.test(line) || blockedName.test(line) || metadata(line) || address.test(line) || receiptDate(line) || /^\d/.test(line)) return;
+    if ((line.match(/[\p{L}]{2,}/gu) || []).length >= 2) names.push({ index, name: line });
+  });
+  const appearsCostco = /\bcostco\b/i.test(`${merchantName} ${lines.slice(0, 12).join(' ')}`) || details.some(item => /\bZ\s*$/i.test(lines[item.index]));
+  if (!appearsCostco || !details.length) return { pairs: new Map(), detailRows: new Map() };
+
+  const pairs = new Map();
+  details.slice(0, names.length).forEach((detail, index) => {
+    pairs.set(names[index].index, { ...detail, name: names[index].name });
+  });
+  return { pairs, detailRows: new Map(details.map(detail => [detail.index, detail])) };
+}
+
 export function parseReceipt(input) {
   const text = typeof input === 'string' ? input : input?.text || '';
   const sources = Array.isArray(input?.lines) ? input.lines : String(text || '').slice(0, 100000).split(/\r?\n/).map(text => ({ text }));
@@ -69,8 +92,10 @@ export function parseReceipt(input) {
     rawText:redactPaymentData(String(rawSourceText).slice(0,100000)), unprocessedLineCount:Math.max(0,meaningfulSources.length-sourceLines.length) };
   result.time = lines.join('\n').match(/\b(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?\b/)?.[0]?.slice(0, 5) || '';
   result.currency = /£|\bGBP\b/.test(text) ? 'GBP' : /€|\bEUR\b/.test(text) ? 'EUR' : /\bUSD\b/.test(text) ? 'USD' : '';
-  const known = lines.slice(0, 8).find(line => /\b(?:tesco|asda|aldi|lidl|sainsbury'?s|morrisons|iceland|farmfoods)\b/i.test(line) && !moneyEnd.test(line));
+  const known = lines.slice(0, 8).find(line => /\b(?:costco|tesco|asda|aldi|lidl|sainsbury'?s|morrisons|iceland|farmfoods)\b/i.test(line) && !moneyEnd.test(line));
   result.merchantName = known || lines.slice(0, 5).find(line => /[a-z]{3}/i.test(line) && !noise.test(line) && !address.test(line) && !/\d|welcome|receipt/i.test(line)) || '';
+  const { pairs: costcoPairs, detailRows: costcoDetails } = costcoItemPairs(lines, result.merchantName);
+  const pairedCostcoDetails = new Set([...costcoPairs.values()].map(item => item.index));
   const aldi = /\baldi\b/i.test(result.merchantName);
   const codeLine = /^\d{5,8}\s+\S/;
   const firstProduct = lines.findIndex(line => codeLine.test(line) && moneyEnd.test(line));
@@ -120,6 +145,29 @@ export function parseReceipt(input) {
   };
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index];
+    const costcoPair = costcoPairs.get(index);
+    if (costcoPair) {
+      const item = { rawText: line, name: costcoPair.name, normalizedName: normalizedName(costcoPair.name), retailerProductCode: costcoPair.code,
+        quantity: costcoPair.quantity, unit: 'each', unitPrice: costcoPair.unitPrice, lineTotal: costcoPair.lineTotal };
+      addItem(item, index);
+      result.items.at(-1).rawText = redactPaymentData(`${sourceLines[index]?.text || line}\n${sourceLines[costcoPair.index]?.text || lines[costcoPair.index]}`);
+      result.items.at(-1).confidence.lineTotal = 80;
+      result.items.at(-1).confidence.quantity = 80;
+      result.items.at(-1).confidence.unitPrice = 80;
+      markLine(costcoPair.index, 'PRODUCT_ITEM', 80, result.items.length - 1);
+      continue;
+    }
+    const costcoDetail = costcoDetails.get(index);
+    if (costcoDetail && !pairedCostcoDetails.has(index)) {
+      const name = `Costco item ${costcoDetail.code}`;
+      addItem({ rawText: line, name, normalizedName: normalizedName(name), retailerProductCode: costcoDetail.code,
+        quantity: costcoDetail.quantity, unit: 'each', unitPrice: costcoDetail.unitPrice, lineTotal: costcoDetail.lineTotal }, index);
+      result.items.at(-1).confidence.lineTotal = 80;
+      result.items.at(-1).confidence.quantity = 80;
+      result.items.at(-1).confidence.unitPrice = 80;
+      continue;
+    }
+    if (pairedCostcoDetails.has(index)) continue;
     const price = line.match(moneyEnd);
     const label = (price ? line.slice(0, price.index) : line).replace(/[:=]/g, '').trim();
     const nextPrice = lines[index + 1]?.match(/^[£€$]?\s*(\d+[.,]\d{2})$/);
@@ -128,6 +176,11 @@ export function parseReceipt(input) {
     if (count) { result.itemCount = Number(count[1]); afterTotal = true; markLine(index, 'FOOTER', 95); continue; }
     if (/^[a-z]\s+[iItT]tems?\b/i.test(line)) { result.itemCountUncertain = true; afterTotal = true; markLine(index, 'FOOTER', 55); continue; }
     if (/\b(?:card\s*sales|amount\s*paid)\b/i.test(line)) { if (amount != null) paymentAmount = amount; afterTotal = true; markLine(index, 'PAYMENT', 95); continue; }
+    if (/please\s+keep\s+this\s+for\s+your\s+records/i.test(line)) {
+      if (amount !== null && 2 >= rank) { result.total = amount; rank = 2; result.confidence.total = 85; }
+      markLine(index, 'TOTAL', result.confidence.total || 70);
+      continue;
+    }
     if (/\bnet\b.*\bvat\b|\bvat\b.*\bnet\b|\d[.,]\d+\s*%/i.test(line)) {
       const tax = line.match(/\bvat\s+(\d+[.,]\d{2})/i); if (tax) result.tax = minor(tax[1]);
       markLine(index, 'TAX', 85);
