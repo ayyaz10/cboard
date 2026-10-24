@@ -20,7 +20,7 @@ test('suggestions omit the transaction being edited and enforce the result limit
   assert.deepEqual(matchingTransactions(transactions, 'spice', { excludeId: 'old', limit: 1 }).map(item => item.id), ['newer']);
 });
 
-test('suggestions wait for two characters and return no results for unrelated names', () => {
-  assert.deepEqual(matchingTransactions(transactions, 's'), []);
+test('suggestions appear from the first typed character and return no results for unrelated names', () => {
+  assert.deepEqual(matchingTransactions(transactions, 's').map(item => item.id), ['newer', 'old', 'other']);
   assert.deepEqual(matchingTransactions(transactions, 'coffee'), []);
 });

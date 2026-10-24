@@ -11,15 +11,13 @@ function matchesQuery(value, query) {
 
 export function matchingTransactions(transactions, title, { excludeId = '', limit = 5 } = {}) {
   const query = normalizeMerchantName(title);
-  if (query.length < 2) return [];
+  if (query.length < 1) return [];
 
   return (Array.isArray(transactions) ? transactions : [])
-    .filter(transaction => transaction?.id !== excludeId && transaction?.title && matchesQuery(transaction.title, query))
+    .filter(transaction => transaction?.id !== excludeId && [transaction?.title, transaction?.rawMerchantText, transaction?.resolvedMerchantName].some(value => matchesQuery(value, query)))
     .sort((a, b) => {
-      const aName = normalizeMerchantName(a.title);
-      const bName = normalizeMerchantName(b.title);
-      const score = name => name === query ? 3 : name.startsWith(query) ? 2 : 1;
-      return score(bName) - score(aName) || String(b.date || '').localeCompare(String(a.date || '')) || String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
+      const score = transaction => Math.max(...[transaction.title,transaction.rawMerchantText,transaction.resolvedMerchantName].map(value=>{const name=normalizeMerchantName(value);return name===query?3:name.startsWith(query)?2:name.includes(query)?1:0}));
+      return score(b) - score(a) || String(b.date || '').localeCompare(String(a.date || '')) || String(b.createdAt || '').localeCompare(String(a.createdAt || ''));
     })
     .slice(0, Math.max(0, limit));
 }
