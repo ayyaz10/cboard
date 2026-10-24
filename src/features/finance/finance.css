@@ -131,6 +131,7 @@ html[data-theme="matrix"] .finance .f-tabs a[aria-current=page]{border-color:var
 .f-transaction-history-suggestions .f-help span{color:var(--color-text-muted,#858481);font-size:.7rem;font-weight:500;text-align:right}
 .finance .f-transaction-history-suggestions .f-button{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"title category" "details details";align-items:center;gap:.15rem .65rem;width:100%;min-width:0;padding:.55rem .7rem;border:1px solid var(--color-border,#383838);border-radius:var(--radius-sm,.45rem);background:var(--color-surface-interactive,#171717);color:var(--color-text,#f0efed);text-align:left;transition:border-color .15s,background-color .15s,transform .15s}
 .finance .f-transaction-history-suggestions .f-button:hover{border-color:var(--color-accent,#f28a47);background:var(--color-surface,#0a0a0a);transform:translateY(-1px)}
+.finance .f-transaction-history-suggestions .f-button:focus-visible{outline:2px solid var(--color-focus,#f28a47);outline-offset:2px}
 .f-transaction-history-suggestions button strong{grid-area:title;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.85rem}
 .f-transaction-history-suggestions button span{grid-area:details;color:var(--color-text-secondary,#b5b4b1);font-size:.72rem;line-height:1.35}
 .f-transaction-history-suggestions button small{grid-area:category;max-width:9rem;overflow:hidden;color:var(--color-text-muted,#858481);font-size:.68rem;text-overflow:ellipsis;white-space:nowrap;text-align:right}
