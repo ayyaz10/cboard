@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import { applyDueMonthlyAllocations, applyIncomeAllocations, reconcileIncomeAllocations, settleAllocation } from './financeAllocations.js';
 import { financeSummary } from './financeMath.js';
 import { deriveFinancePosition } from './financeLedger.js';
+import { debtPaymentDue, recordDebtPayment } from './debtAccounting.js';
 
 function state() {
-  return { settings:{monthlyIncome:300000}, transactions:[], allocationRules:[], goals:[], goalContributions:[], investments:[], debts:[], debtPayments:[] };
+  return { settings:{monthlyIncome:300000,currency:'GBP'}, budgets:{}, transactions:[], allocationRules:[], goals:[], goalContributions:[], investments:[], debts:[], debtPayments:[], debtAccruals:[] };
 }
 
 test('income rules create deductions once for each income transaction', () => {
@@ -34,9 +35,10 @@ test('goal allocations reserve goal progress while investment balances wait for 
   assert.equal(value.investments[0].contributed,10000);
   assert.equal(value.investments[0].currentValue,12000);
   assert.equal(value.debts[0].remaining,3000);
-  assert.equal(value.transactions.find(x=>x.type==='debt').allocationStatus,'allocated');
+  assert.equal(debtPaymentDue(value,'d'),3000);
+  assert.equal(value.transactions.some(x=>x.type==='debt'),false);
   assert.equal(value.transactions.find(x=>x.type==='investment').allocationStatus,'allocated');
-  assert.deepEqual(value.transactions.map(x=>x.amount),[5000,2000,3000]);
+  assert.deepEqual(value.transactions.map(x=>x.amount),[5000,2000]);
 });
 
 test('only a started debt plan can reserve an automatic payment', () => {
@@ -46,18 +48,21 @@ test('only a started debt plan can reserve an automatic payment', () => {
   const income={id:'payday',type:'income',amount:10000,date:'2026-10-16'};value.transactions.push(income);
   applyIncomeAllocations(value,income);
   assert.equal(value.transactions.length,1);
+  assert.equal(value.debtAccruals.length,0);
   assert.equal(value.debts[0].remaining,3000);
 });
 
-test('debt automatic reserve is capped at the remaining balance and payoff completes the plan', () => {
+test('debt automatic income rule creates capped due, then only actual payment completes the plan', () => {
   const value=state();
   value.debts=[{id:'loan',remaining:800,status:'open',repaymentPlanStatus:'active'}];
   value.allocationRules=[{id:'rule',targetType:'debt',targetId:'loan',mode:'amount',value:2000,timing:'income',active:true}];
   const income={id:'payday',type:'income',amount:10000,date:'2026-10-16'};value.transactions.push(income);
   applyIncomeAllocations(value,income);
-  const payment=value.transactions.find(item=>item.type==='debt');
-  assert.equal(payment.amount,800);
-  assert.equal(settleAllocation(value,payment.id,'2026-10-16'),true);
+  assert.equal(value.transactions.length,1);
+  assert.equal(debtPaymentDue(value,'loan'),800);
+  assert.equal(value.debts[0].remaining,800);
+  const payment=recordDebtPayment(value,{debtId:'loan',amount:800,date:'2026-10-17'});
+  assert.equal(payment.type,'debt');
   assert.equal(value.debts[0].remaining,0);
   assert.equal(value.debts[0].status,'paid');
   assert.equal(value.debts[0].repaymentPlanStatus,'completed');

@@ -40,6 +40,7 @@ function transactionEvents(transaction) {
   if (transaction.reversedAt || isCancelled(transaction)) return [];
   const allocationDate = eventDate(transaction.allocatedOn, transaction.date);
   const paymentDate = eventDate(transaction.paymentDate, transaction.date);
+  if (transaction.type === 'debt' && transaction.paidFromFundId) return [{ date: paymentDate, kind: 'fund-payment', transaction }];
   if (transaction.goalMovement === 'spend' && transaction.goalId) return [{ date: paymentDate, kind: 'goal-spend', transaction }];
   if (transaction.allocationStatus === 'allocated' || (transaction.accountingKind === 'allocation' && transaction.allocationStatus === 'completed')) {
     return [{ date: allocationDate, kind: 'reserve', transaction }];
@@ -79,6 +80,11 @@ function applyEvent(event, balances) {
     balances.actualCash += transactionCashEffect({ ...transaction, allocationStatus: transaction.allocationStatus === 'transferred' ? 'transferred' : 'paid' });
     if (reservationTypes.has(transaction.type)) balances.reserved[transaction.type] = Math.max(0, balances.reserved[transaction.type] - transaction.amount);
     if (transaction.type === 'savings' && transaction.allocationStatus === 'transferred') balances.savingsAsset += transaction.amount;
+  } else if (kind === 'fund-payment') {
+    balances.actualCash += transactionCashEffect(transaction);
+    const fund = String(transaction.paidFromFundId || '');
+    const component = fund.startsWith('savings:') ? 'savings' : fund.startsWith('goal:') ? 'goal' : fund.startsWith('investment:') || fund.startsWith('asset:') ? 'investment' : fund.startsWith('donation:') ? 'donation' : fund.startsWith('debt:') ? 'debt' : fund.startsWith('budget:') ? 'budget' : '';
+    if (component) balances.reserved[component] = Math.max(0, balances.reserved[component] - transaction.amount);
   } else if (kind === 'cash' || kind === 'transfer') {
     balances.actualCash += transactionCashEffect(transaction);
     if (transaction.type === 'expense' && transaction.linkedReservationId) balances.reserved.donation = Math.max(0, balances.reserved.donation - transaction.amount);
@@ -95,7 +101,7 @@ function ownedAssetsAt(state, date) {
 function liabilitiesAt(state, date) {
   const paidByDebt = new Map();
   for (const payment of state.debtPayments || []) {
-    if (payment.date && payment.date <= date) paidByDebt.set(payment.debtId, (paidByDebt.get(payment.debtId) || 0) + payment.amount);
+    if (!payment.reversedAt && payment.date && payment.date <= date) paidByDebt.set(payment.debtId, (paidByDebt.get(payment.debtId) || 0) + payment.amount);
   }
   return (state.debts || []).filter(debt => {
     const started = eventDate(debt.startedOn || debt.createdAt);

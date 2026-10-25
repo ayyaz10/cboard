@@ -81,9 +81,20 @@ export function investmentSummary(items) {
 }
 
 export function debtSummary(items, payments, selectedMonth) {
+  const activePayments = payments.filter(item => !item.reversedAt);
   return {
-    outstanding: items.reduce((sum, item) => sum + item.remaining, 0),
-    paidThisMonth: payments.filter((item) => inMonth(item.date, selectedMonth)).reduce((sum, item) => sum + item.amount, 0),
+    // Repayment due is only an intention to pay. Principal falls only when an
+    // actual, non-reversed payment is recorded. Derive this from the payment
+    // ledger so stale cached `remaining` values in older workspaces cannot
+    // contradict the paid total shown beside them.
+    outstanding: items.reduce((sum, item) => {
+      const paid = activePayments.filter(payment => payment.debtId === item.id).reduce((total, payment) => total + (Number(payment.amount) || 0), 0);
+      const original = Number.isFinite(Number(item.original)) ? Number(item.original) : (Number(item.remaining) || 0) + paid;
+      return sum + Math.max(0, original - paid);
+    }, 0),
+    paidThisMonth: activePayments.filter((item) => inMonth(item.date, selectedMonth)).reduce((sum, item) => sum + item.amount, 0),
+    paidAllTime: activePayments.reduce((sum, item) => sum + item.amount, 0),
+    paymentCount: activePayments.length,
   };
 }
 

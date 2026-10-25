@@ -70,6 +70,10 @@ function movement(transaction, funds, reserves, owned, cash, stateGoals, stateIn
       return { owned, cash };
     }
     if (status === 'paid' || status === 'transferred' || !status) {
+      if (type === 'debt' && transaction.paidFromFundId && Object.hasOwn(funds, transaction.paidFromFundId)) {
+        funds[transaction.paidFromFundId] -= amount;
+        return { owned: owned - amount, cash };
+      }
       const wasReserved = transaction._settlementPhase || (status === 'paid' && transaction.allocatedOn && (reserves[type] || 0) >= amount);
       if (wasReserved) reserves[type] = Math.max(0, reserves[type] - amount);
       return { owned: owned - amount, cash: cash - (wasReserved ? 0 : amount) };
@@ -220,6 +224,39 @@ export function inspectFinanceIntegrity(state) {
   for (const debt of state.debts || []) {
     const ledgerRemaining = Math.max(0, money(debt.original) - (paidByDebt.get(debt.id) || 0));
     if (ledgerRemaining !== money(debt.remaining)) issues.push({ type: 'debt-balance-mismatch', debtId: debt.id, storedRemaining: money(debt.remaining), transactionEventsRemaining: ledgerRemaining });
+  }
+
+  const debtExecutions = new Set();
+  for (const accrual of state.debtAccruals || []) {
+    const accrued = money(accrual.accruedAmount ?? accrual.amount);
+    const paid = money(accrual.paidAmount);
+    if (paid < 0 || paid > accrued) issues.push({ type: 'debt-accrual-paid-out-of-range', accrualId: accrual.id, paid, accrued });
+    if (accrual.executionKey) {
+      if (debtExecutions.has(accrual.executionKey)) issues.push({ type: 'duplicate-debt-accrual-execution', executionKey: accrual.executionKey });
+      debtExecutions.add(accrual.executionKey);
+    }
+  }
+  for (const debt of state.debts || []) {
+    const due = (state.debtAccruals || []).filter(item => item.debtId === debt.id && item.status !== 'reversed').reduce((sum, item) => sum + Math.max(0, money(item.accruedAmount ?? item.amount) - money(item.paidAmount)), 0);
+    const paid = (state.debtPayments || []).filter(item => item.debtId === debt.id && !item.reversedAt).reduce((sum, item) => sum + money(item.amount), 0);
+    const original = Number.isSafeInteger(debt.original) ? debt.original : money(debt.remaining) + paid;
+    const canonicalRemaining = Math.max(0, original - paid);
+    if (due > canonicalRemaining) issues.push({ type: 'debt-payment-due-exceeds-remaining', debtId: debt.id, due, remaining: canonicalRemaining });
+    if (paid > original) issues.push({ type: 'debt-paid-exceeds-original', debtId: debt.id, paid, original });
+  }
+
+  const paidByAccrual = new Map();
+  for (const payment of state.debtPayments || []) {
+    const transaction = payment.transactionId ? transactions.find(item => item.id === payment.transactionId) : null;
+    if (!payment.reversedAt && !transaction) issues.push({ type: 'debt-payment-without-finance-transaction', paymentId: payment.id, transactionId: payment.transactionId || '' });
+    if (transaction && Boolean(transaction.reversedAt) !== Boolean(payment.reversedAt)) issues.push({ type: 'debt-payment-reversal-mismatch', paymentId: payment.id, transactionId: transaction.id });
+    if (transaction && (transaction.type !== 'debt' || money(transaction.amount) !== money(payment.amount))) issues.push({ type: 'debt-payment-transaction-mismatch', paymentId: payment.id, transactionId: transaction.id });
+    if (payment.reversedAt) continue;
+    for (const allocation of payment.sourceAccruals || []) paidByAccrual.set(allocation.accrualId, (paidByAccrual.get(allocation.accrualId) || 0) + money(allocation.amount));
+  }
+  for (const accrual of state.debtAccruals || []) {
+    const allocated = paidByAccrual.get(accrual.id) || 0;
+    if (allocated !== money(accrual.paidAmount)) issues.push({ type: 'debt-accrual-payment-allocation-mismatch', accrualId: accrual.id, storedPaid: money(accrual.paidAmount), linkedPayments: allocated });
   }
 
   const paymentGroups = new Map();

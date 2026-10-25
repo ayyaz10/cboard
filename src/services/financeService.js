@@ -5,15 +5,18 @@ import { applyDueMonthlyAllocations, applyIncomeAllocations, eligibleBookedBankI
 import { id, today } from '../features/finance/financeData.js';
 import { nextTransactionSequence } from '../features/finance/transactionOrder.js';
 import { nextRecurringDate } from '../features/finance/financeMath.js';
+import { migrateLegacyDebtAllocations } from '../features/finance/debtAccounting.js';
 
 function runFinanceAutomations(state, date = today()) {
-  if (!state.settings.configured) return false;
-  let changed = false;
+  let changed = migrateLegacyDebtAllocations(state) > 0;
+  if (!state.settings.configured) return changed;
   const month = date.slice(0, 7);
   const day = Number(date.slice(8, 10));
   const dueMonthly = (state.allocationRules || []).some(rule => rule.active && rule.timing === 'monthly' && (!rule.startedOn || rule.startedOn <= date) && day >= Number(rule.day || 1) && (rule.targetType === 'donation'
     ? !(state.donationAccruals || []).some(item => item.executionKey === `${rule.id}:monthly:${month}`)
-    : !state.transactions.some(item => item.allocationRuleId === rule.id && item.date?.slice(0, 7) === month)));
+    : rule.targetType === 'debt'
+      ? !(state.debtAccruals || []).some(item => item.executionKey === `${rule.id}:monthly:${month}`)
+      : !state.transactions.some(item => item.allocationRuleId === rule.id && item.date?.slice(0, 7) === month)));
   if (dueMonthly) { applyDueMonthlyAllocations(state, date); changed = true; }
 
   if ((state.recurring || []).some(item => !item.paused && item.mode === 'auto' && item.nextDate <= date)) {

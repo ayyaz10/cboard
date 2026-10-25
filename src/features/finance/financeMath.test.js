@@ -29,7 +29,7 @@ test('monthly totals separate income and each outflow type', () => {
 
 test('investment gain, debt partial payments, and goal projections are correct', () => {
   assert.deepEqual(investmentSummary([{ contributed: 10000, currentValue: 12500 }]), { contributed:10000,value:12500,gain:2500,gainRate:2500 });
-  assert.deepEqual(debtSummary([{ remaining: 7000 }],[{ amount:3000,date:'2026-09-10' }],'2026-09'),{ outstanding:7000,paidThisMonth:3000 });
+  assert.deepEqual(debtSummary([{ remaining: 7000 }],[{ amount:3000,date:'2026-09-10' }],'2026-09'),{ outstanding:7000,paidThisMonth:3000,paidAllTime:3000,paymentCount:1 });
   assert.deepEqual(goalProjection({ target:100000,saved:25000,monthlyContribution:10000 }),{percent:2500,months:8});
 });
 
