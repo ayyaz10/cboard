@@ -116,6 +116,24 @@ export function canUndoDonationPayment(state, transaction) {
   return Boolean(transaction.linkedReservationId && (state.transactions || []).some(item => item.id === transaction.linkedReservationId && item.type === 'donation' && item.allocationStatus === 'allocated'));
 }
 
+function isDonationFinanceTransaction(state, transaction) {
+  if (!transaction || !['expense', 'donation'].includes(transaction.type)) return false;
+  const financeCategory = (state.categories || []).find(item => item.id === transaction.categoryId);
+  return transaction.type === 'donation'
+    || transaction.financeGroup === 'donation'
+    || financeCategory?.type === 'donation'
+    || Boolean(transaction.donationCategoryId);
+}
+
+/** Existing CBoard Donation expenses can be corrected even if they predate DonationPayment links. */
+export function canMarkDonationPaymentUnpaid(state, transaction) {
+  if (!transaction || transaction.reversedAt || transaction.source === 'bank' || transaction.source || transaction.sourceType === 'bank_import' || transaction.sourceType === 'receipt' || transaction.receipt) return false;
+  if (['allocated', 'planned', 'cancelled'].includes(transaction.allocationStatus)) return false;
+  const linkedPayment = canUndoDonationPayment(state, transaction);
+  if (!linkedPayment && transaction.sourceType && !['manual', 'donation_payment', 'legacy_manual'].includes(transaction.sourceType)) return false;
+  return linkedPayment || isDonationFinanceTransaction(state, transaction);
+}
+
 /** Reverse a CBoard recorded donation payment without deleting its finance or due history. */
 export function undoDonationPayment(state, paymentOrTransactionId, reversedOn = new Date().toISOString().slice(0, 10)) {
   const payment = (state.donationPayments || []).find(item => item.id === paymentOrTransactionId || item.financeTransactionId === paymentOrTransactionId);
@@ -147,4 +165,51 @@ export function undoDonationPayment(state, paymentOrTransactionId, reversedOn = 
   if (payment) { payment.reversedAt = reversedOn; payment.reversalId = reversal.id; }
   if (reservation?.settlementTransactionId === transaction.id) delete reservation.settlementTransactionId;
   return { alreadyReversed: false, transaction, payment, reversal, amount: transaction.amount, restoredTo: sourceAccruals.length ? 'due' : reservation ? 'reserve' : 'due' };
+}
+
+/** Reverses a linked payment, or safely constructs Donation due/payment links for a legacy Finance entry. */
+export function markDonationPaymentUnpaid(state, transactionId, categoryId = '', reversedOn = new Date().toISOString().slice(0, 10)) {
+  const transaction = (state.transactions || []).find(item => item.id === transactionId);
+  if (!transaction) throw new Error('The Finance donation transaction could not be found.');
+  if (transaction.reversedAt || (state.donationReversals || []).some(item => item.financeTransactionId === transaction.id)) {
+    return undoDonationPayment(state, transaction.id, reversedOn);
+  }
+  if (!canMarkDonationPaymentUnpaid(state, transaction)) {
+    if (transaction.source === 'bank' || transaction.sourceType === 'bank_import') throw new Error('Imported bank transactions cannot be marked unpaid. Reclassify the transaction while keeping the bank record.');
+    if (transaction.sourceType === 'receipt' || transaction.receipt) throw new Error('Receipt transactions cannot be corrected as Donation payments.');
+    if (transaction.source) throw new Error('Imported transactions cannot be marked unpaid here. Reclassify the transaction while keeping its source record.');
+    throw new Error('This is not an eligible active Donation payment.');
+  }
+  if (canUndoDonationPayment(state, transaction)) return undoDonationPayment(state, transaction.id, reversedOn);
+
+  const storedCategory = (state.donationCategories || []).find(item => item.id === transaction.donationCategoryId);
+  const selectedCategory = (state.donationCategories || []).find(item => item.id === categoryId);
+  if (storedCategory && categoryId && storedCategory.id !== categoryId) throw new Error('This transaction already has a Donation category. Keep that category for its Due record.');
+  const resolvedCategoryId = storedCategory?.id || selectedCategory?.id;
+  if (!resolvedCategoryId) throw new Error('Choose the Donation category this payment belongs to.');
+  const amount = Number(transaction.amount);
+  if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error('The Finance transaction amount is invalid.');
+
+  state.donationAccruals ||= [];
+  state.donationPayments ||= [];
+  const accrualId = id();
+  const paymentId = id();
+  const stamp = transaction.createdAt || new Date().toISOString();
+  state.donationAccruals.push({
+    id: accrualId, categoryId: resolvedCategoryId, amount, accruedAmount: amount, paidAmount: amount,
+    currency: state.settings?.currency || 'GBP', effectiveDate: transaction.date, sourceType: 'legacy_payment_correction',
+    linkedFinanceTransactionId: transaction.id, note: 'Reopened from a previously recorded Finance Donation payment',
+    status: 'fully_paid', createdAt: stamp,
+  });
+  state.donationPayments.push({
+    id: paymentId, categoryId: resolvedCategoryId, amount, financeTransactionId: transaction.id,
+    date: transaction.paymentDate || transaction.date, sourceAccruals: [{ accrualId, amount }],
+    paidFromFundId: transaction.paidFromFundId || '', note: transaction.note || '', sourceType: 'legacy_conversion', createdAt: stamp,
+  });
+  transaction.donationCategoryId = resolvedCategoryId;
+  transaction.financeGroup = 'donation';
+  transaction.donationPaymentId = paymentId;
+  transaction.sourceType ||= 'manual';
+  transaction.legacyDonationPayment = true;
+  return { ...undoDonationPayment(state, transaction.id, reversedOn), legacyConverted: true };
 }
