@@ -15,6 +15,18 @@ export function donationDue(state, categoryId = '') {
     .reduce((sum, item) => sum + Math.max(0, Number(item.accruedAmount ?? item.amount ?? 0) - Number(item.paidAmount || 0)), 0);
 }
 
+export function reopenedDonationDues(state) {
+  return (state.donationAccruals || [])
+    .filter(item => item.sourceType === 'legacy_payment_correction' && item.status !== 'reversed')
+    .map(accrual => ({
+      accrual,
+      amount: Math.max(0, Number(accrual.accruedAmount ?? accrual.amount ?? 0) - Number(accrual.paidAmount || 0)),
+      transaction: (state.transactions || []).find(item => item.id === accrual.linkedFinanceTransactionId),
+    }))
+    .filter(item => item.amount > 0)
+    .sort((a, b) => String(a.accrual.effectiveDate).localeCompare(String(b.accrual.effectiveDate)) || String(a.accrual.id).localeCompare(String(b.accrual.id)));
+}
+
 export function accrueDonation(state, { categoryId = '', amount, currency = state.settings?.currency || 'GBP', effectiveDate, sourceType = 'manual', linkedIncomeTransactionId = '', automationRuleId = '', linkedDonationTargetId = '', note = '', executionKey = '' }) {
   const value = Number(amount);
   if (!Number.isSafeInteger(value) || value <= 0) throw new Error('Donation due must be a positive amount.');

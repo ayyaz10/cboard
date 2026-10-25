@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { accrueDonation, canMarkDonationPaymentUnpaid, canUndoDonationPayment, donationDue, markDonationPaymentUnpaid, payDonationDue, reconcileDonationIncome, undoDonationPayment } from './donationAccounting.js';
+import { accrueDonation, canMarkDonationPaymentUnpaid, canUndoDonationPayment, donationDue, markDonationPaymentUnpaid, payDonationDue, reconcileDonationIncome, reopenedDonationDues, undoDonationPayment } from './donationAccounting.js';
 import { applyIncomeAllocations } from './financeAllocations.js';
 import { deriveFinancePosition, inspectFinanceIntegrity } from './financeLedger.js';
 import { donationSummary } from './donationAnalytics.js';
@@ -95,7 +95,7 @@ test('undoing one of multiple payments restores only its exact partial allocatio
 test('legacy manual Donation transaction converts to due once, then genuine re-payment creates a new active transaction', () => {
   const state = makeState();
   const income = { id: 'salary', type: 'income', amount: 10000, date: '2026-10-01' };
-  const legacy = { id: 'old-wasiyat', type: 'expense', amount: 2250, categoryId: 'donation', donationCategoryId: 'wasiyat', title: 'Hissa Amad', date: '2026-10-05', note: 'Automatic income allocation', paidFromFundId: 'cash', sourceType: 'manual' };
+  const legacy = { id: 'old-wasiyat', type: 'expense', amount: 2250, categoryId: 'donation', donationCategoryId: 'wasiyat', title: 'Wasiyat', date: '2026-10-05', note: 'Automatic income allocation', paidFromFundId: 'cash', sourceType: 'manual' };
   state.transactions.push(income, legacy);
   assert.equal(canUndoDonationPayment(state, legacy), false);
   assert.equal(canMarkDonationPaymentUnpaid(state, legacy), true);
@@ -107,6 +107,7 @@ test('legacy manual Donation transaction converts to due once, then genuine re-p
   assert.equal(state.donationPayments.length, 1);
   assert.equal(state.donationReversals.length, 1);
   assert.equal(donationDue(state, 'wasiyat'), 2250);
+  assert.deepEqual(reopenedDonationDues(state).map(item => ({ amount: item.amount, title: item.transaction?.title, categoryId: item.accrual.categoryId })), [{ amount: 2250, title: 'Wasiyat', categoryId: 'wasiyat' }]);
   assert.equal(donationSummary(state, '2026-10').donated, 0);
   assert.equal(donationSummary(state, null).lifetime, 0);
   assert.equal(deriveFinancePosition(state).totalOwned, 10000);
