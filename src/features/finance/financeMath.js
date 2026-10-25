@@ -42,7 +42,7 @@ export function budgetTarget(item, income) {
 
 export function financeSummary(state, selectedMonth) {
   const allTime = selectedMonth === null;
-  const transactions = (allTime ? state.transactions : state.transactions.filter((item) => inMonth(item.date, selectedMonth))).filter(item => !['allocated', 'planned', 'cancelled'].includes(item.allocationStatus) && (!item.source || item.providerStatus === 'BOOK'));
+  const transactions = (allTime ? state.transactions : state.transactions.filter((item) => inMonth(item.date, selectedMonth))).filter(item => !item.reversedAt && !['allocated', 'planned', 'cancelled'].includes(item.allocationStatus) && (!item.source || item.providerStatus === 'BOOK'));
   const sum = (type) => transactions.filter((item) => item.type === type).reduce((total, item) => total + item.amount, 0);
   const donationCategoryIds = new Set((state.categories || []).filter(category => category.type === 'donation').map(category => category.id));
   const income = sum('income');

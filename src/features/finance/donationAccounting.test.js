@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { accrueDonation, donationDue, payDonationDue, reconcileDonationIncome } from './donationAccounting.js';
+import { accrueDonation, canUndoDonationPayment, donationDue, payDonationDue, reconcileDonationIncome, undoDonationPayment } from './donationAccounting.js';
 import { applyIncomeAllocations } from './financeAllocations.js';
-import { deriveFinancePosition } from './financeLedger.js';
+import { deriveFinancePosition, inspectFinanceIntegrity } from './financeLedger.js';
+import { donationSummary } from './donationAnalytics.js';
 
 function makeState() {
-  return { settings: { currency: 'GBP' }, categories: [{ id: 'donation', type: 'donation', archived: false }], donationCategories: [{ id: 'wasiyat', name: 'Wasiyat' }], donationAccruals: [], donationPayments: [], transactions: [], allocationRules: [], donationTargets: [] };
+  return { settings: { currency: 'GBP' }, categories: [{ id: 'donation', type: 'donation', archived: false }], donationCategories: [{ id: 'wasiyat', name: 'Wasiyat' }], donationAccruals: [], donationPayments: [], donationReversals: [], transactions: [], allocationRules: [], donationTargets: [] };
 }
 
 test('income percentage is idempotent, and editing income reconciles unpaid due', () => {
@@ -52,4 +53,68 @@ test('deleting or editing income after a payment preserves paid history and flag
   assert.equal(state.donationAccruals[0].paidAmount, 3000);
   assert.equal(state.donationAccruals[0].reconciliationRequired, true);
   assert.equal(state.transactions.filter(item => item.financeGroup === 'donation').length, 1);
+});
+
+test('undo restores exact due, paid analytics, and the original spendable balance exactly once', () => {
+  const state = makeState();
+  accrueDonation(state, { categoryId: 'wasiyat', amount: 5000, effectiveDate: '2026-10-01' });
+  const income = { id: 'salary', type: 'income', amount: 10000, date: '2026-10-01' };
+  state.transactions.push(income);
+  const payment = payDonationDue(state, { categoryId: 'wasiyat', amount: 5000, date: '2026-10-10' });
+  assert.equal(donationDue(state, 'wasiyat'), 0);
+  assert.equal(donationSummary(state, '2026-10').donated, 5000);
+  assert.equal(deriveFinancePosition(state).totalOwned, 5000);
+  const result = undoDonationPayment(state, payment.id, '2026-10-25');
+  assert.equal(result.restoredTo, 'due');
+  assert.equal(donationDue(state, 'wasiyat'), 5000);
+  assert.equal(state.donationAccruals[0].paidAmount, 0);
+  assert.equal(donationSummary(state, '2026-10').donated, 0);
+  assert.equal(donationSummary(state, null).lifetime, 0);
+  assert.equal(deriveFinancePosition(state).totalOwned, 10000);
+  assert.equal(undoDonationPayment(state, payment.id, '2026-10-26').alreadyReversed, true);
+  assert.equal(state.donationReversals.length, 1);
+  assert.equal(deriveFinancePosition(state).totalOwned, 10000);
+  assert.deepEqual(inspectFinanceIntegrity(state), []);
+});
+
+test('undoing one of multiple payments restores only its exact partial allocations', () => {
+  const state = makeState();
+  accrueDonation(state, { categoryId: 'wasiyat', amount: 2000, effectiveDate: '2026-10-01' });
+  accrueDonation(state, { categoryId: 'wasiyat', amount: 3000, effectiveDate: '2026-10-02' });
+  const first = payDonationDue(state, { categoryId: 'wasiyat', amount: 3000, date: '2026-10-10' });
+  const second = payDonationDue(state, { categoryId: 'wasiyat', amount: 1000, date: '2026-10-11' });
+  assert.equal(donationDue(state, 'wasiyat'), 1000);
+  undoDonationPayment(state, first.id, '2026-10-12');
+  assert.equal(donationDue(state, 'wasiyat'), 4000);
+  assert.deepEqual(state.donationAccruals.map(item => item.paidAmount), [0, 1000]);
+  assert.equal(donationSummary(state, '2026-10').donated, 1000);
+  assert.equal(second.reversedAt, undefined);
+  assert.deepEqual(inspectFinanceIntegrity(state), []);
+});
+
+test('undo of a legacy Donation Reserve settlement restores reserve, not due or spendable', () => {
+  const state = makeState();
+  const reserve = { id: 'reserve', type: 'donation', amount: 4500, date: '2026-10-01', allocationStatus: 'allocated', donationCategoryId: 'wasiyat' };
+  const payment = { id: 'reserve-payment', type: 'expense', amount: 1500, date: '2026-10-10', financeGroup: 'donation', donationCategoryId: 'wasiyat', linkedReservationId: reserve.id };
+  reserve.settlementTransactionId = payment.id;
+  state.transactions.push(reserve, payment);
+  assert.equal(deriveFinancePosition(state).reserves.donation, 3000);
+  assert.equal(canUndoDonationPayment(state, payment), true);
+  const result = undoDonationPayment(state, payment.id, '2026-10-12');
+  assert.equal(result.restoredTo, 'reserve');
+  assert.equal(reserve.settlementTransactionId, undefined);
+  assert.equal(deriveFinancePosition(state).reserves.donation, 4500);
+  assert.equal(donationDue(state, 'wasiyat'), 0);
+  assert.deepEqual(inspectFinanceIntegrity(state), []);
+});
+
+test('bank imported donation transactions cannot be undone as CBoard payments', () => {
+  const state = makeState();
+  const transaction = { id: 'bank-tx', type: 'expense', amount: 2500, date: '2026-10-10', source: 'bank', sourceType: 'bank_import', financeGroup: 'donation', donationCategoryId: 'wasiyat', donationPaymentId: 'payment' };
+  state.transactions.push(transaction);
+  state.donationPayments.push({ id: 'payment', financeTransactionId: transaction.id, categoryId: 'wasiyat', amount: transaction.amount, sourceAccruals: [] });
+  assert.equal(canUndoDonationPayment(state, transaction), false);
+  assert.throws(() => undoDonationPayment(state, transaction.id), /Bank transactions cannot be undone/);
+  assert.equal(transaction.reversedAt, undefined);
+  assert.deepEqual(inspectFinanceIntegrity(state), []);
 });

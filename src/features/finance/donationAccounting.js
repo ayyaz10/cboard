@@ -85,7 +85,7 @@ export function payDonationDue(state, { categoryId, amount, date, paidFromFundId
     remaining -= allocated;
   }
   const paymentId = id();
-  const transaction = { id: id(), sequence: nextTransactionSequence(state), title: title || `Donation: ${(state.donationCategories || []).find(item => item.id === categoryId)?.name || 'Donation'}`, amount, type: 'expense', categoryId: category.id, financeGroup: 'donation', donationCategoryId: categoryId, date, paymentDate: date, paymentMethod: paidFromFundId, paidFromFundId, note, donationPaymentId: paymentId, createdAt: new Date().toISOString() };
+  const transaction = { id: id(), sequence: nextTransactionSequence(state), title: title || `Donation: ${(state.donationCategories || []).find(item => item.id === categoryId)?.name || 'Donation'}`, amount, type: 'expense', categoryId: category.id, financeGroup: 'donation', donationCategoryId: categoryId, date, paymentDate: date, paymentMethod: paidFromFundId, paidFromFundId, note, sourceType: 'donation_payment', donationPaymentId: paymentId, createdAt: new Date().toISOString() };
   state.transactions.push(transaction);
   state.donationPayments.push({ id: paymentId, categoryId, amount, financeTransactionId: transaction.id, date, sourceAccruals: allocations, paidFromFundId, note, createdAt: transaction.createdAt });
   return transaction;
@@ -102,4 +102,49 @@ export function removeDonationPayment(state, financeTransactionId) {
     if (accrual.status !== 'reversed') accrual.status = accrual.paidAmount === 0 ? 'outstanding' : accrual.paidAmount >= Number(accrual.accruedAmount ?? accrual.amount) ? 'fully_paid' : 'partially_paid';
   }
   return true;
+}
+
+export function donationPaymentForTransaction(state, transaction) {
+  if (!transaction) return null;
+  return (state.donationPayments || []).find(item => item.id === transaction.donationPaymentId || item.financeTransactionId === transaction.id) || null;
+}
+
+export function canUndoDonationPayment(state, transaction) {
+  if (!transaction || transaction.source === 'bank' || transaction.sourceType === 'bank_import' || transaction.reversedAt) return false;
+  const payment = donationPaymentForTransaction(state, transaction);
+  if (payment) return !payment.reversedAt;
+  return Boolean(transaction.linkedReservationId && (state.transactions || []).some(item => item.id === transaction.linkedReservationId && item.type === 'donation' && item.allocationStatus === 'allocated'));
+}
+
+/** Reverse a CBoard recorded donation payment without deleting its finance or due history. */
+export function undoDonationPayment(state, paymentOrTransactionId, reversedOn = new Date().toISOString().slice(0, 10)) {
+  const payment = (state.donationPayments || []).find(item => item.id === paymentOrTransactionId || item.financeTransactionId === paymentOrTransactionId);
+  const transaction = (state.transactions || []).find(item => item.id === (payment?.financeTransactionId || paymentOrTransactionId) || item.donationPaymentId === paymentOrTransactionId);
+  if (!transaction) throw new Error('The linked Finance payment could not be found.');
+  if (transaction.source === 'bank' || transaction.sourceType === 'bank_import') throw new Error('Bank transactions cannot be undone here. Unlink the donation while keeping the bank transaction.');
+  state.donationReversals ||= [];
+  const existing = state.donationReversals.find(item => item.financeTransactionId === transaction.id);
+  if (transaction.reversedAt || payment?.reversedAt || existing) return { alreadyReversed: true, transaction, payment, reversal: existing || null, amount: transaction.amount, restoredTo: transaction.linkedReservationId ? 'reserve' : 'due' };
+  if (!payment && !transaction.linkedReservationId) throw new Error('This transaction is not linked to an undoable Donation payment.');
+  const reservation = transaction.linkedReservationId && (state.transactions || []).find(item => item.id === transaction.linkedReservationId && item.type === 'donation' && item.allocationStatus === 'allocated');
+  if (!payment && !reservation) throw new Error('The linked Donation reserve could not be found.');
+  const sourceAccruals = (payment?.sourceAccruals || []).map(item => ({ accrualId: item.accrualId, amount: Number(item.amount || 0) }));
+  for (const allocation of sourceAccruals) {
+    const accrual = (state.donationAccruals || []).find(item => item.id === allocation.accrualId);
+    if (!accrual) throw new Error('A Donation due allocation linked to this payment is missing.');
+    const paidAmount = Number(accrual.paidAmount || 0);
+    if (allocation.amount < 0 || allocation.amount > paidAmount) throw new Error('The linked Donation due allocation is inconsistent; payment was not changed.');
+  }
+  for (const allocation of sourceAccruals) {
+    const accrual = state.donationAccruals.find(item => item.id === allocation.accrualId);
+    accrual.paidAmount = Number(accrual.paidAmount || 0) - allocation.amount;
+    if (accrual.status !== 'reversed') accrual.status = accrual.paidAmount === 0 ? 'outstanding' : accrual.paidAmount >= Number(accrual.accruedAmount ?? accrual.amount) ? 'fully_paid' : 'partially_paid';
+  }
+  const reversal = { id: id(), paymentId: payment?.id || '', financeTransactionId: transaction.id, categoryId: payment?.categoryId || transaction.donationCategoryId || reservation?.donationCategoryId || '', amount: transaction.amount, date: reversedOn, originalPaymentDate: payment?.date || transaction.paymentDate || transaction.date, sourceType: 'manual_undo', sourceAccruals, linkedReservationId: transaction.linkedReservationId || '', createdAt: new Date().toISOString() };
+  state.donationReversals.push(reversal);
+  transaction.reversedAt = reversedOn;
+  transaction.donationReversalId = reversal.id;
+  if (payment) { payment.reversedAt = reversedOn; payment.reversalId = reversal.id; }
+  if (reservation?.settlementTransactionId === transaction.id) delete reservation.settlementTransactionId;
+  return { alreadyReversed: false, transaction, payment, reversal, amount: transaction.amount, restoredTo: sourceAccruals.length ? 'due' : reservation ? 'reserve' : 'due' };
 }

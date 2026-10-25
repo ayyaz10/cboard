@@ -74,21 +74,23 @@ function buildTargetCards(data, month) {
   return cards;
 }
 
-export function FinanceTimeline({ data, month, setMonth, change, transactionScope, setTransactionScope, openTransaction, deleteTransaction }) {
+export function FinanceTimeline({ data, month, setMonth, change, transactionScope, setTransactionScope, openTransaction, deleteTransaction, undoPayment, canUndoPayment }) {
   const merchants=data.merchantProfiles||[];
   const allTime = transactionScope === 'all';
-  const transactions = useMemo(() => data.transactions.filter(item => !item.source || item.providerStatus === 'BOOK'), [data.transactions]);
+  const transactions = useMemo(() => data.transactions.filter(item => !item.reversedAt && (!item.source || item.providerStatus === 'BOOK')), [data.transactions]);
   const rangeMonth = allTime ? null : month;
   const activity = useMemo(() => {
     const categories = new Map((data.donationCategories || []).map(item => [item.id, item.name]));
-    const transactionEvents = transactions.filter(item => item.allocationStatus !== 'allocated' && item.type !== 'goal' && (allTime || item.date?.startsWith(month))).map(item => {
+    const activityTransactions = data.transactions.filter(item => !item.source || item.providerStatus === 'BOOK');
+    const transactionEvents = activityTransactions.filter(item => item.allocationStatus !== 'allocated' && item.type !== 'goal' && (allTime || item.date?.startsWith(month))).map(item => {
       const donation = item.type === 'donation' || item.financeGroup === 'donation' || data.categories.some(category => category.id === item.categoryId && category.type === 'donation');
-      return { id: `tx-${item.id}`, date: item.date, title: donation ? `${categories.get(item.donationCategoryId) || 'Donation'} paid` : item.title || markerLabels[item.type] || item.type, kind: donation ? 'PAID' : markerLabels[item.type] || item.type, amount: item.type === 'income' ? item.amount : ['transfer','savings','budget','goal'].includes(item.type) ? 0 : -item.amount, type: 'transaction' };
+      return { id: `tx-${item.id}`, date: item.date, title: donation ? `${categories.get(item.donationCategoryId) || 'Donation'} paid${item.reversedAt?' · undone':''}` : item.title || markerLabels[item.type] || item.type, kind: item.reversedAt?'UNDONE':donation ? 'PAID' : markerLabels[item.type] || item.type, amount: item.type === 'income' ? item.amount : ['transfer','savings','budget','goal'].includes(item.type) ? 0 : -item.amount, type: 'transaction' };
     });
+    const reversalEvents = (data.donationReversals || []).filter(item => allTime || item.date?.startsWith(month)).map(item => ({ id: `reversal-${item.id}`, date: item.date, title: `${categories.get(item.categoryId) || 'Donation'} payment undone${item.linkedReservationId?' · returned to reserve':' · returned to Due'}`, kind: 'UNDO', amount: item.amount, type: 'reversal' }));
     const accrualEvents = (data.donationAccruals || []).filter(item => allTime || item.effectiveDate?.startsWith(month)).map(item => ({ id: `due-${item.id}`, date: item.effectiveDate, title: `${categories.get(item.categoryId) || 'Donation'} ${item.status === 'reversed' ? 'due reversed' : 'added to due'}`, kind: 'DUE', amount: item.status === 'reversed' ? -item.amount : item.amount, type: 'due' }));
     const goalEvents = (data.goalContributions || []).filter(item => allTime || item.date?.startsWith(month)).map(item => ({ id: `goal-${item.id}`, date: item.date, title: `${data.goals.find(goal => goal.id === item.goalId)?.title || 'Goal'} ${item.kind === 'spending' ? 'spending' : 'allocated'}`, kind: 'GOAL', amount: 0, type: 'goal' }));
-    return [...transactionEvents, ...accrualEvents, ...goalEvents].filter(item => item.date).sort((a,b) => String(b.date).localeCompare(String(a.date)) || a.id.localeCompare(b.id));
-  }, [transactions, data.donationCategories, data.donationAccruals, data.goalContributions, data.goals, data.categories, allTime, month]);
+    return [...transactionEvents, ...reversalEvents, ...accrualEvents, ...goalEvents].filter(item => item.date).sort((a,b) => String(b.date).localeCompare(String(a.date)) || a.id.localeCompare(b.id));
+  }, [data.transactions, data.donationReversals, data.donationCategories, data.donationAccruals, data.goalContributions, data.goals, data.categories, allTime, month]);
   const openingMonth = transactions.map(item=>item.date.slice(0,7)).sort()[0] || month;
   const currency = data.settings.currency;
   const [showLogos,setShowLogos] = useState(true);
@@ -260,7 +262,7 @@ export function FinanceTimeline({ data, month, setMonth, change, transactionScop
         </div>
         </div>
       </div>}
-      {selectedTransaction&&<article className="f-chart-selected" aria-live="polite"><div className="f-between"><div><span className="f-tag">Selected transaction</span><h3>{selectedTransaction.title}</h3><p className="f-meta">{markerLabels[selectedTransaction.type]||selectedTransaction.type} &middot; {selectedTransaction.date} &middot; {formatMoney(selectedTransaction.amount,currency)}</p></div><button type="button" className="f-button" aria-label="Close selected transaction actions" onClick={()=>setSelectedTransactionId(null)}>Close</button></div><div className="f-actions mt-3"><button type="button" className="f-primary" onClick={()=>openTransaction(selectedTransaction)}>Open record</button><button type="button" className="f-button danger-action" onClick={()=>deleteTransaction(selectedTransaction)}>Delete</button></div></article>}
+      {selectedTransaction&&<article className="f-chart-selected" aria-live="polite"><div className="f-between"><div><span className="f-tag">Selected transaction</span><h3>{selectedTransaction.title}</h3><p className="f-meta">{markerLabels[selectedTransaction.type]||selectedTransaction.type} &middot; {selectedTransaction.date} &middot; {formatMoney(selectedTransaction.amount,currency)}</p></div><button type="button" className="f-button" aria-label="Close selected transaction actions" onClick={()=>setSelectedTransactionId(null)}>Close</button></div><div className="f-actions mt-3"><button type="button" className="f-primary" onClick={()=>openTransaction(selectedTransaction)}>Open record</button>{canUndoPayment?.(selectedTransaction)?<button type="button" className="f-button danger-action" onClick={()=>undoPayment(selectedTransaction)}>Undo payment</button>:selectedTransaction.source!=='bank'&&<button type="button" className="f-button danger-action" onClick={()=>deleteTransaction(selectedTransaction)}>Delete</button>}</div></article>}
       <p className="f-help">{allTime?'Transaction dates run along the bottom.':'Day of month runs along the bottom.'} Zoom ranges from 25% to 500%. Saved merchant logos appear when available; unknown or unavailable logos use a letter badge. Transfers use a transfer marker and do not change available cash.</p>
     </section>
     <section className="f-card mt-6" aria-labelledby="finance-activity-heading"><div><h3 id="finance-activity-heading" className="text-2xl font-bold">Finance activity</h3><p className="f-help mt-1">Transactions, donation due events, and goal activity. Due and goal entries do not change the cash line.</p></div>{activity.length?<div className="f-list mt-4">{activity.map(item=><article className="f-item f-between" key={item.id}><div><span className="f-tag">{item.kind}</span><p className="f-item-title mt-2">{item.title}</p><p className="f-meta">{item.date}</p></div><strong>{item.amount===0?'':`${item.amount>0?'+':'−'}${formatMoney(Math.abs(item.amount),currency)}`}</strong></article>)}</div>:<p className="f-help mt-4">No finance activity in this range.</p>}</section>

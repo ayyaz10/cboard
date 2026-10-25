@@ -2,7 +2,7 @@ import { inMonth } from './financeMath.js';
 import { deriveFinancePosition } from './financeLedger.js';
 
 export function isActualDonation(transaction, categoriesById) {
-  if (!transaction || ['allocated', 'planned', 'cancelled'].includes(transaction.allocationStatus)) return false;
+  if (!transaction || transaction.reversedAt || ['allocated', 'planned', 'cancelled'].includes(transaction.allocationStatus)) return false;
   if (transaction.type === 'donation') return true;
   return transaction.type === 'expense'
     && (transaction.financeGroup === 'donation' || categoriesById.get(transaction.categoryId)?.type === 'donation');
@@ -14,9 +14,9 @@ export function donationTransactions(state) {
 }
 
 export function refreshDonationTargetStatus(state, date = new Date().toISOString().slice(0, 10)) {
-  const settledReservations=new Set((state.transactions||[]).filter(item=>item.type==='expense'&&item.linkedReservationId).map(item=>item.linkedReservationId));
+  const settledReservations=new Set((state.transactions||[]).filter(item=>!item.reversedAt&&item.type==='expense'&&item.linkedReservationId).map(item=>item.linkedReservationId));
   for (const target of state.donationTargets || []) {
-    const attributed = (state.transactions || []).filter(item => item.linkedDonationTargetId === target.id && (!item.source || item.providerStatus === 'BOOK') && !['cancelled', 'planned'].includes(item.allocationStatus) && !(item.type==='donation'&&settledReservations.has(item.id))).reduce((sum, item) => sum + Number(item.amount || 0), 0);
+    const attributed = (state.transactions || []).filter(item => !item.reversedAt && item.linkedDonationTargetId === target.id && (!item.source || item.providerStatus === 'BOOK') && !['cancelled', 'planned'].includes(item.allocationStatus) && !(item.type==='donation'&&settledReservations.has(item.id))).reduce((sum, item) => sum + Number(item.amount || 0), 0);
     if (attributed >= Number(target.targetAmount || 0) && Number(target.targetAmount) > 0) {
       target.status = 'completed';
       target.active = false;

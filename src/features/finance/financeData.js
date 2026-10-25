@@ -26,7 +26,7 @@ export function initialFinanceState() {
   return {
     version: 1,
     settings: { configured: false, currency: defaultCurrency(), monthlyIncome: 0, budgetStartDay: 1, defaultForeignCurrency: 'PKR', leftoverDestination: 'rollover', leftoverGoalId: '' },
-    categories: structuredClone(defaultCategories), donationCategories: structuredClone(defaultDonationCategories), donationTargets: [], donationAccruals: [], donationPayments: [], transactions: [], merchantProfiles: [], budgets: {}, openingBalances: {}, budgetPresets: [],
+    categories: structuredClone(defaultCategories), donationCategories: structuredClone(defaultDonationCategories), donationTargets: [], donationAccruals: [], donationPayments: [], donationReversals: [], transactions: [], merchantProfiles: [], budgets: {}, openingBalances: {}, budgetPresets: [],
     goals: [], goalContributions: [], investments: [], debts: [], debtPayments: [], recurring: [], transactionPresets: [], allocationRules: [],
   };
 }
@@ -35,7 +35,7 @@ export function normalizeFinanceState(value) {
   const fallback = initialFinanceState();
   if (!value || typeof value !== 'object') return fallback;
   const state = { ...fallback, ...structuredClone(value), settings: { ...fallback.settings, ...(value.settings || {}) } };
-  for (const key of ['categories', 'donationCategories', 'donationTargets', 'donationAccruals', 'donationPayments', 'transactions', 'budgetPresets', 'goals', 'goalContributions', 'investments', 'debts', 'debtPayments', 'recurring', 'transactionPresets', 'allocationRules']) {
+  for (const key of ['categories', 'donationCategories', 'donationTargets', 'donationAccruals', 'donationPayments', 'donationReversals', 'transactions', 'budgetPresets', 'goals', 'goalContributions', 'investments', 'debts', 'debtPayments', 'recurring', 'transactionPresets', 'allocationRules']) {
     if (!Array.isArray(state[key])) state[key] = [];
   }
   migrateDebtPlanStatuses(state.debts, state.allocationRules);

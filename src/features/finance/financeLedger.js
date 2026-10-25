@@ -4,7 +4,7 @@ const FUND_TYPES = new Set(['savings', 'goal', 'investment']);
 const RESERVED_TYPES = new Set(['donation', 'debt', 'budget']);
 const cancelled = new Set(['cancelled', 'planned']);
 const accepted = transactions => orderedTransactions(transactions || [], false)
-  .filter(item => (!item.source || item.providerStatus === 'BOOK') && !cancelled.has(item.allocationStatus));
+  .filter(item => (!item.source || item.providerStatus === 'BOOK') && !cancelled.has(item.allocationStatus) && !item.reversedAt);
 const sum = values => values.reduce((total, value) => total + value, 0);
 const money = value => Number.isSafeInteger(value) ? value : 0;
 const labelKey = value => String(value || '').trim().toLocaleLowerCase();
@@ -149,6 +149,42 @@ export function inspectFinanceIntegrity(state) {
   const issues = [];
   const transactions = state.transactions || [];
   const ids = new Set(transactions.map(item => item.id));
+  const payments = state.donationPayments || [];
+  const reversals = state.donationReversals || [];
+  const reversalByTransaction = new Map();
+  const paymentIds = new Set();
+  const activeAllocationTotals = new Map();
+  for (const payment of payments) {
+    if (paymentIds.has(payment.id)) issues.push({ type: 'duplicate-donation-payment', paymentId: payment.id });
+    paymentIds.add(payment.id);
+    if (!payment.reversedAt) for (const allocation of payment.sourceAccruals || []) activeAllocationTotals.set(allocation.accrualId, (activeAllocationTotals.get(allocation.accrualId) || 0) + money(allocation.amount));
+  }
+  for (const reversal of reversals) reversalByTransaction.set(reversal.financeTransactionId, (reversalByTransaction.get(reversal.financeTransactionId) || 0) + 1);
+  for (const payment of payments) {
+    const transaction = transactions.find(item => item.id === payment.financeTransactionId);
+    if (!transaction) issues.push({ type: 'orphan-donation-payment', paymentId: payment.id, transactionId: payment.financeTransactionId });
+    if (payment.reversedAt && (reversalByTransaction.get(payment.financeTransactionId) || 0) !== 1) issues.push({ type: 'donation-reversal-count-mismatch', paymentId: payment.id, count: reversalByTransaction.get(payment.financeTransactionId) || 0 });
+  }
+  for (const [transactionId, count] of reversalByTransaction) {
+    const transaction = transactions.find(item => item.id === transactionId);
+    if (!transaction) issues.push({ type: 'orphan-donation-reversal', transactionId });
+    if (count > 1) issues.push({ type: 'duplicate-donation-reversal', transactionId, count });
+    if (transaction?.source === 'bank' || transaction?.sourceType === 'bank_import') issues.push({ type: 'bank-transaction-reversed', transactionId });
+    if (transaction && !transaction.reversedAt) issues.push({ type: 'reversal-without-reversed-transaction', transactionId });
+  }
+  for (const reversal of reversals) {
+    if (reversal.paymentId && !payments.some(item => item.id === reversal.paymentId)) issues.push({ type: 'orphan-donation-reversal-payment', reversalId: reversal.id, paymentId: reversal.paymentId });
+    const transaction = transactions.find(item => item.id === reversal.financeTransactionId);
+    if (transaction && !transaction.donationPaymentId && !transaction.linkedReservationId) issues.push({ type: 'unlinked-donation-reversal', reversalId: reversal.id, transactionId: transaction.id });
+  }
+  for (const transaction of transactions.filter(item => item.reversedAt && (item.donationPaymentId || item.linkedReservationId))) {
+    if ((reversalByTransaction.get(transaction.id) || 0) !== 1) issues.push({ type: 'donation-reversal-count-mismatch', transactionId: transaction.id, count: reversalByTransaction.get(transaction.id) || 0 });
+  }
+  for (const accrual of state.donationAccruals || []) {
+    const allocated = activeAllocationTotals.get(accrual.id) || 0;
+    if (allocated !== money(accrual.paidAmount)) issues.push({ type: 'donation-accrual-paid-mismatch', accrualId: accrual.id, storedPaid: money(accrual.paidAmount), paymentAllocations: allocated });
+    if (money(accrual.paidAmount) < 0 || money(accrual.paidAmount) > money(accrual.accruedAmount ?? accrual.amount)) issues.push({ type: 'donation-accrual-paid-out-of-range', accrualId: accrual.id, paid: money(accrual.paidAmount), accrued: money(accrual.accruedAmount ?? accrual.amount) });
+  }
   for (const [name, records, link] of [
     ['goal contribution', state.goalContributions || [], item => item.transactionId],
     ['debt payment', state.debtPayments || [], item => item.transactionId],

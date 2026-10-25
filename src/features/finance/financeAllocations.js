@@ -43,7 +43,7 @@ export function applyAllocation(state, rule, income, date, sourceIncomeId = '') 
   }
   const donationTarget = rule.targetType === 'donation' && rule.donationTargetId ? (state.donationTargets || []).find(item => item.id === rule.donationTargetId) : null;
   if (donationTarget) {
-    const settledReservations=new Set(state.transactions.filter(item=>item.type==='expense'&&item.linkedReservationId).map(item=>item.linkedReservationId));
+    const settledReservations=new Set(state.transactions.filter(item=>!item.reversedAt&&item.type==='expense'&&item.linkedReservationId).map(item=>item.linkedReservationId));
     const attributed = state.transactions.filter(item => item.linkedDonationTargetId === donationTarget.id && (!item.source || item.providerStatus === 'BOOK') && !['cancelled','planned'].includes(item.allocationStatus) && !(item.type==='donation'&&settledReservations.has(item.id))).reduce((sum, item) => sum + item.amount, 0);
     amount = Math.min(amount, Math.max(0, donationTarget.targetAmount - attributed));
     if (!amount) { rule.active = false; donationTarget.status = 'completed'; donationTarget.completedAt ||= date; return false; }
@@ -74,7 +74,7 @@ export function applyAllocation(state, rule, income, date, sourceIncomeId = '') 
   }
   state.transactions.push(transaction);
   if (donationTarget) {
-    const settledReservations=new Set(state.transactions.filter(item=>item.type==='expense'&&item.linkedReservationId).map(item=>item.linkedReservationId));
+    const settledReservations=new Set(state.transactions.filter(item=>!item.reversedAt&&item.type==='expense'&&item.linkedReservationId).map(item=>item.linkedReservationId));
     const newTotal = state.transactions.filter(item => item.linkedDonationTargetId === donationTarget.id && (!item.source || item.providerStatus === 'BOOK') && !['cancelled','planned'].includes(item.allocationStatus) && !(item.type==='donation'&&settledReservations.has(item.id))).reduce((sum, item) => sum + item.amount, 0);
     if (newTotal >= donationTarget.targetAmount) { donationTarget.status = 'completed'; donationTarget.completedAt ||= date; rule.active = false; }
   }
@@ -144,7 +144,7 @@ export function settleAllocation(state, transactionId, date) {
   if (transaction.type === 'donation') {
     if (transaction.settlementTransactionId && state.transactions.some(item => item.id === transaction.settlementTransactionId)) return false;
     const financeCategory = (state.categories || []).find(category => category.type === 'donation' && !category.archived);
-    const payment = { id: id(), sequence: nextTransactionSequence(state), title: transaction.title || 'Donation', amount: transaction.amount, type: 'expense', categoryId: financeCategory?.id || '', financeGroup: 'donation', donationCategoryId: transaction.donationCategoryId || '', linkedDonationTargetId: transaction.linkedDonationTargetId || '', linkedReservationId: transaction.id, date, paymentDate: date, note: transaction.note || 'Paid from Donation Reserve', paymentMethod: transaction.paymentMethod || '', createdAt: new Date().toISOString() };
+    const payment = { id: id(), sequence: nextTransactionSequence(state), title: transaction.title || 'Donation', amount: transaction.amount, type: 'expense', categoryId: financeCategory?.id || '', financeGroup: 'donation', donationCategoryId: transaction.donationCategoryId || '', linkedDonationTargetId: transaction.linkedDonationTargetId || '', linkedReservationId: transaction.id, sourceType: 'donation_payment', date, paymentDate: date, note: transaction.note || 'Paid from Donation Reserve', paymentMethod: transaction.paymentMethod || '', createdAt: new Date().toISOString() };
     transaction.paymentDate = date;
     transaction.settlementTransactionId = payment.id;
     transaction.updatedAt = payment.createdAt;

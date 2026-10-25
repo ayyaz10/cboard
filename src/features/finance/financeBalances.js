@@ -25,7 +25,7 @@ function isInternalTransfer(transaction) {
 }
 
 export function transactionCashEffect(transaction) {
-  if (!transaction || isCancelled(transaction) || isReserved(transaction) || isInternalTransfer(transaction)) return 0;
+  if (!transaction || transaction.reversedAt || isCancelled(transaction) || isReserved(transaction) || isInternalTransfer(transaction)) return 0;
   if (isIncome(transaction)) return transaction.amount;
   if (transaction.type === 'transfer') return transaction.transferKind === 'external-in' ? transaction.amount : -transaction.amount;
   return cashOutTypes.has(transaction.type) ? -transaction.amount : 0;
@@ -37,7 +37,7 @@ function eventDate(value, fallback) {
 }
 
 function transactionEvents(transaction) {
-  if (isCancelled(transaction)) return [];
+  if (transaction.reversedAt || isCancelled(transaction)) return [];
   const allocationDate = eventDate(transaction.allocatedOn, transaction.date);
   const paymentDate = eventDate(transaction.paymentDate, transaction.date);
   if (transaction.goalMovement === 'spend' && transaction.goalId) return [{ date: paymentDate, kind: 'goal-spend', transaction }];

@@ -116,7 +116,7 @@ const finance = {
   recordCount(data) {
     const state = data.workspace?.state;
     if (!state) return 0;
-    return ['categories', 'donationCategories', 'donationTargets', 'donationAccruals', 'donationPayments', 'transactions', 'merchantProfiles', 'budgetPresets', 'goals', 'goalContributions', 'investments', 'debts', 'debtPayments', 'recurring', 'transactionPresets', 'allocationRules'].reduce((count, key) => count + (Array.isArray(state[key]) ? state[key].length : 0), 0)
+    return ['categories', 'donationCategories', 'donationTargets', 'donationAccruals', 'donationPayments', 'donationReversals', 'transactions', 'merchantProfiles', 'budgetPresets', 'goals', 'goalContributions', 'investments', 'debts', 'debtPayments', 'recurring', 'transactionPresets', 'allocationRules'].reduce((count, key) => count + (Array.isArray(state[key]) ? state[key].length : 0), 0)
       + (state.budgets && typeof state.budgets === 'object' ? Object.keys(state.budgets).length : 0);
   },
 };
