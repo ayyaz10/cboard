@@ -28,7 +28,7 @@ import { notify } from '../../lib/notifications.js';
 import { allocationTargets, applyAllocation, applyIncomeAllocations, reconcileIncomeAllocations, settleAllocation } from './financeAllocations.js';
 import { convertMinorUnits, financeCurrencies, getCurrencyQuote } from '../../services/currencyService.js';
 import { bankDataProvider } from '../../services/bankingService.js';
-import { donationSummary, donationTransactions, refreshDonationTargetStatus, targetMonthlyAllocation } from './donationAnalytics.js';
+import { donationRulePreviewAmount, donationSummary, donationTransactions, refreshDonationTargetStatus, targetMonthlyAllocation } from './donationAnalytics.js';
 import { matchingTransactions } from './transactionSuggestions.js';
 import { donationDue, payDonationDue, accrueDonation, removeDonationPayment, canMarkDonationPaymentUnpaid, markDonationPaymentUnpaid, reopenedDonationDues } from './donationAccounting.js';
 import './finance.css';
@@ -582,7 +582,7 @@ function Automation({data,change,confirmAction,initialRule,onInitialRuleUsed}) {
     if(rule.targetType==='donation'){
       const latest=[...(data.donationAccruals||[])].filter(item=>item.automationRuleId===rule.id).sort((a,b)=>String(b.effectiveDate).localeCompare(String(a.effectiveDate)))[0];
       const latestIncome=[...data.transactions].filter(item=>item.type==='income').sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0];
-      const value=latest?.amount??(rule.mode==='percent'?Number(latestIncome?.amount||0)*Number(rule.value||0)/10000:Number(rule.value||0));
+      const value=donationRulePreviewAmount(rule,latestIncome?.amount,latest);
       const category=(data.donationCategories||[]).find(item=>item.id===rule.donationCategoryId)?.name;
       return `Creates ${formatMoney(Math.round(value),data.settings.currency)} due${rule.mode==='percent'?` · ${(rule.value/100).toFixed(2)}% of income`:''}${category?` · ${category}`:''} · ${timing}`;
     }

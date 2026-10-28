@@ -90,3 +90,10 @@ export function donationSummary(state, month, incomeMonth = month) {
   };
 }
 
+export function donationRulePreviewAmount(rule, incomeAmount, latestAccrual) {
+  const recorded = Number(latestAccrual?.accruedAmount ?? latestAccrual?.amount);
+  if (Number.isFinite(recorded) && recorded > 0) return recorded;
+  if (rule.mode === 'percent') return Math.round((Number(incomeAmount) || 0) * (Number(rule.value) || 0) / 10000);
+  return Math.max(0, Number(rule.value) || 0);
+}
+

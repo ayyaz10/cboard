@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { initialFinanceState, normalizeFinanceState } from './financeData.js';
-import { donationSummary, refreshDonationTargetStatus, targetMonthlyAllocation } from './donationAnalytics.js';
+import { donationRulePreviewAmount, donationSummary, refreshDonationTargetStatus, targetMonthlyAllocation } from './donationAnalytics.js';
 import { financeSummary } from './financeMath.js';
 import { deriveFinancePosition } from './financeLedger.js';
 
@@ -42,6 +42,13 @@ test('donation dashboard reports selected-month and all-time recorded income', (
   assert.equal(allTime.incomeLifetime,520000);
   const allTimeView=donationSummary(state,null,'2026-10');
   assert.equal(allTimeView.monthlyIncome,280000);
+});
+
+test('automatic donation preview falls back to the income calculation when a stale accrual is zero', () => {
+  const rule = { mode: 'percent', value: 1000 };
+  assert.equal(donationRulePreviewAmount(rule, 37500, { amount: 0, accruedAmount: 0 }), 3750);
+  assert.equal(donationRulePreviewAmount(rule, 37500, { amount: 2500, accruedAmount: 3000 }), 3000);
+  assert.equal(donationRulePreviewAmount({ mode: 'amount', value: 1200 }, 37500, { amount: 0 }), 1200);
 });
 
 test('legacy paid donations receive a stable starter category on normalization', () => {
