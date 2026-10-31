@@ -1,6 +1,6 @@
 import { getUserScopedClient, assertSupabaseResult } from './supabaseCrud.js';
 import { validateState as validateTrainingState } from '../features/training/trainingData.js';
-import { validateDrivingData } from '../features/drivingImprovement/drivingData.js';
+import { migrateHabitData } from '../features/drivingImprovement/drivingData.js';
 
 const PAGE_SIZE = 500;
 const secretField = key => /^(password|password_hash|passwd|session_token|access_token|refresh_token|auth_token|reset_token|cookie|auth_cookie|token|private_key|api_key|service_role_key|credentials|provider_id|user_id)$/i.test(key.replace(/([a-z])([A-Z])/g, '$1_$2'));
@@ -181,20 +181,20 @@ const training = {
 };
 
 const drivingImprovement = {
-  moduleId: 'drivingImprovement', displayName: 'Driving Improvement', schemaVersion: 1,
+  moduleId: 'drivingImprovement', displayName: 'Habit Improvement', schemaVersion: 1,
   async exportData({ client, userId }) {
     const result = await client.from('driving_workspaces').select('data,revision,updated_at').eq('user_id', userId).maybeSingle();
     assertSupabaseResult(result);
     return { workspace: result.data || null };
   },
   validate(data) {
-    if (!data || !(data.workspace === null || (typeof data.workspace === 'object' && data.workspace.data))) throw new Error('Driving Improvement backup data is invalid.');
-    if (data.workspace?.data) validateDrivingData(data.workspace.data);
+    if (!data || !(data.workspace === null || (typeof data.workspace === 'object' && data.workspace.data))) throw new Error('Habit Improvement backup data is invalid.');
+    if (data.workspace?.data) migrateHabitData(data.workspace.data);
   },
   async importData({ client, userId, data }) {
     const removed = await client.from('driving_workspaces').delete().eq('user_id', userId); assertSupabaseResult(removed);
     if (!data.workspace) return;
-    const restored = structuredClone(data.workspace.data);
+    const restored = migrateHabitData(data.workspace.data).data;
     restored.mistakes = restored.mistakes.map(mistake => ({ ...mistake, userId }));
     restored.reminders = (restored.reminders || []).map(reminder => ({ ...reminder, userId }));
     const result = await client.from('driving_workspaces').insert({ user_id: userId, data: restored, revision: Math.max(1, Number(data.workspace.revision) || 1) });

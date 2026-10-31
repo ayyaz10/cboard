@@ -74,6 +74,27 @@ test('one-app backup keeps a selective scope and round-trips the source data', a
   assert.equal(parsed.modules[0].data.workspace.state.transactions[0].id, 'stable-tx-1');
 });
 
+test('legacy Driving Improvement backups restore as Habit Improvement and map CONFIDENT to STABLE', async () => {
+  const category = { id: 'driving-category-1', name: 'Mirrors', createdAt: '2025-01-02T00:00:00.000Z' };
+  const item = {
+    id: 'driving-item-1', userId: 'old-account', categoryId: category.id, title: 'Late mirror check',
+    cause: 'Original reason', correction: 'Original next action', status: 'CONFIDENT',
+    createdAt: '2025-02-01T00:00:00.000Z', updatedAt: '2025-02-02T00:00:00.000Z',
+  };
+  const client = new FinanceMemoryClient();
+  client.rows = [{ user_id: 'new-account', data: { replaced: true }, revision: 3 }];
+  await importBackupModule('drivingImprovement', {
+    workspace: { data: { version: 1, categories: [category], mistakes: [item] }, revision: 7, updated_at: '2025-02-02T00:00:00.000Z' },
+  }, { client, userId: 'new-account' });
+  const restored = client.rows[0];
+  assert.equal(restored.user_id, 'new-account');
+  assert.equal(restored.revision, 7);
+  assert.equal(restored.data.categories[0].id, category.id);
+  assert.equal(restored.data.categories[0].name, 'Mirrors');
+  assert.deepEqual(restored.data.mistakes[0], { ...item, userId: 'new-account', status: 'STABLE' });
+  assert.equal(backupModuleRegistry.find(module => module.moduleId === 'drivingImprovement').displayName, 'Habit Improvement');
+});
+
 test('multi-app backup preserves linked identifiers between selected modules', async () => {
   const goalId = 'goal-1';
   const note = { id: 'note-1', linked_goal_id: goalId, content_text: 'Progress note' };

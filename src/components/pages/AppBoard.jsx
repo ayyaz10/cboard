@@ -19,9 +19,9 @@ const appSections = [
     color: '#ff90e8', colorKey: 'pink', countLabel: 'Weight & photos',
   },
   {
-    id: 'driving-improvement', path: '/driving-improvement', label: 'Learn from mistakes', name: 'Driving Improvement',
-    description: 'Capture driving mistakes, keep your correction visible, and review before practice.',
-    color: '#ffd166', colorKey: 'amber', countLabel: 'Driving tracker',
+    id: 'habit-improvement', path: '/driving-improvement', label: 'Understand patterns', name: 'Habit Improvement',
+    description: 'Track recurring patterns, understand why they happen, and plan what to change next time.',
+    color: '#ffd166', colorKey: 'amber', countLabel: 'Improvement tracker',
   },
   {
     id: 'groceries', path: '/groceries', label: 'Your kitchen', name: 'Groceries',

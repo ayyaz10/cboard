@@ -1,55 +1,84 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createInitialDrivingData, getDrivingSummary, makeDrivingMistake, seedDrivingPresets, sortDrivingMistakes, STARTER_CATEGORIES, validateDrivingData } from './drivingData.js';
+import {
+  createInitialHabitData, getHabitSummary, makeImprovementItem, migrateHabitData,
+  sortImprovementItems, validateHabitData,
+} from './drivingData.js';
 
-test('first-use state seeds the requested categories, mistakes and separate reminders', () => {
-  const data = createInitialDrivingData('user-a', '2026-10-31T00:00:00.000Z');
-  assert.deepEqual(data.categories.map(category => category.name), STARTER_CATEGORIES);
-  assert.equal(data.mistakes.length, 26);
-  assert.equal(data.reminders.length, 4);
-  assert.equal(data.mistakes.every(item => item.status === 'NEEDS_WORK' && item.userId === 'user-a' && !item.cause && !item.correction), true);
-  assert.equal(data.reminders.every(item => item.categoryId === data.categories[9].id), true);
-  assert.equal(getDrivingSummary(data.mistakes).total, 26);
+test('new workspaces are empty and do not seed driving categories or reminders', () => {
+  assert.deepEqual(createInitialHabitData(), {
+    version: 1, habitVersion: 1, categories: [], mistakes: [], reminders: [], guidanceNotes: [],
+  });
 });
 
-test('mistakes retain category identity and summaries reflect their current status', () => {
-  const data = createInitialDrivingData();
-  const mistake = makeDrivingMistake({ title: 'Late mirror check', categoryId: data.categories[1].id, cause: '', correction: '', status: 'NEEDS_WORK' }, 'user-a');
-  data.mistakes.push(mistake);
-  validateDrivingData(data);
-  assert.equal(data.mistakes.find(item => item.id === mistake.id).categoryId, data.categories[1].id);
-  assert.deepEqual(getDrivingSummary([mistake]), { total: 1, NEEDS_WORK: 1, IMPROVING: 0, CONFIDENT: 0 });
+test('generic behaviour items work with user-created Focus and Sleep categories', () => {
+  const data = createInitialHabitData();
+  data.categories.push({ id: 'focus', name: 'Focus', createdAt: '2026-10-31T00:00:00.000Z' });
+  data.categories.push({ id: 'sleep', name: 'Sleep', createdAt: '2026-10-31T00:00:00.000Z' });
+  const phone = makeImprovementItem({
+    title: 'Phone distraction while working', categoryId: 'focus', cause: 'User-entered trigger',
+    correction: 'User-entered next action', status: 'NEEDS_WORK',
+  }, 'user-a');
+  const sleep = makeImprovementItem({
+    title: 'Going to bed too late', categoryId: 'sleep', cause: '', correction: 'Set a wind-down alarm', status: 'IMPROVING',
+  }, 'user-a');
+  data.mistakes.push(phone, sleep);
+  validateHabitData(data);
+  assert.equal(phone.title, 'Phone distraction while working');
+  assert.equal(phone.cause, 'User-entered trigger');
+  assert.equal(phone.correction, 'User-entered next action');
+  assert.deepEqual(getHabitSummary(data.mistakes), { total: 2, NEEDS_WORK: 1, IMPROVING: 1, STABLE: 0 });
 });
 
-test('preset upgrade adds the provided records once while retaining existing user records', () => {
-  const base = createInitialDrivingData('user-a');
+test('legacy driving data keeps IDs, dates, category and text while CONFIDENT maps to STABLE', () => {
   const legacy = {
     version: 1,
-    categories: base.categories.map((category, index) => ({ ...category, id: `old-${index}`, name: ['Roundabouts','Mirrors','Stopping & Braking','Speed Control','Speed Bumps','Lane Discipline','Changing Lanes','Junctions & Traffic Signals','Pedestrian Awareness','Road Signs'][index] })),
-    mistakes: [{ id: 'personal', userId: 'user-a', categoryId: 'old-0', title: 'My own note', cause: '', correction: '', status: 'IMPROVING', createdAt: '2026-01-01', updatedAt: '2026-01-01' }],
+    categories: [{ id: 'category-mirrors', name: 'Mirrors', createdAt: '2025-01-02T00:00:00.000Z' }],
+    mistakes: [
+      { id: 'needs', userId: 'user-a', categoryId: 'category-mirrors', title: 'Late mirror check', cause: 'Busy junction', correction: 'Check before changing speed', status: 'NEEDS_WORK', createdAt: '2025-02-01', updatedAt: '2025-02-02' },
+      { id: 'improving', userId: 'user-a', categoryId: 'category-mirrors', title: 'Mirror timing', cause: 'User text', correction: 'Check before turning', status: 'IMPROVING', createdAt: '2025-03-01', updatedAt: '2025-03-02' },
+      { id: 'confident', userId: 'user-a', categoryId: 'category-mirrors', title: 'Stable observation', cause: 'Original why', correction: 'Original action', status: 'CONFIDENT', createdAt: '2025-04-01', updatedAt: '2025-04-02' },
+    ],
+    reminders: [{ id: 'legacy-reminder', userId: 'user-a', categoryId: 'category-mirrors', title: 'Archived reminder', text: 'Keep archived', createdAt: '2025-01-01', updatedAt: '2025-01-01' }],
+    guidanceNotes: ['Keep archived guidance note'],
   };
-  const seeded = seedDrivingPresets(legacy, 'user-a', '2026-10-31T00:00:00.000Z');
-  const again = seedDrivingPresets(seeded, 'user-a', '2026-10-31T00:00:00.000Z');
-  assert.equal(seeded.mistakes.length, 27);
-  assert.equal(seeded.reminders.length, 4);
-  assert.equal(seeded.mistakes.find(item => item.id === 'personal').status, 'IMPROVING');
-  assert.equal(seeded.categories.find(item => item.id === 'old-3').name, 'Speed Management');
-  assert.equal(again.mistakes.length, seeded.mistakes.length);
-  assert.equal(again.reminders.length, seeded.reminders.length);
+  const migrated = migrateHabitData(legacy);
+  const repeated = migrateHabitData(migrated.data);
+  assert.equal(migrated.changed, true);
+  assert.equal(repeated.changed, false);
+  assert.deepEqual(repeated.data, migrated.data);
+  assert.equal(migrated.data.categories[0].id, 'category-mirrors');
+  assert.equal(migrated.data.categories[0].name, 'Mirrors');
+  assert.deepEqual(migrated.data.mistakes.map(item => item.status), ['NEEDS_WORK', 'IMPROVING', 'STABLE']);
+  assert.deepEqual(migrated.data.mistakes[2], legacy.mistakes[2] && { ...legacy.mistakes[2], status: 'STABLE' });
+  assert.deepEqual(migrated.data.reminders, legacy.reminders);
+  assert.deepEqual(migrated.data.guidanceNotes, legacy.guidanceNotes);
 });
 
-test('list ordering prioritizes Needs Work, then Improving, then Confident', () => {
-  const rows = [
-    { id: 'c', status: 'CONFIDENT', updatedAt: '2026-10-30' },
-    { id: 'i', status: 'IMPROVING', updatedAt: '2026-10-29' },
-    { id: 'n-old', status: 'NEEDS_WORK', updatedAt: '2026-10-29' },
-    { id: 'n-new', status: 'NEEDS_WORK', updatedAt: '2026-10-30' },
+test('Quick Review order is Needs Work then Improving and excludes Stable', () => {
+  const items = [
+    { id: 'stable', status: 'STABLE', updatedAt: '2026-10-30' },
+    { id: 'improving', status: 'IMPROVING', updatedAt: '2026-10-29' },
+    { id: 'needs-old', status: 'NEEDS_WORK', updatedAt: '2026-10-29' },
+    { id: 'needs-new', status: 'NEEDS_WORK', updatedAt: '2026-10-30' },
   ];
-  assert.deepEqual(sortDrivingMistakes(rows).map(row => row.id), ['n-new', 'n-old', 'i', 'c']);
+  const ordered = sortImprovementItems(items);
+  assert.deepEqual(ordered.map(item => item.id), ['needs-new', 'needs-old', 'improving', 'stable']);
+  assert.deepEqual(ordered.filter(item => item.status !== 'STABLE').map(item => item.id), ['needs-new', 'needs-old', 'improving']);
 });
 
-test('validation rejects orphan mistakes and unknown statuses', () => {
-  const data = createInitialDrivingData();
-  data.mistakes.push({ id: 'x', categoryId: 'missing', title: 'Mistake', cause: '', correction: '', status: 'NEEDS_WORK' });
-  assert.throws(() => validateDrivingData(data), /invalid/);
+test('all status transitions are reversible and unknown states or orphan items are rejected', () => {
+  const data = createInitialHabitData();
+  data.categories.push({ id: 'focus', name: 'Focus' });
+  const item = makeImprovementItem({ title: 'Phone distraction', categoryId: 'focus', cause: '', correction: '', status: 'NEEDS_WORK' }, 'user-a');
+  data.mistakes.push(item);
+  for (const status of ['IMPROVING', 'STABLE', 'IMPROVING', 'NEEDS_WORK']) {
+    item.status = status;
+    validateHabitData(data);
+  }
+  item.status = 'CONFIDENT';
+  assert.throws(() => validateHabitData(data), /invalid/i);
+  item.status = 'NEEDS_WORK';
+  item.categoryId = 'missing';
+  assert.throws(() => validateHabitData(data), /invalid/i);
 });
