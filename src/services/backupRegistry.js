@@ -196,10 +196,11 @@ const drivingImprovement = {
     if (!data.workspace) return;
     const restored = structuredClone(data.workspace.data);
     restored.mistakes = restored.mistakes.map(mistake => ({ ...mistake, userId }));
+    restored.reminders = (restored.reminders || []).map(reminder => ({ ...reminder, userId }));
     const result = await client.from('driving_workspaces').insert({ user_id: userId, data: restored, revision: Math.max(1, Number(data.workspace.revision) || 1) });
     assertSupabaseResult(result);
   },
-  recordCount(data) { return (data.workspace?.data?.categories?.length || 0) + (data.workspace?.data?.mistakes?.length || 0); },
+  recordCount(data) { return (data.workspace?.data?.categories?.length || 0) + (data.workspace?.data?.mistakes?.length || 0) + (data.workspace?.data?.reminders?.length || 0); },
 };
 
 const focus = {

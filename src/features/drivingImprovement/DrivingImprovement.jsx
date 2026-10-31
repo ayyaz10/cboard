@@ -9,7 +9,7 @@ import { loadDrivingWorkspace, saveDrivingWorkspace } from '../../services/drivi
 import { DRIVING_STATUS_LABELS, DRIVING_STATUSES, getDrivingSummary, makeDrivingMistake, sortDrivingMistakes, validateDrivingData } from './drivingData.js';
 import './drivingImprovement.css';
 
-const blankForm = item => ({ title: item?.title || '', categoryId: item?.categoryId || '', correction: item?.correction || '', cause: item?.cause || '', status: item?.status || 'NEEDS_WORK' });
+const blankForm = item => ({ title: item?.title || '', description: item?.description || '', categoryId: item?.categoryId || '', correction: item?.correction || '', cause: item?.cause || '', status: item?.status || 'NEEDS_WORK' });
 
 export function DrivingImprovement({ userId }) {
   const [data, setData] = useState(null), [revision, setRevision] = useState(0), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [error, setError] = useState('');
@@ -42,7 +42,7 @@ export function DrivingImprovement({ userId }) {
     event.preventDefault();
     if (!form.title.trim() || !form.categoryId) return;
     const now = new Date().toISOString();
-    const mistake = dialog.item ? { ...dialog.item, ...form, title: form.title.trim(), cause: form.cause.trim(), correction: form.correction.trim(), updatedAt: now } : makeDrivingMistake(form, userId, now);
+    const mistake = dialog.item ? { ...dialog.item, ...form, title: form.title.trim(), description: form.description.trim(), cause: form.cause.trim(), correction: form.correction.trim(), updatedAt: now } : makeDrivingMistake(form, userId, now);
     const next = { ...data, mistakes: dialog.item ? data.mistakes.map(item => item.id === mistake.id ? mistake : item) : [...data.mistakes, mistake] };
     if (await commit(next, dialog.item ? 'Mistake updated.' : 'Mistake added.')) { setDialog(null); setExpanded(mistake.id); }
   }
@@ -71,11 +71,11 @@ export function DrivingImprovement({ userId }) {
     return commit({ ...data, categories: data.categories.map(item => item.id === category.id ? { ...item, name: normalized, updatedAt: new Date().toISOString() } : item) }, 'Category renamed.');
   }
   async function removeCategory(category) {
-    if (data.mistakes.some(item => item.categoryId === category.id)) { setError('Move or delete this category’s mistakes before removing it.'); return; }
+    if (data.mistakes.some(item => item.categoryId === category.id) || (data.reminders || []).some(item => item.categoryId === category.id)) { setError('Move or delete linked records before removing this category.'); return; }
     if (await commit({ ...data, categories: data.categories.filter(item => item.id !== category.id) }, 'Category removed.')) { setDialog(null); setConfirm(null); }
   }
 
-  const categories = data?.categories || [], mistakes = data?.mistakes || [], summary = useMemo(() => getDrivingSummary(mistakes), [mistakes]);
+  const categories = data?.categories || [], mistakes = data?.mistakes || [], reminders = data?.reminders || [], summary = useMemo(() => getDrivingSummary(mistakes), [mistakes]);
   const ordered = useMemo(() => sortDrivingMistakes(mistakes), [mistakes]);
   const shown = ordered.filter(item => filter === 'ALL' || item.status === filter);
   const reviewItems = ordered.filter(item => item.status !== 'CONFIDENT');
@@ -100,16 +100,20 @@ export function DrivingImprovement({ userId }) {
           {item.correction && <span className="di-preview"><b>Next time:</b> {item.correction}</span>}
         </button>
         {isOpen && <div id={`di-details-${item.id}`} className="di-details"><div className="di-detail-correction"><span className="di-eyebrow">Next time</span><p>{item.correction || <em>Correction not added yet</em>}</p>{!item.correction && <button type="button" className="di-text-button" onClick={() => openMistake(item)}>Add correction</button>}</div>
+          {item.description && <div className="di-pattern"><span className="di-eyebrow">What this looks like</span><p>{item.description}</p></div>}
           <div className="di-detail-cause"><span className="di-eyebrow">Why it happened</span><p>{item.cause || <em>Not recorded</em>}</p></div>
           <label className="di-status-control">Status<select value={item.status} disabled={busy} onChange={event => changeStatus(item, event.target.value)}>{DRIVING_STATUSES.map(status => <option key={status} value={status}>{DRIVING_STATUS_LABELS[status]}</option>)}</select></label>
           <div className="di-actions"><Button onClick={() => openMistake(item)}>Edit</Button><Button variant="danger" onClick={() => setConfirm(item)}>Delete</Button></div>
         </div>}
       </article>; })}</div> : <div className="di-empty"><h3>{mistakes.length ? 'No mistakes in this filter' : 'No mistakes recorded yet'}</h3><p>{mistakes.length ? 'Choose another status above to see the rest.' : 'Add a mistake when you are ready. Your categories are here to organise them.'}</p>{!mistakes.length && <Button variant="primary" onClick={() => openMistake()}>＋ Add Mistake</Button>}</div>}
+      {reminders.length > 0 && <section className="di-reference-section" aria-labelledby="di-reminders-title"><div className="di-toolbar"><div><span className="di-eyebrow">Saved separately from mistakes</span><h2 id="di-reminders-title">Positioning reminders <span>{reminders.length}</span></h2></div></div><div className="di-reference-grid">{reminders.map(reminder => <article className="di-reference-card" key={reminder.id}><span className="di-category">{categoryById(reminder.categoryId)}</span><h3>{reminder.title}</h3><p>{reminder.text}</p></article>)}</div></section>}
+      {(data.guidanceNotes || []).length > 0 && <details className="di-guidance"><summary>Driving guidance notes</summary><ul>{data.guidanceNotes.map((note,index) => <li key={index}>{note}</li>)}</ul></details>}
     </>)}
   </section>
 
   <Dialog open={dialog?.type === 'mistake'} onClose={() => setDialog(null)} labelledBy="di-mistake-title" className="di-dialog"><h2 id="di-mistake-title">{dialog?.item ? 'Edit mistake' : 'Add mistake'}</h2><form className="di-form" onSubmit={saveMistake}>
     <label>Mistake<input autoFocus required maxLength={160} value={form.title} onChange={event => setForm({ ...form, title: event.target.value })} /></label>
+    <label>What this looks like (optional)<textarea rows="2" maxLength={2000} value={form.description} onChange={event => setForm({ ...form, description: event.target.value })} /></label>
     <label>Category<select required value={form.categoryId} onChange={event => setForm({ ...form, categoryId: event.target.value })}><option value="">Choose category</option>{categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
     <button type="button" className="di-text-button" onClick={() => { setCategoryName(''); setDialog(current => ({ ...current, categoryDialog: true })); }}>＋ New category</button>
     <label>What will I do differently?<textarea rows="3" maxLength={5000} value={form.correction} onChange={event => setForm({ ...form, correction: event.target.value })} placeholder="Add a correction later" /></label>
@@ -120,14 +124,15 @@ export function DrivingImprovement({ userId }) {
 
   <Dialog open={dialog?.type === 'mistake' && dialog.categoryDialog} onClose={() => setDialog(current => ({ ...current, categoryDialog: false }))} labelledBy="di-category-create-title" className="di-dialog"><h2 id="di-category-create-title">New category</h2><form className="di-form" onSubmit={createCategory}><label>Category name<input autoFocus required maxLength={80} value={categoryName} onChange={event => setCategoryName(event.target.value)} /></label><div className="di-actions"><Button variant="primary" type="submit" disabled={busy}>Create category</Button><Button type="button" onClick={() => setDialog(current => ({ ...current, categoryDialog: false }))}>Cancel</Button></div></form></Dialog>
 
-  <Dialog open={dialog?.type === 'categories'} onClose={() => setDialog(null)} labelledBy="di-categories-title" className="di-dialog"><h2 id="di-categories-title">Manage categories</h2><p className="di-muted">Categories organise mistakes. A category with mistakes must be empty before it can be removed.</p><form className="di-inline-create" onSubmit={createCategory}><label className="sr-only" htmlFor="di-manage-new-category">New category name</label><input id="di-manage-new-category" placeholder="New category name" maxLength={80} value={categoryName} onChange={event => setCategoryName(event.target.value)} /><Button type="submit" disabled={busy || !categoryName.trim()}>Add</Button></form><div className="di-category-list">{categories.map(category => <CategoryRow key={category.id} category={category} busy={busy} count={mistakes.filter(item => item.categoryId === category.id).length} rename={renameCategory} remove={value => setConfirm({ type: 'category', category: value })} />)}</div><div className="di-actions"><Button onClick={() => setDialog(null)}>Done</Button></div></Dialog>
+  <Dialog open={dialog?.type === 'categories'} onClose={() => setDialog(null)} labelledBy="di-categories-title" className="di-dialog"><h2 id="di-categories-title">Manage categories</h2><p className="di-muted">Categories organise mistakes and reminders. Reassign or delete linked records before removing a category.</p><form className="di-inline-create" onSubmit={createCategory}><label className="sr-only" htmlFor="di-manage-new-category">New category name</label><input id="di-manage-new-category" placeholder="New category name" maxLength={80} value={categoryName} onChange={event => setCategoryName(event.target.value)} /><Button type="submit" disabled={busy || !categoryName.trim()}>Add</Button></form><div className="di-category-list">{categories.map(category => { const count = mistakes.filter(item => item.categoryId === category.id).length, reminderCount = reminders.filter(item => item.categoryId === category.id).length; return <CategoryRow key={category.id} category={category} busy={busy} count={count} reminderCount={reminderCount} rename={renameCategory} remove={value => setConfirm({ type: 'category', category: value })} />; })}</div><div className="di-actions"><Button onClick={() => setDialog(null)}>Done</Button></div></Dialog>
 
   <ConfirmDialog isOpen={Boolean(confirm)} title={confirm?.type === 'category' ? 'Delete category?' : 'Delete mistake?'} message={confirm?.type === 'category' ? `“${confirm.category.name}” will be removed. It has no linked mistakes.` : confirm ? `${confirm.title} will be removed from your tracker.` : ''} onCancel={() => setConfirm(null)} onConfirm={() => confirm?.type === 'category' ? removeCategory(confirm.category) : confirm && deleteMistake(confirm)} />
   </PageShell>;
 }
 
-function CategoryRow({ category, count, busy, rename, remove }) {
+function CategoryRow({ category, count, reminderCount = 0, busy, rename, remove }) {
   const [name, setName] = useState(category.name);
   useEffect(() => setName(category.name), [category.name]);
-  return <div className="di-category-row"><label><span className="sr-only">Category name</span><input maxLength={80} value={name} disabled={busy} onChange={event => setName(event.target.value)} /></label><span className="di-category-count">{count} {count === 1 ? 'mistake' : 'mistakes'}</span><Button disabled={busy || !name.trim() || name.trim() === category.name} onClick={() => rename(category, name)}>Rename</Button><Button variant="danger" disabled={busy || count > 0} title={count ? 'Reassign or delete its mistakes first' : 'Delete category'} onClick={() => remove(category)}>Delete</Button></div>;
+  const linked = count + reminderCount;
+  return <div className="di-category-row"><label><span className="sr-only">Category name</span><input maxLength={80} value={name} disabled={busy} onChange={event => setName(event.target.value)} /></label><span className="di-category-count">{count} mistakes{reminderCount ? ` · ${reminderCount} reminders` : ''}</span><Button disabled={busy || !name.trim() || name.trim() === category.name} onClick={() => rename(category, name)}>Rename</Button><Button variant="danger" disabled={busy || linked > 0} title={linked ? 'Reassign or delete linked records first' : 'Delete category'} onClick={() => remove(category)}>Delete</Button></div>;
 }
