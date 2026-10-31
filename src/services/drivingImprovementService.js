@@ -12,7 +12,7 @@ export async function loadDrivingWorkspace(userId, attempt = 0) {
   const result = await client.from('driving_workspaces').select('data,revision,updated_at').eq('user_id', userId).maybeSingle();
   assertSupabaseResult(result);
   if (result.data) {
-    const { data, changed } = migrateHabitData(result.data.data);
+    const { data, changed } = migrateHabitData(result.data.data, userId);
     if (!changed) return { data, revision: result.data.revision };
     try {
       const revision = await saveDrivingWorkspace(userId, data, result.data.revision);

@@ -61,7 +61,7 @@ test('offline navigation to all app routes returns the public shell; static chun
   const sw = setup({ offline: true });
   await sw.lifecycle('install');
   assert.equal(sw.activated, 0, 'install must wait for user consent');
-  for (const route of ['', 'food-diary', 'recipes/diary/day', 'groceries', 'finance?section=timeline', 'notes', 'training', 'calculators/calorie', 'login']) {
+  for (const route of ['', 'food-diary', 'recipes/diary/day', 'groceries', 'finance?section=timeline', 'notes', 'training', 'calculators/calorie', 'habit-improvement', 'habit-improvement/driving-improvement', 'driving-improvement', 'login']) {
     assert.equal(await (await sw.request(`/cboard/${route}`, { mode: 'navigate' })).text(), 'CBoard shell');
   }
   assert.equal(await (await sw.request('/cboard/assets/app-new.js')).text(), 'public asset');

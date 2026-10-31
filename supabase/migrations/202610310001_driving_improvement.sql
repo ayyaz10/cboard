@@ -1,5 +1,5 @@
--- User-owned V1 aggregate. Categories and mistakes are separate records in the JSON model.
--- Starter categories are created once with the workspace; later deletions stay deleted.
+-- User-owned V1 aggregate. Habits, categories and improvements are stored in the JSON model.
+-- Empty workspaces receive no seeded records; legacy Driving data is wrapped once on load.
 create table if not exists public.driving_workspaces (
   user_id uuid primary key references auth.users(id) on delete cascade,
   revision bigint not null default 1 check (revision > 0),

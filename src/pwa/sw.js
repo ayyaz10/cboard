@@ -68,7 +68,7 @@ self.addEventListener('fetch', event => {
   if (!url.pathname.startsWith(CONFIG.base)) return;
   // Extensionless application routes only, never endpoints or file downloads.
   const route = url.pathname.slice(CONFIG.base.length);
-  const appRoute = /^(?:|index\.html|login|board|calculators(?:\/[^.]+)?|progress-tracker|notes|groceries|weight-progress|finance|training|food-diary|recipes(?:\/[^.]+)?|focus-timer)\/?$/.test(route);
+  const appRoute = /^(?:|index\.html|login|board|calculators(?:\/[^.]+)?|progress-tracker|notes|groceries|weight-progress|finance|training|habit-improvement(?:\/[^.]+)?|driving-improvement|food-diary|recipes(?:\/[^.]+)?|focus-timer)\/?$/.test(route);
   if (request.mode === 'navigate' && appRoute) {
     event.respondWith(appShell());
     return;

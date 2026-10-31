@@ -181,7 +181,8 @@ const training = {
 };
 
 const drivingImprovement = {
-  moduleId: 'drivingImprovement', displayName: 'Habit Improvement', schemaVersion: 1,
+  moduleId: 'drivingImprovement', displayName: 'Habit Improvement', schemaVersion: 2,
+  migrations: [{ fromVersion: 1, toVersion: 2, migrate: data => data }],
   async exportData({ client, userId }) {
     const result = await client.from('driving_workspaces').select('data,revision,updated_at').eq('user_id', userId).maybeSingle();
     assertSupabaseResult(result);
@@ -194,13 +195,15 @@ const drivingImprovement = {
   async importData({ client, userId, data }) {
     const removed = await client.from('driving_workspaces').delete().eq('user_id', userId); assertSupabaseResult(removed);
     if (!data.workspace) return;
-    const restored = migrateHabitData(data.workspace.data).data;
+    const restored = migrateHabitData(data.workspace.data, userId).data;
+    restored.habits = restored.habits.map(habit => ({ ...habit, userId }));
+    restored.categories = restored.categories.map(category => ({ ...category, userId }));
     restored.mistakes = restored.mistakes.map(mistake => ({ ...mistake, userId }));
     restored.reminders = (restored.reminders || []).map(reminder => ({ ...reminder, userId }));
     const result = await client.from('driving_workspaces').insert({ user_id: userId, data: restored, revision: Math.max(1, Number(data.workspace.revision) || 1) });
     assertSupabaseResult(result);
   },
-  recordCount(data) { return (data.workspace?.data?.categories?.length || 0) + (data.workspace?.data?.mistakes?.length || 0) + (data.workspace?.data?.reminders?.length || 0); },
+  recordCount(data) { return (data.workspace?.data?.habits?.length || 0) + (data.workspace?.data?.categories?.length || 0) + (data.workspace?.data?.mistakes?.length || 0) + (data.workspace?.data?.reminders?.length || 0); },
 };
 
 const focus = {

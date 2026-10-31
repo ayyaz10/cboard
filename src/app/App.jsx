@@ -24,7 +24,8 @@ import { FinancePage } from '../features/finance/FinancePage.jsx';
 import { ProfilePage } from '../components/pages/ProfilePage.jsx';
 const ThemePreview = lazy(() => import('../components/pages/ThemePreview.jsx').then(module => ({ default: module.ThemePreview })));
 const Training = lazy(() => import('../features/training/Training.jsx').then(module => ({ default: module.Training })));
-const DrivingImprovement = lazy(() => import('../features/drivingImprovement/DrivingImprovement.jsx').then(module => ({ default: module.DrivingImprovement })));
+const HabitImprovementHome = lazy(() => import('../features/drivingImprovement/HabitImprovementHome.jsx').then(module => ({ default: module.HabitImprovementHome })));
+const HabitImprovementDetail = lazy(() => import('../features/drivingImprovement/DrivingImprovement.jsx').then(module => ({ default: module.HabitImprovementDetail })));
 
 export default function App() {
   const { isAuthenticated, user } = useAuth();
@@ -39,6 +40,10 @@ function AppContent() {
   const [isMigrating, setIsMigrating] = useState(false);
   const [migrationError, setMigrationError] = useState('');
   const workspaceSetupRef = useRef(null);
+
+  useEffect(() => {
+    if (route === '/driving-improvement') navigateTo('/habit-improvement/driving-improvement', { replace: true });
+  }, [route]);
 
   useEffect(() => {
     if (!user?.id) {
@@ -160,7 +165,12 @@ function AppContent() {
   if (route === '/finance') return <FinancePage key={user.id} />;
   if (route === '/account') return <ProfilePage key={user.id} />;
   if (route === '/training') return <Suspense fallback={<main className="panel m-6 p-6" role="status">Loading Training…</main>}><Training key={user.id} /></Suspense>;
-  if (route === '/driving-improvement') return <Suspense fallback={<main className="panel m-6 p-6" role="status">Loading Habit Improvement…</main>}><DrivingImprovement key={user.id} userId={user.id} /></Suspense>;
+  if (route === '/driving-improvement') return <main className="panel m-6 p-6" role="status">Opening Driving Improvement...</main>;
+  if (route === '/habit-improvement') return <Suspense fallback={<main className="panel m-6 p-6" role="status">Loading Habit Improvement...</main>}><HabitImprovementHome key={user.id} userId={user.id} /></Suspense>;
+  if (route.startsWith('/habit-improvement/')) {
+    const habitSlug = route.slice('/habit-improvement/'.length).split('/')[0];
+    return <Suspense fallback={<main className="panel m-6 p-6" role="status">Loading improvement area...</main>}><HabitImprovementDetail key={`${user.id}:${habitSlug}`} userId={user.id} habitSlug={habitSlug} /></Suspense>;
+  }
 
   if (route === '/food-diary') {
     return <Recipes key={user.id} route="/recipes/diary/day" navigationPath="/food-diary" />;

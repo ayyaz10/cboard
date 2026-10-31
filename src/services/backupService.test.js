@@ -74,7 +74,7 @@ test('one-app backup keeps a selective scope and round-trips the source data', a
   assert.equal(parsed.modules[0].data.workspace.state.transactions[0].id, 'stable-tx-1');
 });
 
-test('legacy Driving Improvement backups restore as Habit Improvement and map CONFIDENT to STABLE', async () => {
+test('legacy Driving Improvement backups restore under one parent habit and map CONFIDENT to STABLE', async () => {
   const category = { id: 'driving-category-1', name: 'Mirrors', createdAt: '2025-01-02T00:00:00.000Z' };
   const item = {
     id: 'driving-item-1', userId: 'old-account', categoryId: category.id, title: 'Late mirror check',
@@ -91,8 +91,25 @@ test('legacy Driving Improvement backups restore as Habit Improvement and map CO
   assert.equal(restored.revision, 7);
   assert.equal(restored.data.categories[0].id, category.id);
   assert.equal(restored.data.categories[0].name, 'Mirrors');
+  assert.equal(restored.data.habits.length, 1);
+  assert.equal(restored.data.habits[0].name, 'Driving Improvement');
+  assert.equal(restored.data.habits[0].slug, 'driving-improvement');
+  assert.equal(restored.data.categories[0].habitId, restored.data.habits[0].id);
+  assert.equal(restored.data.habits[0].userId, 'new-account');
   assert.deepEqual(restored.data.mistakes[0], { ...item, userId: 'new-account', status: 'STABLE' });
   assert.equal(backupModuleRegistry.find(module => module.moduleId === 'drivingImprovement').displayName, 'Habit Improvement');
+});
+
+test('older Driving Improvement backup schema remains parseable through the parent-area upgrade', async () => {
+  const legacyData = { workspace: { data: { version: 1, categories: [{ id: 'cat-old', name: 'Roundabouts' }], mistakes: [] }, revision: 4 } };
+  const backup = await backupFor(['drivingImprovement'], { drivingImprovement: legacyData });
+  backup.data.drivingImprovement.schemaVersion = 1;
+  backup.integrity.digest = await digest(backup.data);
+  const parsed = await parseBackupFile(await asFile(backup));
+  const module = parsed.modules[0];
+  assert.equal(module.schemaVersion, 2);
+  assert.equal(module.displayName, 'Habit Improvement');
+  assert.equal(module.data.workspace.data.categories[0].name, 'Roundabouts');
 });
 
 test('multi-app backup preserves linked identifiers between selected modules', async () => {

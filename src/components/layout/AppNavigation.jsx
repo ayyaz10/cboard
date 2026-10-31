@@ -5,7 +5,7 @@ export const primaryNavItems = [
   { path: '/finance', label: 'Finance' },
   { path: '/food-diary', label: 'Food Diary' },
   { path: '/weight-progress', label: 'Weight Progress' },
-  { path: '/driving-improvement', label: 'Habit Improvement' },
+  { path: '/habit-improvement', label: 'Habit Improvement' },
   { path: '/groceries', label: 'Groceries' },
   { path: '/notes', label: 'Notes' },
   { path: '/calculators', label: 'Calculator Tools' },
