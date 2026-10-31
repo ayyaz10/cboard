@@ -5,7 +5,6 @@ import { DailyNutritionTargets, useNutritionGoals } from '../nutrition/DailyNutr
 import { useEffect, useRef, useState } from "react";
 import { PageShell } from "../../components/layout/PageShell";
 import { AppNavigation } from "../../components/layout/AppNavigation";
-import { useAdaptiveNavigation } from "../../hooks/useAdaptiveNavigation";
 import { readGroceryImage, resizeGroceryImage } from "./groceryImage";
 import { groceryImage } from "../../services/groceryService";
 import { useGroceries } from "./useGroceries";
@@ -182,12 +181,7 @@ export function Groceries() {
     [category, setCategory] = useState("All"),
     [status, setStatus] = useState("All"),
     [recipeUsage, setRecipeUsage] = useState("all");
-  const groceryTabs = useAdaptiveNavigation(
-    "grocery-sections",
-    [["stock", "My Groceries"], ["shop", "Shopping List"], ["unused", "Unused recipe ingredients"], ["links", "Ingredient links"], ["wishlist", "Wishlist"]],
-    tab,
-    ([key]) => key,
-  );
+  const groceryTabs = [["stock", "My Groceries"], ["shop", "Shopping List"], ["unused", "Unused recipe ingredients"], ["links", "Ingredient links"], ["wishlist", "Wishlist"]];
   const [selected, setSelected] = useState([]),
     [modal, setModal] = useState(null),
     [deleteTarget, setDeleteTarget] = useState(null),

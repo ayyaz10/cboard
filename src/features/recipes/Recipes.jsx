@@ -5,7 +5,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { navigateTo, getAppHref } from '../../app/useRoute';
 import { PageShell } from '../../components/layout/PageShell';
 import { AppNavigation } from '../../components/layout/AppNavigation';
-import { useAdaptiveNavigation } from '../../hooks/useAdaptiveNavigation.js';
 import { PrimaryButton } from '../../components/ui/PrimaryButton';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog.jsx';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog.js';
@@ -197,12 +196,7 @@ function RecipesContent({ route, navigationPath }) {
   const planning =
     parts.length === 3 && parts[1] === 'planner' && parts[2] === 'day';
   const diary = parts.length === 3 && parts[1] === 'diary' && parts[2] === 'day';
-  const recipeSection = foods ? 'foods' : importing ? 'add' : planning ? 'planner' : diary ? 'diary' : manage ? 'manage' : 'home';
-  const shortcutOrder = useAdaptiveNavigation(
-    'recipe-sections',
-    ['home', 'foods', 'add', 'planner', 'diary', 'manage'],
-    recipeSection,
-  );
+  const shortcutOrder = ['home', 'foods', 'add', 'planner', 'diary', 'manage'];
   function startImport(initial = null, editing = false) {
     setDraft({ initial, editing, key: crypto.randomUUID() });
     navigateTo('/recipes/import');

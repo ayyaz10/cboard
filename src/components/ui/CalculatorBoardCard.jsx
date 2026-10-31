@@ -7,7 +7,7 @@ const boardColorKeys = {
   '#ffd166': 'amber',
 };
 
-export function CalculatorBoardCard({ calculator, index }) {
+export function CalculatorBoardCard({ calculator }) {
   const colorKey = boardColorKeys[calculator.boardColor] || 'paper';
 
   return (
@@ -27,9 +27,6 @@ export function CalculatorBoardCard({ calculator, index }) {
           </h2>
         </div>
 
-        <span className="rounded-full border-2 border-black bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-black">
-          {String(index + 1).padStart(2, '0')}
-        </span>
       </div>
 
       <p className="mt-4 max-w-sm text-sm font-medium leading-7 text-black/72">

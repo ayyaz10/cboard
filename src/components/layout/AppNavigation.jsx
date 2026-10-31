@@ -1,21 +1,20 @@
 import { getAppHref } from '../../app/useRoute';
 import { useEffect, useId, useState } from 'react';
-import { useAdaptiveNavigation } from '../../hooks/useAdaptiveNavigation';
 
 export const primaryNavItems = [
-  { path: '/training', label: 'Training' },
-  { path: '/driving-improvement', label: 'Driving Improvement' },
-  { path: '/board', label: 'C Board' },
-  { path: '/calculators', label: 'Calculator Tools' },
-  { path: '/progress-tracker', label: 'Progress Tracker' },
-  { path: '/notes', label: 'Notes' },
-  { path: '/food-diary', label: 'Food Diary' },
-  { path: '/recipes', label: 'Recipes' },
-  { path: '/groceries', label: 'Groceries' },
-  { path: '/focus-timer', label: 'Focus Timer' },
-  { path: '/weight-progress', label: 'Weight Progress' },
   { path: '/finance', label: 'Finance' },
-  { path: '/account', label: 'Profile / Account' },
+  { path: '/food-diary', label: 'Food Diary' },
+  { path: '/weight-progress', label: 'Weight Progress' },
+  { path: '/driving-improvement', label: 'Driving Improvement' },
+  { path: '/groceries', label: 'Groceries' },
+  { path: '/notes', label: 'Notes' },
+  { path: '/calculators', label: 'Calculator Tools' },
+  { path: '/training', label: 'Training' },
+  { path: '/recipes', label: 'Recipes' },
+  { path: '/progress-tracker', label: 'Progress Tracker' },
+  { path: '/focus-timer', label: 'Focus Timer' },
+  { path: '/board', label: 'C Board' },
+  { path: '/account', label: 'Profile' },
 ];
 
 const relatedCalculators = {
@@ -52,14 +51,8 @@ const relatedCalculators = {
 
 export function AppNavigation({ activePath, extraItems = [] }) {
   const contextualItems = relatedCalculators[activePath] || [];
-  const homeItem = primaryNavItems.find((item) => item.path === '/board');
-  const adaptiveItems = useAdaptiveNavigation(
-    'main-apps',
-    [...primaryNavItems.filter((item) => item.path !== '/board'), ...extraItems],
-    activePath === '/board' ? null : activePath,
-    (item) => item.path,
-  );
-  const orderedItems = [homeItem, ...adaptiveItems];
+  const profileItem = primaryNavItems.find((item) => item.path === '/account');
+  const orderedItems = [...primaryNavItems.filter((item) => item.path !== '/account'), ...extraItems, profileItem];
   const [open, setOpen] = useState(false);
   const menuId = useId();
   useEffect(() => {
@@ -79,6 +72,10 @@ export function AppNavigation({ activePath, extraItems = [] }) {
     {open && <button type="button" className="app-menu-backdrop" aria-label="Close navigation menu" onClick={() => setOpen(false)} />}
     <aside id={menuId} className="app-navigation-content" data-open={open} aria-label="Application navigation">
     <div className="app-menu-heading"><strong>Navigate</strong><button type="button" aria-label="Close navigation menu" onClick={() => setOpen(false)}>×</button></div>
+    {contextualItems.length > 0 && <nav className="app-navigation-related flex flex-wrap items-center gap-2" aria-label="Related calculators">
+      <span className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">Related calculators</span>
+      {contextualItems.map((item) => <a key={item.path} href={getAppHref(item.path)} className="inline-flex items-center rounded-full border border-black/70 bg-[#f4f9e9] px-3 py-1.5 text-xs font-semibold text-black transition hover:bg-[#c5ff6f]">{item.label}</a>)}
+    </nav>}
     <nav className="app-navigation-primary" aria-label="Main navigation">
       <div className="app-navigation-list flex flex-wrap gap-2 pb-1">
         {orderedItems.map((item) => {
@@ -101,10 +98,6 @@ export function AppNavigation({ activePath, extraItems = [] }) {
         })}
       </div>
     </nav>
-    {contextualItems.length > 0 && <nav className="app-navigation-related flex flex-wrap items-center gap-2" aria-label="Related calculators">
-      <span className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">Related calculators</span>
-      {contextualItems.map((item) => <a key={item.path} href={getAppHref(item.path)} className="inline-flex items-center rounded-full border border-black/70 bg-[#f4f9e9] px-3 py-1.5 text-xs font-semibold text-black transition hover:bg-[#c5ff6f]">{item.label}</a>)}
-    </nav>}
     </aside>
     </div>
   );

@@ -33,7 +33,7 @@ export const calculators = [
     id: 'percentage',
     path: '/calculators/percentage',
     name: 'Percentage Calculator',
-    boardLabel: 'Calculator 01',
+    boardLabel: 'Quick calculation',
     boardColor: '#c5ff6f',
     boardDescription: 'Calculate a percentage of any number in one step.',
     formula: [
@@ -50,7 +50,7 @@ export const calculators = [
     id: 'calorie',
     path: '/calculators/calorie',
     name: 'Calorie Calculator',
-    boardLabel: 'Calculator 02',
+    boardLabel: 'Food & nutrition',
     boardColor: '#ff90e8',
     boardDescription: 'Calculate calories for any portion size from a total amount.',
     description:
@@ -70,7 +70,7 @@ export const calculators = [
     id: 'mass',
     path: '/calculators/mass',
     name: 'Mass Unit Converter',
-    boardLabel: 'Calculator 03',
+    boardLabel: 'Unit conversion',
     boardColor: '#9fe3ff',
     boardDescription: 'Convert between metric and imperial mass units.',
     description:
@@ -90,7 +90,7 @@ export const calculators = [
     id: 'protein-intake',
     path: '/calculators/protein-intake',
     name: 'Protein Intake Calculator',
-    boardLabel: 'Calculator 05',
+    boardLabel: 'Nutrition planning',
     boardColor: '#c5ff6f',
     boardDescription: 'Estimate daily protein for three muscle-gain confidence ranges from body weight.',
     description: 'Enter your weight in kilograms or pounds to compare three daily protein intake ranges.',
@@ -109,7 +109,7 @@ export const calculators = [
     id: 'crypto-futures',
     path: '/calculators/crypto-futures',
     name: 'Crypto Futures Trade Calculator',
-    boardLabel: 'Calculator 04',
+    boardLabel: 'Trade planning',
     boardColor: '#ffd166',
     boardDescription: 'Plan futures profit, loss, ROI, position size, and risk/reward before entering a trade.',
     description:

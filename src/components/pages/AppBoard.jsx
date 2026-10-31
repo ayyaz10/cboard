@@ -1,18 +1,17 @@
 import { getAppHref } from '../../app/useRoute';
 import { PageShell } from '../layout/PageShell';
 import { AppNavigation } from '../layout/AppNavigation';
-import { useAdaptiveNavigation } from '../../hooks/useAdaptiveNavigation.js';
 
 const appSections = [
   {
-    id: 'training', path: '/training', label: 'Strength · skill · recovery', name: 'Training',
-    description: 'Start your session, log a set in one tap, and build clean, consistent progress.',
-    color: '#c5ff6f', colorKey: 'lime', countLabel: 'Calisthenics tracker',
+    id: 'finance', path: '/finance', label: 'Money workspace', name: 'Finance',
+    description: 'Plan your month, track spending, manage repayments, and grow savings goals.',
+    color: '#9fe3ff', colorKey: 'cyan', countLabel: 'Budget & goals',
   },
   {
-    id: 'driving-improvement', path: '/driving-improvement', label: 'Learn from mistakes', name: 'Driving Improvement',
-    description: 'Capture driving mistakes, keep your correction visible, and review before practice.',
-    color: '#ffd166', colorKey: 'amber', countLabel: 'Driving tracker',
+    id: 'food-diary', path: '/food-diary', label: 'Meals & nutrition', name: 'Food Diary',
+    description: 'Log meals, review nutrition, and keep your daily food records together.',
+    color: '#c5ff6f', colorKey: 'lime', countLabel: 'Daily food log',
   },
   {
     id: 'weight-progress', path: '/weight-progress', label: 'Your personal progress', name: 'Weight Progress',
@@ -20,9 +19,9 @@ const appSections = [
     color: '#ff90e8', colorKey: 'pink', countLabel: 'Weight & photos',
   },
   {
-    id: 'finance', path: '/finance', label: 'Money workspace', name: 'Finance Manager',
-    description: 'Plan your month, track spending, manage repayments, and grow savings goals.',
-    color: '#9fe3ff', colorKey: 'cyan', countLabel: 'Budget & goals',
+    id: 'driving-improvement', path: '/driving-improvement', label: 'Learn from mistakes', name: 'Driving Improvement',
+    description: 'Capture driving mistakes, keep your correction visible, and review before practice.',
+    color: '#ffd166', colorKey: 'amber', countLabel: 'Driving tracker',
   },
   {
     id: 'groceries', path: '/groceries', label: 'Your kitchen', name: 'Groceries',
@@ -30,65 +29,43 @@ const appSections = [
     color: '#c5ff6f', colorKey: 'lime', countLabel: 'Stock & shopping list',
   },
   {
+    id: 'notebook', path: '/notes', label: 'Your notebook', name: 'Notes',
+    description: 'Write rich notebook pages, attach media, and link notes to trackers.',
+    color: '#ff90e8', colorKey: 'pink', countLabel: 'Rich notebook',
+  },
+  {
+    id: 'calculator-board', path: '/calculators', label: 'Quick tools', name: 'Calculator Tools',
+    description: 'Percentage, calories, and unit tools collected in one quick board.',
+    color: '#c5ff6f', colorKey: 'lime', countLabel: 'Calculator tools',
+  },
+  {
+    id: 'training', path: '/training', label: 'Strength, skill & recovery', name: 'Training',
+    description: 'Start your session, log a set in one tap, and build consistent progress.',
+    color: '#c5ff6f', colorKey: 'lime', countLabel: 'Calisthenics tracker',
+  },
+  {
     id: 'recipes', path: '/recipes', label: 'Meal library', name: 'Recipes',
     description: 'Keep your meal plans, ingredients, alternatives, and recipe photos together.',
     color: '#c5ff6f', colorKey: 'lime', countLabel: 'Import your recipes',
   },
   {
-    id: 'calculator-board',
-    path: '/calculators',
-    label: 'App 01',
-    name: 'Calculator Tools',
-    description:
-      'Percentage, calories, and unit tools collected in one quick board.',
-    color: '#c5ff6f',
-    colorKey: 'lime',
-    countLabel: '3 live tools',
+    id: 'progress-tracker', path: '/progress-tracker', label: 'Goals & metrics', name: 'Progress Tracker',
+    description: 'Create goals, log daily metrics, and watch your numbers move over time.',
+    color: '#9fe3ff', colorKey: 'cyan', countLabel: 'Goal dashboard',
   },
   {
-    id: 'progress-tracker',
-    path: '/progress-tracker',
-    label: 'App 02',
-    name: 'Progress Tracker',
-    description:
-      'Create goals, log daily metrics, and watch your numbers move over time.',
-    color: '#9fe3ff',
-    colorKey: 'cyan',
-    countLabel: 'Goal dashboard',
+    id: 'focus-timer', path: '/focus-timer', label: 'Focus sessions', name: 'Focus Timer',
+    description: 'Run focus sessions, breaks, reflections, and review saved history.',
+    color: '#ffd166', colorKey: 'amber', countLabel: 'Focus sessions',
   },
   {
-    id: 'focus-timer',
-    path: '/focus-timer',
-    label: 'App 03',
-    name: 'Focus Timer',
-    description:
-      'Run focus sessions, breaks, reflections, and review saved history.',
-    color: '#ffd166',
-    colorKey: 'amber',
-    countLabel: 'Focus sessions',
-  },
-  {
-    id: 'notebook',
-    path: '/notes',
-    label: 'App 04',
-    name: 'Notes',
-    description:
-      'Write rich notebook pages, attach media, and link notes to trackers.',
-    color: '#ff90e8',
-    colorKey: 'pink',
-    countLabel: 'Rich notebook',
+    id: 'profile', path: '/account', label: 'Your account', name: 'Profile',
+    description: 'Manage your profile details and sign-in security.',
+    color: '#9fe3ff', colorKey: 'cyan', countLabel: 'Profile & security',
   },
 ];
 
-const futureAppSections = [];
-
 export function AppBoard({ calculators }) {
-  const orderedSections = useAdaptiveNavigation(
-    'main-apps',
-    appSections,
-    null,
-    (section) => section.path,
-  );
   return (
     <PageShell>
       <section className="panel p-6 sm:p-8 lg:p-10">
@@ -109,7 +86,7 @@ export function AppBoard({ calculators }) {
         </p>
 
         <div className="mt-8 grid gap-4 md:grid-cols-2">
-          {orderedSections.map((section, index) => (
+          {appSections.map((section) => (
             <a
               key={section.id}
               href={getAppHref(section.path)}
@@ -117,19 +94,13 @@ export function AppBoard({ calculators }) {
               data-theme-color={section.colorKey}
               style={{ '--theme-card-bg': section.color }}
             >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
-                    {section.label}
-                  </p>
-                  <h2 className="mt-3 text-2xl font-bold tracking-[-0.04em] text-black sm:text-3xl">
-                    {section.name}
-                  </h2>
-                </div>
-
-                <span className="rounded-full border-2 border-black bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-black">
-                  {String(index + 1).padStart(2, '0')}
-                </span>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
+                  {section.label}
+                </p>
+                <h2 className="mt-3 text-2xl font-bold tracking-[-0.04em] text-black sm:text-3xl">
+                  {section.name}
+                </h2>
               </div>
 
               <p className="mt-4 max-w-sm text-sm font-medium leading-7 text-black/72">
@@ -142,19 +113,11 @@ export function AppBoard({ calculators }) {
                     ? `${calculators.length} calculators`
                     : section.countLabel}
                 </span>
-                <span className="text-2xl font-bold text-black">{'->'}</span>
+                <span className="text-2xl font-bold text-black" aria-hidden="true">{'->'}</span>
               </div>
             </a>
           ))}
         </div>
-
-        {futureAppSections.length > 0 ? (
-          <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {futureAppSections.map((section) => (
-              <div key={section.id}>{section.name}</div>
-            ))}
-          </div>
-        ) : null}
       </section>
     </PageShell>
   );

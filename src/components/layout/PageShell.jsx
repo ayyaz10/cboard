@@ -18,10 +18,10 @@ export function PageShell({ children }) {
             {user ? (
               <>
                 <div className="page-shell-identity-group">
-                  <a href={getAppHref('/account')} aria-label="Open profile and account" title="Profile and account" className="account-avatar-link">
+                  <div aria-label={`Signed in as ${displayName}`} title={`Signed in as ${displayName}`} className="account-avatar-link">
                     <span className="account-avatar-small">{profile?.avatarUrl ? <img src={profile.avatarUrl} alt=""/> : getProfileInitials(displayName,user.email)}</span>
                     <span className="max-w-[10rem] truncate">{displayName}</span>
-                  </a>
+                  </div>
                 </div>
                 <div className="page-shell-quick-actions">
                   <a
