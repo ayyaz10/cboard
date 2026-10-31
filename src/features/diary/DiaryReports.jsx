@@ -73,12 +73,15 @@ export function DiaryReports({ days, date, today, goals, disabled, onSelectDate 
   const loggedDays = periodDays.filter((day) => day.date <= today && day.meals?.length).length;
 
   return (
-    <section className="diary-panel diary-report" aria-labelledby="calorie-report-heading">
-      <div className="diary-section-heading">
+    <details className="diary-panel diary-report" aria-labelledby="calorie-report-heading">
+      <summary className="diary-report-summary-heading">
         <div>
           <span className="pill">Nutrition report</span>
           <h2 id="calorie-report-heading">Nutrition</h2>
         </div>
+        <span className="diary-report-toggle-label"><span className="diary-report-show">Show report</span><span className="diary-report-hide">Hide report</span></span>
+      </summary>
+      <div className="diary-section-heading diary-report-controls">
         <div className="diary-report-tabs" role="tablist" aria-label="Nutrition report period">
           {[
             ["daily", "Daily"],
@@ -230,7 +233,7 @@ export function DiaryReports({ days, date, today, goals, disabled, onSelectDate 
           </div>
         </div>
       )}
-    </section>
+    </details>
   );
 }
 

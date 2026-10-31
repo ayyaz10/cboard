@@ -238,6 +238,7 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
         groceryDecision: 'historical-foods-not-tracked',
       });
       setLegacyMigration(pendingReview.length ? { candidates: [], needsReview: [...new Set(pendingReview)], dismissed: false, completed: true, completedAt: new Date().toISOString(), migrated } : null);
+      if (!pendingReview.length) setView("day");
       notify.success(`${migrated} older food${migrated === 1 ? '' : 's'} added to All Food Items. Grocery tracking remains off.${pendingReview.length ? ` ${new Set(pendingReview).size} food${new Set(pendingReview).size === 1 ? '' : 's'} remain in the review queue.` : ''}`);
     } catch (migrationError) {
       notify.error(`Today's diary is unaffected. The older-food migration could not be completed: ${migrationError.message || 'Please try again.'}`);
@@ -252,10 +253,11 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
         pendingReview: [], groceryDecision: 'historical-foods-not-tracked',
       });
       setLegacyMigration(null);
+      setView("day");
     } catch (error) { notify.error(`Could not update the old-food review list: ${error.message || 'Please try again.'}`); }
     finally { setMigrationBusy(false); }
   }
-  function dismissLegacyMigration() { setLegacyMigration(current => current ? { ...current, dismissed: true } : current); }
+  function dismissLegacyMigration() { setLegacyMigration(current => current ? { ...current, dismissed: true } : current); setView("day"); }
   async function persist(next, success) {
     if (lock.current) return false;
     lock.current = true;
@@ -506,12 +508,6 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
         </div>
         <RecipeLink to="/recipes/planner/day">Daily Planner</RecipeLink>
       </header>
-      {legacyMigration && !legacyMigration.dismissed && <aside className="diary-legacy-migration" aria-label="Older food library update">
-        <div><strong>{legacyMigration.completed ? 'Older foods needing review' : 'Older diary foods'}</strong><p>{legacyMigration.completed ? `${legacyMigration.needsReview.length} older food${legacyMigration.needsReview.length === 1 ? '' : 's'} could not be matched safely. They remain in diary history and were not added to Groceries.` : `${legacyMigration.candidates.length} can be added to All Food Items; ${legacyMigration.needsReview.length} need duplicate review. This does not affect today's meal saves. Grocery tracking will stay off for migrated foods.`}</p>
-          {legacyMigration.needsReview.length > 0 && <details><summary>Show foods needing review</summary><ul>{legacyMigration.needsReview.map((name, index) => <li key={`${name}-${index}`}>{name}</li>)}</ul></details>}
-        </div>
-        <div className="diary-actions">{legacyMigration.completed ? <><RecipeLink to="/recipes/library/items">Go to food library</RecipeLink><button type="button" disabled={migrationBusy} onClick={acknowledgeLegacyReviews}>Mark review handled</button></> : <button type="button" className="diary-primary" disabled={migrationBusy} onClick={migrateLegacyDiaryFoods}>{migrationBusy ? 'Adding foods…' : 'Add unique foods'}</button>}<button type="button" disabled={migrationBusy} onClick={dismissLegacyMigration}>Review later</button></div>
-      </aside>}
       <nav className="diary-view-tabs" role="tablist" aria-label="Food diary views">
         <button
           type="button"
@@ -531,17 +527,24 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
         >
           Food sources
         </button>
+        {legacyMigration && !legacyMigration.dismissed && <button
+          type="button"
+          role="tab"
+          aria-selected={view === "review"}
+          disabled={view !== "review" && disabled}
+          onClick={() => setView("review")}
+        >
+          Food review
+        </button>}
       </nav>
       {view === "day" && <section className="diary-streak" aria-label="Logging streak">
         <div>
           <strong>{streak.current}</strong>
-          <span>day logging streak</span>
+          <span>day streak</span>
         </div>
-        <p>
-          Best: <b>{streak.longest} days</b> · {streak.completed} completed days
-        </p>
+        <p>Best: <b>{streak.longest} days</b></p>
       </section>}
-      <div className="diary-datebar" ref={diaryTopRef}>
+      {view !== "review" && <div className="diary-datebar" ref={diaryTopRef}>
         <button
           type="button"
           disabled={disabled || date <= "2000-01-01"}
@@ -573,8 +576,20 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
         >
           Today
         </button>
-      </div>
-      {view === "sources" ? (
+      </div>}
+      {view === "review" ? (
+        <section className="diary-panel diary-review-page" role="tabpanel" aria-label="Older food review">
+          <div className="diary-section-heading">
+            <div><span className="pill">Food library</span><h2>{legacyMigration?.completed ? 'Older foods needing review' : 'Review older diary foods'}</h2></div>
+          </div>
+          <div className="diary-legacy-migration" aria-label="Older food library update">
+            <div><strong>{legacyMigration?.completed ? 'These foods could not be matched safely' : 'Add older foods to your library'}</strong><p>{legacyMigration?.completed ? `${legacyMigration.needsReview.length} older food${legacyMigration.needsReview.length === 1 ? '' : 's'} remain in diary history and were not added to Groceries.` : `${legacyMigration?.candidates.length || 0} can be added to All Food Items; ${legacyMigration?.needsReview.length || 0} need duplicate review. This does not affect today's meal saves. Grocery tracking will stay off for migrated foods.`}</p>
+              {!!legacyMigration?.needsReview.length && <details><summary>Show foods needing review</summary><ul>{legacyMigration.needsReview.map((name, index) => <li key={`${name}-${index}`}>{name}</li>)}</ul></details>}
+            </div>
+            <div className="diary-actions">{legacyMigration?.completed ? <><RecipeLink to="/recipes/library/items">Go to food library</RecipeLink><button type="button" disabled={migrationBusy} onClick={acknowledgeLegacyReviews}>Mark review handled</button></> : <button type="button" className="diary-primary" disabled={migrationBusy} onClick={migrateLegacyDiaryFoods}>{migrationBusy ? 'Adding foods…' : 'Add unique foods'}</button>}<button type="button" disabled={migrationBusy} onClick={dismissLegacyMigration}>Review later</button></div>
+          </div>
+        </section>
+      ) : view === "sources" ? (
         <DiaryFoodSources meals={day.meals} goals={goals} date={date} today={today} disabled={disabled} foodCatalog={foodCatalog} onSaveAlternativeFood={item => onFoodCatalogChange?.([item])} onApplyChanges={meals => persist({ ...day, meals, complete: day.complete && canComplete({ ...day, meals }) }, 'What-if changes applied to this day.')} />
       ) : <>
       <DiaryReports
