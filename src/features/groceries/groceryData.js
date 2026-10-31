@@ -87,6 +87,20 @@ export function normalizeGroceryState(value) {
   state.shopping = Array.isArray(state.shopping) ? state.shopping : [];
   state.receiptPurchaseLedger = state.receiptPurchaseLedger && typeof state.receiptPurchaseLedger === 'object' ? state.receiptPurchaseLedger : {};
   state.settings = { ...fallback.settings, ...(state.settings || {}) };
+  state.migrations = state.migrations && typeof state.migrations === 'object' ? state.migrations : {};
+  state.stockAlerts = Array.isArray(state.stockAlerts) ? state.stockAlerts : [];
+  state.stockAlertSequence = Number.isSafeInteger(state.stockAlertSequence) && state.stockAlertSequence >= 0 ? state.stockAlertSequence : 0;
+  let migratedNegativeItems = 0;
+  for (const item of state.items) {
+    if (Number.isFinite(item.quantity) && item.quantity < 0) {
+      migratedNegativeItems++;
+      item.shortage = round((Number.isFinite(item.shortage) ? Math.max(0, item.shortage) : 0) + Math.abs(item.quantity));
+      item.quantity = 0;
+    }
+    item.shortage = Number.isFinite(item.shortage) && item.shortage >= 0 ? item.shortage : 0;
+  }
+  state.migrations.negativeStockV1 = true;
+  state.migrations.negativeStockV1Count = Math.max(0, Number(state.migrations.negativeStockV1Count) || 0) + migratedNegativeItems;
   state.imageLibrary =
     state.imageLibrary && typeof state.imageLibrary === "object"
       ? state.imageLibrary
@@ -97,6 +111,7 @@ export function normalizeGroceryState(value) {
     if (typeof item.image === "string" && item.image.startsWith("data:image/"))
       state.imageLibrary[normalizeName(item.name)] = item.image;
     item.nutrition ??= null;
+    if (item.thresholdEnabled == null) item.thresholdEnabled = Number.isFinite(item.threshold) && item.threshold > 0;
     item.estimatedPrice ??= null;
     item.priceQuantity ??= 1;
     delete item.image;
@@ -131,6 +146,8 @@ export function newItem(name, quantity = null, unit = "pieces", category) {
     estimatedPrice: null,
     priceQuantity: 1,
     threshold: 0,
+    thresholdEnabled: false,
+    shortage: 0,
     expiry: "",
     location: "",
   };
@@ -155,16 +172,56 @@ export const initialState = () => ({
   shopping: [],
   wishlist: [],
   imageLibrary: {},
+  migrations: { negativeStockV1: true },
   settings: { currency: "GBP", autoImages: false, expiryReminders: true, imageLimit: 0 },
 });
 export const stockStatus = (item) =>
-  item.quantity == null
-    ? "Set quantity"
+  item.quantity == null || !Number.isFinite(item.quantity)
+    ? "Unknown"
     : item.quantity <= 0
       ? "Out of stock"
-      : item.quantity <= item.threshold
+      : item.thresholdEnabled !== false && Number.isFinite(item.threshold) && item.threshold > 0 && item.quantity <= item.threshold
         ? "Low stock"
         : "In stock";
+
+export function checkGroceryIntegrity(state) {
+  const issues = [];
+  const canonical = new Set();
+  for (const item of state.items || []) {
+    if (item.quantity != null && (!Number.isFinite(item.quantity) || item.quantity < 0)) issues.push(`${item.name}: available stock is invalid.`);
+    if (!Number.isFinite(item.shortage ?? 0) || (item.shortage ?? 0) < 0) issues.push(`${item.name}: shortage is invalid.`);
+    if ((item.shortageHistory || []).some(event => !Number.isFinite(event.quantity) || event.quantity < 0 || typeof event.unit !== 'string')) issues.push(`${item.name}: historical shortage is invalid.`);
+    if (item.thresholdEnabled && (!Number.isFinite(item.threshold) || item.threshold < 0)) issues.push(`${item.name}: low-stock threshold is invalid.`);
+    if (!item.removed && item.foodId) {
+      if (canonical.has(item.foodId)) issues.push(`${item.name}: duplicate Grocery rows use the same canonical food.`);
+      canonical.add(item.foodId);
+    }
+  }
+  const alertIds = new Set();
+  for (const alert of state.stockAlerts || []) {
+    if (!alert.id || alertIds.has(alert.id)) issues.push('Stock alerts contain a duplicate event identity.');
+    alertIds.add(alert.id);
+  }
+  return issues;
+}
+
+export function recordStockTransitions(before, after, { at = Date.now() } = {}) {
+  const prior = new Map((before.items || []).filter(item => !item.removed).map(item => [item.id, stockStatus(item)]));
+  const transitions = (after.items || []).filter(item => !item.removed && prior.has(item.id)).flatMap(item => {
+    const from = prior.get(item.id), to = stockStatus(item);
+    return from !== to && ['Low stock', 'Out of stock'].includes(to) ? [{ itemId: item.id, name: item.name, from, to, quantity: item.quantity, unit: item.unit }] : [];
+  });
+  if (!transitions.length) return after;
+  const out = transitions.filter(item => item.to === 'Out of stock'), low = transitions.filter(item => item.to === 'Low stock');
+  const describe = (items, label) => items.length === 1
+    ? `${items[0].name} is ${label.toLowerCase()}${label === 'Out of stock' ? '.' : ` — ${items[0].quantity} ${items[0].unit} remaining.`}`
+    : `${items.length} Grocery items are now ${label.toLowerCase()}.`;
+  const alerts = [];
+  if (out.length) alerts.push({ id: crypto.randomUUID(), type: 'out', title: describe(out, 'Out of stock'), itemIds: out.map(item => item.itemId), items: out.map(({ name, quantity, unit }) => ({ name, quantity, unit })), at, read: false });
+  if (low.length) alerts.push({ id: crypto.randomUUID(), type: 'low', title: describe(low, 'Low stock'), itemIds: low.map(item => item.itemId), items: low.map(({ name, quantity, unit }) => ({ name, quantity, unit })), at, read: false });
+  after.stockAlerts = [...alerts, ...(after.stockAlerts || [])].slice(0, 50);
+  return after;
+}
 export const increment = (unit) =>
   unit === "g" || unit === "ml" ? 50 : unit === "kg" || unit === "L" ? 0.25 : 1;
 const aliases = {
@@ -295,7 +352,7 @@ export function addItems(state, entries, shopping = false) {
       next.shopping = addShopping(next.shopping, entry, entry.quantity ?? 1);
       continue;
     }
-    const existing = next.items.find(
+    const existing = next.items.find(i => entry.foodId && i.foodId === entry.foodId) || next.items.find(
       (i) => normalizeName(i.name) === normalizeName(entry.name),
     );
     if (existing) {
@@ -422,16 +479,14 @@ export function recipeNeeds(recipe, state, multiplier = 1, foodCatalog = []) {
   }));
 }
 export function cookRecipe(state, needs) {
-  if (needs.some((i) => i.missing !== 0))
-    throw new Error(
-      "Resolve missing stock and unknown quantities before cooking.",
-    );
   const next = structuredClone(state);
   for (const need of needs) {
     const item = next.items.find((i) => i.id === need.itemId);
-    if (!item || item.quantity == null || item.quantity < need.required)
-      throw new Error("Stock changed. Review ingredients again.");
-    item.quantity = round(item.quantity - need.required);
+    if (!item || item.quantity == null || !Number.isFinite(need.required) || need.required < 0)
+      throw new Error("Set a known stock quantity and check recipe amounts before cooking.");
+    const consumed = Math.min(item.quantity, need.required);
+    item.quantity = round(item.quantity - consumed);
+    item.shortage = round((item.shortage || 0) + need.required - consumed);
   }
   return next;
 }

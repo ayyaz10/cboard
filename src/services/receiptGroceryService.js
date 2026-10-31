@@ -1,6 +1,7 @@
 import { loadGroceries, saveGroceries } from './groceryService.js';
 import { getFoodCatalog } from './foodCatalogService.js';
 import { updateReceiptPurchasesState } from '../features/groceries/receiptPurchases.js';
+import { notify } from '../lib/notifications.js';
 
 /** Apply, replace or reverse a transaction's receipt stock events idempotently. */
 export async function syncReceiptPurchases(transaction, expectedUserId) {
@@ -12,6 +13,8 @@ export async function syncReceiptPurchases(transaction, expectedUserId) {
     const result = updateReceiptPurchasesState(loaded.state,transaction,catalog);
     try {
       const version = await saveGroceries(result.state,loaded.version,loaded.userId);
+      const previousAlerts = new Set((loaded.state.stockAlerts || []).map(alert => alert.id));
+      for (const alert of result.state.stockAlerts || []) if (!previousAlerts.has(alert.id)) notify.warning(alert.title);
       return { applied:result.applied, warnings:result.warnings, version };
     } catch (error) {
       if (attempt === 1 || !/another tab|changed/i.test(error.message || '')) throw error;

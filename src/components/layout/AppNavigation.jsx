@@ -4,6 +4,7 @@ import { useAdaptiveNavigation } from '../../hooks/useAdaptiveNavigation';
 
 export const primaryNavItems = [
   { path: '/training', label: 'Training' },
+  { path: '/driving-improvement', label: 'Driving Improvement' },
   { path: '/board', label: 'C Board' },
   { path: '/calculators', label: 'Calculator Tools' },
   { path: '/progress-tracker', label: 'Progress Tracker' },

@@ -24,6 +24,7 @@ import { FinancePage } from '../features/finance/FinancePage.jsx';
 import { ProfilePage } from '../components/pages/ProfilePage.jsx';
 const ThemePreview = lazy(() => import('../components/pages/ThemePreview.jsx').then(module => ({ default: module.ThemePreview })));
 const Training = lazy(() => import('../features/training/Training.jsx').then(module => ({ default: module.Training })));
+const DrivingImprovement = lazy(() => import('../features/drivingImprovement/DrivingImprovement.jsx').then(module => ({ default: module.DrivingImprovement })));
 
 export default function App() {
   const { isAuthenticated, user } = useAuth();
@@ -159,6 +160,7 @@ function AppContent() {
   if (route === '/finance') return <FinancePage key={user.id} />;
   if (route === '/account') return <ProfilePage key={user.id} />;
   if (route === '/training') return <Suspense fallback={<main className="panel m-6 p-6" role="status">Loading Training…</main>}><Training key={user.id} /></Suspense>;
+  if (route === '/driving-improvement') return <Suspense fallback={<main className="panel m-6 p-6" role="status">Loading Driving Improvement…</main>}><DrivingImprovement key={user.id} userId={user.id} /></Suspense>;
 
   if (route === '/food-diary') {
     return <Recipes key={user.id} route="/recipes/diary/day" navigationPath="/food-diary" />;

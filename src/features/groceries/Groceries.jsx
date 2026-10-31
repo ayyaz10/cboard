@@ -21,6 +21,7 @@ import {
   stockStatus,
   increment,
   round,
+  convert,
   parseEntry,
   addItems,
   addShopping,
@@ -189,6 +190,7 @@ export function Groceries() {
   );
   const [selected, setSelected] = useState([]),
     [modal, setModal] = useState(null),
+    [deleteTarget, setDeleteTarget] = useState(null),
     [text, setText] = useState(""),
     [entries, setEntries] = useState(null),
     [edit, setEdit] = useState(null),
@@ -343,13 +345,14 @@ export function Groceries() {
   const currency = data?.settings.currency || "GBP";
   const money = (amount) => new Intl.NumberFormat(undefined, { style: "currency", currency }).format(amount);
   const estimate = shoppingEstimate(data?.shopping || []);
-  const list = data ? (tab === "stock" ? data.items.filter(item => !item.recipeOnly && !item.removed && !item.trackingDisabled) : data.shopping) : [];
+  const stockItems = data ? data.items.filter(item => !item.recipeOnly && !item.removed && !item.trackingDisabled) : [];
+  const list = data ? (tab === "stock" ? stockItems : data.shopping) : [];
   const filtered = list.filter(
     (i) =>
       i.name.toLowerCase().includes(query.toLowerCase()) &&
       (category === "All" || i.category === category) &&
       (tab !== "stock" || recipeUsage === "all" || (recipeUsage === "used" ? Boolean(i.recipeRefs?.length) : !i.recipeRefs?.length)) &&
-      (tab !== "stock" || status === "All" || stockStatus(i) === status),
+      (tab !== "stock" || status === "All" || (status === "Needs attention" ? ["Low stock", "Out of stock"].includes(stockStatus(i)) : stockStatus(i) === status)),
   );
   function beginBuy(items) {
     setBuy(items.map((i) => ({ ...i, currentQuantity: "" })));
@@ -431,13 +434,14 @@ export function Groceries() {
                     onClick={() => {
                       setTab(label === "Shopping list" ? "shop" : "stock");
                       setStatus(label === "Shopping list" ? "All" : label);
+                      setQuery(""); setCategory("All"); setRecipeUsage("all");
                       setSelected([]);
                     }}
                   >
                     <strong>
                       {label === "Shopping list"
                         ? data.shopping.length
-                        : data.items.filter((i) => !i.recipeOnly && !i.removed && stockStatus(i) === label)
+                        : stockItems.filter((i) => stockStatus(i) === label)
                             .length}
                     </strong>
                     <span>{label}</span>
@@ -445,6 +449,18 @@ export function Groceries() {
                 ),
               )}
             </div>
+            <p className="g-attention-summary"><strong>Needs attention:</strong> {stockItems.filter(i => stockStatus(i) === 'Out of stock').length} out of stock · {stockItems.filter(i => stockStatus(i) === 'Low stock').length} low stock</p>
+            {data.stockAlerts?.length > 0 && <section className="g-stock-alerts" aria-label="Grocery stock alerts">
+              <div className="g-between"><h2>Stock alerts</h2><button type="button" onClick={() => change(s => { s.stockAlerts = s.stockAlerts.map(alert => ({ ...alert, read: true })); return s; }, 'Alerts marked as read', false)}>Mark all read</button></div>
+              {data.stockAlerts.slice(0, 5).map(alert => <div key={alert.id} className={`g-stock-alert ${alert.type === 'out' ? 'is-out' : 'is-low'}${alert.read ? ' is-read' : ''}`}>
+                <span>{alert.title}{alert.items?.length > 1 && <small className="g-alert-items">{alert.items.map(item => `${item.name} · ${item.quantity} ${item.unit}`).join('  /  ')}</small>}</span><button type="button" onClick={() => {
+                  const firstId = alert.itemIds?.[0]; const item = data.items.find(candidate => candidate.id === firstId);
+                  setTab('stock'); setCategory('All'); setRecipeUsage('all'); setStatus(alert.type === 'out' ? 'Out of stock' : 'Low stock');
+                  if (item) { setQuery(item.name); requestAnimationFrame(() => document.getElementById(`grocery-${item.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })); }
+                  change(s => { s.stockAlerts = s.stockAlerts.map(saved => saved.id === alert.id ? { ...saved, read: true } : saved); return s; }, 'Alert opened', false);
+                }}>View item</button>
+              </div>)}
+            </section>}
             <div className="g-between">
               <div className="g-tabs g-section-tabs" role="group" aria-label="Grocery sections">
                 {groceryTabs.map(([key, name]) => (
@@ -507,10 +523,11 @@ export function Groceries() {
                 >
                   {[
                     "All",
+                    "Needs attention",
                     "In stock",
                     "Low stock",
                     "Out of stock",
-                    "Set quantity",
+                    "Unknown",
                   ].map((s) => (
                     <option key={s}>{s}</option>
                   ))}
@@ -670,7 +687,7 @@ export function Groceries() {
                       {categoryIcon(c)} {c} <small>{rows.length}</small>
                     </h2>
                     {rows.map((item) => (
-                      <div key={item.id} className="g-row">
+                      <div key={item.id} id={`grocery-${item.id}`} className={`g-row ${tab === 'stock' ? `is-${stockStatus(item).toLowerCase().replaceAll(' ', '-')}` : ''}`}>
                         <input
                           aria-label={`Select ${item.name}`}
                           type="checkbox"
@@ -694,10 +711,10 @@ export function Groceries() {
                           >
                             {item.name}
                           </button>
-                          <small>
-                            {tab === "stock"
-                              ? stockStatus(item)
-                              : "To purchase"}
+                          <small className="g-status-line">
+                            {tab === "stock" ? <span className={`g-status-badge is-${stockStatus(item).toLowerCase().replaceAll(' ', '-')}`} role="status" aria-label={`${item.name}: ${stockStatus(item)}`}>{stockStatus(item) === 'Unknown' ? 'STOCK UNKNOWN' : stockStatus(item).toUpperCase()}</span> : "To purchase"}
+                            {tab === 'stock' && item.shortage > 0 && <span>Shortage recorded: {item.shortage} {item.unit}</span>}
+                            {tab === 'stock' && item.shortageHistory?.length > 0 && <span>Previous shortage: {item.shortageHistory.map(event => `${event.quantity} ${event.unit}`).join(', ')}</span>}
                             {tab === "stock" && <RecipeReferences item={item} />}
                           {tab === "stock" && item.location
                               ? ` · ${item.location}`
@@ -805,11 +822,10 @@ export function Groceries() {
                               >
                                 Edit
                               </button>
+                              <button className="danger-action" aria-label={`Delete ${item.name} from Groceries`} onClick={() => { setDeleteTarget({ ...item, fromShopping: false }); setModal('delete'); }}>Delete</button>
                             </>
                           ) : (
-                            <button onClick={() => beginBuy([item])}>
-                              ✓ Bought
-                            </button>
+                            <><button onClick={() => beginBuy([item])}>✓ Bought</button><button className="danger-action" aria-label={`Delete ${item.name} from Shopping List`} onClick={() => { setDeleteTarget({ ...item, fromShopping: true }); setModal('delete'); }}>Delete</button></>
                           )}
                         </div>
                       </div>
@@ -1012,6 +1028,11 @@ export function Groceries() {
                       category: edit.category.trim(),
                       quantity: edit.quantity == null || edit.quantity === "" ? null : Number(edit.quantity),
                     };
+                    if (previous && previous.unit !== cleanEdit.unit) {
+                      const convertedShortage = convert(previous.shortage || 0, previous.unit, cleanEdit.unit);
+                      cleanEdit.shortage = convertedShortage == null ? 0 : convertedShortage;
+                      cleanEdit.shortageHistory = [...(previous.shortageHistory || []), ...(convertedShortage == null && previous.shortage > 0 ? [{ quantity: previous.shortage, unit: previous.unit }] : [])];
+                    }
                     if (!units.includes(cleanEdit.unit))
                       throw new Error("Choose a supported stock unit.");
                     if (cleanEdit.quantity != null && (!Number.isFinite(cleanEdit.quantity) || cleanEdit.quantity < 0))
@@ -1070,7 +1091,7 @@ export function Groceries() {
                   <select
                     value={edit.unit}
                     onChange={(e) =>
-                      setEdit({ ...edit, unit: e.target.value, quantity: null, estimatedPrice: null, priceQuantity: 1 })
+                      setEdit({ ...edit, unit: e.target.value, quantity: null, estimatedPrice: null, priceQuantity: 1, threshold: 0, thresholdEnabled: false })
                     }
                   >
                     {units.map((u) => (
@@ -1083,6 +1104,10 @@ export function Groceries() {
                 Changing the unit clears the quantity and estimated price so you can enter the
                 correct amount.
               </p>
+              {modal === 'edit' && <>
+                <label className="g-check"><input type="checkbox" checked={Boolean(edit.thresholdEnabled)} onChange={e => setEdit({ ...edit, thresholdEnabled: e.target.checked })} />Low-stock alert</label>
+                <label>Alert below ({edit.unit})<input type="number" min="0" step="any" disabled={!edit.thresholdEnabled} required={Boolean(edit.thresholdEnabled)} value={edit.threshold} onChange={e => setEdit({ ...edit, threshold: Number(e.target.value) })} /></label>
+              </>}
               <SavedFoodSuggestions item={edit} library={savedFoods.library} onChange={setEdit} />
               <PriceFields item={edit} currency={currency} onChange={setEdit} />
               <NutritionFields item={edit} onChange={setEdit} />
@@ -1168,21 +1193,6 @@ export function Groceries() {
                   )}
                   <details>
                     <summary>More details & photo</summary>
-                    <label>
-                      Low-stock alert at ({edit.unit})
-                      <input
-                        type="number"
-                        min="0"
-                        step="any"
-                        value={edit.threshold}
-                        onChange={(e) =>
-                          setEdit({
-                            ...edit,
-                            threshold: Number(e.target.value),
-                          })
-                        }
-                      />
-                    </label>
                     <label>
                       Best-before date
                       <input
@@ -1280,6 +1290,12 @@ export function Groceries() {
             </form>
           </Modal>
         )}
+        {modal === 'delete' && deleteTarget && <Modal title={`Delete ${deleteTarget.name}?`} error={error} close={() => { setModal(null); setDeleteTarget(null); setError(''); }}>
+          <p>{deleteTarget.fromShopping ? 'This removes the item from your Shopping List. Grocery stock and All Food Items stay intact.' : 'This removes the item from your Grocery inventory. All Food Items, recipes, nutrition, and Food Diary history stay intact.'}</p>
+          <div className="g-between"><button type="button" onClick={() => { setModal(null); setDeleteTarget(null); }}>Keep item</button><button type="button" className="danger-action" disabled={busy} onClick={async () => {
+            if (await change(s => removeGroceryItems(s, [deleteTarget.id], deleteTarget.fromShopping), deleteTarget.fromShopping ? 'Shopping list item deleted' : 'Grocery item deleted')) { setModal(null); setDeleteTarget(null); setSelected(ids => ids.filter(id => id !== deleteTarget.id)); }
+          }}>{deleteTarget.fromShopping ? 'Delete from Shopping List' : 'Delete from Groceries'}</button></div>
+        </Modal>}
         {modal === "buy" && (
           <Modal
             error={error}

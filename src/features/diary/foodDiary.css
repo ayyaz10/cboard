@@ -1099,6 +1099,15 @@ html[data-theme="midnight"] .food-diary .diary-recipe-confirm .diary-actions { b
 .diary-food-reorder .diary-food-drag-handle:active { cursor: grabbing; }
 .diary-food-reorder .diary-food-move-button:not(:disabled) { background: color-mix(in srgb, var(--g-accent, #f28a3c) 13%, transparent); }
 .diary-food-toggle { flex: 1 1 auto; min-width: 0; }
+.food-diary .diary-food-remove {
+  flex: 0 0 auto;
+  min-height: 2.25rem;
+  padding: 0.45rem 0.65rem;
+  border-color: #b44936;
+  color: #9a2f22;
+  white-space: nowrap;
+}
+.food-diary .diary-food-remove:hover { background: #fff0ed; }
 .diary-food.is-dragging { opacity: .45; }
 .diary-food.is-drag-over { outline: 2px solid var(--color-accent, #f28a3c); outline-offset: -2px; }
 .food-diary .diary-food-toggle {

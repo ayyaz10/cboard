@@ -202,6 +202,11 @@ export function DiaryMealEditor({
     const target = draft.items[index + offset];
     if (target) moveFood(id, target.id, offset > 0);
   }
+  function removeFood(id) {
+    setDraft(current => ({ ...current, items: current.items.filter(food => food.id !== id) }));
+    if (lookup === id) setLookup(null);
+    if (manualId === id) setManualId(null);
+  }
   function renderFood(item, index) {
               const totals = itemNutrition(item);
               return (
@@ -238,6 +243,15 @@ export function DiaryMealEditor({
                     <motion.svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" className="diary-food-chevron" animate={{ rotate: openFood === item.id ? 180 : 0 }} transition={{ duration: reduceMotion ? 0 : 0.28, ease: [0.22, 1, 0.36, 1] }}>
                       <path d="m6 9 6 6 6-6" />
                     </motion.svg>
+                  </button>
+                  <button
+                    type="button"
+                    className="diary-food-remove"
+                    disabled={busy}
+                    aria-label={`Remove ${item.name || 'food'} from this meal`}
+                    onClick={() => removeFood(item.id)}
+                  >
+                    Remove
                   </button>
                   </div>
                   <AnimatePresence initial={false}>
@@ -425,21 +439,6 @@ export function DiaryMealEditor({
                     {item.id === manualId && <span className="diary-hint">This food is added to the meal when you leave its editor.</span>}
                     <button type="button" onClick={() => setLookup(item.id)}>
                       Replace from food lookup
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDraft({
-                          ...draft,
-                          items: draft.items.filter(
-                            (food) => food.id !== item.id,
-                          ),
-                        });
-                        if (lookup === item.id) setLookup(null);
-                        if (manualId === item.id) setManualId(null);
-                      }}
-                    >
-                      {item.id === manualId ? 'Cancel manual add' : 'Remove food'}
                     </button>
                   </div>
                   </div>
@@ -644,7 +643,8 @@ export function DiaryMealEditor({
             </label>
           </details>
           <div className="diary-actions diary-add-methods diary-add-methods-bottom" aria-label="Add another food">
-            <button type="button" className="diary-find-food-button" disabled={draft.items.length >= 100} onClick={toggleNewFoodLookup}>Add another food</button>
+            <button type="button" className="diary-find-food-button" disabled={draft.items.length >= 100} onClick={toggleNewFoodLookup}>Add food</button>
+            <button type="button" className="diary-manual-food-button" disabled={draft.items.length >= 100 || Boolean(manualId)} onClick={() => addManualFood()}>Add manually</button>
           </div>
           <div className="diary-actions diary-editor-footer">
             <button

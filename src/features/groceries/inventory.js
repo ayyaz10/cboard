@@ -1,4 +1,4 @@
-import { newItem, convert, canonicalUnit, round, ingredientKey } from './groceryData.js';
+import { newItem, convert, canonicalUnit, round, ingredientKey, recordStockTransitions, normalizeGroceryState } from './groceryData.js';
 const nameKey = name => String(name || '').trim().toLowerCase().replace(/\s+/g, ' ');
 const baseUnit = unit => ['g', 'kg'].includes(canonicalUnit(unit)) ? 'g' : ['ml', 'L'].includes(canonicalUnit(unit)) ? 'ml' : canonicalUnit(unit);
 
@@ -96,7 +96,8 @@ function dayUsage(state, day, activate, foodCatalog = []) {
 // A per-entry applied ledger distinguishes actual deductions from old or paused logs.
 // Repeated saves reconcile to zero; deletion restores only stock actually deducted.
 export function reconcileInventory(state, before, after, foodCatalog = []) {
-  const next = structuredClone(state);
+  const next = normalizeGroceryState(state);
+  const original = structuredClone(next);
   next.inventoryLedger ||= {};
   const previous = dayUsage(next, before, false, foodCatalog);
   const current = dayUsage(next, after, true, foodCatalog);
@@ -110,8 +111,12 @@ export function reconcileInventory(state, before, after, foodCatalog = []) {
     for (const itemId of new Set([...old.keys(), ...now.keys(), ...Object.keys(applied)])) {
       const item = next.items.find(item => item.id === itemId);
       if (!item) throw new Error('A tracked stock item was removed. Reload groceries before reconciling this entry.');
-      const prior = applied[itemId] ? convert(applied[itemId].amount, applied[itemId].unit, item.unit) : 0;
-      if (prior == null) {
+      const record = applied[itemId];
+      const legacy = record && !Number.isFinite(record.requested);
+      const prior = record ? convert(legacy ? record.amount : record.requested, record.unit, item.unit) : 0;
+      const priorConsumedInUnit = record && !legacy ? convert(record.consumed || 0, record.unit, item.unit) : 0;
+      const priorShortageInUnit = record && !legacy ? convert(record.shortage || 0, record.unit, item.unit) : 0;
+      if (prior == null || priorConsumedInUnit == null || priorShortageInUnit == null) {
         if (!after) throw new Error(`${item.name}: use the original stock unit before deleting this diary entry.`);
         warnings.add(`${item.name}: diary saved, but grocery stock was not adjusted because its unit changed. Restore the original stock unit to reconcile it.`);
         updated[itemId] = applied[itemId];
@@ -119,16 +124,43 @@ export function reconcileInventory(state, before, after, foodCatalog = []) {
       }
       const delta = (now.get(itemId) || 0) - (old.get(itemId) || 0);
       const foodTrackingDisabled = foodCatalog.find(food => food.id === item.foodId)?.groceryTrackingEnabled === false || item.trackingDisabled === true;
-      const target = next.settings.stockTrackingPaused || item.stockTrackingPaused || item.removed || foodTrackingDisabled ? prior : current.has(key) ? Math.max(0, round(prior + delta)) : 0;
-      const change = round(target - prior);
-      if (change && item.quantity != null) {
-        item.quantity = round(item.quantity - change);
-        adjustments.push({ entry: key, itemId, amount: change, unit: item.unit });
+      const paused = next.settings.stockTrackingPaused || item.stockTrackingPaused || item.removed || foodTrackingDisabled;
+      const priorConsumed = legacy ? 0 : Math.max(0, priorConsumedInUnit);
+      const priorShortage = legacy ? 0 : Math.max(0, priorShortageInUnit);
+      if (paused) {
+        if (applied[itemId]) updated[itemId] = structuredClone(applied[itemId]);
+        continue;
       }
-      if (current.has(key) && item.quantity != null && target) updated[itemId] = { amount: target, unit: item.unit };
+      let requested = round(Math.max(0, prior + delta)), consumed = priorConsumed, shortage = priorShortage;
+      if (legacy) {
+        // Old ledgers stored requested use but cannot identify which part became negative.
+        // Keep that historical shortage intact and reconcile only future changes.
+        requested = round(Math.max(0, prior + delta));
+      } else if (item.quantity != null) {
+        if (delta > 0) {
+          const used = Math.min(item.quantity, delta);
+          item.quantity = round(item.quantity - used);
+          consumed = round(consumed + used);
+          const short = round(delta - used);
+          shortage = round(shortage + short);
+          item.shortage = round((item.shortage || 0) + short);
+          if (used) adjustments.push({ entry: key, itemId, amount: used, unit: item.unit, requested: delta, shortage: short });
+        } else if (delta < 0) {
+          let released = Math.min(shortage, -delta);
+          shortage = round(shortage - released);
+          item.shortage = round(Math.max(0, (item.shortage || 0) - released));
+          let refund = Math.min(consumed, -delta - released);
+          consumed = round(consumed - refund);
+          item.quantity = round(item.quantity + refund);
+          if (refund || released) adjustments.push({ entry: key, itemId, amount: -refund, unit: item.unit, requested: delta, shortage: -released });
+        }
+      }
+      // Unknown quantities stay unknown and do not invent consumption or shortage.
+      if (item.quantity != null && requested > 0) updated[itemId] = { requested, consumed, shortage, unit: item.unit, ...(legacy ? { legacy: true } : {}) };
     }
     if (Object.keys(updated).length) next.inventoryLedger[key] = updated;
     else delete next.inventoryLedger[key];
   }
+  recordStockTransitions(original, next);
   return { state: next, adjustments, warnings: [...warnings] };
 }

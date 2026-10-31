@@ -216,6 +216,12 @@ html[data-theme="midnight"] .groceries :is(button,.g-hint,.g-thumb,.g-stats butt
 html[data-theme="midnight"] .groceries button:hover { background: var(--mid-soft) !important; }
 html[data-theme="midnight"] .groceries .g-primary { background: var(--mid-accent) !important; color: var(--mid-accent-text) !important; border-color: var(--mid-accent) !important; }
 html[data-theme="midnight"] .groceries .g-tabs button[aria-pressed="true"] { background: var(--mid-accent-soft) !important; color: var(--mid-accent) !important; }
+html[data-theme="midnight"] .groceries .g-status-badge.is-in-stock { background: var(--color-success-soft) !important; color: var(--color-success) !important; border-color: var(--color-success) !important; }
+html[data-theme="midnight"] .groceries .g-status-badge.is-low-stock { background: var(--color-warning-soft) !important; color: var(--color-warning) !important; border-color: var(--color-warning) !important; }
+html[data-theme="midnight"] .groceries .g-status-badge.is-out-of-stock { background: var(--color-danger-soft) !important; color: var(--color-danger) !important; border-color: var(--color-danger) !important; }
+html[data-theme="midnight"] .groceries .g-stock-alert { background: var(--color-warning-soft) !important; color: var(--mid-text) !important; border-color: var(--color-warning) !important; }
+html[data-theme="midnight"] .groceries .g-stock-alert.is-out { background: var(--color-danger-soft) !important; border-color: var(--color-danger) !important; }
+html[data-theme="midnight"] .groceries .g-stock-alerts { background: var(--surface-primary) !important; border-color: var(--mid-border) !important; }
 html[data-theme="midnight"] .groceries :is(input:not([type="checkbox"]),select,textarea) { background: var(--surface-primary) !important; border-color: var(--border-strong) !important; color: var(--mid-text) !important; }
 html[data-theme="midnight"] .groceries :focus-visible { outline-color: var(--mid-accent); }
 html[data-theme="midnight"] .note-editor:empty::before { color: var(--mid-muted); }

@@ -148,12 +148,14 @@ test('duplicate app scopes are rejected; replace mode is the only supported rest
 
 test('backup shape can retain real recipe, diary, grocery, and nutrition source records', async () => {
   const recipeId = 'lentil-stew';
-  const grocery = { rows: [{ key: 'groceries:v1', value: { items: [{ id: 'stock-1', name: 'Lentils' }] } }] };
+  const grocery = { rows: [{ key: 'groceries:v1', value: { items: [{ id: 'stock-1', name: 'Lentils', quantity: 0, unit: 'g', threshold: 300, thresholdEnabled: true, shortage: 150, stockTrackingPaused: false }], stockAlerts: [{ id: 'stock-event-1', type: 'out', itemIds: ['stock-1'], read: false }], migrations: { negativeStockV1: true, negativeStockV1Count: 1 } } }] };
   const recipes = { rows: [{ key: `recipe:v1:${recipeId}`, value: { recipe: { slug: recipeId, ingredients: [{ name: 'Lentils' }] }, image: 'data:image/webp;base64,AA==' }, updated_at: '2026-10-01T00:00:00Z' }] };
   const diary = { rows: [{ key: 'food-diary:v1:2026-10-05', value: { date: '2026-10-05', meals: [{ items: [{ recipeSlug: recipeId, inventoryUsage: [{ key: 'stock-1', id: 'stock-1' }] }] }] } }] };
   const parsed = await parseBackupFile(await asFile(await backupFor(['recipes', 'grocery', 'foodDiary'], { recipes, grocery, foodDiary: diary })));
   assert.equal(parsed.modules.find(module => module.moduleId === 'recipes').data.rows[0].value.recipe.slug, recipeId);
   assert.equal(parsed.modules.find(module => module.moduleId === 'foodDiary').data.rows[0].value.meals[0].items[0].recipeSlug, recipeId);
+  const restoredGrocery = parsed.modules.find(module => module.moduleId === 'grocery').data.rows[0].value;
+  assert.deepEqual([restoredGrocery.items[0].threshold, restoredGrocery.items[0].shortage, restoredGrocery.items[0].stockTrackingPaused, restoredGrocery.stockAlerts[0].id, restoredGrocery.migrations.negativeStockV1Count], [300, 150, false, 'stock-event-1', 1]);
 });
 
 test('food library backups preserve independent nutrition, Grocery and shopping preferences', async () => {

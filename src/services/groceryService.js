@@ -8,6 +8,7 @@ import { createSingleFlightByKey } from '../utils/singleFlight.js';
 import {
   initialState,
   normalizeGroceryState,
+  checkGroceryIntegrity,
 } from "../features/groceries/groceryData";
 const key = "groceries:v1";
 const loadGroceriesOnce = createSingleFlightByKey();
@@ -22,6 +23,9 @@ export async function loadGroceries() {
       .maybeSingle();
     assertSupabaseResult(result);
     const [recipes, days, foodCatalog] = await Promise.all([getRecipes(userId), getFoodDiary(userId), getFoodCatalog(userId)]);
+    const storedItems = Array.isArray(result.data?.value?.items) ? result.data.value.items : [];
+    const migratedNegativeItemCount = storedItems.filter(item => Number.isFinite(item.quantity) && item.quantity < 0).length;
+    const migrationPending = Boolean(result.data && migratedNegativeItemCount > 0);
     const loaded = result.data
       ? {
           state: normalizeGroceryState(result.data.value),
@@ -30,7 +34,9 @@ export async function loadGroceries() {
         }
       : { state: initialState(), version: null, userId };
     const resolvedRecipes = recipes.map(recipe => resolveRecipeIngredients(recipe, foodCatalog).recipe);
+    if (migrationPending) loaded.version = await saveGroceries(loaded.state, loaded.version, loaded.userId);
     loaded.state = linkRecipeInventory(loaded.state, resolvedRecipes, days, foodCatalog);
+    loaded.migratedNegativeItemCount = migratedNegativeItemCount;
     return loaded;
   });
 }
@@ -38,6 +44,8 @@ export async function saveGroceries(state, version, expectedUserId) {
   const { client, userId } = await getUserScopedClient();
   if (userId !== expectedUserId)
     throw new Error("Your account changed. Reload groceries before saving.");
+  const integrityIssues = checkGroceryIntegrity(state).filter(issue => !issue.includes('duplicate Grocery rows'));
+  if (integrityIssues.length) throw new Error(`Grocery integrity check failed: ${integrityIssues[0]}`);
   for (const entry of Object.values(state.inventoryLedger || {})) for (const id of Object.keys(entry)) {
     if (!state.items.some(item => item.id === id)) throw new Error('This stock item has tracked diary usage. Set its stock to zero instead of deleting it.');
   }

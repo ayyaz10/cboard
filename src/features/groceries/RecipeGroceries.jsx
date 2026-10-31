@@ -127,7 +127,7 @@ export function RecipeGroceries({ recipe, foodCatalog = [], onRecipeUpdated }) {
           ＋ Add auto-buy shortages to shopping list
         </button>
         {data.settings.stockTrackingPaused ? <button
-          disabled={busy || !needs.length || needs.some((i) => i.missing !== 0)}
+          disabled={busy || !needs.length || unresolved}
           onClick={() => setReview(true)}
         >
           Mark as cooked
@@ -135,7 +135,7 @@ export function RecipeGroceries({ recipe, foodCatalog = [], onRecipeUpdated }) {
       </div>
       {review && data.settings.stockTrackingPaused && (
         <div className="g-hint">
-          <p>Deduct the amounts shown above from your groceries?</p>
+          <p>Use what is available from your groceries. Any over-consumption will be recorded as shortage, and the recipe action will still complete.</p>
           <div className="g-actions">
             <button
               className="g-primary"

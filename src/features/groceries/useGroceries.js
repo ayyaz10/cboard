@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { loadGroceries, saveGroceries } from "../../services/groceryService";
 import { upsertFoodCatalogItems } from '../../services/foodCatalogService';
 import { groceryCatalogUpdates } from '../nutrition/savedFoods.js';
+import { recordStockTransitions } from './groceryData.js';
+import { notify } from '../../lib/notifications.js';
 export function useGroceries() {
   const [data, setData] = useState(null),
     [error, setError] = useState(""),
@@ -20,6 +22,7 @@ export function useGroceries() {
       current.current = await loadGroceries();
       setData(current.current.state);
       setUndo(null);
+      if (current.current.migratedNegativeItemCount > 0) setNotice(`Migrated ${current.current.migratedNegativeItemCount} negative stock balance${current.current.migratedNegativeItemCount === 1 ? '' : 's'} to zero available stock and recorded the shortage.`);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -41,12 +44,14 @@ export function useGroceries() {
     setError("");
     const before = current.current;
     try {
-      const state = transform(structuredClone(before.state));
+      const state = recordStockTransitions(before.state, transform(structuredClone(before.state)));
       setData(state);
       const version = await saveGroceries(state, before.version, before.userId);
       current.current = { state, version, userId: before.userId };
       setUndo(allowUndo ? before.state : null);
       setNotice(message);
+      const previousAlerts = new Set((before.state.stockAlerts || []).map(alert => alert.id));
+      for (const alert of state.stockAlerts || []) if (!previousAlerts.has(alert.id)) notify.warning(alert.title);
       const updates = groceryCatalogUpdates(before.state, state);
       if (updates.length) {
         try {

@@ -24,3 +24,11 @@ test('unreconciled receipt cannot change stock and an explicitly disabled food s
   const disabled=updateReceiptPurchasesState(baseState(),transaction(),[{...food,groceryTrackingEnabled:false}]);
   assert.equal(disabled.state.items[0].quantity,500);assert.equal(disabled.applied,0);
 });
+
+test('reversing an already-used receipt clamps available stock and retains the unrecovered amount as shortage',()=>{
+  const bought=updateReceiptPurchasesState(baseState(),transaction(),[food]);
+  bought.state.items[0].quantity=300;
+  const removed=updateReceiptPurchasesState(bought.state,{...transaction(),receipt:null},[food]);
+  assert.equal(removed.state.items[0].quantity,0);
+  assert.equal(removed.state.items[0].shortage,700);
+});

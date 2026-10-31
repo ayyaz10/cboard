@@ -17,6 +17,7 @@ import {
   recipeNeeds,
   cookRecipe,
   normalizeGroceryState,
+  checkGroceryIntegrity,
   groceryImageFor,
   setGroceryImage,
 } from "./groceryData.js";
@@ -25,7 +26,7 @@ test("all 30 starter groceries have unknown stock, not zero", () => {
   assert.equal(state.items.length, 30);
   assert.ok(
     state.items.every(
-      (i) => i.quantity === null && stockStatus(i) === "Set quantity",
+      (i) => i.quantity === null && stockStatus(i) === "Unknown",
     ),
   );
 });
@@ -118,8 +119,45 @@ test("recipes scale, match common variations, aggregate ingredients, and deduct 
   const cooked = cookRecipe(state, needs);
   assert.equal(cooked.items[0].quantity, 300);
   assert.equal(cooked.items[1].quantity, 0);
+  assert.equal(cooked.items[1].shortage, 0);
   assert.equal(state.items[1].quantity, 4);
-  assert.throws(() => cookRecipe(cooked, needs));
+  const cookedAgain = cookRecipe(cooked, needs);
+  assert.equal(cookedAgain.items[1].quantity, 0);
+  assert.equal(cookedAgain.items[1].shortage, 4);
+});
+
+test('negative balances migrate once to available zero and preserve shortage', () => {
+  const raw = { items: [{ id: 'berries', name: 'Frozen berries', quantity: -310, unit: 'g' }], shopping: [] };
+  const migrated = normalizeGroceryState(raw);
+  assert.equal(migrated.items[0].quantity, 0);
+  assert.equal(migrated.items[0].shortage, 310);
+  assert.equal(migrated.migrations.negativeStockV1Count, 1);
+  assert.equal(stockStatus(migrated.items[0]), 'Out of stock');
+  assert.equal(normalizeGroceryState(migrated).items[0].shortage, 310);
+  assert.equal(normalizeGroceryState(migrated).migrations.negativeStockV1Count, 1);
+});
+
+test('item thresholds are opt-in and status uses the shared resolver', () => {
+  const item = newItem('Chicken', 200, 'g');
+  assert.equal(stockStatus(item), 'In stock');
+  item.thresholdEnabled = true; item.threshold = 300;
+  assert.equal(stockStatus(item), 'Low stock');
+  item.quantity = 0;
+  assert.equal(stockStatus(item), 'Out of stock');
+});
+
+test('grocery integrity check rejects negative availability, invalid shortage and duplicate canonical rows', () => {
+  const state = { items: [{ id: 'a', name: 'A', quantity: -1, shortage: -2, foodId: 'food' }, { id: 'b', name: 'B', quantity: 0, shortage: 0, foodId: 'food' }], stockAlerts: [] };
+  assert.equal(checkGroceryIntegrity(state).length, 3);
+  assert.equal(checkGroceryIntegrity(normalizeGroceryState(state)).length, 1);
+});
+
+test('re-adding a canonical food reuses its Grocery row instead of making a duplicate', () => {
+  const item = { ...newItem('Store chicken', 0, 'g'), foodId: 'food-chicken', removed: true };
+  const added = addItems({ items: [item], shopping: [] }, [{ ...newItem('Chicken breast', 200, 'g'), foodId: 'food-chicken' }]);
+  assert.equal(added.items.length, 1);
+  assert.equal(added.items[0].removed, false);
+  assert.equal(added.items[0].quantity, 200);
 });
 test("unknown recipe amounts and incompatible units block deductions", () => {
   const state = { items: [newItem("Oats", 100, "g")], shopping: [] };

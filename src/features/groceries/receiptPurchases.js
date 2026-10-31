@@ -1,4 +1,4 @@
-import { canonicalUnit, convert, newItem, normalizeName, normalizeGroceryState, round } from './groceryData.js';
+import { canonicalUnit, convert, newItem, normalizeName, normalizeGroceryState, round, recordStockTransitions } from './groceryData.js';
 import { reconcileReceipt } from '../finance/receiptParser.js';
 
 const receiptEventKey = (transactionId, itemId) => `${transactionId}:${itemId}`;
@@ -28,7 +28,11 @@ function restorePriorPurchases(state, transactionId) {
       const amount = convert(event.stockAmount,event.stockUnit,stock.unit);
       if (amount == null) { warnings.push(`${stock.name}: stock unit changed, so the saved receipt adjustment could not be reversed automatically.`); delete state.receiptPurchaseLedger[key]; continue; }
       const next = round(stock.quantity - amount);
-      if (next < 0) warnings.push(`${stock.name}: the receipt purchase has already been partly used; available stock was set to zero when removing the receipt link.`);
+      if (next < 0) {
+        const shortage = Math.abs(next);
+        stock.shortage = round((stock.shortage || 0) + shortage);
+        warnings.push(`${stock.name}: the receipt purchase has already been used; ${shortage} ${stock.unit} was recorded as shortage when removing the receipt link.`);
+      }
       stock.quantity = Math.max(0,next);
     }
     const shopping = state.shopping.find(item => item.id === event.shoppingItemId);
@@ -93,7 +97,8 @@ function applyReceiptItems(state, transaction, catalog) {
 }
 
 export function updateReceiptPurchasesState(inputState, transaction, catalog) {
-  const state = normalizeGroceryState(inputState), warnings = restorePriorPurchases(state,transaction?.id);
+  const state = normalizeGroceryState(inputState), before = structuredClone(state), warnings = restorePriorPurchases(state,transaction?.id);
   const applied = applyReceiptItems(state,transaction,catalog);
+  recordStockTransitions(before, state);
   return { state, applied:applied.applied, warnings:[...warnings,...applied.warnings] };
 }

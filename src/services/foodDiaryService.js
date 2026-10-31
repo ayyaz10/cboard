@@ -4,6 +4,7 @@ import { getUserScopedClient, assertSupabaseResult } from "./supabaseCrud";
 import { validateDay } from "../features/diary/diaryData.js";
 import { getFoodCatalog } from './foodCatalogService.js';
 import { createSingleFlightByKey } from '../utils/singleFlight.js';
+import { notify } from '../lib/notifications.js';
 
 const PREFIX = "food-diary:v1:";
 const DIARY_WRITE_TIMEOUT_MS = 30_000;
@@ -71,6 +72,8 @@ async function commitDay(day, expectedUserId, deleting = false) {
     throw error;
   } finally { clearTimeout(timeout); }
   assertSupabaseResult(result);
+  const previousAlerts = new Set((groceries.state.stockAlerts || []).map(alert => alert.id));
+  for (const alert of inventory.state.stockAlerts || []) if (!previousAlerts.has(alert.id)) notify.warning(alert.title);
   return deleting ? clean.date : { ...clean, updatedAt: result.data, inventoryWarnings: inventory.warnings };
 }
 export const saveFoodDiary = (day, expectedUserId) => commitDay(day, expectedUserId);

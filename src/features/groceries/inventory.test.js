@@ -144,12 +144,85 @@ test('item pause freezes edits and deletions; global pause overrides item tracki
 test('shortages remain reversible, unset stock stays unset, copies are separate consumption', () => {
   const first = day(recipeItems(recipe())); const initial = stock(); initial.items[0].quantity = 20;
   const result = reconcileInventory(initial, null, first);
-  assert.equal(quantity(result.state), -130);
-  assert.equal(quantity(reconcileInventory(result.state, first, null).state), 20);
+  assert.equal(quantity(result.state), 0);
+  assert.equal(result.state.items[0].shortage, 130);
+  const restored = reconcileInventory(result.state, first, null).state;
+  assert.equal(quantity(restored), 20);
+  assert.equal(restored.items[0].shortage, 0);
   initial.items[0].quantity = null;
   assert.equal(quantity(reconcileInventory(initial, null, first).state), null);
   const second = structuredClone(first); second.meals[0].items.push({...second.meals[0].items[0], id:'copy'});
   assert.equal(quantity(reconcileInventory(stock(), null, second).state), 700);
+});
+
+test('diary over-consumption records requested use, actual use and shortage without blocking the entry', () => {
+  const first = day([foodItem({ quantity: 500, unit: 'g' }, 'Chicken')]);
+  const initial = stock(); initial.items[0].quantity = 200;
+  const result = reconcileInventory(initial, null, first);
+  assert.equal(quantity(result.state), 0);
+  assert.equal(result.state.items[0].shortage, 300);
+  assert.equal(Object.values(result.state.inventoryLedger)[0].chicken.requested, 500);
+  assert.equal(Object.values(result.state.inventoryLedger)[0].chicken.consumed, 200);
+  assert.equal(Object.values(result.state.inventoryLedger)[0].chicken.shortage, 300);
+  assert.equal(result.state.stockAlerts.filter(alert => alert.type === 'out').length, 1);
+  const repeated = reconcileInventory(result.state, first, first).state;
+  assert.equal(repeated.items[0].shortage, 300);
+  assert.equal(repeated.stockAlerts.length, 1);
+  const reloaded = JSON.parse(JSON.stringify(repeated));
+  assert.deepEqual(reconcileInventory(reloaded, first, first).state.stockAlerts.map(alert => alert.id), repeated.stockAlerts.map(alert => alert.id));
+});
+
+test('exact-zero diary use is out of stock with no shortage and one alert', () => {
+  const initial = stock(); initial.items[0].quantity = 500;
+  const first = day([foodItem({ quantity: 500, unit: 'g' }, 'Chicken')]);
+  const result = reconcileInventory(initial, null, first);
+  assert.equal(quantity(result.state), 0);
+  assert.equal(result.state.items[0].shortage, 0);
+  assert.equal(result.state.stockAlerts.length, 1);
+  assert.equal(result.state.stockAlerts[0].type, 'out');
+});
+
+test('diary reversal converts requested, consumed and shortage ledger values after a stock-unit change', () => {
+  const initial = stock(); initial.items[0].quantity = 100;
+  const first = day([foodItem({ quantity: 250, unit: 'g' }, 'Chicken')]);
+  let state = reconcileInventory(initial, null, first).state;
+  assert.equal(state.items[0].shortage, 150);
+  state.items[0].unit = 'kg';
+  state.items[0].shortage = 0.15;
+  state = reconcileInventory(state, first, null).state;
+  assert.equal(state.items[0].quantity, 0.1);
+  assert.equal(state.items[0].shortage, 0);
+});
+
+test('one operation groups several out-of-stock transitions into one persistent alert', () => {
+  const initial = stock(); initial.items[0].quantity = 10;
+  initial.items.push({ id: 'rice', name: 'Rice', quantity: 5, unit: 'g', shortage: 0 });
+  const first = day([foodItem({ quantity: 20, unit: 'g' }, 'Chicken'), foodItem({ quantity: 10, unit: 'g' }, 'Rice')]);
+  const result = reconcileInventory(initial, null, first);
+  assert.equal(result.state.stockAlerts.length, 1);
+  assert.match(result.state.stockAlerts[0].title, /2 Grocery items/);
+  assert.equal(result.state.stockAlerts[0].items.length, 2);
+});
+
+test('low and out transitions are grouped and restock re-arms a later transition', () => {
+  const initial = stock(); initial.items[0].quantity = 500; initial.items[0].thresholdEnabled = true; initial.items[0].threshold = 300;
+  const first = day([foodItem({ quantity: 250, unit: 'g' }, 'Chicken')]);
+  let result = reconcileInventory(initial, null, first);
+  assert.equal(result.state.items[0].quantity, 250);
+  assert.equal(result.state.stockAlerts[0].type, 'low');
+  const second = day([foodItem({ quantity: 250, unit: 'g' }, 'Chicken')]);
+  result = reconcileInventory(result.state, null, second);
+  assert.equal(result.state.items[0].quantity, 0);
+  assert.equal(result.state.stockAlerts[0].type, 'out');
+  assert.equal(result.state.stockAlerts.length, 2);
+  const restocked = structuredClone(result.state); restocked.items[0].quantity = 1000;
+  const afterRestock = reconcileInventory(restocked, second, null).state;
+  assert.equal(afterRestock.stockAlerts.length, 2);
+  const outAgain = day([foodItem({ quantity: 2000, unit: 'g' }, 'Chicken')]);
+  const newTransition = reconcileInventory(afterRestock, null, outAgain).state;
+  assert.equal(newTransition.items[0].quantity, 0);
+  assert.equal(newTransition.stockAlerts.length, 3);
+  assert.notEqual(newTransition.stockAlerts[0].id, result.state.stockAlerts[0].id);
 });
 
 test('whole recipes, kg ingredients and changed piece weights use physical amounts', () => {

@@ -10,6 +10,11 @@ const appSections = [
     color: '#c5ff6f', colorKey: 'lime', countLabel: 'Calisthenics tracker',
   },
   {
+    id: 'driving-improvement', path: '/driving-improvement', label: 'Learn from mistakes', name: 'Driving Improvement',
+    description: 'Capture driving mistakes, keep your correction visible, and review before practice.',
+    color: '#ffd166', colorKey: 'amber', countLabel: 'Driving tracker',
+  },
+  {
     id: 'weight-progress', path: '/weight-progress', label: 'Your personal progress', name: 'Weight Progress',
     description: 'Log weigh-ins, follow your weight trend, and compare private progress photos.',
     color: '#ff90e8', colorKey: 'pink', countLabel: 'Weight & photos',

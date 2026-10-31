@@ -198,6 +198,23 @@
   font-size: 12px;
   color: #627057;
 }
+.g-status-line { display: flex !important; align-items: center; gap: 7px; flex-wrap: wrap; margin-block: 4px; }
+.g-status-badge { display: inline-flex; align-items: center; min-height: 22px; padding: 2px 7px; border: 1px solid var(--color-border); border-radius: 999px; font-size: 10px !important; font-weight: 800; letter-spacing: .04em; }
+.g-status-badge.is-in-stock { color: var(--color-success); background: var(--color-success-soft); border-color: var(--color-success); }
+.g-status-badge.is-low-stock { color: var(--color-warning); background: var(--color-warning-soft); border-color: var(--color-warning); }
+.g-status-badge.is-out-of-stock { color: var(--color-danger); background: var(--color-danger-soft); border-color: var(--color-danger); }
+.g-status-badge.is-unknown { color: var(--color-text-muted); background: var(--surface-primary); border-color: var(--color-border); }
+.g-status-badge.is-in-stock { color: var(--color-success); background: var(--surface-primary); border-color: var(--color-border); }
+.g-row.is-low-stock { box-shadow: inset 2px 0 var(--color-warning); padding-left: 8px; }
+.g-row.is-out-of-stock { box-shadow: inset 2px 0 var(--color-danger); padding-left: 8px; }
+.g-attention-summary { margin: -12px 0 22px; font-size: 13px; }
+.g-stock-alerts { display: grid; gap: 8px; margin: 0 0 22px; padding: 14px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--surface-primary); }
+.g-stock-alerts h2 { font-size: 1rem; }
+.g-stock-alert { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; border-left: 3px solid var(--color-warning); background: var(--color-warning-soft); }
+.g-stock-alert.is-out { border-color: var(--color-danger); background: var(--color-danger-soft); }
+.g-stock-alert.is-read { opacity: .66; }
+.g-stock-alert > span { min-width: 0; overflow-wrap: anywhere; }
+.g-alert-items { display: block; margin-top: 3px; }
 .g-quantity {
   display: flex;
   align-items: center;
@@ -458,9 +475,6 @@ kbd {
   .g-quantity button {
     padding: 8px;
   }
-  .g-row-actions button[aria-label^="Edit"] {
-    display: none;
-  }
   .g-stats {
     gap: 7px;
   }
@@ -482,6 +496,7 @@ kbd {
   }
   .g-row-actions {
     margin-left: auto;
+    justify-content: flex-end;
   }
   .g-footer small {
     display: none;
