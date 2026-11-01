@@ -1,4 +1,5 @@
 import { DiaryFoodAnalysis } from './DiaryFoodAnalysis';
+import { ChevronDown } from 'lucide-react';
 import { DiaryRecipeConfirm } from './DiaryRecipeConfirm';
 import { buildDiaryRecipe, buildDiaryRecipeUpdate } from './diaryRecipeUpdate.js';
 import { saveRecipe, saveDiaryRecipeUpdate } from '../../services/recipeService';
@@ -774,7 +775,14 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
                 </button>
               </div>
               {!!entries.length && <details className="diary-meal-details">
-                <summary>Show {entries.length === 1 ? "meal" : "meals"} · {entries.reduce((sum, meal) => sum + meal.items.length, 0)} food items</summary>
+                <summary>
+                  <span className="diary-meal-disclosure-label">
+                    <span className="diary-meal-disclosure-closed">Show {slot.toLowerCase()} {entries.length === 1 ? "meal" : "meals"}</span>
+                    <span className="diary-meal-disclosure-open">Hide {slot.toLowerCase()} {entries.length === 1 ? "meal" : "meals"}</span>
+                  </span>
+                  <span className="diary-meal-item-count">{entries.reduce((sum, meal) => sum + meal.items.length, 0)} food items</span>
+                  <ChevronDown className="diary-meal-disclosure-chevron" size={18} aria-hidden="true" />
+                </summary>
               {entries.map((meal) => {
                 return (
                   <article className="diary-entry" key={meal.id}>

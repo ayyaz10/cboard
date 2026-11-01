@@ -465,9 +465,17 @@ html[data-theme="midnight"] .food-diary .diary-recipe-confirm .diary-actions { b
 .diary-meal-sections > .diary-panel { padding:clamp(.8rem,2vw,1rem); }
 .diary-meal-sections .diary-section-heading { gap:.5rem; }
 .diary-meal-sections .diary-section-heading > button { min-height:2.75rem; padding:.5rem .75rem; }
-.diary-meal-details { margin-top:.35rem; border-top:1px solid var(--g-border); }
-.diary-meal-details > summary { display:flex; align-items:center; min-height:2.75rem; gap:.5rem; color:var(--color-text-secondary); font-size:.84rem; }
-.diary-meal-details[open] > summary { border-bottom:1px solid var(--g-border); }
+.diary-meal-details { margin-top:.45rem; }
+.diary-meal-details > summary { display:flex; align-items:center; min-height:2.9rem; gap:.55rem; padding:.4rem .7rem; border:1px solid var(--color-border); border-radius:var(--radius-sm); background:var(--color-surface-interactive); color:var(--color-text); cursor:pointer; list-style:none; font-size:.86rem; }
+.diary-meal-details > summary::-webkit-details-marker { display:none; }
+.diary-meal-details > summary::marker { content:""; }
+.diary-meal-details > summary:hover { border-color:var(--color-accent); }
+.diary-meal-disclosure-label { font-weight:750; }
+.diary-meal-disclosure-open,.diary-meal-details[open] .diary-meal-disclosure-closed { display:none; }
+.diary-meal-details[open] .diary-meal-disclosure-open { display:inline; }
+.diary-meal-item-count { margin-left:auto; padding:.17rem .5rem; border:1px solid var(--color-border); border-radius:var(--radius-pill); color:var(--color-text-secondary); font-size:.74rem; font-weight:700; white-space:nowrap; }
+.diary-meal-disclosure-chevron { flex:0 0 auto; color:var(--color-accent); transition:transform .16s ease; }
+.diary-meal-details[open] .diary-meal-disclosure-chevron { transform:rotate(180deg); }
 .diary-meal-empty { margin-top:.55rem; }
 .diary-meal-empty > p { margin:.35rem 0; color:var(--color-text-secondary); }
 .diary-macros-dense { grid-template-columns:repeat(5,minmax(0,1fr)); gap:.55rem; margin:.55rem 0; }
