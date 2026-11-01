@@ -17,11 +17,11 @@ export function RecipeSource({ source, compact = false, linkClassName }) {
   if (compact) return link;
   return (
     <section
-      className="space-y-3 rounded-2xl border-2 border-black bg-white p-5"
+      className="space-y-3 rounded-2xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-5"
       aria-label="Recipe source"
     >
       <h2 className="text-xl font-bold">Recipe source</h2>
-      <p className="break-all text-sm text-black/70">
+      <p className="break-all text-sm text-[var(--color-text-secondary)]">
         {new URL(source.url).hostname}
       </p>
       {link}

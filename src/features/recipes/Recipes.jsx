@@ -431,7 +431,7 @@ function RecipesContent({ route, navigationPath }) {
   const deletingInDialog = confirmBulkDelete ? bulkDeleteItems : removing ? [removing] : [];
   return (
     <PageShell>
-      <section className="recipe-page-shell panel space-y-7 border-black p-5 text-black sm:p-8 lg:p-10">
+      <section className="recipe-page-shell panel space-y-7 border-[var(--border-default)] p-5 text-[var(--color-text)] sm:p-8 lg:p-10">
         <AppNavigation activePath={navigationPath} />
         <DailyNutritionTargets controller={nutritionGoals} />
         <nav className="recipe-shortcuts mobile-section-nav flex flex-wrap gap-2" aria-label="Recipe shortcuts">
@@ -455,7 +455,7 @@ function RecipesContent({ route, navigationPath }) {
           await saveMainFoodItems([item]);
           notify.success(item.allowDuplicate ? 'Food duplicated in your library' : reuse ? 'Existing food reused' : editing ? 'Food updated' : 'Food added to your library');
         }} />}
-        {favouriteError && <p role="alert" className="rounded-xl border-2 border-black bg-[#ffe0de] p-3 text-sm font-semibold">{favouriteError}</p>}
+        {favouriteError && <p role="alert" className="rounded-xl border-2 border-[var(--border-default)] bg-[var(--color-danger-soft)] p-3 text-sm font-semibold">{favouriteError}</p>}
         <p role="status" className="sr-only">{favouriteNotice}</p>
         {loading ? (
           <p role="status" className="py-12 text-center font-bold">
@@ -517,7 +517,7 @@ function RecipesContent({ route, navigationPath }) {
                     <h1 className="mt-4 text-4xl font-bold tracking-[-0.05em] sm:text-5xl">
                       {manage ? 'Manage Recipes' : 'Recipes'}
                     </h1>
-                    <p className="mt-3 text-black/70">
+                    <p className="mt-3 text-[var(--color-text-secondary)]">
                       Your meals, ingredients, and alternatives in one place.
                     </p>
                   </div>
@@ -536,9 +536,9 @@ function RecipesContent({ route, navigationPath }) {
                         />
                       </label>
                       <div className="flex flex-wrap items-center gap-3" aria-label="Recipe filters and view">
-                        <button type="button" className={`${secondaryButton.replace('bg-white', '')} min-h-11 ${!favouritesOnly ? 'bg-[#c5ff6f]' : 'bg-white'}`} aria-pressed={!favouritesOnly} onClick={() => setFavouritesOnly(false)}>All recipes</button>
-                        <button type="button" className={`${secondaryButton.replace('bg-white', '')} min-h-11 ${favouritesOnly ? 'bg-[#c5ff6f]' : 'bg-white'}`} aria-pressed={favouritesOnly} onClick={() => setFavouritesOnly(true)}><span aria-hidden="true" className="mr-2">♥</span>Favourites ({recipes.filter(item => favourites.has(item.slug)).length})</button>
-                        <label className="recipe-meal-filter inline-flex min-h-11 items-center gap-2 rounded-full border-2 border-black bg-white px-3 text-sm font-bold">
+                        <button type="button" className={`${secondaryButton.replace('bg-[var(--surface-elevated)]', '')} min-h-11 ${!favouritesOnly ? 'bg-[var(--color-accent)]' : 'bg-[var(--surface-elevated)]'}`} aria-pressed={!favouritesOnly} onClick={() => setFavouritesOnly(false)}>All recipes</button>
+                        <button type="button" className={`${secondaryButton.replace('bg-[var(--surface-elevated)]', '')} min-h-11 ${favouritesOnly ? 'bg-[var(--color-accent)]' : 'bg-[var(--surface-elevated)]'}`} aria-pressed={favouritesOnly} onClick={() => setFavouritesOnly(true)}><span aria-hidden="true" className="mr-2">♥</span>Favourites ({recipes.filter(item => favourites.has(item.slug)).length})</button>
+                        <label className="recipe-meal-filter inline-flex min-h-11 items-center gap-2 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm font-bold">
                           <span>Meal type</span>
                           <select
                             className="min-w-0 bg-transparent font-bold outline-none"
@@ -551,19 +551,19 @@ function RecipesContent({ route, navigationPath }) {
                             ))}
                           </select>
                         </label>
-                        <p role="status" className="text-sm text-black/70">{filtered.length} recipe{filtered.length === 1 ? '' : 's'}</p>
+                        <p role="status" className="text-sm text-[var(--color-text-secondary)]">{filtered.length} recipe{filtered.length === 1 ? '' : 's'}</p>
                         <RecipeCardViewControl />
                         {!manage && <RecipeLink to="/recipes/manage">Manage recipes</RecipeLink>}
                       </div>
                     </div>
-                    {manage && <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-black bg-white p-3" aria-label="Bulk recipe actions">
+                    {manage && <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-3" aria-label="Bulk recipe actions">
                       <div className="flex flex-wrap items-center gap-3">
                         {!selectionMode && <button type="button" className={secondaryButton} onClick={toggleSelectionMode}>Select recipes</button>}
                         {selectionMode && <label className="flex items-center gap-2 text-sm font-bold">
                           <input type="checkbox" className="h-4 w-4 accent-lime-500" checked={filtered.length > 0 && filtered.every(item => selectedRecipeSlugs.has(item.slug))} onChange={event => setVisibleSelected(event.target.checked)} aria-label={`Select all ${filtered.length} shown recipes`} />
                           Select all shown
                         </label>}
-                        {selectionMode && <span className="text-sm text-black/65">{bulkDeleteItems.length} selected <span className="hidden sm:inline">· up to 50 at a time</span></span>}
+                        {selectionMode && <span className="text-sm text-[var(--color-text-secondary)]">{bulkDeleteItems.length} selected <span className="hidden sm:inline">· up to 50 at a time</span></span>}
                         {selectionMode && selectedRecipeSlugs.size > 0 && <button type="button" className={secondaryButton} onClick={() => setSelectedRecipeSlugs(new Set())}>Clear</button>}
                       </div>
                       {selectionMode && <div className="flex gap-2">
@@ -599,7 +599,7 @@ function RecipesContent({ route, navigationPath }) {
                     )}
                   </>
                 ) : (
-                  <div className="rounded-2xl border-2 border-black bg-white p-6">
+                  <div className="rounded-2xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-6">
                     <h2 className="text-2xl font-bold">No recipes yet.</h2>
                     <p className="mt-2 leading-7">
                       Import your first recipe to start building your meal
@@ -635,7 +635,7 @@ function RecipesContent({ route, navigationPath }) {
                   ← {recipe.title}
                 </RecipeLink>
                 <h1 className="text-3xl font-bold">Ingredient alternatives</h1>
-                <section className="rounded-2xl border-2 border-black bg-white p-5">
+                <section className="rounded-2xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-5">
                   <h2 className="text-sm font-bold uppercase tracking-wider">
                     Original ingredient
                   </h2>
@@ -694,14 +694,14 @@ function RecipesContent({ route, navigationPath }) {
           onClose={() => {
             if (!busy) { setRemoving(null); setConfirmBulkDelete(false); setRecipeCleanup(null); }
           }}
-          className="panel fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-md border-black p-6 text-black backdrop:bg-black/35"
+          className="panel fixed inset-0 m-auto w-[calc(100%-2rem)] max-w-md border-[var(--border-default)] p-6 text-[var(--color-text)] backdrop:bg-black/35"
           aria-labelledby="recipe-delete-title"
         >
-          <button type="button" aria-label="Close popup" disabled={busy} onClick={() => { dialog.current?.close(); setRemoving(null); setConfirmBulkDelete(false); }} className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-black bg-white text-xl font-bold leading-none shadow-[3px_3px_0_#000] hover:bg-[#c5ff6f]">×</button>
+          <button type="button" aria-label="Close popup" disabled={busy} onClick={() => { dialog.current?.close(); setRemoving(null); setConfirmBulkDelete(false); }} className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] text-xl font-bold leading-none shadow-[3px_3px_0_#000] hover:bg-[var(--color-accent-hover)]">×</button>
           <h2 id="recipe-delete-title" className="text-2xl font-bold">
             {recipeCleanup ? 'Recipe deleted' : confirmBulkDelete ? `Delete ${deletingInDialog.length} selected recipe${deletingInDialog.length === 1 ? '' : 's'}?` : `Delete “${removing?.title}”?`}
           </h2>
-          <p className="mt-3 text-black/70">
+          <p className="mt-3 text-[var(--color-text-secondary)]">
             {recipeCleanup ? `${recipeCleanup.foods.length} reusable food${recipeCleanup.foods.length === 1 ? ' is' : 's are'} no longer used by any recipe. They will stay in your library unless you choose to delete them.` : confirmBulkDelete ? 'This removes the selected recipes and their saved favourites from your library.' : 'This removes the recipe and its uploaded image from your library.'}
           </p>
           {recipeCleanup && <ul className="mt-3 max-h-36 list-inside list-disc overflow-auto text-sm">{recipeCleanup.foods.slice(0, 8).map(item => <li key={item.id}>{item.name}</li>)}{recipeCleanup.foods.length > 8 && <li>and {recipeCleanup.foods.length - 8} more</li>}</ul>}

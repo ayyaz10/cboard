@@ -88,17 +88,17 @@ export function CalorieCalculator() {
         <form
           noValidate
           onSubmit={handleSubmit}
-          className="order-2 rounded-[2rem] border-2 border-black bg-[#fffdf8] p-5 sm:p-6 lg:order-1"
+          className="order-2 rounded-[2rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-5 sm:p-6 lg:order-1"
         >
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
                 Inputs
               </p>
-              <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-black">
+              <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-[var(--color-text)]">
                 Enter values
               </h2>
-              <p className="mt-2 text-sm font-medium leading-6 text-black/60">
+              <p className="mt-2 text-sm font-medium leading-6 text-[var(--color-text-muted)]">
                 Use the same unit for both quantity fields.
               </p>
             </div>
@@ -129,7 +129,7 @@ export function CalorieCalculator() {
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
             <PrimaryButton type="submit">Calculate</PrimaryButton>
-            <p className="text-sm font-medium leading-6 text-black/55">
+            <p className="text-sm font-medium leading-6 text-[var(--color-text-muted)]">
               Updates live after the first submit.
             </p>
           </div>
@@ -147,32 +147,32 @@ export function CalorieCalculator() {
         error={resultsError}
       />
 
-      <section className="rounded-[1.75rem] border-2 border-black bg-[#fffdf8] p-5 text-black sm:p-6">
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
+      <section className="rounded-[1.75rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-5 text-[var(--color-text)] sm:p-6">
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
           How it helps
         </p>
-        <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-black">
+        <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-[var(--color-text)]">
           Find calories for the portion you actually eat
         </h2>
-        <p className="mt-3 max-w-3xl text-sm font-medium leading-7 text-black/70 sm:text-base">
+        <p className="mt-3 max-w-3xl text-sm font-medium leading-7 text-[var(--color-text-secondary)] sm:text-base">
           Food labels often show calories for a fixed weight, like 100g. This
           calculator converts that label value into the calories for your real
           portion, so you do not have to guess or do the ratio manually.
         </p>
 
         <div className="mt-5 grid gap-4 lg:grid-cols-3">
-          <article className="rounded-[1.35rem] border-2 border-black bg-[#fff0b8] p-4">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-black/55">
+          <article className="rounded-[1.35rem] border-2 border-[var(--border-default)] bg-[var(--color-warning-soft)] p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-muted)]">
               Example
             </p>
-            <p className="mt-2 text-lg font-bold leading-7 text-black">
+            <p className="mt-2 text-lg font-bold leading-7 text-[var(--color-text)]">
               If the packet says 400 calories per 100g, then 30g has 120
               calories.
             </p>
           </article>
 
-          <article className="rounded-[1.35rem] border-2 border-black bg-[#c5ff6f] p-4">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-black/55">
+          <article className="rounded-[1.35rem] border-2 border-[var(--border-default)] bg-[var(--color-accent)] p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-muted)]">
               What to enter
             </p>
             <p className="mt-2 text-sm font-semibold leading-7 text-black/75">
@@ -180,8 +180,8 @@ export function CalorieCalculator() {
             </p>
           </article>
 
-          <article className="rounded-[1.35rem] border-2 border-black bg-[#9fe3ff] p-4">
-            <p className="text-xs font-bold uppercase tracking-[0.14em] text-black/55">
+          <article className="rounded-[1.35rem] border-2 border-[var(--border-default)] bg-[#9fe3ff] p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-muted)]">
               Formula
             </p>
             <p className="mt-2 text-sm font-semibold leading-7 text-black/75">

@@ -38,15 +38,15 @@ function ChartTooltip({ active, label, payload }) {
   const tooltipLabel = payload[0]?.payload?.tooltipLabel || label;
 
   return (
-    <div className="rounded-[1rem] border-2 border-black bg-[#fffdf8] px-4 py-3 shadow-[4px_4px_0_#000]">
-      <p className="text-xs font-bold uppercase tracking-[0.16em] text-black/55">
+    <div className="rounded-[1rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3 shadow-[4px_4px_0_#000]">
+      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-text-muted)]">
         {tooltipLabel}
       </p>
       <div className="mt-2 space-y-1">
         {payload.map((item) => (
           <p
             key={item.dataKey}
-            className="text-sm font-bold text-black"
+            className="text-sm font-bold text-[var(--color-text)]"
             style={{ color: item.color }}
           >
             {item.name}: {formatTrackerNumber(item.value)}
@@ -100,10 +100,10 @@ function BinaryHeatmap({ goal, entries }) {
   const sortedEntries = [...entries].sort(compareEntriesChronologically);
 
   return (
-    <div className="mt-5 rounded-[1.5rem] border-2 border-black bg-[#fffdf8] p-4">
+    <div className="mt-5 rounded-[1.5rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-4">
       {sortedEntries.length === 0 ? (
         <div className="flex min-h-72 items-center justify-center text-center">
-          <p className="max-w-sm text-lg font-bold leading-7 tracking-[-0.03em] text-black/65">
+          <p className="max-w-sm text-lg font-bold leading-7 tracking-[-0.03em] text-[var(--color-text-secondary)]">
             Save your first daily entry to draw the consistency calendar.
           </p>
         </div>
@@ -116,15 +116,15 @@ function BinaryHeatmap({ goal, entries }) {
             return (
               <div
                 key={entry.id}
-                className="binary-heatmap-cell aspect-square rounded-[0.75rem] border-2 border-black p-2"
+                className="binary-heatmap-cell aspect-square rounded-[0.75rem] border-2 border-[var(--border-default)] p-2"
                 data-theme-color={completed ? 'lime' : 'danger'}
                 style={{ '--heatmap-cell-bg': completed ? '#c5ff6f' : '#ffe0de' }}
                 title={`${entryLabel}: ${completed ? 'Completed' : 'Missed'}`}
               >
-                <p className="text-[10px] font-bold uppercase leading-none tracking-[0.08em] text-black/55">
+                <p className="text-[10px] font-bold uppercase leading-none tracking-[0.08em] text-[var(--color-text-muted)]">
                   {entryLabel.slice(5)}
                 </p>
-                <p className="mt-1 text-xs font-bold uppercase tracking-[0.08em] text-black">
+                <p className="mt-1 text-xs font-bold uppercase tracking-[0.08em] text-[var(--color-text)]">
                   {completed ? 'Done' : 'Miss'}
                 </p>
               </div>
@@ -200,17 +200,17 @@ export function GoalChart({ goal, entries }) {
     : 'Save your first daily entry to draw the chart.';
 
   return (
-    <section className="rounded-[1.75rem] border-2 border-black bg-[#f8f3ea] p-5 sm:p-6">
+    <section className="rounded-[1.75rem] border-2 border-[var(--border-default)] bg-[var(--surface-primary)] p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
             Graph
           </p>
-          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-black">
+          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-[var(--color-text)]">
             {title}
           </h2>
         </div>
-        <span className="rounded-full border-2 border-black bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-black">
+        <span className="rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text)]">
           {badge}
         </span>
       </div>
@@ -219,7 +219,7 @@ export function GoalChart({ goal, entries }) {
         <>
           <BinaryHeatmap goal={goal} entries={entries} />
           {chartData.length > 0 ? (
-            <div className="mt-5 h-72 rounded-[1.5rem] border-2 border-black bg-[#fffdf8] p-3 sm:p-4">
+            <div className="mt-5 h-72 rounded-[1.5rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-3 sm:p-4">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart
                   data={chartData}
@@ -298,13 +298,13 @@ export function GoalChart({ goal, entries }) {
           ) : null}
         </>
       ) : chartData.length === 0 ? (
-        <div className="mt-5 flex min-h-72 items-center justify-center rounded-[1.5rem] border-2 border-dashed border-black bg-[#fffdf8] p-6 text-center">
-          <p className="max-w-sm text-lg font-bold leading-7 tracking-[-0.03em] text-black/65">
+        <div className="mt-5 flex min-h-72 items-center justify-center rounded-[1.5rem] border-2 border-dashed border-[var(--border-default)] bg-[var(--surface-elevated)] p-6 text-center">
+          <p className="max-w-sm text-lg font-bold leading-7 tracking-[-0.03em] text-[var(--color-text-secondary)]">
             {emptyChartMessage}
           </p>
         </div>
       ) : (
-        <div className="mt-5 h-80 rounded-[1.5rem] border-2 border-black bg-[#fffdf8] p-3 sm:h-96 sm:p-4">
+        <div className="mt-5 h-80 rounded-[1.5rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-3 sm:h-96 sm:p-4">
           <ResponsiveContainer width="100%" height="100%">
             {goalType === 'accumulative' ? (
               <LineChart

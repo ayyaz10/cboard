@@ -18,12 +18,12 @@ export function GoalDetailsPanel({
 }) {
   if (!goal) {
     return (
-      <section className="rounded-[1.75rem] border-2 border-black bg-[#fffdf8] p-5 sm:p-6">
+      <section className="rounded-[1.75rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-5 sm:p-6">
         <span className="pill">Dashboard</span>
-        <h2 className="mt-4 text-3xl font-bold tracking-[-0.05em] text-black">
+        <h2 className="mt-4 text-3xl font-bold tracking-[-0.05em] text-[var(--color-text)]">
           Select a goal
         </h2>
-        <p className="mt-3 text-sm font-semibold leading-6 text-black/65">
+        <p className="mt-3 text-sm font-semibold leading-6 text-[var(--color-text-secondary)]">
           Goals are collapsed by default. Open one to review stats, chart,
           entries, and logging tools.
         </p>
@@ -39,14 +39,14 @@ export function GoalDetailsPanel({
         <button
           type="button"
           onClick={() => onEditGoal(goal)}
-          className="rounded-full border-2 border-black bg-[#9fe3ff] px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[3px_3px_0_#000]"
+          className="rounded-full border-2 border-[var(--border-default)] bg-[#9fe3ff] px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text)] shadow-[3px_3px_0_#000]"
         >
           Edit goal
         </button>
         <button
           type="button"
           onClick={() => onDeleteGoal(goal.id)}
-          className="danger-action rounded-full border-2 border-black px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] shadow-[3px_3px_0_#000] transition"
+          className="danger-action rounded-full border-2 border-[var(--border-default)] px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] shadow-[3px_3px_0_#000] transition"
         >
           Delete goal
         </button>

@@ -14,7 +14,7 @@ export function MealRoutine({ routine, meals, onEdit }) {
           <span className="pill">Currently following</span>
           <h2 className="break-words text-3xl font-bold">{routine.name}</h2>
           {routine.notes && (
-            <p className="whitespace-pre-wrap break-words text-black/70">
+            <p className="whitespace-pre-wrap break-words text-[var(--color-text-secondary)]">
               {routine.notes}
             </p>
           )}
@@ -23,7 +23,7 @@ export function MealRoutine({ routine, meals, onEdit }) {
           Edit routine
         </button>
       </header>
-      <p className="text-sm text-black/70">
+      <p className="text-sm text-[var(--color-text-secondary)]">
         Your saved everyday meal routine. Daily totals above use the latest
         recipe macros.
       </p>
@@ -38,7 +38,7 @@ export function MealRoutine({ routine, meals, onEdit }) {
                   {selected.map((meal) => (
                     <article
                       key={meal.id}
-                      className="recipe-clickable-card grid min-w-0 gap-3 break-words rounded-2xl border-2 border-black bg-white p-3 sm:grid-cols-[8rem_minmax(0,1fr)]"
+                      className="recipe-clickable-card grid min-w-0 gap-3 break-words rounded-2xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-3 sm:grid-cols-[8rem_minmax(0,1fr)]"
                     >
                       {meal.recipe ? (
                         <>
@@ -77,7 +77,7 @@ export function MealRoutine({ routine, meals, onEdit }) {
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-black/70">
+                <p className="text-sm text-[var(--color-text-secondary)]">
                   No {slot.toLowerCase()} selected.
                 </p>
               )}

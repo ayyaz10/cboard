@@ -128,10 +128,10 @@ export function GoalList({
     <section className="ui-panel tracker-goal-list p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
             Goals
           </p>
-          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-black">
+          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-[var(--color-text)]">
             Tracker list
           </h2>
         </div>
@@ -230,10 +230,10 @@ export function GoalList({
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-black/55">
+                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-text-muted)]">
                           {goalBehaviorTypes[goalType].shortLabel} - {goalTypePresets[goal.type]?.label || goal.type}
                         </p>
-                        <h3 className="mt-1 break-words text-xl font-bold tracking-[-0.04em] text-black">
+                        <h3 className="mt-1 break-words text-xl font-bold tracking-[-0.04em] text-[var(--color-text)]">
                           {goal.title}
                         </h3>
                       </div>
@@ -267,11 +267,11 @@ export function GoalList({
                     <div className="mt-3 grid gap-2">
                       <ProgressStrip percentage={summary.percentage} />
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">
+                        <span className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
                           {Number.isFinite(summary.percentage) ? `${summary.percentage}% progress` : 'Progress pending'}
                         </span>
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">
+                          <span className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
                             {goal.allowMultipleEntriesPerDay ? 'Multi-entry' : 'Daily entry'}
                           </span>
                           <button

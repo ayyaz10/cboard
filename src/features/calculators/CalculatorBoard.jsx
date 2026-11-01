@@ -10,16 +10,16 @@ export function CalculatorBoard({ calculators }) {
 
         <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
           <span className="pill">Calculator tools</span>
-          <span className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
+          <span className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
             {calculators.length} live tool{calculators.length === 1 ? '' : 's'}
           </span>
         </div>
 
-        <h1 className="mt-6 max-w-3xl text-4xl font-bold tracking-[-0.05em] text-black sm:text-5xl lg:text-6xl">
+        <h1 className="mt-6 max-w-3xl text-4xl font-bold tracking-[-0.05em] text-[var(--color-text)] sm:text-5xl lg:text-6xl">
           Choose a calculator
         </h1>
 
-        <p className="mt-3 max-w-2xl text-base font-medium leading-7 text-black/70 sm:text-lg">
+        <p className="mt-3 max-w-2xl text-base font-medium leading-7 text-[var(--color-text-secondary)] sm:text-lg">
           Open any tool from C Board.
         </p>
 

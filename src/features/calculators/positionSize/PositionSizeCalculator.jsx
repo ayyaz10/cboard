@@ -30,7 +30,7 @@ export function PositionSizeCalculator() {
   );
   const select = (key, label, options) => (
     <label className="block">
-      <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">{label}</span>
+      <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">{label}</span>
       <select className="field-input" value={form[key]} onChange={(event) => update(key, event.target.value)} aria-invalid={Boolean(result.errors[key])}>
         {options.map(([value, text]) => <option key={value} value={value}>{text}</option>)}
       </select>
@@ -78,12 +78,12 @@ export function PositionSizeCalculator() {
               <div className="sm:col-span-2">{field('margin', 'Custom margin (USD, optional)', `Leave blank to use ${recommendedPercent(Number(form.leverage))}% of your wallet. Estimates use this override when supplied.`, 'Use recommended margin')}</div>
             </>}
           </div>
-          {!spot && Number(form.leverage) < 10 && <p className="mt-5 text-sm leading-6 text-black/70">1x–5x: a 1% margin fallback is used because the supplied strategy does not define these tiers.</p>}
+          {!spot && Number(form.leverage) < 10 && <p className="mt-5 text-sm leading-6 text-[var(--color-text-secondary)]">1x–5x: a 1% margin fallback is used because the supplied strategy does not define these tiers.</p>}
         </section>
         <section className="panel min-w-0 p-5 sm:p-6" aria-labelledby="position-results">
           <p className="position-eyebrow">02 / Position overview</p>
           <h2 id="position-results" className="mt-2 text-2xl font-bold tracking-tight">{spot ? 'Leave room to diversify' : 'Know your risk before entry'}</h2>
-          <p className="mb-5 mt-2 text-sm text-black/70">{spot ? 'Allocation for one coin, based on your selected percentage.' : 'Live estimates · USD · Before fees, funding and slippage'}</p>
+          <p className="mb-5 mt-2 text-sm text-[var(--color-text-secondary)]">{spot ? 'Allocation for one coin, based on your selected percentage.' : 'Live estimates · USD · Before fees, funding and slippage'}</p>
           {!valid && <p className="position-error mb-4" role="status">Correct the highlighted inputs to see updated results.</p>}
           <div className="grid gap-3 sm:grid-cols-2">
             {cards.map(([label, value, tone]) => <article key={label} className={`position-result ${tone || ''}`}>
@@ -104,10 +104,10 @@ export function PositionSizeCalculator() {
         <div className="my-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {[['10x–20x', '1% margin'], ['30x–40x', '0.5% margin'], ['50x', '0.25% margin'], ['Spot / per coin', '5–10% maximum']].map(([label, value]) => <div key={label} className="position-result"><p className="position-eyebrow">{label}</p><p className="mt-2 text-lg font-bold">{value}</p></div>)}
         </div>
-        <p className="text-sm leading-6 text-black/70">Never use the whole wallet. Leverage changes exposure; actual risk depends on position size and stop-loss distance. Use a stop-loss on every leveraged trade. Stops do not guarantee the execution price. Exact liquidation requires an exchange-specific maintenance-margin model and is not calculated here.</p>
-        <p className="mt-3 text-sm leading-6 text-black/70">Notional = margin × leverage. Estimated loss = notional × stop-loss distance %. Estimated profit = notional × target distance %. Risk/reward = estimated profit ÷ estimated loss.</p>
+        <p className="text-sm leading-6 text-[var(--color-text-secondary)]">Never use the whole wallet. Leverage changes exposure; actual risk depends on position size and stop-loss distance. Use a stop-loss on every leveraged trade. Stops do not guarantee the execution price. Exact liquidation requires an exchange-specific maintenance-margin model and is not calculated here.</p>
+        <p className="mt-3 text-sm leading-6 text-[var(--color-text-secondary)]">Notional = margin × leverage. Estimated loss = notional × stop-loss distance %. Estimated profit = notional × target distance %. Risk/reward = estimated profit ÷ estimated loss.</p>
       </section>
-      <p className="mt-5 text-center text-xs leading-6 text-black/70">This calculator is for education only and is not financial advice.</p>
+      <p className="mt-5 text-center text-xs leading-6 text-[var(--color-text-secondary)]">This calculator is for education only and is not financial advice.</p>
     </div>
   );
 }

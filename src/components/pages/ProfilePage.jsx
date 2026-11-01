@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { navigateTo } from '../../app/useRoute';
 import { useAuth } from '../../contexts/AuthContext';
 import { getProfileInitials, isValidUsername, normalizeUsername, validateAvatarFile } from '../../services/profileService';
@@ -53,11 +53,11 @@ export function ProfilePage() {
   async function logout(){try{await signOut();navigateTo('/login',{replace:true})}catch(err){setError(err.message||'Could not sign out. Try again.')}}
   async function resend(){setError('');try{await resendVerification();notify.info('If verification is still needed, a new confirmation email has been sent.')}catch(err){setError(err.message||'Could not resend the confirmation email.');notify.error(err.message||'Could not resend the confirmation email')}}
 
-  return <PageShell><section className="panel p-5 sm:p-8 lg:p-10"><AppNavigation activePath="/account"/><header className="mt-6"><span className="pill">Account</span><h1 className="mt-4 text-3xl font-bold tracking-[-0.05em] sm:text-4xl">Profile &amp; security</h1><p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-black/65">Manage the details and sign-in security for your CBoard account.</p></header>
+  return <PageShell><section className="panel p-5 sm:p-8 lg:p-10"><AppNavigation activePath="/account"/><header className="mt-6"><span className="pill">Account</span><h1 className="mt-4 text-3xl font-bold tracking-[-0.05em] sm:text-4xl">Profile &amp; security</h1><p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-[var(--color-text-secondary)]">Manage the details and sign-in security for your CBoard account.</p></header>
     {error&&<p className="auth-message auth-error mt-5" role="alert">{error}</p>}
     <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(18rem,.85fr)]">
       <form className="account-card grid gap-5" onSubmit={saveProfile}>
-        <div className="flex items-center gap-4"><div className="account-avatar" aria-label={avatarUrl?'Profile picture':`Avatar initials ${initials}`}>{avatarUrl?<img src={avatarUrl} alt="Profile"/>:<span>{initials}</span>}</div><div><h2 className="text-xl font-bold">Personal details</h2><p className="text-sm font-semibold text-black/60">Your profile is private to your account.</p></div></div>
+        <div className="flex items-center gap-4"><div className="account-avatar" aria-label={avatarUrl?'Profile picture':`Avatar initials ${initials}`}>{avatarUrl?<img src={avatarUrl} alt="Profile"/>:<span>{initials}</span>}</div><div><h2 className="text-xl font-bold">Personal details</h2><p className="text-sm font-semibold text-[var(--color-text-muted)]">Your profile is private to your account.</p></div></div>
         <div className="auth-label"><span>Profile picture</span><FileUpload accept="image/jpeg,image/png,image/webp" onChange={event=>{const file=event.target.files?.[0];if(!file)return;const message=validateAvatarFile(file);if(message){setError(message);event.target.value='';return}setError('');setAvatarFile(file);setRemoveAvatar(false)}}>Choose image</FileUpload><span className="account-hint">JPEG, PNG, or WEBP · up to 5 MB. Images are resized before private upload.</span></div>
         {(profile?.avatar_path||avatarFile)&&!removeAvatar&&<button type="button" className="account-text-button danger-action justify-self-start" onClick={()=>{setAvatarFile(null);setRemoveAvatar(true)}}>Remove profile picture</button>}
         {removeAvatar&&<button type="button" className="account-text-button justify-self-start" onClick={()=>setRemoveAvatar(false)}>Keep current picture</button>}
@@ -69,7 +69,7 @@ export function ProfilePage() {
         <button type="submit" className="auth-primary" disabled={saving}>{saving?'Saving profile…':'Save profile'}</button>
       </form>
       <div className="grid content-start gap-5">
-        <form className="account-card grid gap-4" onSubmit={savePassword}><div><h2 className="text-xl font-bold">Change password</h2><p className="mt-1 text-sm font-semibold leading-6 text-black/60">Confirm your current password before choosing a new one.</p></div>
+        <form className="account-card grid gap-4" onSubmit={savePassword}><div><h2 className="text-xl font-bold">Change password</h2><p className="mt-1 text-sm font-semibold leading-6 text-[var(--color-text-muted)]">Confirm your current password before choosing a new one.</p></div>
           <label className="auth-label">Current password<input className="field-input" type={passwordVisible?'text':'password'} autoComplete="current-password" value={currentPassword} onChange={event=>setCurrentPassword(event.target.value)} required/></label>
           <label className="auth-label">New password<input className="field-input" type={passwordVisible?'text':'password'} autoComplete="new-password" minLength={6} value={newPassword} onChange={event=>setNewPassword(event.target.value)} placeholder="At least 6 characters" required/></label>
           <label className="auth-label">Confirm new password<input className="field-input" type={passwordVisible?'text':'password'} autoComplete="new-password" minLength={6} value={confirmPassword} onChange={event=>setConfirmPassword(event.target.value)} required/></label>
@@ -77,7 +77,7 @@ export function ProfilePage() {
           {passwordError&&<p className="auth-message auth-error" role="alert">{passwordError}</p>}
           <button type="submit" className="auth-primary" disabled={passwordBusy}>{passwordBusy?'Updating password…':'Update password'}</button>
         </form>
-        <section className="account-card grid gap-3"><div><h2 className="text-xl font-bold">Sign out</h2><p className="mt-1 text-sm font-semibold leading-6 text-black/60">Sign out of this device. Your saved CBoard data will remain in your account.</p></div><button type="button" className="account-secondary justify-self-start" onClick={logout}>Log out</button></section>
+        <section className="account-card grid gap-3"><div><h2 className="text-xl font-bold">Sign out</h2><p className="mt-1 text-sm font-semibold leading-6 text-[var(--color-text-muted)]">Sign out of this device. Your saved CBoard data will remain in your account.</p></div><button type="button" className="account-secondary justify-self-start" onClick={logout}>Log out</button></section>
       </div>
     </div>
     <BackupRestorePanel />

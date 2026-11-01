@@ -78,7 +78,7 @@ export function PercentageCalculator() {
         <form
           noValidate
           onSubmit={handleSubmit}
-          className="order-2 rounded-[1.75rem] border-2 border-black bg-[#fffdf8] p-5 sm:p-6 lg:order-1"
+          className="order-2 rounded-[1.75rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-5 sm:p-6 lg:order-1"
         >
           <div className="grid gap-5">
             {percentageFieldConfig.map((field) => (
@@ -102,18 +102,18 @@ export function PercentageCalculator() {
 
         <aside
           aria-live="polite"
-          className="order-1 rounded-[1.75rem] border-2 border-black bg-[#ff90e8] p-5 text-black sm:p-6 lg:order-2"
+          className="order-1 rounded-[1.75rem] border-2 border-[var(--border-default)] bg-[#ff90e8] p-5 text-[var(--color-text)] sm:p-6 lg:order-2"
         >
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/60">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
             Result
           </p>
 
-          <div className="mt-4 min-h-[5rem] break-words text-4xl font-bold tracking-[-0.06em] text-black sm:min-h-[6rem] sm:text-5xl lg:text-6xl">
+          <div className="mt-4 min-h-[5rem] break-words text-4xl font-bold tracking-[-0.06em] text-[var(--color-text)] sm:min-h-[6rem] sm:text-5xl lg:text-6xl">
             {result ? result.formattedValue : '--'}
           </div>
 
           {result ? (
-            <p className="mt-3 text-sm font-medium leading-7 text-black/70">
+            <p className="mt-3 text-sm font-medium leading-7 text-[var(--color-text-secondary)]">
               Calculation: {result.formulaText}
             </p>
           ) : null}

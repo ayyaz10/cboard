@@ -41,7 +41,7 @@ export function RecipeProducts({ recipe, onSaved, onPreview }) {
     } catch (err) { setError(err.message); }
     finally { setBusy(false); }
   }
-  return <details className="recipe-products groceries rounded-2xl border-2 border-black bg-white p-4" onToggle={(event) => setOpen(event.currentTarget.open)}>
+  return <details className="recipe-products groceries rounded-2xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-4" onToggle={(event) => setOpen(event.currentTarget.open)}>
     <summary className="cursor-pointer font-bold">Choose products & calculate nutrition</summary>
     <div className="mt-4 space-y-4">
       <p>Choose the product you use for each ingredient, including sauces. Match raw or cooked weights to the label. Alternatives are not added unless you replace the ingredient in your recipe.</p>

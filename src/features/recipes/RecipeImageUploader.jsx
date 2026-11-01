@@ -47,7 +47,7 @@ export function RecipeImageUploader({
   }
   return (
     <section
-      className="space-y-4 rounded-2xl border-2 border-dashed border-black p-5"
+      className="space-y-4 rounded-2xl border-2 border-dashed border-[var(--border-default)] p-5"
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => {
         event.preventDefault();
@@ -57,7 +57,7 @@ export function RecipeImageUploader({
       <label className="block font-bold" htmlFor="recipe-image">
         Upload Recipe Image
       </label>
-      <p className="text-sm text-black/70">
+      <p className="text-sm text-[var(--color-text-secondary)]">
         Choose a file or drop it here. JPG, PNG or WebP, up to 5 MB. Images are
         resized to fit your library.
       </p>

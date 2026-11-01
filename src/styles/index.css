@@ -35,8 +35,10 @@ html[data-theme="matrix"] {
   }
 
   body {
-    @apply min-h-screen bg-[#f4f0e6] text-black antialiased;
-    font-family: "Instrument Sans", "Segoe UI", sans-serif;
+    @apply min-h-screen antialiased;
+    background-color: var(--surface-page);
+    color: var(--color-text);
+    font-family: var(--font-family-ui, "Instrument Sans"), "Segoe UI", sans-serif;
   }
 
   #root {
@@ -50,7 +52,8 @@ html[data-theme="matrix"] {
 
 @layer base {
   html[data-theme="matrix"] body {
-    @apply bg-black text-[#d9ffd9];
+    background-color: var(--surface-page);
+    color: var(--color-text);
     background-image:
       linear-gradient(rgba(0, 255, 65, 0.05) 1px, transparent 1px),
       linear-gradient(90deg, rgba(0, 255, 65, 0.035) 1px, transparent 1px);
@@ -61,21 +64,37 @@ html[data-theme="matrix"] {
 
 @layer components {
   .panel {
-    @apply rounded-[2rem] border-2 border-black bg-[#f8f3ea];
+    border: var(--border-width-strong) solid var(--border-default);
+    border-radius: var(--radius-panel);
+    background: var(--surface-primary);
+    color: var(--color-text);
   }
 
   .field-input {
-    @apply w-full rounded-[1.35rem] border-2 border-black bg-[#fffdf8] px-4 py-3.5 text-base font-medium text-black outline-none transition placeholder:text-black/35 focus:-translate-y-px focus:shadow-[6px_6px_0_#000];
-    box-shadow: 4px 4px 0 #000;
+    width: 100%;
+    min-height: var(--control-height-md);
+    border: var(--border-width-strong) solid var(--border-strong);
+    border-radius: var(--radius-input);
+    background: var(--surface-elevated);
+    color: var(--color-text);
+    padding: .65rem .85rem;
+    font: var(--font-weight-body) var(--font-size-body)/1.4 var(--font-family-ui);
+    box-shadow: var(--shadow-sm);
+    transition: border-color .15s, background-color .15s, box-shadow .15s;
   }
+
+  .field-input::placeholder { color: var(--color-text-muted); opacity: 1; }
+  .field-input:hover:not(:disabled) { border-color: var(--border-interactive); background: var(--surface-interactive); }
+  .field-input:focus-visible { border-color: var(--border-focus); outline: 2px solid var(--border-focus); outline-offset: 2px; box-shadow: var(--shadow-md); }
+  .field-input:disabled { border-color: var(--border-subtle); background: var(--surface-primary); color: var(--color-text-disabled); box-shadow: none; cursor: not-allowed; }
 
   select.field-input {
     @apply cursor-pointer pr-12 font-semibold;
     appearance: none;
     background-image:
-      linear-gradient(45deg, transparent 50%, #000 50%),
-      linear-gradient(135deg, #000 50%, transparent 50%),
-      linear-gradient(#000, #000);
+      linear-gradient(45deg, transparent 50%, var(--color-text) 50%),
+      linear-gradient(135deg, var(--color-text) 50%, transparent 50%),
+      linear-gradient(var(--border-default), var(--border-default));
     background-position:
       calc(100% - 1.35rem) 50%,
       calc(100% - 0.95rem) 50%,
@@ -86,50 +105,73 @@ html[data-theme="matrix"] {
 
   select.field-input:hover,
   input[type="date"].field-input:hover {
-    @apply bg-white;
+    background-color: var(--surface-hover);
   }
 
   select.field-input option {
-    background-color: #fffdf8;
-    color: #000;
+    background-color: var(--surface-elevated);
+    color: var(--color-text);
     font-weight: 700;
   }
 
   select.field-input option:checked {
-    background-color: #c5ff6f;
-    color: #000;
+    background-color: var(--color-accent-soft);
+    color: var(--color-accent-text);
   }
 
   input[type="date"].field-input {
     @apply cursor-pointer pr-3 font-semibold;
-    color-scheme: light;
-    accent-color: #c5ff6f;
+    color-scheme: inherit;
+    accent-color: var(--color-accent);
   }
 
   input[type="date"].field-input::-webkit-calendar-picker-indicator {
     width: 1.45rem;
     height: 1.45rem;
     padding: 0.2rem;
-    border: 2px solid #000;
-    border-radius: 999px;
-    background-color: #c5ff6f;
-    box-shadow: 2px 2px 0 #000;
+    border: var(--border-width-strong) solid var(--border-default);
+    border-radius: var(--radius-pill);
+    background-color: var(--color-accent);
+    box-shadow: var(--shadow-sm);
     cursor: pointer;
     opacity: 1;
   }
 
   input[type="date"].field-input::-webkit-calendar-picker-indicator:hover {
-    background-color: #9fe3ff;
+    background-color: var(--color-accent-hover);
   }
 
   .pill {
-    @apply inline-flex items-center rounded-full border-2 border-black bg-[#c5ff6f] px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-black;
+    display: inline-flex;
+    align-items: center;
+    border: var(--border-width-strong) solid var(--color-accent);
+    border-radius: var(--radius-pill);
+    background: var(--color-accent-soft);
+    color: var(--color-accent-text);
+    padding: .25rem .75rem;
+    font-size: var(--font-size-meta);
+    font-weight: var(--font-weight-label);
+    letter-spacing: .16em;
+    text-transform: uppercase;
   }
 
   .board-card {
-    @apply block rounded-[1.9rem] border-2 border-black p-5 text-left transition hover:-translate-y-1 hover:shadow-[8px_8px_0_#000] sm:p-6;
-    background-color: var(--theme-card-bg);
-    box-shadow: 6px 6px 0 #000;
+    display: block;
+    border: var(--border-width-strong) solid var(--border-default);
+    border-radius: var(--radius-card);
+    background: var(--surface-elevated);
+    color: var(--color-text);
+    padding: 1.25rem;
+    text-align: left;
+    transition: transform .15s, border-color .15s, background-color .15s, box-shadow .15s;
+    box-shadow: var(--shadow-card);
+  }
+
+  .board-card:hover {
+    border-color: var(--border-interactive);
+    background: var(--surface-hover);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
   }
 
   .theme-color-card {
@@ -149,8 +191,24 @@ html[data-theme="matrix"] {
   }
 
   .brand-badge {
-    @apply inline-flex w-fit items-center gap-2.5 rounded-[1.5rem] border-2 border-black bg-[#fffdf8] px-2.5 py-2 pr-4 no-underline transition hover:-translate-y-1 hover:shadow-[8px_8px_0_#000];
-    box-shadow: 6px 6px 0 #000;
+    display: inline-flex;
+    width: fit-content;
+    align-items: center;
+    gap: .625rem;
+    border: var(--border-width-strong) solid var(--border-default);
+    border-radius: var(--radius-card);
+    background: var(--surface-elevated);
+    color: var(--color-text);
+    padding: .5rem .625rem .5rem 1rem;
+    text-decoration: none;
+    transition: transform .15s, background-color .15s, box-shadow .15s;
+    box-shadow: var(--shadow-card);
+  }
+
+  .brand-badge:hover {
+    background: var(--surface-hover);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
   }
 
   .app-menu-toggle,

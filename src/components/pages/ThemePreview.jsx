@@ -6,6 +6,8 @@ import { FileUpload } from '../ui/FileUpload.jsx';
 import { FormField } from '../ui/FormField.jsx';
 import { PageHeader, SectionHeader } from '../ui/PageHeader.jsx';
 import { Tabs } from '../ui/Tabs.jsx';
+import { Dialog } from '../ui/Dialog.jsx';
+import { toast } from 'sonner';
 import { useTheme } from '../../contexts/ThemeContext.jsx';
 
 const colorTokens = ['--surface-page', '--surface-primary', '--surface-secondary', '--surface-elevated', '--surface-interactive', '--surface-hover', '--surface-selected', '--border-subtle', '--border-default', '--border-strong', '--border-focus', '--color-text', '--color-text-secondary', '--color-text-muted', '--color-text-disabled', '--color-accent-text', '--interaction-primary', '--chart-primary', '--chart-secondary', '--chart-tertiary'];
@@ -15,6 +17,7 @@ export function ThemePreview() {
   const [tab, setTab] = useState('controls');
   const [value, setValue] = useState('');
   const [testOverride, setTestOverride] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [tokenValues, setTokenValues] = useState({});
   useEffect(() => {
     const frame = requestAnimationFrame(() => setTokenValues(Object.fromEntries(colorTokens.map(token => [token, getComputedStyle(document.documentElement).getPropertyValue(token).trim()]))));
@@ -49,5 +52,7 @@ export function ThemePreview() {
       {tab === 'feedback' && <div className="flex flex-wrap gap-2"><Badge>Neutral</Badge><Badge variant="accent">Accent</Badge><Badge variant="success">Success</Badge><Badge variant="warning">Warning</Badge><Badge variant="danger">Danger</Badge><Badge variant="info">Info</Badge></div>}
       {tab === 'data' && <Card className="ui-metric-card grid gap-3 p-4"><SectionHeader title="Metric card" description="Surface, geometry and typography respond to theme tokens." actions={<Badge variant="success">On track</Badge>} /><strong className="ui-metric-card__value">£1,284.50</strong><small className="ui-metric-card__meta">Updated this month</small><progress value="68" max="100" /></Card>}
     </Panel>
+    {tab === 'data' && <Panel className="grid gap-4 p-4"><SectionHeader title="Table, overlays and notifications" description="These shared components read the same active theme tokens." /><div className="overflow-x-auto"><table className="ui-table w-full border-collapse"><thead><tr><th>Module</th><th>Status</th><th>Updated</th></tr></thead><tbody><tr><td>Food Diary</td><td><Badge variant="success">Ready</Badge></td><td>Today</td></tr><tr><td>Finance</td><td><Badge variant="warning">Review</Badge></td><td>Yesterday</td></tr></tbody></table></div><a className="ui-preview-link" href="#preview-link" onClick={event => event.preventDefault()}>Preview link</a><div className="flex flex-wrap gap-2"><Button onClick={() => setDialogOpen(true)}>Open dialog</Button><Button variant="success" onClick={() => toast.success('Theme preview notification')}>Show toast</Button><Button variant="warning" onClick={() => toast.warning('Review this themed notice')}>Warning toast</Button><Button variant="danger" onClick={() => toast.error('This is an error notification')}>Error toast</Button></div></Panel>}
+    <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} labelledBy="theme-preview-dialog-title" className="ui-confirm-dialog"><h2 id="theme-preview-dialog-title">Themed dialog</h2><p>Surface, text, border, and focus states use active tokens.</p><FormField label="Dialog field" htmlFor="preview-dialog-input"><input id="preview-dialog-input" className="ui-control" placeholder="Type here" /></FormField><div className="ui-confirm-actions"><Button onClick={() => setDialogOpen(false)}>Close</Button><Button variant="primary" onClick={() => { setDialogOpen(false); toast.success('Dialog action complete'); }}>Confirm</Button></div></Dialog>
   </main>;
 }

@@ -164,7 +164,7 @@ export function NoteEditor({
   }
 
   return (
-    <div className="rounded-[1.35rem] border-2 border-black bg-[#fffdf8] p-3 shadow-[4px_4px_0_#000]">
+    <div className="rounded-[1.35rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-3 shadow-[4px_4px_0_#000]">
       <div className="flex flex-wrap gap-2 border-b-2 border-black/15 pb-3">
         <select
           className="field-input w-auto min-w-36 px-3 py-2 text-sm shadow-none"
@@ -207,7 +207,7 @@ export function NoteEditor({
                 type="button"
                 onClick={() => runCommand(item.command, item.value)}
                 title={item.title}
-                className="h-10 min-w-10 rounded-full border-2 border-black bg-white px-3 text-xs font-bold uppercase text-black transition hover:bg-[#c5ff6f]"
+                className="h-10 min-w-10 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-xs font-bold uppercase text-[var(--color-text)] transition hover:bg-[var(--color-accent-hover)]"
               >
                 {item.label}
               </button>
@@ -216,7 +216,7 @@ export function NoteEditor({
         ))}
 
         <label
-          className="flex h-10 items-center gap-2 rounded-full border-2 border-black bg-white px-3 text-xs font-bold uppercase text-black"
+          className="flex h-10 items-center gap-2 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-xs font-bold uppercase text-[var(--color-text)]"
           title="Text color"
         >
           Text
@@ -228,7 +228,7 @@ export function NoteEditor({
         </label>
 
         <label
-          className="flex h-10 items-center gap-2 rounded-full border-2 border-black bg-white px-3 text-xs font-bold uppercase text-black"
+          className="flex h-10 items-center gap-2 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-xs font-bold uppercase text-[var(--color-text)]"
           title="Highlight"
         >
           Mark
@@ -248,7 +248,7 @@ export function NoteEditor({
               runCommand('createLink', href);
             }
           }}
-          className="h-10 rounded-full border-2 border-black bg-white px-3 text-xs font-bold uppercase text-black transition hover:bg-[#c5ff6f]"
+          className="h-10 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-xs font-bold uppercase text-[var(--color-text)] transition hover:bg-[var(--color-accent-hover)]"
         >
           Link
         </button>
@@ -256,7 +256,7 @@ export function NoteEditor({
         <button
           type="button"
           onClick={() => runCommand('removeFormat')}
-          className="h-10 rounded-full border-2 border-black bg-white px-3 text-xs font-bold uppercase text-black transition hover:bg-[#ffe0de]"
+          className="h-10 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-xs font-bold uppercase text-[var(--color-text)] transition hover:bg-[var(--color-danger-soft)]"
         >
           Clear
         </button>
@@ -264,7 +264,7 @@ export function NoteEditor({
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="h-10 rounded-full border-2 border-black bg-[#9fe3ff] px-3 text-xs font-bold uppercase text-black transition hover:bg-white"
+          className="h-10 rounded-full border-2 border-[var(--border-default)] bg-[#9fe3ff] px-3 text-xs font-bold uppercase text-[var(--color-text)] transition hover:bg-[var(--surface-elevated)]"
         >
           Media
         </button>
@@ -290,7 +290,7 @@ export function NoteEditor({
         onInput={syncContent}
         onBlur={syncContent}
         onPaste={handlePaste}
-        className="note-editor mt-4 min-h-80 rounded-[1rem] border-2 border-black bg-white px-4 py-3 text-base font-medium leading-7 text-black outline-none focus:shadow-[4px_4px_0_#000]"
+        className="note-editor mt-4 min-h-80 rounded-[1rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3 text-base font-medium leading-7 text-[var(--color-text)] outline-none focus:shadow-[4px_4px_0_#000]"
         data-placeholder="Start writing..."
       />
     </div>
@@ -429,20 +429,20 @@ export function NotesPanel({
 
   return (
     <div className="notes-workspace grid items-start gap-5 xl:grid-cols-[0.78fr_1.22fr]">
-      <aside className="notes-sidebar rounded-[1.75rem] border-2 border-black bg-[#9fe3ff] p-4 sm:p-5">
+      <aside className="notes-sidebar rounded-[1.75rem] border-2 border-[var(--border-default)] bg-[#9fe3ff] p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
               Saved notes
             </p>
-              <h2 className="mt-2 text-2xl font-bold text-black">
+              <h2 className="mt-2 text-2xl font-bold text-[var(--color-text)]">
               {isGoalLocked ? activeGoal.title : 'Notebook'}
             </h2>
           </div>
           <button
             type="button"
             onClick={startNewNote}
-            className="rounded-full border-2 border-black bg-[#c5ff6f] px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[3px_3px_0_#000]"
+            className="rounded-full border-2 border-[var(--border-default)] bg-[var(--color-accent)] px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-accent-contrast)] shadow-[3px_3px_0_#000]"
           >
             New
           </button>
@@ -452,19 +452,19 @@ export function NotesPanel({
           {draft ? (
             <button
               type="button"
-              className="rounded-[1.15rem] border-2 border-black bg-[#c5ff6f] p-4 text-left shadow-[4px_4px_0_#000]"
+              className="rounded-[1.15rem] border-2 border-[var(--border-default)] bg-[var(--color-accent)] p-4 text-left shadow-[4px_4px_0_#000]"
             >
-              <span className="block text-xs font-bold uppercase tracking-[0.14em] text-black/55">
+              <span className="block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-muted)]">
                 Draft
               </span>
-              <span className="mt-2 block text-lg font-bold text-black">
+              <span className="mt-2 block text-lg font-bold text-[var(--color-text)]">
                 Unsaved note
               </span>
             </button>
           ) : null}
 
           {sortedNotes.length === 0 && !draft ? (
-            <div className="rounded-[1.15rem] border-2 border-black bg-white px-4 py-5 text-sm font-bold leading-6 text-black/70">
+            <div className="rounded-[1.15rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-5 text-sm font-bold leading-6 text-[var(--color-text-secondary)]">
               No notes yet.
             </div>
           ) : null}
@@ -481,24 +481,24 @@ export function NotesPanel({
                   setDraft(null);
                   setSelectedNoteId(note.id);
                 }}
-                className={`rounded-[1.15rem] border-2 border-black p-4 text-left transition ${
+                className={`rounded-[1.15rem] border-2 border-[var(--border-default)] p-4 text-left transition ${
                   isActive
-                    ? 'bg-[#c5ff6f] shadow-[4px_4px_0_#000]'
-                    : 'bg-[#fffdf8] hover:bg-white'
+                    ? 'bg-[var(--color-accent)] shadow-[4px_4px_0_#000]'
+                    : 'bg-[var(--surface-elevated)] hover:bg-[var(--surface-elevated)]'
                 }`}
                 data-active={isActive ? 'true' : undefined}
               >
-                <span className="block text-xs font-bold uppercase tracking-[0.14em] text-black/55">
+                <span className="block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-muted)]">
                   {formatDate(note.updatedAt || note.createdAt)}
                 </span>
-                <span className="mt-2 block break-words text-lg font-bold text-black">
+                <span className="mt-2 block break-words text-lg font-bold text-[var(--color-text)]">
                   {note.title}
                 </span>
-                <span className="mt-2 line-clamp-2 block text-sm font-semibold leading-6 text-black/65">
+                <span className="mt-2 line-clamp-2 block text-sm font-semibold leading-6 text-[var(--color-text-secondary)]">
                   {note.contentText || `${note.media.length} media attachment${note.media.length === 1 ? '' : 's'}`}
                 </span>
                 {linkedGoal ? (
-                  <span className="mt-3 inline-flex rounded-full border-2 border-black bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-black">
+                  <span className="mt-3 inline-flex rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text)]">
                     {linkedGoal.title}
                   </span>
                 ) : null}
@@ -508,12 +508,12 @@ export function NotesPanel({
         </div>
       </aside>
 
-      <section className="notes-editor-panel rounded-[1.75rem] border-2 border-black bg-[#fff0b8] p-4 sm:p-5">
+      <section className="notes-editor-panel rounded-[1.75rem] border-2 border-[var(--border-default)] bg-[var(--color-warning-soft)] p-4 sm:p-5">
         {selectedNote ? (
           <form onSubmit={handleSave} className="grid gap-4">
             <div className="grid gap-4 md:grid-cols-[1fr_0.65fr]">
               <label className="block">
-                <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+                <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
                   Title
                 </span>
                 <input
@@ -525,7 +525,7 @@ export function NotesPanel({
               </label>
 
               <label className="block">
-                <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+                <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
                   Tracker link
                 </span>
                 <select
@@ -543,7 +543,7 @@ export function NotesPanel({
             </div>
 
             <label className="block">
-              <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+              <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
                 Tags
               </span>
               <input
@@ -563,15 +563,15 @@ export function NotesPanel({
             />
 
             {media.length > 0 ? (
-              <div className="grid gap-2 rounded-[1.15rem] border-2 border-black bg-[#fffdf8] p-3">
-                <p className="text-xs font-bold uppercase tracking-[0.14em] text-black/60">
+              <div className="grid gap-2 rounded-[1.15rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-3">
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-muted)]">
                   Attachments
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {media.map((item) => (
                     <span
                       key={item.id}
-                      className="inline-flex items-center gap-2 rounded-full border-2 border-black bg-white px-3 py-1 text-xs font-bold text-black"
+                      className="inline-flex items-center gap-2 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-bold text-[var(--color-text)]"
                     >
                       <a
                         href={item.dataUrl}
@@ -584,7 +584,7 @@ export function NotesPanel({
                       <button
                         type="button"
                         onClick={() => setMedia((current) => current.filter((mediaItem) => mediaItem.id !== item.id))}
-                        className="font-bold text-black/60"
+                        className="font-bold text-[var(--color-text-muted)]"
                         title="Remove attachment"
                       >
                         x
@@ -596,7 +596,7 @@ export function NotesPanel({
             ) : null}
 
             {error ? (
-              <p className="rounded-[1rem] border-2 border-black bg-[#ffe0de] px-4 py-3 text-sm font-bold text-black">
+              <p className="rounded-[1rem] border-2 border-[var(--border-default)] bg-[var(--color-danger-soft)] px-4 py-3 text-sm font-bold text-[var(--color-text)]">
                 {error}
               </p>
             ) : null}
@@ -605,22 +605,22 @@ export function NotesPanel({
               <button
                 type="submit"
                 disabled={isSaving}
-                className="inline-flex flex-1 items-center justify-center rounded-full border-2 border-black bg-[#c5ff6f] px-5 py-3 text-sm font-bold uppercase tracking-[0.12em] text-black shadow-[4px_4px_0_#000] transition hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_#000] disabled:cursor-not-allowed disabled:opacity-55"
+                className="inline-flex flex-1 items-center justify-center rounded-full border-2 border-[var(--border-default)] bg-[var(--color-accent)] px-5 py-3 text-sm font-bold uppercase tracking-[0.12em] text-[var(--color-accent-contrast)] shadow-[4px_4px_0_#000] transition hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_#000] disabled:cursor-not-allowed disabled:opacity-55"
               >
                 {isSaving ? 'Saving...' : 'Save note'}
               </button>
               <button
                 type="button"
                 onClick={handleDelete}
-                className="danger-action rounded-full border-2 border-black bg-[#ffe0de] px-5 py-3 text-sm font-bold uppercase tracking-[0.12em] text-black shadow-[4px_4px_0_#000]"
+                className="danger-action rounded-full border-2 border-[var(--border-default)] bg-[var(--color-danger-soft)] px-5 py-3 text-sm font-bold uppercase tracking-[0.12em] text-[var(--color-text)] shadow-[4px_4px_0_#000]"
               >
                 {selectedNote.isDraft ? 'Discard' : 'Delete'}
               </button>
             </div>
           </form>
         ) : (
-          <div className="rounded-[1.35rem] border-2 border-black bg-[#fffdf8] px-4 py-8 text-center">
-            <p className="text-lg font-bold text-black">Select or create a note.</p>
+          <div className="rounded-[1.35rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-8 text-center">
+            <p className="text-lg font-bold text-[var(--color-text)]">Select or create a note.</p>
           </div>
         )}
       </section>

@@ -38,7 +38,7 @@ function StatGrid({ stats }) {
             data-stat-color={colorKey}
           >
             <div className="flex items-start justify-between gap-2">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-black/55">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-text-muted)]">
                 {stat.label}
               </p>
               {stat.unit ? (
@@ -47,11 +47,11 @@ function StatGrid({ stats }) {
                 </span>
               ) : null}
             </div>
-            <p className="mt-3 break-words text-4xl font-bold tracking-[-0.05em] text-black">
+            <p className="mt-3 break-words text-4xl font-bold tracking-[-0.05em] text-[var(--color-text)]">
               {stat.value}
             </p>
             <div className="mt-3 border-t-2 border-black/15 pt-3">
-              <p className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
                 {stat.detail}
               </p>
             </div>
@@ -294,10 +294,10 @@ export function GoalStats({ goal, entries }) {
     return (
       <section className="ui-panel p-5 sm:p-6">
         <span className="pill">Dashboard</span>
-        <h2 className="mt-4 text-3xl font-bold tracking-[-0.05em] text-black">
+        <h2 className="mt-4 text-3xl font-bold tracking-[-0.05em] text-[var(--color-text)]">
           Select or create a goal
         </h2>
-        <p className="mt-3 text-sm font-semibold leading-6 text-black/65">
+        <p className="mt-3 text-sm font-semibold leading-6 text-[var(--color-text-secondary)]">
           Your target card, stats, streak, and chart will appear here.
         </p>
       </section>
@@ -316,10 +316,10 @@ export function GoalStats({ goal, entries }) {
     <section className="ui-panel p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
             Dashboard
           </p>
-          <h2 className="mt-2 text-3xl font-bold tracking-[-0.05em] text-black sm:text-4xl">
+          <h2 className="mt-2 text-3xl font-bold tracking-[-0.05em] text-[var(--color-text)] sm:text-4xl">
             {goal.title}
           </h2>
         </div>

@@ -135,14 +135,14 @@ export function EntryForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-[1.75rem] border-2 border-black bg-[#c5ff6f] p-5 shadow-[5px_5px_0_#000] sm:p-6"
+      className="rounded-[1.75rem] border-2 border-[var(--border-default)] bg-[var(--color-accent)] p-5 shadow-[5px_5px_0_#000] sm:p-6"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
             Daily entry
           </p>
-          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-black">
+          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-[var(--color-text)]">
             {editingEntry ? 'Edit log' : 'Log today'}
           </h2>
         </div>
@@ -150,7 +150,7 @@ export function EntryForm({
           <button
             type="button"
             onClick={onCancelEdit}
-            className="rounded-full border-2 border-black bg-white px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-black"
+            className="rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text)]"
           >
             Cancel
           </button>
@@ -158,7 +158,7 @@ export function EntryForm({
       </div>
 
       {goals.length === 0 ? (
-        <div className="mt-5 rounded-[1.35rem] border-2 border-black bg-white px-4 py-5 text-sm font-bold leading-6 text-black/70">
+        <div className="mt-5 rounded-[1.35rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-5 text-sm font-bold leading-6 text-[var(--color-text-secondary)]">
           Create a goal first, then daily metrics will appear here.
         </div>
       ) : (
@@ -166,7 +166,7 @@ export function EntryForm({
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             {!hideGoalSelect ? (
             <label className="block">
-              <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+              <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
                 Goal
               </span>
               <ThemedSelect
@@ -179,7 +179,7 @@ export function EntryForm({
             ) : null}
 
             <label className="block">
-              <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+              <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
                 Date
               </span>
               <ThemedDatePicker
@@ -192,7 +192,7 @@ export function EntryForm({
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             {isBinaryGoal(selectedGoal) ? (
               <div className="md:col-span-2">
-                <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+                <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
                   Completion
                 </span>
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -207,7 +207,7 @@ export function EntryForm({
                         key={option.label}
                         type="button"
                         onClick={() => setCompleted(option.value)}
-                        className={`entry-choice-card rounded-[1.35rem] border-2 border-black px-4 py-4 text-left text-sm font-bold uppercase tracking-[0.12em] text-black transition hover:-translate-y-1 hover:shadow-[4px_4px_0_#000] ${
+                        className={`entry-choice-card rounded-[1.35rem] border-2 border-[var(--border-default)] px-4 py-4 text-left text-sm font-bold uppercase tracking-[0.12em] text-[var(--color-text)] transition hover:-translate-y-1 hover:shadow-[4px_4px_0_#000] ${
                           selected ? 'shadow-[4px_4px_0_#000]' : ''
                         }`}
                         data-theme-color={selected ? 'cyan' : option.value ? 'paper' : 'danger'}
@@ -221,7 +221,7 @@ export function EntryForm({
               </div>
             ) : selectedGoal?.metrics.map((metric) => (
               <label key={metric.id} className="block">
-                <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+                <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
                   {metric.name}
                   {metric.unit ? ` (${metric.unit})` : ''}
                 </span>
@@ -240,7 +240,7 @@ export function EntryForm({
           </div>
 
           <label className="mt-4 block">
-            <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+            <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
               Note
             </span>
             <textarea
@@ -254,7 +254,7 @@ export function EntryForm({
       )}
 
       {error ? (
-        <p className="mt-4 rounded-[1rem] border-2 border-black bg-[#ffe0de] px-4 py-3 text-sm font-bold text-black">
+        <p className="mt-4 rounded-[1rem] border-2 border-[var(--border-default)] bg-[var(--color-danger-soft)] px-4 py-3 text-sm font-bold text-[var(--color-text)]">
           {error}
         </p>
       ) : null}
@@ -262,7 +262,7 @@ export function EntryForm({
       <button
         type="submit"
         disabled={goals.length === 0 || isSaving}
-        className="mt-6 inline-flex w-full items-center justify-center rounded-full border-2 border-black bg-black px-5 py-3.5 text-sm font-bold uppercase tracking-[0.12em] text-white shadow-[4px_4px_0_#fff] transition hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_#fff] disabled:cursor-not-allowed disabled:opacity-45"
+        className="mt-6 inline-flex w-full items-center justify-center rounded-full border-2 border-[var(--border-default)] bg-black px-5 py-3.5 text-sm font-bold uppercase tracking-[0.12em] text-white shadow-[4px_4px_0_#fff] transition hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_#fff] disabled:cursor-not-allowed disabled:opacity-45"
       >
         {isSaving ? 'Saving...' : editingEntry ? 'Update entry' : 'Save entry'}
       </button>

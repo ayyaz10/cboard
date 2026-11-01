@@ -9,10 +9,11 @@
     overflow-y: auto;
     margin-top: 0 !important;
     padding: 0.85rem;
-    border: 2px solid #000;
-    border-radius: 1.25rem;
-    background: #fffdf8;
-    box-shadow: 5px 5px 0 #000;
+    border: var(--border-width-strong) solid var(--border-default);
+    border-radius: var(--radius-panel);
+    background: var(--surface-primary);
+    color: var(--color-text);
+    box-shadow: var(--shadow-popover);
   }
 
   .recipe-page-shell > .recipe-shortcuts {
@@ -38,18 +39,12 @@
 
 }
 
-html[data-theme='matrix'] .recipe-page-shell > .recipe-shortcuts {
-  border-color: var(--matrix-border);
-  background: var(--matrix-surface);
-  color: var(--matrix-text);
-}
-
 .recipe-mobile-add { display: none; }
 
 .recipe-item-drag-handle {
   display: inline-flex;
   margin-right: 0.2rem;
-  color: #777;
+  color: var(--color-text-muted);
   vertical-align: middle;
   cursor: grab;
   touch-action: none;
@@ -62,23 +57,17 @@ html[data-theme='matrix'] .recipe-page-shell > .recipe-shortcuts {
   place-items: center;
   min-width: 2rem;
   min-height: 1.8rem;
-  border: 1px solid #777;
-  border-radius: 0.35rem;
-  background: #fff;
-  color: #111;
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-elevated);
+  color: var(--color-text);
   font-weight: 700;
 }
 .recipe-item-move svg { width: 1rem; height: 1rem; }
-.recipe-item-move:not(:disabled) { background: color-mix(in srgb, var(--g-accent, #f28a3c) 13%, #fff); }
+.recipe-item-move:not(:disabled) { background: color-mix(in srgb, var(--color-accent) 13%, var(--surface-elevated)); }
 .recipe-item-move:disabled { opacity: 0.4; }
 .recipe-item-row.is-dragging { opacity: 0.55; }
 .recipe-item-row.is-drag-over { outline: 2px solid var(--color-accent, #f28a3c); outline-offset: -2px; }
-
-html[data-theme='matrix'] .recipe-item-move {
-  border-color: var(--matrix-border);
-  background: var(--matrix-surface);
-  color: var(--matrix-text);
-}
 
 @media (max-width: 47.99rem) {
   .recipe-page-shell { padding-bottom: calc(10rem + env(safe-area-inset-bottom)); }
@@ -86,9 +75,10 @@ html[data-theme='matrix'] .recipe-item-move {
 }
 
 .meal-planner-disclosure {
-  border: 2px solid #000;
-  border-radius: 1rem;
-  background: #fff;
+  border: var(--border-width-strong) solid var(--border-default);
+  border-radius: var(--radius-panel);
+  background: var(--surface-secondary);
+  color: var(--color-text);
   padding: 1.25rem;
 }
 
@@ -115,7 +105,36 @@ html[data-theme='matrix'] .recipe-item-move {
 }
 
 .meal-planner-disclosure > summary small {
-  color: rgb(0 0 0 / 0.65);
+  color: var(--color-text-secondary);
+}
+
+.meal-planner-empty {
+  border: var(--border-width-strong) solid var(--border-default);
+  background: var(--surface-secondary);
+  color: var(--color-text);
+}
+
+.meal-plan-options {
+  border: var(--border-width-strong) solid var(--border-default);
+  background: var(--surface-primary);
+  color: var(--color-text);
+}
+
+.meal-plan-entry {
+  border: var(--border-width-strong) solid var(--border-default);
+  background: var(--surface-elevated);
+  color: var(--color-text);
+}
+
+.ui-media-placeholder {
+  border-color: var(--border-default);
+  background: var(--surface-interactive);
+  color: var(--color-text-secondary);
+}
+
+.meal-planner-disclosure :focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 3px;
 }
 
 .meal-planner-disclosure[open] > summary > span:last-child:not(.meal-planner-total-preview) {
@@ -250,10 +269,10 @@ html[data-theme='matrix'] .recipe-item-move {
     bottom: calc(4.65rem + env(safe-area-inset-bottom));
     margin-inline: -0.5rem;
     padding: 0.65rem;
-    border: 2px solid #000;
-    border-radius: 1rem;
-    background: rgb(255 253 248 / 0.96);
-    box-shadow: 0 -4px 14px rgb(0 0 0 / 0.12);
+    border: var(--border-width-strong) solid var(--border-default);
+    border-radius: var(--radius-card);
+    background: color-mix(in srgb, var(--surface-elevated) 94%, transparent);
+    box-shadow: var(--shadow-popover);
     backdrop-filter: blur(10px);
   }
 
@@ -272,15 +291,15 @@ html[data-theme='matrix'] .recipe-item-move {
 .food-library-nutrients dd{font-weight:700;text-align:right}
 .food-library summary{cursor:pointer;font-weight:700;min-height:44px}
 .food-library-views{display:flex;flex-wrap:wrap;gap:.5rem}
-.food-library-views button[aria-pressed="true"]{background:var(--accent,#c1ff72);box-shadow:3px 3px 0 currentColor}
-.food-library-table-wrap{min-width:0;overflow-x:auto;border:2px solid currentColor;border-radius:1rem;background:var(--panel,#fff)}
+.food-library-views button[aria-pressed="true"]{border-color:var(--border-focus);background:var(--surface-selected);color:var(--color-accent-text);box-shadow:inset 0 -2px var(--color-accent)}
+.food-library-table-wrap{min-width:0;overflow-x:auto;border:var(--border-width-strong) solid var(--border-default);border-radius:var(--radius-card);background:var(--surface-secondary);color:var(--color-text)}
 .food-library-table{width:100%;border-collapse:collapse;font-size:.875rem;text-align:left}
 .food-library-table caption{text-align:left;padding:1rem;font-size:.8rem}
-.food-library-table th,.food-library-table td{padding:.85rem .65rem;border-top:1px solid #8886;vertical-align:top}
-.food-library-table thead th{background:#8881;white-space:nowrap}
+.food-library-table th,.food-library-table td{padding:.85rem .65rem;border-top:1px solid var(--border-subtle);vertical-align:top}
+.food-library-table thead th{background:var(--surface-primary);color:var(--color-text-secondary);white-space:nowrap}
 .food-library-table thead small{display:block;font-weight:400}
 .food-library-table tbody th{min-width:150px;max-width:230px;overflow-wrap:anywhere}
-.food-library-table tbody tr:hover{background:#8881}
+.food-library-table tbody tr:hover{background:var(--surface-hover)}
 .food-library-meta{display:block;font-size:.8rem;font-weight:400;margin-top:.3rem;line-height:1.5}
 .food-library-number{font-variant-numeric:tabular-nums;white-space:nowrap}
 .food-library-number small{font-size:.7rem}
@@ -292,7 +311,7 @@ html[data-theme='matrix'] .recipe-item-move {
 @media(max-width:760px){
   .food-library-table thead{display:none}
   .food-library-table,.food-library-table tbody,.food-library-table tr,.food-library-table th,.food-library-table td{display:block}
-  .food-library-table tbody tr{padding:.75rem;border-top:2px solid currentColor}
+  .food-library-table tbody tr{padding:.75rem;border-top:var(--border-width-strong) solid var(--border-default)}
   .food-library-table tbody th{max-width:none;border:0;font-size:1rem}
   .food-library-table td{display:flex;justify-content:space-between;gap:1rem;padding:.55rem .65rem}
   .food-library-table td::before{content:attr(data-label);font-weight:600;flex-shrink:0}

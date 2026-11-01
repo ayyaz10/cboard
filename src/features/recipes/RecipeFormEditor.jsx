@@ -1,4 +1,4 @@
-﻿import { NutritionLabelScan } from '../nutrition/NutritionLabelScan';
+import { NutritionLabelScan } from '../nutrition/NutritionLabelScan';
 import { ingredientScanCurrent } from '../nutrition/nutritionScanAdapters.js';
 import { NUTRIENTS } from '../nutrition/nutrients.js';
 import { secondaryButton } from './RecipeComponents';
@@ -99,20 +99,20 @@ function IngredientNameField({ value, onChange, onSelect, library }) {
         else if (event.key === 'Escape') setOpen(false);
       }}
     />
-    {show && <div id={listId} role="listbox" className="ingredient-name-suggestions absolute z-20 mt-1 max-h-72 w-full min-w-64 overflow-y-auto rounded-xl border-2 border-black bg-white p-1 shadow-[4px_4px_0_#000]">
+    {show && <div id={listId} role="listbox" className="ingredient-name-suggestions absolute z-20 mt-1 max-h-72 w-full min-w-64 overflow-y-auto rounded-xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-1 shadow-[4px_4px_0_#000]">
       {matches.map((entry, index) => <button
         id={`${listId}-${index}`}
         key={entry.key}
         type="button"
         role="option"
         aria-selected={active === index}
-        className={`ingredient-name-suggestion block w-full rounded-lg px-3 py-2 text-left text-black ${active === index ? 'bg-[#e8f7d8]' : 'bg-white hover:bg-black/5'}`}
+        className={`ingredient-name-suggestion block w-full rounded-lg px-3 py-2 text-left text-[var(--color-text)] ${active === index ? 'bg-[#e8f7d8]' : 'bg-[var(--surface-elevated)] hover:bg-black/5'}`}
         onMouseDown={(event) => event.preventDefault()}
         onMouseEnter={() => setActive(index)}
         onClick={() => choose(entry)}
       >
         <span className="block font-bold">{entry.item.name}</span>
-        <span className="block text-xs font-normal text-black/65">
+        <span className="block text-xs font-normal text-[var(--color-text-secondary)]">
           {[entry.item.amount, entry.item.unit, entry.item.nutritionLabel?.source?.name || (hasStoredNutrition(entry.item) ? 'saved nutrition' : ''), entry.recipeTitles.join(', ')].filter((part) => part !== '' && part != null).join(' Â· ')}
         </span>
       </button>)}
@@ -233,7 +233,7 @@ function ItemEditor({ item, onChange, groups, visible, ingredientLibrary, isIngr
       <details ref={nutritionDetails} open={nutritionOpen} onToggle={(event) => setNutritionOpen(event.currentTarget.open)}>
         <summary className="font-semibold">{label ? 'Item nutrition (calculated)' : 'Item nutrition (optional)'}</summary>
         <div className="mt-4">
-          {!label && <p className="mb-3 text-sm text-black/60">Manual values for the full amount above. Changing the amount scales these values automatically.</p>}
+          {!label && <p className="mb-3 text-sm text-[var(--color-text-muted)]">Manual values for the full amount above. Changing the amount scales these values automatically.</p>}
           <Macros
             value={item.nutrition}
             onChange={(value) => set('nutrition', value)}
@@ -253,7 +253,7 @@ function ItemRow({ title, item, index, items, onChange, groups, ingredientLibrar
 
   return (
     <details
-      className={`recipe-item-row min-w-0 self-start rounded-xl border-2 border-black bg-white p-3${dragging ? ' is-dragging' : ''}${dragOver ? ' is-drag-over' : ''}`}
+      className={`recipe-item-row min-w-0 self-start rounded-xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-3${dragging ? ' is-dragging' : ''}${dragOver ? ' is-drag-over' : ''}`}
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
       onDragOver={event => onDragOver(event, index)}
@@ -261,10 +261,10 @@ function ItemRow({ title, item, index, items, onChange, groups, ingredientLibrar
     >
       <summary className="cursor-pointer font-bold">
         <span className="recipe-item-drag-handle" draggable aria-label={`Drag to reorder ${normalizedItem.name || title.slice(0, -1).toLowerCase()}`} title="Drag to reorder" onDragStart={event => onDragStart(event, index)} onDragEnd={onDragEnd}><svg aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><circle cx="5" cy="3" r="1.25"/><circle cx="11" cy="3" r="1.25"/><circle cx="5" cy="8" r="1.25"/><circle cx="11" cy="8" r="1.25"/><circle cx="5" cy="13" r="1.25"/><circle cx="11" cy="13" r="1.25"/></svg></span>{' '}
-        <span className="text-black/55">{index + 1}.</span>{' '}
+        <span className="text-[var(--color-text-muted)]">{index + 1}.</span>{' '}
         {normalizedItem.name || `New ${title.toLowerCase()}`}
         {(normalizedItem.amount != null || normalizedItem.unit) && (
-          <span className="ml-2 text-sm font-normal text-black/60">
+          <span className="ml-2 text-sm font-normal text-[var(--color-text-muted)]">
             {[normalizedItem.amount, normalizedItem.unit]
               .filter((value) => value != null && value !== '')
               .join(' ')}
@@ -464,7 +464,7 @@ export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary 
   };
   return (
     <div className="flex flex-col gap-5">
-      <section className="space-y-3 rounded-2xl border-2 border-black bg-white p-4">
+      <section className="space-y-3 rounded-2xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-4">
         <h2 className="text-2xl font-bold">Recipe details</h2>
         <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
           <Field label="Recipe title" required value={recipe.title} onChange={(value) => set('title', value)} />
@@ -500,7 +500,7 @@ export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary 
           />
         </div>
         {editing && (
-          <p className="text-sm text-black/70">
+          <p className="text-sm text-[var(--color-text-secondary)]">
             Recipe link: {recipe.slug} (kept unchanged)
           </p>
         )}
@@ -510,10 +510,10 @@ export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary 
           onChange={(value) => set('tags', value.split(','))}
         />
       </section>
-      <section className="space-y-3 rounded-2xl border-2 border-black bg-white p-4">
+      <section className="space-y-3 rounded-2xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-4">
         <h2 className="text-2xl font-bold">Recipe scaling</h2>
         {anchor ? <>
-          <p className="text-sm text-black/70">Scaling uses the saved base amounts each time. Changing the main ingredient sets a new base without changing recipe quantities.</p>
+          <p className="text-sm text-[var(--color-text-secondary)]">Scaling uses the saved base amounts each time. Changing the main ingredient sets a new base without changing recipe quantities.</p>
           <div className="grid gap-3 sm:grid-cols-2">
             <p className="self-center"><strong>Main ingredient:</strong> {anchor.name} Â· Base amount {recipe.scaling.baseQuantities[anchor.id]?.amount} {recipe.scaling.baseQuantities[anchor.id]?.unit}</p>
             <Field label={`New ${anchor.name} amount (${anchor.unit || 'unit'})`} type="number" min="0" step="any" value={scaleTarget} onChange={setScaleTarget} />
@@ -539,17 +539,17 @@ export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary 
               <button type="button" className={secondaryButton} onClick={() => setAnchor(anchor.id)}>Set current amounts as base recipe</button>
             </div>
           </>}
-          {confirmScaling && <div role="alertdialog" aria-modal="true" aria-labelledby="scale-confirm-title" className="space-y-3 rounded-xl border-2 border-black bg-[#fffdf8] p-4">
+          {confirmScaling && <div role="alertdialog" aria-modal="true" aria-labelledby="scale-confirm-title" className="space-y-3 rounded-xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-4">
             <h3 id="scale-confirm-title" className="text-lg font-bold">Scale recipe?</h3>
             <p>{anchor.name}: {recipe.scaling.baseQuantities[anchor.id]?.amount} {anchor.unit} â†’ {formatScaledQuantity(Number(scaleTarget))} {anchor.unit}. {scalingPreview.scaledCount} other ingredients will be adjusted proportionally.</p>
             {Number(scaleTarget) === 0 && <p className="font-semibold">This sets scalable ingredient quantities to zero. Confirm to apply.</p>}
             <div className="flex gap-2"><button type="button" className={secondaryButton} onClick={() => setConfirmScaling(false)}>Cancel</button><button type="button" className={secondaryButton} onClick={applyScaling}>Scale ingredients</button></div>
           </div>}
-        </> : <p className="text-sm text-black/70">Choose an ingredient below with â€œUse as main ingredientâ€ to enable proportional scaling. Existing recipes are left unanchored until you choose.</p>}
+        </> : <p className="text-sm text-[var(--color-text-secondary)]">Choose an ingredient below with â€œUse as main ingredientâ€ to enable proportional scaling. Existing recipes are left unanchored until you choose.</p>}
       </section>
-      <details className="rounded-2xl border-2 border-black bg-white p-4" open={!editing}>
+      <details className="rounded-2xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-4" open={!editing}>
         <summary className="cursor-pointer text-xl font-bold">Recipe nutrition</summary>
-        <p className="text-sm text-black/70">
+        <p className="text-sm text-[var(--color-text-secondary)]">
           {recipe.nutritionFromIngredients ? 'Calculated from ingredient and sauce quantities. Shows the whole recipe until a serving count is set, then per serving; alternatives are not included.' : 'Enter macros manually or use food lookup inside an ingredient to calculate from ingredients. Item nutrition describes the full amount listed for that ingredient.'}
         </p>
         <details className="mt-3"><summary>Scan a label for recipe-level nutrition</summary>
@@ -577,7 +577,7 @@ export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary 
         <h2 className="text-2xl font-bold">Instructions</h2>
         <div className="grid gap-3 lg:grid-cols-2">
         {(recipe.steps ?? []).map((step, index) => (
-          <div key={index} className="space-y-2 rounded-xl border-2 border-black bg-white p-3">
+          <div key={index} className="space-y-2 rounded-xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-3">
             <Field
               label={`Step ${index + 1}`}
               multiline
@@ -615,18 +615,18 @@ export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary 
           Add step
         </button>
       </section>
-      <details className="rounded-2xl border-2 border-black bg-white p-4">
+      <details className="rounded-2xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-4">
         <summary className="cursor-pointer text-xl font-bold">Sauces ({recipe.sauces?.length ?? 0})</summary>
         <div className="mt-4"><Items title="Sauces" items={recipe.sauces ?? []} onChange={(value, options) => set('sauces', value, options)} ingredientLibrary={ingredientLibrary} anchorId={anchor?.id} onSetAnchor={setAnchor} /></div>
       </details>
       {Object.keys(groups).length > 0 && (
-        <details className="rounded-2xl border-2 border-black bg-white p-4">
+        <details className="rounded-2xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-4">
           <summary className="cursor-pointer text-xl font-bold">Ingredient alternatives ({Object.keys(groups).length})</summary>
           <div className="mt-4 space-y-3">
           {Object.entries(groups).map(([key, group]) => (
             <details
               key={key}
-              className="rounded-2xl border-2 border-black p-4"
+              className="rounded-2xl border-2 border-[var(--border-default)] p-4"
             >
               <summary className="font-bold">{group.title}</summary>
               <div className="mt-4 space-y-4">
@@ -658,7 +658,7 @@ export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary 
           </div>
         </details>
       )}
-      <details className="order-first rounded-2xl border-2 border-black bg-white p-4" open={Boolean(recipe.source)}>
+      <details className="order-first rounded-2xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-4" open={Boolean(recipe.source)}>
         <summary className="cursor-pointer text-xl font-bold">Recipe source</summary>
         <div className="mt-4 space-y-3">
         <label className="flex items-center gap-3 font-semibold">

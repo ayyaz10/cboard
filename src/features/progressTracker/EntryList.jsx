@@ -21,23 +21,23 @@ function formatEntryTime(entry) {
 
 export function EntryList({ goal, entries, onEditEntry, onDeleteEntry }) {
   return (
-    <section className="rounded-[1.75rem] border-2 border-black bg-[#9fe3ff] p-5 sm:p-6">
+    <section className="rounded-[1.75rem] border-2 border-[var(--border-default)] bg-[#9fe3ff] p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
             History
           </p>
-          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-black">
+          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-[var(--color-text)]">
             Past entries
           </h2>
         </div>
-        <span className="rounded-full border-2 border-black bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-black">
+        <span className="rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text)]">
           Edit ready
         </span>
       </div>
 
       {entries.length === 0 ? (
-        <div className="mt-5 rounded-[1.35rem] border-2 border-black bg-white px-4 py-5 text-sm font-bold leading-6 text-black/70">
+        <div className="mt-5 rounded-[1.35rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-5 text-sm font-bold leading-6 text-[var(--color-text-secondary)]">
           No entries for this goal yet.
         </div>
       ) : (
@@ -48,11 +48,11 @@ export function EntryList({ goal, entries, onEditEntry, onDeleteEntry }) {
             return (
               <article
                 key={entry.id}
-                className="rounded-[1.35rem] border-2 border-black bg-[#fffdf8] p-4"
+                className="rounded-[1.35rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-4"
               >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-black/55">
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-text-muted)]">
                     {entry.date}
                     {goal.allowMultipleEntriesPerDay && formatEntryTime(entry)
                       ? ` - ${formatEntryTime(entry)}`
@@ -61,7 +61,7 @@ export function EntryList({ goal, entries, onEditEntry, onDeleteEntry }) {
                   <div className="mt-3 flex flex-wrap gap-2">
                     {isBinaryGoal(goal) ? (
                       <span
-                        className="metric-color-pill rounded-full border-2 border-black px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-black"
+                        className="metric-color-pill rounded-full border-2 border-[var(--border-default)] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text)]"
                         data-theme-color={isBinaryEntryCompleted(entry, goal) ? 'lime' : 'danger'}
                         style={{
                           '--metric-pill-bg': isBinaryEntryCompleted(entry, goal)
@@ -78,7 +78,7 @@ export function EntryList({ goal, entries, onEditEntry, onDeleteEntry }) {
                       .map((metric) => (
                         <span
                           key={metric.id}
-                          className="metric-color-pill rounded-full border-2 border-black px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-black"
+                          className="metric-color-pill rounded-full border-2 border-[var(--border-default)] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text)]"
                           data-theme-color={metric.colorKey}
                           style={{
                             '--metric-pill-bg':
@@ -96,14 +96,14 @@ export function EntryList({ goal, entries, onEditEntry, onDeleteEntry }) {
                   <button
                     type="button"
                     onClick={() => onEditEntry(entry)}
-                    className="rounded-full border-2 border-black bg-[#c5ff6f] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-black"
+                    className="rounded-full border-2 border-[var(--border-default)] bg-[var(--color-accent)] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-accent-contrast)]"
                   >
                     Edit
                   </button>
                   <button
                     type="button"
                     onClick={() => onDeleteEntry(entry.id)}
-                    className="danger-action rounded-full border-2 border-black px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] transition"
+                    className="danger-action rounded-full border-2 border-[var(--border-default)] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] transition"
                   >
                     Delete
                   </button>
@@ -111,7 +111,7 @@ export function EntryList({ goal, entries, onEditEntry, onDeleteEntry }) {
               </div>
 
               {entry.note ? (
-                <p className="mt-4 rounded-[1rem] border-2 border-black bg-white px-3 py-2 text-sm font-semibold leading-6 text-black/70">
+                <p className="mt-4 rounded-[1rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-semibold leading-6 text-[var(--color-text-secondary)]">
                   {entry.note}
                 </p>
               ) : null}

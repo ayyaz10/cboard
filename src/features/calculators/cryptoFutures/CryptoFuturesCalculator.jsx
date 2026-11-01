@@ -81,7 +81,7 @@ function TradeInput({
   return (
     <label className="block">
       <span className={`mb-2 block text-xs font-bold uppercase tracking-[0.14em] ${
-        isMatrixTheme ? 'text-white/60' : 'text-black/70'
+        isMatrixTheme ? 'text-white/60' : 'text-[var(--color-text-secondary)]'
       }`}
       >
         {label}
@@ -92,8 +92,8 @@ function TradeInput({
             ? `bg-[#070b10] text-white placeholder:text-white/25 focus:shadow-[0_0_0_3px_rgba(197,255,111,0.18)] ${
               error ? 'border-[#ff6b6b]' : 'border-white/15 focus:border-[#c5ff6f]'
             }`
-            : `bg-[#fffdf8] text-black placeholder:text-black/35 shadow-[4px_4px_0_#000] focus:shadow-[6px_6px_0_#000] ${
-              error ? 'border-[#ff6b6b]' : 'border-black'
+            : `bg-[var(--surface-elevated)] text-[var(--color-text)] placeholder:text-black/35 shadow-[4px_4px_0_#000] focus:shadow-[6px_6px_0_#000] ${
+              error ? 'border-[#ff6b6b]' : 'border-[var(--border-default)]'
             }`
         }`}
         name={name}
@@ -114,7 +114,7 @@ function TradeInput({
         </span>
       ) : hint ? (
         <span className={`mt-2 block text-xs font-semibold leading-5 ${
-          isMatrixTheme ? 'text-white/40' : 'text-black/55'
+          isMatrixTheme ? 'text-white/40' : 'text-[var(--color-text-muted)]'
         }`}
         >
           {hint}
@@ -132,9 +132,9 @@ function ResultCard({ label, value, tone = 'neutral', isMatrixTheme }) {
       neutral: 'border-white/15 bg-[#0b1118] text-white',
     }[tone]
     : {
-      profit: 'border-black bg-[#d9ff9f] text-black',
-      loss: 'border-black bg-[#ffe0de] text-black',
-      neutral: 'border-black bg-[#fffdf8] text-black',
+      profit: 'border-[var(--border-default)] bg-[#d9ff9f] text-[var(--color-text)]',
+      loss: 'border-[var(--border-default)] bg-[var(--color-danger-soft)] text-[var(--color-text)]',
+      neutral: 'border-[var(--border-default)] bg-[var(--surface-elevated)] text-[var(--color-text)]',
     }[tone];
 
   return (
@@ -143,7 +143,7 @@ function ResultCard({ label, value, tone = 'neutral', isMatrixTheme }) {
     }`}
     >
       <p className={`text-xs font-bold uppercase tracking-[0.14em] ${
-        isMatrixTheme ? 'text-white/50' : 'text-black/55'
+        isMatrixTheme ? 'text-white/50' : 'text-[var(--color-text-muted)]'
       }`}
       >
         {label}
@@ -173,7 +173,7 @@ function TradeHistoryTable({
       <div className={`mt-5 rounded-[1.25rem] border-2 border-dashed p-6 text-center text-sm font-bold leading-6 ${
         isMatrixTheme
           ? 'border-white/15 bg-[#070b10] text-white/45'
-          : 'border-black bg-[#fffdf8] text-black/55'
+          : 'border-[var(--border-default)] bg-[var(--surface-elevated)] text-[var(--color-text-muted)]'
       }`}
       >
         {emptyMessage}
@@ -183,11 +183,11 @@ function TradeHistoryTable({
 
   return (
     <div className={`mt-5 overflow-x-auto rounded-[1.25rem] border-2 ${
-      isMatrixTheme ? 'border-white/10' : 'border-black'
+      isMatrixTheme ? 'border-white/10' : 'border-[var(--border-default)]'
     }`}
     >
       <table className="min-w-[64rem] w-full border-collapse text-left">
-        <thead className={isMatrixTheme ? 'bg-[#0b1118]' : 'bg-[#fff0b8]'}>
+        <thead className={isMatrixTheme ? 'bg-[#0b1118]' : 'bg-[var(--color-warning-soft)]'}>
           <tr>
             {['Date', 'Market', 'Side', 'Entry', 'TP', 'Partials', 'SL', 'Margin', 'Lev.', 'Profit', 'Loss', 'R/R', ''].map((heading) => (
               <th
@@ -195,7 +195,7 @@ function TradeHistoryTable({
                 className={`border-b-2 px-3 py-3 text-xs font-bold uppercase tracking-[0.12em] ${
                   isMatrixTheme
                     ? 'border-white/10 text-white/55'
-                    : 'border-black text-black/55'
+                    : 'border-[var(--border-default)] text-[var(--color-text-muted)]'
                 }`}
               >
                 {heading}
@@ -207,10 +207,10 @@ function TradeHistoryTable({
           {entries.map((entry) => (
             <tr
               key={entry.id}
-              className={isMatrixTheme ? 'bg-black' : 'bg-[#fffdf8]'}
+              className={isMatrixTheme ? 'bg-black' : 'bg-[var(--surface-elevated)]'}
             >
               <td className={`border-b px-3 py-3 text-sm font-bold ${
-                isMatrixTheme ? 'border-white/10 text-white/70' : 'border-black/15 text-black/70'
+                isMatrixTheme ? 'border-white/10 text-white/70' : 'border-black/15 text-[var(--color-text-secondary)]'
               }`}
               >
                 {formatTradeDate(entry.createdAt)}
@@ -222,7 +222,7 @@ function TradeHistoryTable({
                 <span className={`rounded-full border-2 px-2.5 py-1 text-xs font-bold uppercase tracking-[0.12em] ${
                   isMatrixTheme
                     ? 'border-[#c5ff6f]/40 bg-[#071d12] text-[#c5ff6f]'
-                    : 'border-black bg-[#c5ff6f] text-black'
+                    : 'border-[var(--border-default)] bg-[var(--color-accent)] text-[var(--color-accent-contrast)]'
                 }`}
                 >
                   {entry.assetSymbol}
@@ -236,10 +236,10 @@ function TradeHistoryTable({
                   entry.side === 'long'
                     ? isMatrixTheme
                       ? 'border-[#22c55e]/45 bg-[#071d12] text-[#6ee7a8]'
-                      : 'border-black bg-[#d9ff9f] text-black'
+                      : 'border-[var(--border-default)] bg-[#d9ff9f] text-[var(--color-text)]'
                     : isMatrixTheme
                       ? 'border-[#ef4444]/45 bg-[#220b0b] text-[#ff9b9b]'
-                      : 'border-black bg-[#ffe0de] text-black'
+                      : 'border-[var(--border-default)] bg-[var(--color-danger-soft)] text-[var(--color-text)]'
                 }`}
                 >
                   {entry.side}
@@ -263,7 +263,7 @@ function TradeHistoryTable({
                       ? isMatrixTheme ? 'border-white/10 text-[#6ee7a8]' : 'border-black/15 text-[#0f7a35]'
                       : index === 7
                         ? isMatrixTheme ? 'border-white/10 text-[#ff9b9b]' : 'border-black/15 text-[#b42318]'
-                        : isMatrixTheme ? 'border-white/10 text-white' : 'border-black/15 text-black'
+                        : isMatrixTheme ? 'border-white/10 text-white' : 'border-black/15 text-[var(--color-text)]'
                   }`}
                 >
                   {value}
@@ -279,7 +279,7 @@ function TradeHistoryTable({
                   className={`rounded-full border-2 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] transition ${
                     isMatrixTheme
                       ? 'border-[#ef4444]/45 bg-[#220b0b] text-[#ff9b9b] hover:border-[#ef4444]'
-                      : 'border-black bg-[#ffe0de] text-black hover:bg-[#ffb4ad]'
+                      : 'border-[var(--border-default)] bg-[var(--color-danger-soft)] text-[var(--color-text)] hover:bg-[#ffb4ad]'
                   }`}
                 >
                   Delete
@@ -322,11 +322,11 @@ function JournalChart({ entries, allEntries, selectedMarket, isMatrixTheme }) {
         <div className={`rounded-[1.25rem] border-2 p-4 ${
           isMatrixTheme
             ? 'border-[#22c55e]/45 bg-[#071d12] text-[#6ee7a8]'
-            : 'border-black bg-[#d9ff9f] text-black shadow-[4px_4px_0_#000]'
+            : 'border-[var(--border-default)] bg-[#d9ff9f] text-[var(--color-text)] shadow-[4px_4px_0_#000]'
         }`}
         >
           <p className={`text-xs font-bold uppercase tracking-[0.14em] ${
-            isMatrixTheme ? 'text-white/60' : 'text-black/55'
+            isMatrixTheme ? 'text-white/60' : 'text-[var(--color-text-muted)]'
           }`}
           >
             {selectedMarket === 'all' ? 'All markets journal profit' : `${selectedMarket} journal profit`}
@@ -339,11 +339,11 @@ function JournalChart({ entries, allEntries, selectedMarket, isMatrixTheme }) {
         <div className={`rounded-[1.25rem] border-2 p-4 ${
           isMatrixTheme
             ? 'border-white/15 bg-[#0b1118] text-white'
-            : 'border-black bg-[#fffdf8] text-black shadow-[4px_4px_0_#000]'
+            : 'border-[var(--border-default)] bg-[var(--surface-elevated)] text-[var(--color-text)] shadow-[4px_4px_0_#000]'
         }`}
         >
           <p className={`text-xs font-bold uppercase tracking-[0.14em] ${
-            isMatrixTheme ? 'text-white/60' : 'text-black/55'
+            isMatrixTheme ? 'text-white/60' : 'text-[var(--color-text-muted)]'
           }`}
           >
             Total profit across all markets
@@ -358,7 +358,7 @@ function JournalChart({ entries, allEntries, selectedMarket, isMatrixTheme }) {
         <div className={`rounded-[1.25rem] border-2 border-dashed p-6 text-center text-sm font-bold leading-6 ${
           isMatrixTheme
             ? 'border-white/15 bg-[#070b10] text-white/45'
-            : 'border-black bg-[#fffdf8] text-black/55'
+            : 'border-[var(--border-default)] bg-[var(--surface-elevated)] text-[var(--color-text-muted)]'
         }`}
         >
           Save journal trades for this market to draw the profit chart.
@@ -367,7 +367,7 @@ function JournalChart({ entries, allEntries, selectedMarket, isMatrixTheme }) {
       <div className={`h-80 rounded-[1.25rem] border-2 p-3 sm:h-96 ${
         isMatrixTheme
           ? 'border-white/10 bg-[#070b10]'
-          : 'border-black bg-[#fffdf8]'
+          : 'border-[var(--border-default)] bg-[var(--surface-elevated)]'
       }`}
       >
         <ResponsiveContainer width="100%" height="100%">
@@ -442,16 +442,16 @@ function JournalEntryCard({ entry, isMatrixTheme, onDelete }) {
   const sideTone = entry.side === 'long'
     ? isMatrixTheme
       ? 'border-[#22c55e]/45 bg-[#071d12] text-[#6ee7a8]'
-      : 'border-black bg-[#d9ff9f] text-black'
+      : 'border-[var(--border-default)] bg-[#d9ff9f] text-[var(--color-text)]'
     : isMatrixTheme
       ? 'border-[#ef4444]/45 bg-[#220b0b] text-[#ff9b9b]'
-      : 'border-black bg-[#ffe0de] text-black';
+      : 'border-[var(--border-default)] bg-[var(--color-danger-soft)] text-[var(--color-text)]';
 
   return (
     <article className={`rounded-[1.35rem] border-2 p-4 ${
       isMatrixTheme
         ? 'border-white/10 bg-[#0b1118]'
-        : 'border-black bg-[#fffdf8]'
+        : 'border-[var(--border-default)] bg-[var(--surface-elevated)]'
     }`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -461,20 +461,20 @@ function JournalEntryCard({ entry, isMatrixTheme, onDelete }) {
               {entry.side}
             </span>
             <span className={`text-xs font-bold uppercase tracking-[0.12em] ${
-              isMatrixTheme ? 'text-white/45' : 'text-black/55'
+              isMatrixTheme ? 'text-white/45' : 'text-[var(--color-text-muted)]'
             }`}
             >
               {createdAt}
             </span>
           </div>
           <p className={`mt-3 text-lg font-bold tracking-[-0.03em] ${
-            isMatrixTheme ? 'text-white' : 'text-black'
+            isMatrixTheme ? 'text-white' : 'text-[var(--color-text)]'
           }`}
           >
             Entry {formatUsd(entry.entryPrice)} {'->'} TP {formatUsd(entry.takeProfitPrice)}
           </p>
           <p className={`mt-1 text-sm font-semibold ${
-            isMatrixTheme ? 'text-white/55' : 'text-black/60'
+            isMatrixTheme ? 'text-white/55' : 'text-[var(--color-text-muted)]'
           }`}
           >
             SL {formatUsd(entry.stopLossPrice)} | Margin {formatUsd(entry.marginUsed)} | {entry.leverage}x
@@ -486,7 +486,7 @@ function JournalEntryCard({ entry, isMatrixTheme, onDelete }) {
           className={`rounded-full border-2 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] transition ${
             isMatrixTheme
               ? 'border-[#ef4444]/45 bg-[#220b0b] text-[#ff9b9b] hover:border-[#ef4444]'
-              : 'border-black bg-[#ffe0de] text-black hover:bg-[#ffb4ad]'
+              : 'border-[var(--border-default)] bg-[var(--color-danger-soft)] text-[var(--color-text)] hover:bg-[#ffb4ad]'
           }`}
         >
           Delete
@@ -801,8 +801,8 @@ export function CryptoFuturesCalculator() {
     <>
     <div className={`rounded-[1.75rem] border-2 p-4 shadow-[8px_8px_0_#000] sm:p-5 lg:p-6 ${
       isMatrixTheme
-        ? 'border-black bg-[#05070a] text-white'
-        : 'border-black bg-[#fffdf8] text-black'
+        ? 'border-[var(--border-default)] bg-[#05070a] text-white'
+        : 'border-[var(--border-default)] bg-[var(--surface-elevated)] text-[var(--color-text)]'
     }`}
     >
       <div className="grid gap-5 xl:grid-cols-[minmax(320px,0.82fr)_minmax(0,1.18fr)]">
@@ -812,19 +812,19 @@ export function CryptoFuturesCalculator() {
           className={`rounded-[1.5rem] border-2 p-5 ${
             isMatrixTheme
               ? 'border-white/10 bg-[#0b1118]'
-              : 'border-black bg-[#fff0b8]'
+              : 'border-[var(--border-default)] bg-[var(--color-warning-soft)]'
           }`}
         >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className={`text-xs font-bold uppercase tracking-[0.18em] ${
-                isMatrixTheme ? 'text-[#c5ff6f]' : 'text-black/55'
+                isMatrixTheme ? 'text-[#c5ff6f]' : 'text-[var(--color-text-muted)]'
               }`}
               >
                 Trade setup
               </p>
               <h2 className={`mt-2 text-2xl font-bold tracking-[-0.04em] ${
-                isMatrixTheme ? 'text-white' : 'text-black'
+                isMatrixTheme ? 'text-white' : 'text-[var(--color-text)]'
               }`}
               >
                 Plan before entry
@@ -833,7 +833,7 @@ export function CryptoFuturesCalculator() {
             <span className={`rounded-full border-2 px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] ${
               isMatrixTheme
                 ? 'border-white/15 bg-black text-white/70'
-                : 'border-black bg-white text-black'
+                : 'border-[var(--border-default)] bg-[var(--surface-elevated)] text-[var(--color-text)]'
             }`}
             >
               Futures
@@ -843,7 +843,7 @@ export function CryptoFuturesCalculator() {
           <div className={`mt-5 grid grid-cols-2 gap-2 rounded-[1.1rem] border-2 p-1.5 ${
             isMatrixTheme
               ? 'border-white/10 bg-black'
-              : 'border-black bg-[#fffdf8]'
+              : 'border-[var(--border-default)] bg-[var(--surface-elevated)]'
           }`}
           >
             {['long', 'short'].map((side) => {
@@ -857,11 +857,11 @@ export function CryptoFuturesCalculator() {
                   className={`rounded-[0.85rem] px-4 py-3 text-sm font-bold uppercase tracking-[0.14em] transition ${
                     isActive
                       ? side === 'long'
-                        ? 'bg-[#22c55e] text-black'
+                        ? 'bg-[#22c55e] text-[var(--color-text)]'
                         : 'bg-[#ef4444] text-white'
                       : isMatrixTheme
-                        ? 'text-white/55 hover:bg-white/5 hover:text-white'
-                        : 'text-black/55 hover:bg-[#f8f3ea] hover:text-black'
+                        ? 'text-white/55 hover:bg-[var(--surface-elevated)]/5 hover:text-white'
+                        : 'text-[var(--color-text-muted)] hover:bg-[var(--surface-primary)] hover:text-[var(--color-text)]'
                   }`}
                 >
                   {side}
@@ -883,7 +883,7 @@ export function CryptoFuturesCalculator() {
                 {field.name === 'leverage' ? (
                   <div className="mt-3">
                     <p className={`mb-2 text-xs font-bold uppercase tracking-[0.14em] ${
-                      isMatrixTheme ? 'text-white/60' : 'text-black/70'
+                      isMatrixTheme ? 'text-white/60' : 'text-[var(--color-text-secondary)]'
                     }`}
                     >
                       Quick leverage
@@ -901,10 +901,10 @@ export function CryptoFuturesCalculator() {
                           }
                           className={`rounded-full border-2 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] transition ${
                             Number(form.leverage) === leverage
-                              ? 'border-[#c5ff6f] bg-[#c5ff6f] text-black'
+                              ? 'border-[#c5ff6f] bg-[var(--color-accent)] text-[var(--color-accent-contrast)]'
                               : isMatrixTheme
                                 ? 'border-white/15 bg-black text-white/70 hover:border-white/35 hover:text-white'
-                                : 'border-black bg-white text-black hover:bg-[#f8f3ea]'
+                                : 'border-[var(--border-default)] bg-[var(--surface-elevated)] text-[var(--color-text)] hover:bg-[var(--surface-primary)]'
                           }`}
                         >
                           {leverage}x
@@ -920,19 +920,19 @@ export function CryptoFuturesCalculator() {
           <div className={`mt-5 rounded-[1.1rem] border-2 p-4 ${
             isMatrixTheme
               ? 'border-white/10 bg-black'
-              : 'border-black bg-[#fffdf8]'
+              : 'border-[var(--border-default)] bg-[var(--surface-elevated)]'
           }`}
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className={`text-xs font-bold uppercase tracking-[0.14em] ${
-                  isMatrixTheme ? 'text-white/60' : 'text-black/70'
+                  isMatrixTheme ? 'text-white/60' : 'text-[var(--color-text-secondary)]'
                 }`}
                 >
                   Partial take profits
                 </p>
                 <p className={`mt-1 text-sm font-semibold leading-5 ${
-                  isMatrixTheme ? 'text-white/40' : 'text-black/55'
+                  isMatrixTheme ? 'text-white/40' : 'text-[var(--color-text-muted)]'
                 }`}
                 >
                   Add TP price and close percentage. Remaining size exits at the main TP.
@@ -941,7 +941,7 @@ export function CryptoFuturesCalculator() {
               <button
                 type="button"
                 onClick={addPartialTakeProfit}
-                className="rounded-full border-2 border-[#c5ff6f] bg-[#c5ff6f] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-black"
+                className="rounded-full border-2 border-[#c5ff6f] bg-[var(--color-accent)] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-accent-contrast)]"
               >
                 Add partial
               </button>
@@ -951,7 +951,7 @@ export function CryptoFuturesCalculator() {
               <p className={`mt-3 rounded-[0.9rem] border-2 px-3 py-2 text-xs font-bold uppercase tracking-[0.12em] ${
                 isMatrixTheme
                   ? 'border-[#ef4444]/45 bg-[#220b0b] text-[#ff9b9b]'
-                  : 'border-black bg-[#ffe0de] text-black'
+                  : 'border-[var(--border-default)] bg-[var(--color-danger-soft)] text-[var(--color-text)]'
               }`}
               >
                 {errors.partialTakeProfits}
@@ -962,7 +962,7 @@ export function CryptoFuturesCalculator() {
               <p className={`mt-4 rounded-[0.9rem] border-2 border-dashed px-3 py-3 text-sm font-bold ${
                 isMatrixTheme
                   ? 'border-white/15 text-white/35'
-                  : 'border-black text-black/45'
+                  : 'border-[var(--border-default)] text-[var(--color-text-disabled)]'
               }`}
               >
                 No partial exits added.
@@ -975,7 +975,7 @@ export function CryptoFuturesCalculator() {
                     className={`grid gap-3 rounded-[1rem] border-2 p-3 md:grid-cols-[1fr_0.8fr_auto] ${
                       isMatrixTheme
                         ? 'border-white/10 bg-[#070b10]'
-                        : 'border-black bg-[#fff0b8]'
+                        : 'border-[var(--border-default)] bg-[var(--color-warning-soft)]'
                     }`}
                   >
                     <TradeInput
@@ -1006,7 +1006,7 @@ export function CryptoFuturesCalculator() {
                       className={`self-end rounded-full border-2 px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] transition ${
                         isMatrixTheme
                           ? 'border-[#ef4444]/45 bg-[#220b0b] text-[#ff9b9b] hover:border-[#ef4444]'
-                          : 'border-black bg-[#ffe0de] text-black hover:bg-[#ffb4ad]'
+                          : 'border-[var(--border-default)] bg-[var(--color-danger-soft)] text-[var(--color-text)] hover:bg-[#ffb4ad]'
                       }`}
                     >
                       Remove
@@ -1020,18 +1020,18 @@ export function CryptoFuturesCalculator() {
           <label className={`mt-5 flex items-center justify-between gap-4 rounded-[1.1rem] border-2 p-4 ${
             isMatrixTheme
               ? 'border-white/10 bg-black'
-              : 'border-black bg-[#fffdf8]'
+              : 'border-[var(--border-default)] bg-[var(--surface-elevated)]'
           }`}
           >
             <span>
               <span className={`block text-xs font-bold uppercase tracking-[0.14em] ${
-                isMatrixTheme ? 'text-white/60' : 'text-black/70'
+                isMatrixTheme ? 'text-white/60' : 'text-[var(--color-text-secondary)]'
               }`}
               >
                 Save to journal
               </span>
               <span className={`mt-1 block text-sm font-semibold leading-5 ${
-                isMatrixTheme ? 'text-white/40' : 'text-black/55'
+                isMatrixTheme ? 'text-white/40' : 'text-[var(--color-text-muted)]'
               }`}
               >
                 On saves to normal history and journal. Off saves only to normal history.
@@ -1045,12 +1045,12 @@ export function CryptoFuturesCalculator() {
                   ? 'border-[#22c55e] bg-[#22c55e]'
                   : isMatrixTheme
                     ? 'border-white/25 bg-[#070b10]'
-                    : 'border-black bg-white'
+                    : 'border-[var(--border-default)] bg-[var(--surface-elevated)]'
               }`}
               aria-pressed={saveToJournal}
             >
               <span
-                className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${
+                className={`absolute top-1 h-4 w-4 rounded-full bg-[var(--surface-elevated)] transition ${
                   saveToJournal ? 'left-8' : 'left-1'
                 }`}
               />
@@ -1061,7 +1061,7 @@ export function CryptoFuturesCalculator() {
             <button
               type="submit"
               disabled={isSavingTrade}
-              className="inline-flex flex-1 items-center justify-center rounded-full border-2 border-[#c5ff6f] bg-[#c5ff6f] px-5 py-3.5 text-sm font-bold uppercase tracking-[0.12em] text-black shadow-[4px_4px_0_#000] transition hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_#000] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex flex-1 items-center justify-center rounded-full border-2 border-[#c5ff6f] bg-[var(--color-accent)] px-5 py-3.5 text-sm font-bold uppercase tracking-[0.12em] text-[var(--color-accent-contrast)] shadow-[4px_4px_0_#000] transition hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_#000] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSavingTrade ? 'Saving' : 'Calculate'}
             </button>
@@ -1071,7 +1071,7 @@ export function CryptoFuturesCalculator() {
               className={`inline-flex flex-1 items-center justify-center rounded-full border-2 px-5 py-3.5 text-sm font-bold uppercase tracking-[0.12em] transition ${
                 isMatrixTheme
                   ? 'border-white/20 bg-black text-white hover:border-white/45'
-                  : 'border-black bg-white text-black hover:bg-[#f8f3ea]'
+                  : 'border-[var(--border-default)] bg-[var(--surface-elevated)] text-[var(--color-text)] hover:bg-[var(--surface-primary)]'
               }`}
             >
               Reset
@@ -1084,19 +1084,19 @@ export function CryptoFuturesCalculator() {
           className={`rounded-[1.5rem] border-2 p-5 ${
             isMatrixTheme
               ? 'border-white/10 bg-black'
-              : 'border-black bg-[#f8f3ea]'
+              : 'border-[var(--border-default)] bg-[var(--surface-primary)]'
           }`}
         >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className={`text-xs font-bold uppercase tracking-[0.18em] ${
-                isMatrixTheme ? 'text-white/45' : 'text-black/55'
+                isMatrixTheme ? 'text-white/45' : 'text-[var(--color-text-muted)]'
               }`}
               >
                 Result
               </p>
               <h2 className={`mt-2 text-2xl font-bold tracking-[-0.04em] ${
-                isMatrixTheme ? 'text-white' : 'text-black'
+                isMatrixTheme ? 'text-white' : 'text-[var(--color-text)]'
               }`}
               >
                 Trade outcome
@@ -1127,11 +1127,11 @@ export function CryptoFuturesCalculator() {
             <div className={`mt-5 flex min-h-[24rem] items-center justify-center rounded-[1.25rem] border-2 border-dashed p-6 text-center ${
               isMatrixTheme
                 ? 'border-white/15 bg-[#070b10]'
-                : 'border-black bg-[#fffdf8]'
+                : 'border-[var(--border-default)] bg-[var(--surface-elevated)]'
             }`}
             >
               <p className={`max-w-sm text-lg font-bold leading-7 tracking-[-0.03em] ${
-                isMatrixTheme ? 'text-white/45' : 'text-black/55'
+                isMatrixTheme ? 'text-white/45' : 'text-[var(--color-text-muted)]'
               }`}
               >
                 Enter a valid setup and press Calculate to preview profit,
@@ -1143,7 +1143,7 @@ export function CryptoFuturesCalculator() {
           <p className={`mt-5 rounded-[1rem] border-2 px-4 py-3 text-sm font-bold leading-6 ${
             isMatrixTheme
               ? 'border-[#ffd166]/30 bg-[#211a08] text-[#ffd166]'
-              : 'border-black bg-[#fff0b8] text-black/70'
+              : 'border-[var(--border-default)] bg-[var(--color-warning-soft)] text-[var(--color-text-secondary)]'
           }`}
           >
             This calculator does not include exchange fees, funding fees, or
@@ -1155,26 +1155,26 @@ export function CryptoFuturesCalculator() {
       <section className={`mt-5 rounded-[1.5rem] border-2 p-5 ${
         isMatrixTheme
           ? 'border-white/10 bg-black'
-          : 'border-black bg-[#f8f3ea]'
+          : 'border-[var(--border-default)] bg-[var(--surface-primary)]'
       }`}
       >
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className={`text-xs font-bold uppercase tracking-[0.18em] ${
-              isMatrixTheme ? 'text-white/45' : 'text-black/55'
+              isMatrixTheme ? 'text-white/45' : 'text-[var(--color-text-muted)]'
             }`}
             >
               Entries
             </p>
             <h2 className={`mt-2 text-2xl font-bold tracking-[-0.04em] ${
-              isMatrixTheme ? 'text-white' : 'text-black'
+              isMatrixTheme ? 'text-white' : 'text-[var(--color-text)]'
             }`}
             >
               Trade records
             </h2>
           </div>
           <div className={`flex flex-wrap gap-2 rounded-full border-2 p-1 ${
-            isMatrixTheme ? 'border-white/10 bg-[#070b10]' : 'border-black bg-white'
+            isMatrixTheme ? 'border-white/10 bg-[#070b10]' : 'border-[var(--border-default)] bg-[var(--surface-elevated)]'
           }`}
           >
             {[
@@ -1188,10 +1188,10 @@ export function CryptoFuturesCalculator() {
                 onClick={() => setActiveLogTab(tab.id)}
                 className={`rounded-full px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] transition ${
                   activeLogTab === tab.id
-                    ? 'bg-[#c5ff6f] text-black'
+                    ? 'bg-[var(--color-accent)] text-[var(--color-accent-contrast)]'
                     : isMatrixTheme
-                      ? 'text-white/55 hover:bg-white/5 hover:text-white'
-                      : 'text-black/55 hover:bg-[#f8f3ea] hover:text-black'
+                      ? 'text-white/55 hover:bg-[var(--surface-elevated)]/5 hover:text-white'
+                      : 'text-[var(--color-text-muted)] hover:bg-[var(--surface-primary)] hover:text-[var(--color-text)]'
                 }`}
               >
                 {tab.label}
@@ -1203,18 +1203,18 @@ export function CryptoFuturesCalculator() {
         <div className={`mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[1.1rem] border-2 p-3 ${
           isMatrixTheme
             ? 'border-white/10 bg-[#070b10]'
-            : 'border-black bg-[#fffdf8]'
+            : 'border-[var(--border-default)] bg-[var(--surface-elevated)]'
         }`}
         >
           <div>
             <p className={`text-xs font-bold uppercase tracking-[0.14em] ${
-              isMatrixTheme ? 'text-white/60' : 'text-black/70'
+              isMatrixTheme ? 'text-white/60' : 'text-[var(--color-text-secondary)]'
             }`}
             >
               Market filter
             </p>
             <p className={`mt-1 text-sm font-semibold ${
-              isMatrixTheme ? 'text-white/40' : 'text-black/55'
+              isMatrixTheme ? 'text-white/40' : 'text-[var(--color-text-muted)]'
             }`}
             >
               Normal history, journal, and chart follow this market.
@@ -1226,7 +1226,7 @@ export function CryptoFuturesCalculator() {
             className={`rounded-full border-2 px-4 py-2 text-sm font-bold uppercase tracking-[0.12em] outline-none ${
               isMatrixTheme
                 ? 'border-[#c5ff6f]/45 bg-black text-[#c5ff6f]'
-                : 'border-black bg-[#c5ff6f] text-black'
+                : 'border-[var(--border-default)] bg-[var(--color-accent)] text-[var(--color-accent-contrast)]'
             }`}
             aria-label="Filter trades by market"
           >
@@ -1242,7 +1242,7 @@ export function CryptoFuturesCalculator() {
           <p className={`mt-5 rounded-[1rem] border-2 px-4 py-3 text-sm font-bold leading-6 ${
             isMatrixTheme
               ? 'border-[#ef4444]/45 bg-[#220b0b] text-[#ff9b9b]'
-              : 'border-black bg-[#ffe0de] text-black'
+              : 'border-[var(--border-default)] bg-[var(--color-danger-soft)] text-[var(--color-text)]'
           }`}
           >
             {tradeError}
@@ -1253,7 +1253,7 @@ export function CryptoFuturesCalculator() {
           <div className={`mt-5 rounded-[1.25rem] border-2 border-dashed p-6 text-center text-sm font-bold leading-6 ${
             isMatrixTheme
               ? 'border-white/15 bg-[#070b10] text-white/45'
-              : 'border-black bg-[#fffdf8] text-black/55'
+              : 'border-[var(--border-default)] bg-[var(--surface-elevated)] text-[var(--color-text-muted)]'
           }`}
           >
             Loading saved trades...
@@ -1264,7 +1264,7 @@ export function CryptoFuturesCalculator() {
           <>
             <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
               <p className={`text-sm font-bold leading-6 ${
-                isMatrixTheme ? 'text-white/45' : 'text-black/55'
+                isMatrixTheme ? 'text-white/45' : 'text-[var(--color-text-muted)]'
               }`}
               >
                 All calculated trades are stored here. These entries do not affect the chart.
@@ -1276,7 +1276,7 @@ export function CryptoFuturesCalculator() {
                   className={`rounded-full border-2 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] transition ${
                     isMatrixTheme
                       ? 'border-[#ef4444]/45 bg-[#220b0b] text-[#ff9b9b] hover:border-[#ef4444]'
-                      : 'border-black bg-[#ffe0de] text-black hover:bg-[#ffb4ad]'
+                      : 'border-[var(--border-default)] bg-[var(--color-danger-soft)] text-[var(--color-text)] hover:bg-[#ffb4ad]'
                   }`}
                 >
                   Clear normal
@@ -1296,7 +1296,7 @@ export function CryptoFuturesCalculator() {
           <>
             <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
               <p className={`text-sm font-bold leading-6 ${
-                isMatrixTheme ? 'text-white/45' : 'text-black/55'
+                isMatrixTheme ? 'text-white/45' : 'text-[var(--color-text-muted)]'
               }`}
               >
                 Journal entries are the only trades used by the profit chart.
@@ -1305,7 +1305,7 @@ export function CryptoFuturesCalculator() {
                 <button
                   type="button"
                   onClick={() => setActiveLogTab('chart')}
-                  className="rounded-full border-2 border-[#c5ff6f] bg-[#c5ff6f] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-black"
+                  className="rounded-full border-2 border-[#c5ff6f] bg-[var(--color-accent)] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-accent-contrast)]"
                 >
                   View chart
                 </button>
@@ -1316,7 +1316,7 @@ export function CryptoFuturesCalculator() {
                     className={`rounded-full border-2 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] transition ${
                       isMatrixTheme
                         ? 'border-[#ef4444]/45 bg-[#220b0b] text-[#ff9b9b] hover:border-[#ef4444]'
-                        : 'border-black bg-[#ffe0de] text-black hover:bg-[#ffb4ad]'
+                        : 'border-[var(--border-default)] bg-[var(--color-danger-soft)] text-[var(--color-text)] hover:bg-[#ffb4ad]'
                     }`}
                   >
                     Clear journal
@@ -1337,7 +1337,7 @@ export function CryptoFuturesCalculator() {
           <>
             <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
               <p className={`text-sm font-bold leading-6 ${
-                isMatrixTheme ? 'text-white/45' : 'text-black/55'
+                isMatrixTheme ? 'text-white/45' : 'text-[var(--color-text-muted)]'
               }`}
               >
                 Profit chart uses journal entries only. Stop loss stays in the table, not the chart.
@@ -1348,7 +1348,7 @@ export function CryptoFuturesCalculator() {
                 className={`rounded-full border-2 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] transition ${
                   isMatrixTheme
                     ? 'border-white/15 bg-[#070b10] text-white/70 hover:border-white/35'
-                    : 'border-black bg-white text-black hover:bg-[#f8f3ea]'
+                    : 'border-[var(--border-default)] bg-[var(--surface-elevated)] text-[var(--color-text)] hover:bg-[var(--surface-primary)]'
                 }`}
               >
                 Back to journal

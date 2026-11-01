@@ -83,7 +83,7 @@ function AppContent() {
   if (isLoading) {
     return (
       <main className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">
-        <section className="panel mx-auto mt-12 max-w-xl p-6 text-center text-lg font-bold text-black">
+        <section className="panel mx-auto mt-12 max-w-xl p-6 text-center text-lg font-bold text-[var(--color-text)]">
           Loading C Board...
         </section>
       </main>
@@ -105,7 +105,7 @@ function AppContent() {
   if (isMigrating) {
     return (
       <main className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">
-        <section className="panel mx-auto mt-12 max-w-xl p-6 text-center text-lg font-bold text-black">
+        <section className="panel mx-auto mt-12 max-w-xl p-6 text-center text-lg font-bold text-[var(--color-text)]">
           Setting up your workspace...
         </section>
       </main>
@@ -117,10 +117,10 @@ function AppContent() {
       <main className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">
         <section className="panel mx-auto mt-12 max-w-xl p-6">
           <span className="pill">Migration</span>
-          <h1 className="mt-5 text-3xl font-bold tracking-[-0.05em] text-black">
+          <h1 className="mt-5 text-3xl font-bold tracking-[-0.05em] text-[var(--color-text)]">
             Could not migrate local data
           </h1>
-          <p className="mt-3 text-sm font-semibold leading-6 text-black/70">
+          <p className="mt-3 text-sm font-semibold leading-6 text-[var(--color-text-secondary)]">
             {migrationError}
           </p>
         </section>
@@ -131,7 +131,7 @@ function AppContent() {
   if (route === '/login') {
     return (
       <main className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">
-        <section className="panel mx-auto mt-12 max-w-xl p-6 text-center text-lg font-bold text-black">
+        <section className="panel mx-auto mt-12 max-w-xl p-6 text-center text-lg font-bold text-[var(--color-text)]">
           Opening your dashboard...
         </section>
       </main>

@@ -25,8 +25,8 @@ const featureTiles = [
 
 export function LandingPage({ isAuthenticated }) {
   return (
-    <main className="min-h-screen bg-[#f4f0e6] text-black">
-      <section className="relative min-h-[92vh] overflow-hidden border-b-2 border-black px-4 py-6 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-[var(--surface-page)] text-[var(--color-text)]">
+      <section className="relative min-h-[92vh] overflow-hidden border-b-2 border-[var(--border-default)] px-4 py-6 sm:px-6 lg:px-8">
         <img
           src={calLogo}
           alt=""
@@ -38,7 +38,7 @@ export function LandingPage({ isAuthenticated }) {
           <header className="flex flex-wrap items-center justify-between gap-4">
             <a
               href={getAppHref("/")}
-              className="inline-flex w-fit items-center gap-2.5 rounded-[1.5rem] border-2 border-black bg-[#fffdf8] px-2.5 py-2 pr-4 no-underline shadow-[6px_6px_0_#000]"
+              className="inline-flex w-fit items-center gap-2.5 rounded-[1.5rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-2.5 py-2 pr-4 no-underline shadow-[6px_6px_0_#000]"
               aria-label="C Board intro"
             >
               <img
@@ -47,10 +47,10 @@ export function LandingPage({ isAuthenticated }) {
                 className="h-11 w-auto shrink-0 object-contain"
               />
               <div className="space-y-0.5">
-                <p className="text-[0.65rem] font-bold uppercase leading-none tracking-[0.22em] text-black/55">
+                <p className="text-[0.65rem] font-bold uppercase leading-none tracking-[0.22em] text-[var(--color-text-muted)]">
                   Control board
                 </p>
-                <p className="text-lg font-bold leading-none tracking-[-0.05em] text-black sm:text-xl">
+                <p className="text-lg font-bold leading-none tracking-[-0.05em] text-[var(--color-text)] sm:text-xl">
                   C Board
                 </p>
               </div>
@@ -60,7 +60,7 @@ export function LandingPage({ isAuthenticated }) {
               <ThemeToggle />
               <a
                 href={getAppHref(isAuthenticated ? "/board" : "/login")}
-                className="rounded-full border-2 border-black bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[4px_4px_0_#000]"
+                className="rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text)] shadow-[4px_4px_0_#000]"
               >
                 {isAuthenticated ? "Open board" : "Login"}
               </a>
@@ -70,7 +70,7 @@ export function LandingPage({ isAuthenticated }) {
           <div className="grid flex-1 items-center gap-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,1.05fr)]">
             <div className="max-w-3xl">
               {/* <span className="pill">Progress, tools</span> */}
-              <h1 className="mt-6 text-5xl font-bold leading-none tracking-[-0.06em] text-black sm:text-6xl lg:text-7xl">
+              <h1 className="mt-6 text-5xl font-bold leading-none tracking-[-0.06em] text-[var(--color-text)] sm:text-6xl lg:text-7xl">
                 One board for goals and quick calculations.
               </h1>
               <p className="mt-5 max-w-2xl text-base font-semibold leading-7 text-black/72 sm:text-lg">
@@ -80,21 +80,21 @@ export function LandingPage({ isAuthenticated }) {
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <a
                   href={getAppHref(isAuthenticated ? "/board" : "/login")}
-                  className="inline-flex items-center justify-center rounded-full border-2 border-black bg-[#c5ff6f] px-6 py-3.5 text-sm font-bold uppercase tracking-[0.12em] text-black shadow-[4px_4px_0_#000]"
+                  className="inline-flex items-center justify-center rounded-full border-2 border-[var(--border-default)] bg-[var(--color-accent)] px-6 py-3.5 text-sm font-bold uppercase tracking-[0.12em] text-[var(--color-accent-contrast)] shadow-[4px_4px_0_#000]"
                 >
                   {isAuthenticated ? "Open C Board" : "Get started"}
                 </a>
                 <a
                   href={getAppHref("/progress-tracker")}
-                  className="inline-flex items-center justify-center rounded-full border-2 border-black bg-white px-6 py-3.5 text-sm font-bold uppercase tracking-[0.12em] text-black shadow-[4px_4px_0_#000]"
+                  className="inline-flex items-center justify-center rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-6 py-3.5 text-sm font-bold uppercase tracking-[0.12em] text-[var(--color-text)] shadow-[4px_4px_0_#000]"
                 >
                   View tracker
                 </a>
               </div>
             </div>
 
-            <div className="rounded-[2rem] border-2 border-black bg-[#fffdf8] p-4 shadow-[10px_10px_0_#000] sm:p-5">
-              <div className="rounded-[1.5rem] border-2 border-black bg-black p-5 text-white">
+            <div className="rounded-[2rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-4 shadow-[10px_10px_0_#000] sm:p-5">
+              <div className="rounded-[1.5rem] border-2 border-[var(--border-default)] bg-black p-5 text-white">
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/60">
                   Target goal
                 </p>
@@ -102,10 +102,10 @@ export function LandingPage({ isAuthenticated }) {
                   150 WPM
                 </p>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <span className="rounded-full border-2 border-white bg-[#c5ff6f] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-black">
+                  <span className="rounded-full border-2 border-white bg-[var(--color-accent)] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-accent-contrast)]">
                     Current 80 WPM
                   </span>
-                  <span className="rounded-full border-2 border-white bg-[#ffd166] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-black">
+                  <span className="rounded-full border-2 border-white bg-[#ffd166] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text)]">
                     53% of goal
                   </span>
                 </div>
@@ -115,13 +115,13 @@ export function LandingPage({ isAuthenticated }) {
                 {["Latest", "Best", "Streak"].map((label, index) => (
                   <article
                     key={label}
-                    className="theme-color-card rounded-[1.25rem] border-2 border-black p-4"
+                    className="theme-color-card rounded-[1.25rem] border-2 border-[var(--border-default)] p-4"
                     data-theme-color={["lime", "cyan", "pink"][index]}
                     style={{
                       '--theme-card-bg': ["#c5ff6f", "#9fe3ff", "#ff90e8"][index],
                     }}
                   >
-                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-black/55">
+                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-muted)]">
                       {label}
                     </p>
                     <p className="mt-2 text-3xl font-bold tracking-[-0.05em]">
@@ -131,12 +131,12 @@ export function LandingPage({ isAuthenticated }) {
                 ))}
               </div>
 
-              <div className="mt-4 rounded-[1.5rem] border-2 border-black bg-[#fff0b8] p-4">
+              <div className="mt-4 rounded-[1.5rem] border-2 border-[var(--border-default)] bg-[var(--color-warning-soft)] p-4">
                 <div className="flex h-36 items-end gap-3">
                   {[52, 62, 58, 70, 80].map((height, index) => (
                     <div
                       key={height}
-                      className="flex-1 rounded-t-[1rem] border-2 border-black bg-[#c5ff6f]"
+                      className="flex-1 rounded-t-[1rem] border-2 border-[var(--border-default)] bg-[var(--color-accent)]"
                       style={{ height: `${height}%` }}
                       aria-hidden="true"
                     />
@@ -153,14 +153,14 @@ export function LandingPage({ isAuthenticated }) {
           {featureTiles.map((feature) => (
             <article
               key={feature.title}
-              className="theme-color-card rounded-[1.75rem] border-2 border-black p-5 shadow-[5px_5px_0_#000]"
+              className="theme-color-card rounded-[1.75rem] border-2 border-[var(--border-default)] p-5 shadow-[5px_5px_0_#000]"
               data-theme-color={feature.colorKey}
               style={{ '--theme-card-bg': feature.color }}
             >
               <h2 className="text-2xl font-bold tracking-[-0.04em]">
                 {feature.title}
               </h2>
-              <p className="mt-3 text-sm font-semibold leading-6 text-black/70">
+              <p className="mt-3 text-sm font-semibold leading-6 text-[var(--color-text-secondary)]">
                 {feature.text}
               </p>
             </article>

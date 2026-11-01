@@ -22,32 +22,32 @@ export function RecentResultsPanel({
   error = '',
 }) {
   return (
-    <section className="rounded-[1.75rem] border-2 border-black bg-[#fff0b8] p-5 sm:p-6">
+    <section className="rounded-[1.75rem] border-2 border-[var(--border-default)] bg-[var(--color-warning-soft)] p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
             Recent results
           </p>
-          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-black">
+          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-[var(--color-text)]">
             Saved calculations
           </h2>
         </div>
 
-        <span className="rounded-full border-2 border-black bg-[#fffdf8] px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-black">
+        <span className="rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text)]">
           {entries.length}
         </span>
       </div>
 
       {error ? (
-        <p className="mt-4 rounded-[1rem] border-2 border-black bg-[#ffe0de] px-4 py-3 text-sm font-bold text-black">
+        <p className="mt-4 rounded-[1rem] border-2 border-[var(--border-default)] bg-[var(--color-danger-soft)] px-4 py-3 text-sm font-bold text-[var(--color-text)]">
           {error}
         </p>
       ) : isLoading ? (
-        <p className="mt-4 max-w-2xl text-sm font-bold leading-7 text-black/70 sm:text-base">
+        <p className="mt-4 max-w-2xl text-sm font-bold leading-7 text-[var(--color-text-secondary)] sm:text-base">
           Loading saved calculations...
         </p>
       ) : entries.length === 0 ? (
-        <p className="mt-4 max-w-2xl text-sm font-medium leading-7 text-black/70 sm:text-base">
+        <p className="mt-4 max-w-2xl text-sm font-medium leading-7 text-[var(--color-text-secondary)] sm:text-base">
           {emptyMessage}
         </p>
       ) : (
@@ -55,10 +55,10 @@ export function RecentResultsPanel({
           {entries.map((entry) => (
             <article
               key={entry.id}
-              className="rounded-[1.4rem] border-2 border-black bg-[#fffdf8] p-4"
+              className="rounded-[1.4rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-4"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <p className="text-lg font-bold leading-7 text-black">{entry.summary}</p>
+                <p className="text-lg font-bold leading-7 text-[var(--color-text)]">{entry.summary}</p>
                 <div className="ml-auto flex items-center gap-2">
                   <p className="text-xs font-bold uppercase tracking-[0.14em] text-black/50">
                     {formatSavedAt(entry.savedAt)}
@@ -73,7 +73,7 @@ export function RecentResultsPanel({
                           : onRemoveEntry(entry.id)
                       }
                       aria-label={`Remove saved result: ${entry.summary}`}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full border-2 border-black bg-white text-lg font-bold leading-none text-black shadow-[3px_3px_0_#000] transition hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_#000] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-black/15"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] text-lg font-bold leading-none text-[var(--color-text)] shadow-[3px_3px_0_#000] transition hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_#000] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-black/15"
                     >
                       x
                     </button>

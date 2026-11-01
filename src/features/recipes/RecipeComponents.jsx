@@ -20,7 +20,7 @@ import { NutritionLookup } from '../groceries/NutritionLookup.jsx';
 import { notify } from '../../lib/notifications.js';
 
 export const secondaryButton =
-  'inline-flex items-center justify-center rounded-full border-2 border-black bg-white px-4 py-2 text-sm font-bold text-black transition hover:-translate-y-px focus-visible:outline-offset-4 disabled:opacity-50';
+  'inline-flex items-center justify-center rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-2 text-sm font-bold text-[var(--color-text)] transition hover:-translate-y-px focus-visible:outline-offset-4 disabled:opacity-50';
 
 export function RecipeLink({ to, children, className = secondaryButton }) {
   return (
@@ -56,7 +56,7 @@ export function RecipeImage({ image, title, large = false }) {
     />
   ) : (
     <div
-      className={`recipe-image-placeholder flex items-center justify-center rounded-[1.35rem] border-2 border-black bg-white px-2 text-center text-sm font-semibold leading-5 text-black/55 ${large ? 'min-h-28 h-full' : 'aspect-[4/3]'}`}
+      className={`recipe-image-placeholder flex items-center justify-center rounded-[1.35rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-2 text-center text-sm font-semibold leading-5 text-[var(--color-text-muted)] ${large ? 'min-h-28 h-full' : 'aspect-[4/3]'}`}
     >
       No recipe image yet
     </div>
@@ -70,9 +70,9 @@ export function RecipeNutrition({ nutrition = {}, fibreSource }) {
       {values.map(([key, unit]) => (
         <div
           key={key}
-          className="rounded-2xl border-2 border-black bg-white px-4 py-3 text-black"
+          className="rounded-2xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3 text-[var(--color-text)]"
         >
-          <dt className="text-xs capitalize text-black/70">{key === 'fiber' ? 'fibre' : key}</dt>
+          <dt className="text-xs capitalize text-[var(--color-text-secondary)]">{key === 'fiber' ? 'fibre' : key}</dt>
           <dd className="font-bold">
             {nutrition[key]} {unit}
             {key === 'fiber' && fibreSource && <small className="block font-normal">Estimated ? {fibreSource.type === 'ai' ? 'AI assisted' : 'grocery labels'} ? {fibreSource.basis === 'serving' ? 'per serving' : 'whole recipe'}</small>}
@@ -81,7 +81,7 @@ export function RecipeNutrition({ nutrition = {}, fibreSource }) {
       ))}
     </dl>
   ) : (
-    <p className="text-sm text-black/55">Nutrition not provided.</p>
+    <p className="text-sm text-[var(--color-text-muted)]">Nutrition not provided.</p>
   );
 }
 
@@ -106,7 +106,7 @@ function RecipeCardNutrition({ recipe }) {
   ].filter(Boolean);
   if (!values.length) return null;
   const partial = ['calories', 'protein', 'fiber'].some(key => partialKeys.includes(key));
-  return <p className="recipe-card-nutrition text-sm font-semibold text-black/70">
+  return <p className="recipe-card-nutrition text-sm font-semibold text-[var(--color-text-secondary)]">
     {values.join(' · ')}{wholeRecipe && <span className="font-normal"> · whole recipe</span>}{partial && <span className="font-normal"> · partial</span>}
   </p>;
 }
@@ -120,10 +120,10 @@ export function RecipeAlternatives({ group }) {
         {group.options.map((option, index) => (
           <li
             key={index}
-            className="recipe-card rounded-2xl border-2 border-black bg-white p-4"
+            className="recipe-card rounded-2xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-4"
           >
             <p className="font-bold">{formatIngredient(option)}</p>
-            {option.note && <p className="mt-2 text-black/70">{option.note}</p>}
+            {option.note && <p className="mt-2 text-[var(--color-text-secondary)]">{option.note}</p>}
             {Object.values(option.nutrition ?? {}).some(
               (value) => value != null,
             ) && (
@@ -239,20 +239,20 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
       setRemoveConfirmation(false);
     }
   }
-  return <li className="min-w-0 self-start rounded-xl border-2 border-black bg-white px-3 py-2.5">
+  return <li className="min-w-0 self-start rounded-xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2.5">
     <div className="flex min-w-0 items-center justify-between gap-3">
       <div className="min-w-0 flex-1">
         <p className="font-semibold">{formatIngredient(item)}</p>
-        {(item.group || item.preparation) && <p className="text-xs text-black/60">{[item.group, item.preparation].filter(Boolean).join(' · ')}</p>}
-        {item.nutritionTrackingEnabled === false && <p className="text-xs text-black/60">Nutrition excluded</p>}
-        {item.foodId && (item.nutritionLabel?.source?.foodName || item.nutritionLabel?.source?.name) && <p className="text-xs text-black/60">Food: {item.nutritionLabel.source.foodName || item.nutritionLabel.source.name}</p>}
+        {(item.group || item.preparation) && <p className="text-xs text-[var(--color-text-muted)]">{[item.group, item.preparation].filter(Boolean).join(' · ')}</p>}
+        {item.nutritionTrackingEnabled === false && <p className="text-xs text-[var(--color-text-muted)]">Nutrition excluded</p>}
+        {item.foodId && (item.nutritionLabel?.source?.foodName || item.nutritionLabel?.source?.name) && <p className="text-xs text-[var(--color-text-muted)]">Food: {item.nutritionLabel.source.foodName || item.nutritionLabel.source.name}</p>}
         {preview ? (
-          <p className="mt-0.5 text-xs leading-5 text-black/65">{ingredientNutritionSummary(item)}</p>
+          <p className="mt-0.5 text-xs leading-5 text-[var(--color-text-secondary)]">{ingredientNutritionSummary(item)}</p>
         ) : (
           <button
             type="button"
             disabled={busy}
-            className="group mt-0.5 flex min-h-9 max-w-full items-center gap-1.5 text-left text-xs leading-5 text-black/65 transition hover:text-black focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2"
+            className="group mt-0.5 flex min-h-9 max-w-full items-center gap-1.5 text-left text-xs leading-5 text-[var(--color-text-secondary)] transition hover:text-[var(--color-text)] focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2"
             aria-label={`${editing ? 'Close' : 'Edit'} ingredient ${formatIngredient(item)}`}
             aria-expanded={editing}
             title="Edit ingredient name and nutrition"
@@ -281,7 +281,7 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
           Remove ingredient
         </button>
       </div>
-      {recipe.ingredients.length <= 1 && <p className="text-xs text-black/60">A recipe must keep at least one ingredient.</p>}
+      {recipe.ingredients.length <= 1 && <p className="text-xs text-[var(--color-text-muted)]">A recipe must keep at least one ingredient.</p>}
       {removeConfirmation && <div role="alertdialog" aria-label="Confirm ingredient removal" className="space-y-2 rounded-xl border-2 border-black/20 p-3">
         <p>Remove {formatIngredient(item)} from this recipe?</p>
         <div className="flex flex-wrap gap-2">
@@ -322,7 +322,7 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved }) {
           <input className="field-input" type="number" min="0" step="any" value={values[key] ?? ''} onChange={(event) => {setNutritionLabel(null);setValues((current) => ({ ...current, [key]: event.target.value === '' ? null : Number(event.target.value) }));setDirty(true);}} />
         </label>)}
       </div>
-      <p className="text-xs text-black/60">Values are for the full ingredient amount shown above.</p>
+      <p className="text-xs text-[var(--color-text-muted)]">Values are for the full ingredient amount shown above.</p>
       {error && <p role="alert" className="text-sm font-semibold">{error}</p>}
       <div className="flex flex-wrap gap-2">
         <button type="button" className={secondaryButton} disabled={busy || !name.trim()} onClick={save}>{busy ? 'Saving…' : 'Save changes'}</button>
@@ -352,7 +352,7 @@ export function IngredientList({ recipe, preview = false, onRecipeUpdated }) {
     <section>
       <div className="flex items-end justify-between gap-3">
         <h2 className="text-2xl font-bold">Ingredients</h2>
-        <span className="text-right text-sm text-black/60">
+        <span className="text-right text-sm text-[var(--color-text-muted)]">
           {recipe.ingredients.length} items{!preview && <> · Tap the pencil to edit names or nutrition</>}
         </span>
       </div>
@@ -393,16 +393,16 @@ export function RecipePage({ recipe, preview = false, onRecipeUpdated, onMatchEx
     return [{ item, index, matches: findRecipeFoodMatches(item, foodCatalog) }];
   }) : [];
   return (
-    <article className="space-y-5 break-words text-black">
+    <article className="space-y-5 break-words text-[var(--color-text)]">
       <section className="grid gap-5 lg:grid-cols-[minmax(15rem,0.75fr)_minmax(0,1.25fr)] lg:items-stretch">
         <RecipeImage image={recipe.image} title={recipe.title} large />
-        <div className="space-y-4 rounded-[1.35rem] border-2 border-black bg-white p-5">
+        <div className="space-y-4 rounded-[1.35rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-5">
           <header className="space-y-2">
             <div className="flex items-center justify-between gap-3"><span className="pill">{recipe.mealType}</span>{!preview && <RecipeFavouriteButton recipe={recipe} favourite={favourite} pending={favouritePending} onToggle={onToggleFavourite}/>}</div>
             <h1 className="text-3xl font-bold tracking-[-0.04em] sm:text-4xl">
               {recipe.title}
             </h1>
-            {recipe.description && <p className="text-sm leading-6 text-black/70">{recipe.description}</p>}
+            {recipe.description && <p className="text-sm leading-6 text-[var(--color-text-secondary)]">{recipe.description}</p>}
           </header>
           <RecipeNutrition nutrition={recipeNutritionDisplay(recipe).nutrition} fibreSource={recipe.fibreSource} />
           <RecipeNutritionStatus recipe={recipe} />
@@ -413,7 +413,7 @@ export function RecipePage({ recipe, preview = false, onRecipeUpdated, onMatchEx
               ['Servings', recipe.servings],
             ].filter(([, value]) => value != null && value !== '').map(([label, value]) => (
               <div key={label}>
-                <dt className="text-xs text-black/60">{label}</dt>
+                <dt className="text-xs text-[var(--color-text-muted)]">{label}</dt>
                 <dd className="text-sm font-bold">{value}</dd>
               </div>
             ))}
@@ -422,17 +422,17 @@ export function RecipePage({ recipe, preview = false, onRecipeUpdated, onMatchEx
         </div>
       </section>
       {(recipe.healthReview || recipe.tags?.includes('AI imported')) && (
-        <details className="rounded-2xl border-2 border-black bg-white p-4">
+        <details className="rounded-2xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-4">
           <summary className="cursor-pointer font-bold">Ingredient health report</summary>
           <div className="mt-4"><RecipeHealthReview recipe={recipe} /></div>
         </details>
       )}
-      {!preview && onMatchExistingFoods && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-black bg-white p-3"><p className="text-sm">Find existing reusable foods for unlinked recipe ingredients.</p><button type="button" className={secondaryButton} onClick={() => onMatchExistingFoods(recipe)}>Match existing foods</button></div>}
-      {possibleMatches.length > 0 && <section className="space-y-3 rounded-xl border-2 border-black bg-white p-4"><h2 className="font-bold">Possible existing foods</h2>{possibleMatches.map(({ item, index, matches }) => <div key={item.id || index} className="space-y-2 border-t border-black/15 pt-3"><p className="text-sm"><strong>{formatIngredient(item)}</strong> · choose a food to use its nutrition.</p><div className="flex flex-wrap gap-2">{matches.map(({ food }) => <button key={food.id} type="button" className={secondaryButton} onClick={() => onUseFood?.(recipe, index, food)}>{food.name} · {food.nutrition?.calories == null ? 'nutrition not set' : `${new Intl.NumberFormat('en-GB', { maximumFractionDigits: 1 }).format(food.nutrition.calories)} kcal / ${food.quantity} ${food.unit}`}</button>)}<button type="button" className={secondaryButton} onClick={() => onKeepSeparate?.(recipe, index, matches)}>Keep separate</button></div></div>)}</section>}
+      {!preview && onMatchExistingFoods && <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-3"><p className="text-sm">Find existing reusable foods for unlinked recipe ingredients.</p><button type="button" className={secondaryButton} onClick={() => onMatchExistingFoods(recipe)}>Match existing foods</button></div>}
+      {possibleMatches.length > 0 && <section className="space-y-3 rounded-xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-4"><h2 className="font-bold">Possible existing foods</h2>{possibleMatches.map(({ item, index, matches }) => <div key={item.id || index} className="space-y-2 border-t border-black/15 pt-3"><p className="text-sm"><strong>{formatIngredient(item)}</strong> · choose a food to use its nutrition.</p><div className="flex flex-wrap gap-2">{matches.map(({ food }) => <button key={food.id} type="button" className={secondaryButton} onClick={() => onUseFood?.(recipe, index, food)}>{food.name} · {food.nutrition?.calories == null ? 'nutrition not set' : `${new Intl.NumberFormat('en-GB', { maximumFractionDigits: 1 }).format(food.nutrition.calories)} kcal / ${food.quantity} ${food.unit}`}</button>)}<button type="button" className={secondaryButton} onClick={() => onKeepSeparate?.(recipe, index, matches)}>Keep separate</button></div></div>)}</section>}
       <IngredientList recipe={recipe} preview={preview} onRecipeUpdated={onRecipeUpdated} />
       <RecipeSteps steps={recipe.steps} />
       {!preview && (
-        <details className="rounded-2xl border-2 border-black bg-white p-4">
+        <details className="rounded-2xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-4">
           <summary className="cursor-pointer font-bold">Kitchen stock, shopping and fibre tools</summary>
           <div className="mt-4"><RecipeGroceries key={recipe.slug} recipe={recipe} foodCatalog={foodCatalog} onRecipeUpdated={onRecipeUpdated} /></div>
         </details>
@@ -445,7 +445,7 @@ export function RecipePage({ recipe, preview = false, onRecipeUpdated, onMatchEx
               <li key={index}>
                 {formatIngredient(sauce)}
                 {sauce.note && (
-                  <span className="text-black/70"> — {sauce.note}</span>
+                  <span className="text-[var(--color-text-secondary)]"> — {sauce.note}</span>
                 )}
               </li>
             ))}
@@ -473,14 +473,14 @@ export function RecipePage({ recipe, preview = false, onRecipeUpdated, onMatchEx
 
 export function RecipeCard({ recipe, favourite = false, favouritePending = false, onToggleFavourite, onDelete, onEdit, onDuplicate, bulkSelection = false, selected = false, onToggleSelected }) {
   return (
-    <article className="recipe-card recipe-clickable-card panel relative flex min-w-0 flex-col gap-4 border-black p-5 text-black">
+    <article className="recipe-card recipe-clickable-card panel relative flex min-w-0 flex-col gap-4 border-[var(--border-default)] p-5 text-[var(--color-text)]">
       {(onDelete || onEdit || onDuplicate || (bulkSelection && onToggleSelected)) && <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
-        {bulkSelection && onToggleSelected && <label className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border-2 border-black bg-white" title={`Select ${recipe.title}`}>
+        {bulkSelection && onToggleSelected && <label className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)]" title={`Select ${recipe.title}`}>
           <input type="checkbox" className="h-4 w-4 accent-lime-500" checked={selected} onChange={event => onToggleSelected(recipe.slug, event.target.checked)} aria-label={`Select ${recipe.title}`} />
         </label>}
         <details className="group relative">
-          <summary className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full border-2 border-black bg-white text-xl font-bold leading-none hover:bg-[#c5ff6f] focus-visible:outline-2 focus-visible:outline-offset-2" aria-label={`Actions for ${recipe.title}`} title="Recipe actions">⋯</summary>
-          <div className="absolute right-0 top-12 z-20 grid min-w-36 gap-1 rounded-xl border-2 border-black bg-white p-2 shadow-[3px_3px_0_#111]">
+          <summary className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] text-xl font-bold leading-none hover:bg-[var(--color-accent-hover)] focus-visible:outline-2 focus-visible:outline-offset-2" aria-label={`Actions for ${recipe.title}`} title="Recipe actions">⋯</summary>
+          <div className="absolute right-0 top-12 z-20 grid min-w-36 gap-1 rounded-xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-2 shadow-[3px_3px_0_#111]">
             {onEdit && <button type="button" className="rounded-lg px-3 py-2 text-left text-sm font-bold hover:bg-[#edffd5]" onClick={event => { event.currentTarget.closest('details').open = false; onEdit(recipe); }}>Edit recipe</button>}
             {onDuplicate && <button type="button" className="rounded-lg px-3 py-2 text-left text-sm font-bold hover:bg-[#edffd5]" onClick={event => { event.currentTarget.closest('details').open = false; onDuplicate(recipe); }}>Duplicate recipe</button>}
             {onDelete && <button type="button" className="rounded-lg px-3 py-2 text-left text-sm font-bold text-red-800 hover:bg-red-50" onClick={event => { event.currentTarget.closest('details').open = false; onDelete(recipe); }}>Delete recipe</button>}
@@ -493,12 +493,12 @@ export function RecipeCard({ recipe, favourite = false, favouritePending = false
         <h2 className="mt-3 break-words text-2xl font-bold"><RecipeLink to={`/recipes/${recipe.slug}`} className="recipe-card-main-link">{recipe.title}</RecipeLink></h2>
       </div>
       {recipe.description && (
-        <p className="line-clamp-2 text-sm leading-6 text-black/70">
+        <p className="line-clamp-2 text-sm leading-6 text-[var(--color-text-secondary)]">
           {recipe.description}
         </p>
       )}
       <RecipeCardNutrition recipe={recipe} />
-      {(recipe.prepTime || recipe.cookTime) && <p className="text-sm text-black/70">
+      {(recipe.prepTime || recipe.cookTime) && <p className="text-sm text-[var(--color-text-secondary)]">
         {[
           recipe.prepTime && `Prep: ${recipe.prepTime}`,
           recipe.cookTime && `Cook: ${recipe.cookTime}`,

@@ -114,14 +114,14 @@ export function FoodItemEditor({ catalog, onSave, onClose, initial = null, dupli
             {draft.nutritionTrackingEnabled === false && <small>Nutrition excluded. This food remains available in recipes and the diary.</small>}
           </fieldset>
         </details>
-        {!initial && reviewMatches.length > 0 && <section className="rounded-xl border-2 border-black bg-[#fff8dd] p-3" aria-label="Possible existing foods">
+        {!initial && reviewMatches.length > 0 && <section className="rounded-xl border-2 border-[var(--border-default)] bg-[var(--color-warning-soft)] p-3" aria-label="Possible existing foods">
           <h3 className="font-bold">Possible existing food found</h3>
           {reviewMatches.map(match => <div key={match.food.id} className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-black/20 pt-2 text-sm"><p><strong>{match.food.name}</strong> · {match.reasons.join('; ')}</p><button type="button" onClick={async () => { try { await onSave({ ...match.food, reuseExisting: true }); notify.info('Existing food reused'); onClose(); } catch (err) { notify.error(err.message || 'Could not reuse this food'); } }}>Use existing</button></div>)}
           <div className="mt-3 flex flex-wrap gap-2">
             <button type="button" onClick={() => setDuplicateChoice('separate')}>Create separately</button>
           </div>
         </section>}
-        {initial && reviewMatches.length > 0 && <p role="status" className="rounded-xl border-2 border-black bg-[#fff8dd] p-3 text-sm">This edit may duplicate {reviewMatches.map(match => match.food.name).join(', ')}. Use All Food Items → Possible duplicates to review or merge them first.</p>}
+        {initial && reviewMatches.length > 0 && <p role="status" className="rounded-xl border-2 border-[var(--border-default)] bg-[var(--color-warning-soft)] p-3 text-sm">This edit may duplicate {reviewMatches.map(match => match.food.name).join(', ')}. Use All Food Items → Possible duplicates to review or merge them first.</p>}
       </fieldset>
       <button type="submit" className="g-primary" disabled={busy}>{busy ? 'Saving...' : 'Save food item'}</button>
     </form>}

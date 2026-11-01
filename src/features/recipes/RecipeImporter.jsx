@@ -190,7 +190,7 @@ export function RecipeImporter({
     setMode(next);
   }
   return (
-    <div className="space-y-6 text-black">
+    <div className="space-y-6 text-[var(--color-text)]">
       <h1 className="text-3xl font-bold">
         {preview
           ? preview.length > 1
@@ -204,7 +204,7 @@ export function RecipeImporter({
       {error && (
         <p
           role="alert"
-          className="rounded-2xl border-2 border-black bg-white p-4"
+          className="rounded-2xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-4"
         >
           {error}
         </p>
@@ -214,7 +214,7 @@ export function RecipeImporter({
         <>
           {preview.length > 1 && (
             <>
-              <p className="text-sm text-black/70">
+              <p className="text-sm text-[var(--color-text-secondary)]">
                 Choose each recipe to review it and upload its image. Save All
                 Recipes saves the entire batch together.
               </p>
@@ -329,10 +329,10 @@ export function RecipeImporter({
               )}
             </div>
             {mode === 'ai' ? (
-              <section className="space-y-4 rounded-2xl border-2 border-black bg-[#e9f8ff] p-5">
+              <section className="space-y-4 rounded-2xl border-2 border-[var(--border-default)] bg-[var(--color-info-soft)] p-5">
                 <div>
                   <h2 className="text-2xl font-bold">Paste a recipe in your own words</h2>
-                  <p className="mt-2 text-sm leading-6 text-black/70">
+                  <p className="mt-2 text-sm leading-6 text-[var(--color-text-secondary)]">
                     Include a title, cooking time, ingredients, and steps. The server securely parses and saves it to your account.
                   </p>
                 </div>
@@ -346,13 +346,13 @@ export function RecipeImporter({
                   onChange={(event) => setAiText(event.target.value)}
                   placeholder="Chicken fried rice. Use 120g chicken, 160g cooked rice…"
                 />
-                <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-black/65">
+                <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-[var(--color-text-secondary)]">
                   <span>{aiText.length}/2000 characters</span>
                   <span>Includes a short ingredient review with green positives, red points to watch and suggested improvements. AI can make mistakes; check the saved recipe and report.</span>
                 </div>
-                <label className="flex !grid-cols-[auto_1fr] items-start gap-3 rounded-xl border-2 border-black bg-white p-3">
+                <label className="flex !grid-cols-[auto_1fr] items-start gap-3 rounded-xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-3">
                   <input className="mt-1 !w-auto" type="checkbox" checked={generateAiImage} onChange={(event) => setGenerateAiImage(event.target.checked)} />
-                  <span><strong className="block text-black">Generate a recipe image with AI</strong><span className="mt-1 block font-normal text-black/65">Creates a food photo after the recipe is saved. This uses the Cloudflare image allowance configured in Groceries settings; if generation fails, the recipe remains safely saved without an image.</span></span>
+                  <span><strong className="block text-[var(--color-text)]">Generate a recipe image with AI</strong><span className="mt-1 block font-normal text-[var(--color-text-secondary)]">Creates a food photo after the recipe is saved. This uses the Cloudflare image allowance configured in Groceries settings; if generation fails, the recipe remains safely saved without an image.</span></span>
                 </label>
                 <PrimaryButton type="button" disabled={busy || !aiText.trim()} onClick={createWithAi}>
                   {busy ? (generateAiImage ? 'Creating recipe and image…' : 'Creating recipe…') : (generateAiImage ? 'Create recipe + image with AI' : 'Create recipe with AI')}
@@ -376,7 +376,7 @@ export function RecipeImporter({
             ) : (
               <>
                 {!editing && <RecipeJsonGuide />}
-                <p className="leading-7 text-black/70">
+                <p className="leading-7 text-[var(--color-text-secondary)]">
                   Paste or upload one recipe object or an array of up to 20
                   recipes. For batches, add each recipe’s image in the preview.
                   JSON can be up to 2 MB total, with 256 KB per recipe.{' '}
@@ -439,7 +439,7 @@ export function RecipeImporter({
             disabled={busy}
             compact={editing}
           />}
-          {mode !== 'ai' && <p className="text-sm text-black/70">
+          {mode !== 'ai' && <p className="text-sm text-[var(--color-text-secondary)]">
             {editing ? 'Upload a replacement image or remove the current one.' : 'The image above is for a single-recipe import. Batch imports have a separate image uploader for each recipe in the preview.'}
           </p>}
           <div className="flex flex-wrap gap-3">

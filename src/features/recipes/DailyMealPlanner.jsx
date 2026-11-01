@@ -108,12 +108,12 @@ export function DailyMealPlanner({ recipes, nutritionGoals }) {
   }
   const { meals, totals } = calculateMealPlan(entries, recipes);
   return (
-    <div className="daily-meal-planner space-y-5 text-black">
+    <div className="daily-meal-planner space-y-5">
       <header className="space-y-3">
         <span className="pill">Daily meals</span>
         <h1 className="text-4xl font-bold">Daily Meal Planner</h1>
         <RecipeLink to="/food-diary">Food diary · log meals & view history</RecipeLink>
-        <p className="leading-7 text-black/70">
+        <p className="leading-7 text-[var(--color-text-secondary)]">
           Choose your meals to see what you’ll eat and the combined calories,
           protein, carbs, fat and fibre.
         </p>
@@ -160,7 +160,7 @@ export function DailyMealPlanner({ recipes, nutritionGoals }) {
           </details>
           {error && !editing && <p role="alert">{error}</p>}
           {!recipes.length && (
-            <p className="rounded-2xl border-2 border-black bg-white p-5">
+            <p className="meal-planner-empty rounded-2xl p-5">
               No recipes yet.{' '}
               <RecipeLink to="/recipes/import">Add a recipe</RecipeLink> to
               start planning.
@@ -187,14 +187,14 @@ export function DailyMealPlanner({ recipes, nutritionGoals }) {
                 const comparison = compareGoal(totals[key], target, key);
                 const unit = key === 'calories' ? 'kcal' : 'g';
                 return <div key={key}>
-                  <p className="text-sm capitalize text-black/70">{key === 'fiber' ? 'fibre' : key}</p>
+                  <p className="text-sm capitalize text-[var(--color-text-secondary)]">{key === 'fiber' ? 'fibre' : key}</p>
                   <p className="text-2xl font-bold">
                     {totals[key].known ? format(totals[key].value) : '—'}{' '}
                     {units[key]}
                   </p>
-                  {key === 'fiber' && meals.some((meal) => meal.recipe?.fibreSource) && <p className="text-sm text-black/70">Includes saved estimates</p>}
+                  {key === 'fiber' && meals.some((meal) => meal.recipe?.fibreSource) && <p className="text-sm text-[var(--color-text-secondary)]">Includes saved estimates</p>}
                   {totals[key].missing > 0 && (
-                    <p className="text-sm text-black/70">
+                    <p className="text-sm text-[var(--color-text-secondary)]">
                       {totals[key].known ? 'Known subtotal' : 'Not provided'} ·
                       missing for {totals[key].missing} meal
                       {totals[key].missing === 1 ? '' : 's'}
@@ -213,12 +213,12 @@ export function DailyMealPlanner({ recipes, nutritionGoals }) {
               })}
             </div>
             {nutritionGoals.error && <p role="status">Target comparison unavailable until your targets load.</p>}
-            <p role="status" className="text-sm text-black/70">
+            <p role="status" className="text-sm text-[var(--color-text-secondary)]">
               {meals.length
                 ? `${meals.length} selected meal${meals.length === 1 ? '' : 's'}. Totals update as you change selections.`
                 : 'Choose a recipe below to start calculating.'}
             </p>
-            <p className="text-sm text-black/70">
+            <p className="text-sm text-[var(--color-text-secondary)]">
               1× uses the recipe’s listed macros exactly as entered. 0.5× counts
               half; 2× counts double. Servings are not divided automatically.
               Missing macros are never counted as zero.
@@ -241,13 +241,13 @@ export function DailyMealPlanner({ recipes, nutritionGoals }) {
                   <div>
                     <span className="pill">Quick plan</span>
                     <h2 className="mt-2 text-2xl font-bold">Choose today’s meals</h2>
-                    <p className="mt-1 text-sm text-black/65">Swipe through the meal cards, choose recipes, then save.</p>
+                    <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Swipe through the meal cards, choose recipes, then save.</p>
                   </div>
-                  <p role="status" className="text-sm font-semibold text-black/70">
+                  <p role="status" className="text-sm font-semibold text-[var(--color-text-secondary)]">
                     {dirty ? 'Unsaved changes' : saved ? 'Daily plan saved' : `${meals.length} selected`}
                   </p>
                 </div>
-                <details className="meal-plan-options rounded-2xl border-2 border-black bg-white p-4">
+                <details className="meal-plan-options rounded-2xl p-4">
                   <summary className="cursor-pointer font-bold">Routine name & notes</summary>
                   <div className="mt-4 space-y-4">
                   <label htmlFor="routine-name" className="block font-semibold">
@@ -300,7 +300,7 @@ export function DailyMealPlanner({ recipes, nutritionGoals }) {
                   return (
                     <section
                       key={entry.id}
-                      className="meal-plan-entry space-y-3 rounded-2xl border-2 border-black bg-white p-4"
+                      className="meal-plan-entry space-y-3 rounded-2xl p-4"
                       aria-label={`Meal ${index + 1}`}
                     >
                       <div className="meal-plan-entry-heading flex items-center justify-between gap-3">
@@ -392,7 +392,7 @@ export function DailyMealPlanner({ recipes, nutritionGoals }) {
                           <RecipeLink to={`/recipes/${recipe.slug}`}>
                             {recipe.title} →
                           </RecipeLink>
-                          <p className="text-sm text-black/70">
+                          <p className="text-sm text-[var(--color-text-secondary)]">
                             {MACROS.map((key) => {
                               const value = meals.find(
                                 (meal) => meal.id === entry.id,

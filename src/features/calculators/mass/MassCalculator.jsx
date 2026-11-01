@@ -19,16 +19,16 @@ function MassResultPanel({ result, className = "" }) {
     return (
       <aside
         aria-live="polite"
-        className={`rounded-[2rem] border-2 border-black bg-[#ff90e8] p-6 text-black sm:p-7 ${className}`}
+        className={`rounded-[2rem] border-2 border-[var(--border-default)] bg-[#ff90e8] p-6 text-[var(--color-text)] sm:p-7 ${className}`}
       >
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/60">
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
           Result
         </p>
 
-        <p className="mt-6 text-6xl font-bold tracking-[-0.06em] text-black sm:text-7xl">
+        <p className="mt-6 text-6xl font-bold tracking-[-0.06em] text-[var(--color-text)] sm:text-7xl">
           --
         </p>
-        {/* <p className="mt-3 text-sm font-bold uppercase tracking-[0.12em] text-black/65">
+        {/* <p className="mt-3 text-sm font-bold uppercase tracking-[0.12em] text-[var(--color-text-secondary)]">
           Choose values
         </p> */}
       </aside>
@@ -38,43 +38,43 @@ function MassResultPanel({ result, className = "" }) {
   return (
     <aside
       aria-live="polite"
-      className={`rounded-[2rem] border-2 border-black bg-[#ff90e8] p-6 text-black sm:p-7 ${className}`}
+      className={`rounded-[2rem] border-2 border-[var(--border-default)] bg-[#ff90e8] p-6 text-[var(--color-text)] sm:p-7 ${className}`}
     >
-      <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/60">
+      <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
         Result
       </p>
 
-      <p className="mt-6 break-words text-5xl font-bold tracking-[-0.06em] text-black sm:text-6xl">
+      <p className="mt-6 break-words text-5xl font-bold tracking-[-0.06em] text-[var(--color-text)] sm:text-6xl">
         {result.formattedConvertedValue}
       </p>
-      <p className="mt-3 text-sm font-bold uppercase tracking-[0.12em] text-black/65">
+      <p className="mt-3 text-sm font-bold uppercase tracking-[0.12em] text-[var(--color-text-secondary)]">
         {result.toUnitName}
       </p>
 
       <div className="mt-6 grid gap-3">
-        <div className="rounded-[1.4rem] border-2 border-black bg-[#fffdf8] p-4">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-black/55">
+        <div className="rounded-[1.4rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-4">
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-muted)]">
             From
           </p>
-          <p className="mt-2 text-xl font-bold text-black">
+          <p className="mt-2 text-xl font-bold text-[var(--color-text)]">
             {result.formattedInputValue} {result.fromUnitName}
           </p>
         </div>
 
-        <div className="rounded-[1.4rem] border-2 border-black bg-[#fffdf8] p-4">
-          <p className="text-xs font-bold uppercase tracking-[0.14em] text-black/55">
+        <div className="rounded-[1.4rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-4">
+          <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-muted)]">
             Formula
           </p>
-          <p className="mt-2 text-lg font-bold leading-7 text-black">
+          <p className="mt-2 text-lg font-bold leading-7 text-[var(--color-text)]">
             {result.formulaText}
           </p>
         </div>
       </div>
 
-      <p className="mt-6 text-sm font-medium leading-7 text-black/70">
+      <p className="mt-6 text-sm font-medium leading-7 text-[var(--color-text-secondary)]">
         Relation: {result.relationshipText}
       </p>
-      <p className="mt-2 text-sm font-medium leading-7 text-black/70">
+      <p className="mt-2 text-sm font-medium leading-7 text-[var(--color-text-secondary)]">
         Calculation: {result.calculationText}
       </p>
     </aside>
@@ -177,14 +177,14 @@ export function MassCalculator() {
         <form
           noValidate
           onSubmit={handleSubmit}
-          className="order-2 rounded-[2rem] border-2 border-black bg-[#fffdf8] p-5 sm:p-6 lg:order-1"
+          className="order-2 rounded-[2rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-5 sm:p-6 lg:order-1"
         >
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
                 Inputs
               </p>
-              <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-black">
+              <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-[var(--color-text)]">
                 Convert mass
               </h2>
             </div>
@@ -226,7 +226,7 @@ export function MassCalculator() {
 
           <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
             <PrimaryButton type="submit">Calculate</PrimaryButton>
-            <p className="text-sm font-medium leading-6 text-black/55">
+            <p className="text-sm font-medium leading-6 text-[var(--color-text-muted)]">
               Updates live after the first submit.
             </p>
           </div>

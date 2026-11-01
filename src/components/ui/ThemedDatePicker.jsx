@@ -147,7 +147,7 @@ export function ThemedDatePicker({
       >
         <span>{value || 'Pick date'}</span>
         <span
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-black bg-[#c5ff6f] text-xs font-bold shadow-[2px_2px_0_#000] ${
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-[var(--border-default)] bg-[var(--color-accent)] text-xs font-bold shadow-[2px_2px_0_#000] ${
             isOpen ? 'bg-[#9fe3ff]' : ''
           }`}
           aria-hidden="true"
@@ -160,25 +160,25 @@ export function ThemedDatePicker({
         <div
           role="dialog"
           aria-label="Choose date"
-          className="absolute left-0 z-40 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-[1.35rem] border-2 border-black bg-[#fff0b8] p-3 shadow-[7px_7px_0_#000]"
+          className="absolute left-0 z-40 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-[1.35rem] border-2 border-[var(--border-default)] bg-[var(--color-warning-soft)] p-3 shadow-[7px_7px_0_#000]"
         >
-          <div className="flex items-center justify-between gap-3 rounded-[1rem] border-2 border-black bg-[#fffdf8] p-2">
+          <div className="flex items-center justify-between gap-3 rounded-[1rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-2">
             <button
               type="button"
               onClick={() => changeMonth(-1)}
               aria-label="Previous month"
-              className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-black bg-white text-lg font-bold shadow-[2px_2px_0_#000]"
+              className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] text-lg font-bold shadow-[2px_2px_0_#000]"
             >
               &lt;
             </button>
-            <p className="text-center text-sm font-bold uppercase tracking-[0.12em] text-black">
+            <p className="text-center text-sm font-bold uppercase tracking-[0.12em] text-[var(--color-text)]">
               {monthNames[visibleMonth.getMonth()]} {visibleMonth.getFullYear()}
             </p>
             <button
               type="button"
               onClick={() => changeMonth(1)}
               aria-label="Next month"
-              className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-black bg-white text-lg font-bold shadow-[2px_2px_0_#000]"
+              className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] text-lg font-bold shadow-[2px_2px_0_#000]"
             >
               &gt;
             </button>
@@ -188,7 +188,7 @@ export function ThemedDatePicker({
             {weekdays.map((weekday) => (
               <div
                 key={weekday}
-                className="rounded-full border border-black/20 bg-white px-1 py-1 text-center text-[0.62rem] font-bold uppercase tracking-[0.08em] text-black/60"
+                className="rounded-full border border-black/20 bg-[var(--surface-elevated)] px-1 py-1 text-center text-[0.62rem] font-bold uppercase tracking-[0.08em] text-[var(--color-text-muted)]"
               >
                 {weekday}
               </div>
@@ -203,12 +203,12 @@ export function ThemedDatePicker({
                   key={dateValue}
                   type="button"
                   onClick={() => selectDate(date)}
-                  className={`aspect-square rounded-[0.9rem] border-2 border-black text-sm font-bold text-black transition hover:-translate-y-px hover:bg-[#9fe3ff] hover:shadow-[2px_2px_0_#000] ${
+                  className={`aspect-square rounded-[0.9rem] border-2 border-[var(--border-default)] text-sm font-bold text-[var(--color-text)] transition hover:-translate-y-px hover:bg-[#9fe3ff] hover:shadow-[2px_2px_0_#000] ${
                     isSelected
-                      ? 'bg-[#c5ff6f] shadow-[2px_2px_0_#000]'
+                      ? 'bg-[var(--color-accent)] shadow-[2px_2px_0_#000]'
                       : isToday
                         ? 'bg-[#ffd166]'
-                        : 'bg-[#fffdf8]'
+                        : 'bg-[var(--surface-elevated)]'
                   }`}
                 >
                   {date.getDate()}
@@ -223,7 +223,7 @@ export function ThemedDatePicker({
             <button
               type="button"
               onClick={selectToday}
-              className="rounded-full border-2 border-black bg-black px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-white shadow-[3px_3px_0_#c5ff6f]"
+              className="rounded-full border-2 border-[var(--border-default)] bg-black px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-white shadow-[3px_3px_0_#c5ff6f]"
             >
               Today
             </button>

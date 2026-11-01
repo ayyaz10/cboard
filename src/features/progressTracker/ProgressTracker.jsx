@@ -713,17 +713,17 @@ export function ProgressTracker() {
           <span className="pill">Progress tracker</span>
         </div>
 
-        <h1 className="mt-6 max-w-3xl text-4xl font-bold tracking-[-0.05em] text-black sm:text-5xl lg:text-6xl">
+        <h1 className="mt-6 max-w-3xl text-4xl font-bold tracking-[-0.05em] text-[var(--color-text)] sm:text-5xl lg:text-6xl">
           Build goals that show their work
         </h1>
 
-        <p className="mt-3 max-w-2xl text-base font-medium leading-7 text-black/70 sm:text-lg">
+        <p className="mt-3 max-w-2xl text-base font-medium leading-7 text-[var(--color-text-secondary)] sm:text-lg">
           Create performance, completion, or consistency goals and track each
           one with the dashboard behavior that fits it.
         </p>
 
         {error ? (
-          <p className="mt-5 rounded-[1rem] border-2 border-black bg-[#ffe0de] px-4 py-3 text-sm font-bold text-black">
+          <p className="mt-5 rounded-[1rem] border-2 border-[var(--border-default)] bg-[var(--color-danger-soft)] px-4 py-3 text-sm font-bold text-[var(--color-text)]">
             {error}
           </p>
         ) : null}
@@ -738,10 +738,10 @@ export function ProgressTracker() {
                   key={view.id}
                   type="button"
                   onClick={() => setActiveView(view.id)}
-                  className={`inline-flex items-center rounded-full border border-black/85 px-3.5 py-1.5 text-sm font-semibold tracking-[-0.02em] text-black transition ${
+                  className={`inline-flex items-center rounded-full border border-black/85 px-3.5 py-1.5 text-sm font-semibold tracking-[-0.02em] text-[var(--color-text)] transition ${
                     isActive
-                      ? 'bg-[#c5ff6f]'
-                      : 'bg-[#fffdf8] hover:bg-white'
+                      ? 'bg-[var(--color-accent)]'
+                      : 'bg-[var(--surface-elevated)] hover:bg-[var(--surface-elevated)]'
                   }`}
                 >
                   {view.label}
@@ -752,7 +752,7 @@ export function ProgressTracker() {
         </div>
 
         {isLoading ? (
-          <div className="mt-8 rounded-[1.75rem] border-2 border-black bg-[#fffdf8] p-6 text-lg font-bold text-black">
+          <div className="mt-8 rounded-[1.75rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-6 text-lg font-bold text-[var(--color-text)]">
             Loading tracker data...
           </div>
         ) : null}
@@ -768,7 +768,7 @@ export function ProgressTracker() {
                       setEditingEntry(null);
                       setIsLogPanelOpen(false);
                     }}
-                    className="justify-self-start rounded-full border-2 border-black bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[3px_3px_0_#000]"
+                    className="justify-self-start rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text)] shadow-[3px_3px_0_#000]"
                   >
                     Back to tracker list
                   </button>
@@ -832,14 +832,14 @@ export function ProgressTracker() {
                       <button
                         type="button"
                         onClick={() => setEditingGoal(selectedGoal)}
-                        className="rounded-full border-2 border-black bg-[#9fe3ff] px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[3px_3px_0_#000]"
+                        className="rounded-full border-2 border-[var(--border-default)] bg-[#9fe3ff] px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text)] shadow-[3px_3px_0_#000]"
                       >
                         Edit goal
                       </button>
                       <button
                         type="button"
                         onClick={() => handleDeleteGoal(selectedGoal.id)}
-                        className="rounded-full border-2 border-black bg-[#ffe0de] px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[3px_3px_0_#000] transition hover:bg-[#ffb4ad]"
+                        className="rounded-full border-2 border-[var(--border-default)] bg-[var(--color-danger-soft)] px-4 py-2 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text)] shadow-[3px_3px_0_#000] transition hover:bg-[#ffb4ad]"
                       >
                         Delete goal
                       </button>
@@ -861,10 +861,10 @@ export function ProgressTracker() {
                           key={view.id}
                           type="button"
                           onClick={() => setActiveGoalDetailView(view.id)}
-                          className={`inline-flex items-center rounded-full border-2 border-black px-3.5 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-black transition ${
+                          className={`inline-flex items-center rounded-full border-2 border-[var(--border-default)] px-3.5 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text)] transition ${
                             isActive
-                              ? 'bg-[#c5ff6f] shadow-[3px_3px_0_#000]'
-                              : 'bg-[#fffdf8] hover:bg-white'
+                              ? 'bg-[var(--color-accent)] shadow-[3px_3px_0_#000]'
+                              : 'bg-[var(--surface-elevated)] hover:bg-[var(--surface-elevated)]'
                           }`}
                         >
                           {view.label}

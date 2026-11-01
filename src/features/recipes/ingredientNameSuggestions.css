@@ -1,47 +1,23 @@
-/* Keep saved-food autocomplete readable in both light and dark themes. */
+.ingredient-name-suggestions { border: var(--border-width-strong) solid var(--border-strong); border-radius: var(--radius-card); background: var(--surface-elevated); color: var(--color-text); box-shadow: var(--shadow-popover); }
 .ingredient-name-suggestions .ingredient-name-suggestion {
-  color: #172017;
+  color: var(--color-text);
 }
 
 .ingredient-name-suggestions .ingredient-name-suggestion span:first-child {
-  color: #172017;
+  color: var(--color-text);
 }
 
 .ingredient-name-suggestions .ingredient-name-suggestion span:last-child {
-  color: #465246;
+  color: var(--color-text-secondary);
 }
 
 .ingredient-name-suggestions .ingredient-name-suggestion[aria-selected='true'] {
-  background-color: #d8efc6;
-  color: #172017;
-  box-shadow: inset 3px 0 0 #4a7d32;
+  background-color: var(--surface-selected);
+  color: var(--color-accent-text);
+  box-shadow: inset 3px 0 0 var(--color-accent);
 }
 
 .ingredient-name-suggestions .ingredient-name-suggestion[aria-selected='true'] span {
-  color: #172017;
+  color: var(--color-accent-text);
 }
-
-html[data-theme='midnight'] .ingredient-name-suggestions {
-  border-color: #707b70 !important;
-  background-color: #111511 !important;
-  box-shadow: 4px 4px 0 #000 !important;
-}
-
-html[data-theme='midnight'] .ingredient-name-suggestions .ingredient-name-suggestion,
-html[data-theme='midnight'] .ingredient-name-suggestions .ingredient-name-suggestion span {
-  color: #f3f6f0 !important;
-}
-
-html[data-theme='midnight'] .ingredient-name-suggestions .ingredient-name-suggestion {
-  background-color: #171d18 !important;
-}
-
-html[data-theme='midnight'] .ingredient-name-suggestions .ingredient-name-suggestion:hover:not([aria-selected='true']) {
-  background-color: #263126 !important;
-}
-
-html[data-theme='midnight'] .ingredient-name-suggestions .ingredient-name-suggestion[aria-selected='true'],
-html[data-theme='midnight'] .ingredient-name-suggestions .ingredient-name-suggestion[aria-selected='true'] span {
-  background-color: #315b37 !important;
-  color: #fff !important;
-}
+.ingredient-name-suggestions .ingredient-name-suggestion:hover:not([aria-selected='true']) { background: var(--surface-hover); }

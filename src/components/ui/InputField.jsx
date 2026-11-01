@@ -17,7 +17,7 @@ export function InputField({
       <div className="mb-2 flex items-center justify-between gap-2">
         <label
           htmlFor={id}
-          className="text-xs font-bold uppercase tracking-[0.14em] text-black/70"
+          className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]"
         >
           {label}
         </label>
@@ -42,7 +42,7 @@ export function InputField({
       />
 
       {hint ? (
-        <p id={hintId} className="mt-2 text-sm font-medium leading-6 text-black/55">
+        <p id={hintId} className="mt-2 text-sm font-medium leading-6 text-[var(--color-text-muted)]">
           {hint}
         </p>
       ) : null}

@@ -13,12 +13,12 @@ export function ToolLayout({ activeCalculator, calculators, children }) {
           }))}
         />
 
-        <h1 className="mt-7 max-w-3xl text-4xl font-bold tracking-[-0.05em] text-black sm:text-5xl lg:text-6xl">
+        <h1 className="mt-7 max-w-3xl text-4xl font-bold tracking-[-0.05em] text-[var(--color-text)] sm:text-5xl lg:text-6xl">
           {activeCalculator.name}
         </h1>
 
         {activeCalculator.description ? (
-          <p className="mt-3 max-w-xl text-base font-medium leading-7 text-black/70 sm:text-lg">
+          <p className="mt-3 max-w-xl text-base font-medium leading-7 text-[var(--color-text-secondary)] sm:text-lg">
             {activeCalculator.description}
           </p>
         ) : null}
@@ -28,8 +28,8 @@ export function ToolLayout({ activeCalculator, calculators, children }) {
 
       {activeCalculator.showReferenceCards ? (
         <section className="grid gap-4 md:grid-cols-2">
-          <article className="rounded-[1.75rem] border-2 border-black bg-[#fff0b8] p-5 sm:p-6">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
+          <article className="rounded-[1.75rem] border-2 border-[var(--border-default)] bg-[var(--color-warning-soft)] p-5 sm:p-6">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
               Formula
             </p>
 
@@ -40,11 +40,11 @@ export function ToolLayout({ activeCalculator, calculators, children }) {
             </div>
           </article>
 
-          <article className="rounded-[1.75rem] border-2 border-black bg-[#ff90e8] p-5 sm:p-6">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
+          <article className="rounded-[1.75rem] border-2 border-[var(--border-default)] bg-[#ff90e8] p-5 sm:p-6">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
               Example
             </p>
-            <p className="mt-4 text-2xl font-bold tracking-[-0.03em] text-black sm:text-3xl">
+            <p className="mt-4 text-2xl font-bold tracking-[-0.03em] text-[var(--color-text)] sm:text-3xl">
               {activeCalculator.example.total}
             </p>
             <p className="mt-4 text-lg font-medium text-black/85">

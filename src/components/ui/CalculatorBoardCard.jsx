@@ -19,10 +19,10 @@ export function CalculatorBoardCard({ calculator }) {
     >
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
             {calculator.boardLabel}
           </p>
-          <h2 className="mt-3 text-2xl font-bold tracking-[-0.04em] text-black">
+          <h2 className="mt-3 text-2xl font-bold tracking-[-0.04em] text-[var(--color-text)]">
             {calculator.name}
           </h2>
         </div>
@@ -34,10 +34,10 @@ export function CalculatorBoardCard({ calculator }) {
       </p>
 
       <div className="mt-8 flex items-center justify-between gap-3">
-        <span className="rounded-full border-2 border-black bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-black">
+        <span className="rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text)]">
           Open
         </span>
-        <span className="text-2xl font-bold text-black">{'->'}</span>
+        <span className="text-2xl font-bold text-[var(--color-text)]">{'->'}</span>
       </div>
     </a>
   );

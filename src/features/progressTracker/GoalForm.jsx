@@ -208,14 +208,14 @@ export function GoalForm({
   return (
     <form
       onSubmit={handleSubmit}
-      className="rounded-[1.75rem] border-2 border-black bg-[#fffdf8] p-5 shadow-[5px_5px_0_#000] sm:p-6"
+      className="rounded-[1.75rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-5 shadow-[5px_5px_0_#000] sm:p-6"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
             {isEditing ? 'Edit goal' : 'Create goal'}
           </p>
-          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-black">
+          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-[var(--color-text)]">
             {isEditing ? 'Goal details' : 'New tracker'}
           </h2>
         </div>
@@ -223,12 +223,12 @@ export function GoalForm({
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-full border-2 border-black bg-white px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-black"
+            className="rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text)]"
           >
             Cancel
           </button>
         ) : (
-          <span className="rounded-full border-2 border-black bg-[#ffd166] px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-black">
+          <span className="rounded-full border-2 border-[var(--border-default)] bg-[#ffd166] px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text)]">
             Ready
           </span>
         )}
@@ -236,7 +236,7 @@ export function GoalForm({
 
       <div className="mt-5 grid gap-4 md:grid-cols-2">
         <label className="block">
-          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
             Goal title
           </span>
           <input
@@ -248,7 +248,7 @@ export function GoalForm({
         </label>
 
         <label className="block">
-          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
             Template
           </span>
           <ThemedSelect
@@ -260,7 +260,7 @@ export function GoalForm({
       </div>
 
       <div className="mt-6">
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
+        <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
           How should this goal be tracked?
         </p>
         <div className="mt-3 grid gap-3 md:grid-cols-3">
@@ -272,20 +272,20 @@ export function GoalForm({
                 key={goalType}
                 type="button"
                 onClick={() => handleGoalTypeChange(goalType)}
-                className={`rounded-[1.35rem] border-2 border-black p-4 text-left transition hover:-translate-y-1 hover:shadow-[5px_5px_0_#000] ${
-                  isSelected ? 'bg-[#9fe3ff]' : 'bg-[#f8f3ea]'
+                className={`rounded-[1.35rem] border-2 border-[var(--border-default)] p-4 text-left transition hover:-translate-y-1 hover:shadow-[5px_5px_0_#000] ${
+                  isSelected ? 'bg-[#9fe3ff]' : 'bg-[var(--surface-primary)]'
                 }`}
               >
-                <span className="text-sm font-bold tracking-[-0.03em] text-black">
+                <span className="text-sm font-bold tracking-[-0.03em] text-[var(--color-text)]">
                   {option.label}
                 </span>
-                <span className="mt-2 block text-xs font-bold uppercase tracking-[0.12em] text-black/55">
+                <span className="mt-2 block text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
                   {option.description}
                 </span>
-                <span className="mt-3 block text-sm font-semibold leading-6 text-black/70">
+                <span className="mt-3 block text-sm font-semibold leading-6 text-[var(--color-text-secondary)]">
                   {option.examples}
                 </span>
-                <span className="mt-3 inline-flex rounded-full border-2 border-black bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-black">
+                <span className="mt-3 inline-flex rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text)]">
                   {option.note}
                 </span>
               </button>
@@ -296,7 +296,7 @@ export function GoalForm({
 
       <div className="mt-5 grid gap-4 md:grid-cols-2">
         <label className="block">
-          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
             {isBinaryGoal(form)
               ? 'Starting score'
               : form.goalType === 'accumulative'
@@ -314,7 +314,7 @@ export function GoalForm({
         </label>
 
         <label className="block">
-          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
             {isBinaryGoal(form) ? 'Target score' : 'Target value'}
           </span>
           <input
@@ -328,7 +328,7 @@ export function GoalForm({
         </label>
 
         <label className="block md:col-span-2">
-          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
             {isBinaryGoal(form) ? 'Score unit' : 'Target unit'}
           </span>
           <input
@@ -340,7 +340,7 @@ export function GoalForm({
         </label>
 
         <label className="block md:col-span-2">
-          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
             Deadline
           </span>
           <ThemedDatePicker
@@ -350,12 +350,12 @@ export function GoalForm({
         </label>
       </div>
 
-      <label className="mt-5 flex items-center justify-between gap-4 rounded-[1.35rem] border-2 border-black bg-[#f8f3ea] p-4">
+      <label className="mt-5 flex items-center justify-between gap-4 rounded-[1.35rem] border-2 border-[var(--border-default)] bg-[var(--surface-primary)] p-4">
         <span>
-          <span className="block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+          <span className="block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
             Allow multiple entries per day
           </span>
-          <span className="mt-1 block text-sm font-semibold leading-6 text-black/65">
+          <span className="mt-1 block text-sm font-semibold leading-6 text-[var(--color-text-secondary)]">
             Save separate logs on the same date instead of replacing the daily entry.
           </span>
         </span>
@@ -367,13 +367,13 @@ export function GoalForm({
               !form.allowMultipleEntriesPerDay,
             )
           }
-          className={`relative h-8 w-16 shrink-0 rounded-full border-2 border-black transition ${
-            form.allowMultipleEntriesPerDay ? 'bg-[#c5ff6f]' : 'bg-white'
+          className={`relative h-8 w-16 shrink-0 rounded-full border-2 border-[var(--border-default)] transition ${
+            form.allowMultipleEntriesPerDay ? 'bg-[var(--color-accent)]' : 'bg-[var(--surface-elevated)]'
           }`}
           aria-pressed={form.allowMultipleEntriesPerDay}
         >
           <span
-            className={`absolute top-1 h-5 w-5 rounded-full border-2 border-black bg-black transition ${
+            className={`absolute top-1 h-5 w-5 rounded-full border-2 border-[var(--border-default)] bg-black transition ${
               form.allowMultipleEntriesPerDay ? 'left-9' : 'left-1'
             }`}
           />
@@ -383,13 +383,13 @@ export function GoalForm({
       {!isBinaryGoal(form) ? (
       <div className="mt-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
             Metrics
           </p>
           <button
             type="button"
             onClick={addMetric}
-            className="rounded-full border-2 border-black bg-[#9fe3ff] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[3px_3px_0_#000]"
+            className="rounded-full border-2 border-[var(--border-default)] bg-[#9fe3ff] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text)] shadow-[3px_3px_0_#000]"
           >
             Add metric
           </button>
@@ -399,7 +399,7 @@ export function GoalForm({
           {form.metrics.map((metric) => (
             <div
               key={metric.id}
-              className="grid gap-3 rounded-[1.35rem] border-2 border-black bg-[#f8f3ea] p-3 md:grid-cols-[1fr_0.55fr_0.45fr_auto]"
+              className="grid gap-3 rounded-[1.35rem] border-2 border-[var(--border-default)] bg-[var(--surface-primary)] p-3 md:grid-cols-[1fr_0.55fr_0.45fr_auto]"
             >
               <input
                 className="field-input"
@@ -430,7 +430,7 @@ export function GoalForm({
               <button
                 type="button"
                 onClick={() => removeMetric(metric.id)}
-                className="rounded-full border-2 border-black bg-white px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-black"
+                className="rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text)]"
               >
                 Remove
               </button>
@@ -441,7 +441,7 @@ export function GoalForm({
       ) : null}
 
       {error ? (
-        <p className="mt-4 rounded-[1rem] border-2 border-black bg-[#ffe0de] px-4 py-3 text-sm font-bold text-black">
+        <p className="mt-4 rounded-[1rem] border-2 border-[var(--border-default)] bg-[var(--color-danger-soft)] px-4 py-3 text-sm font-bold text-[var(--color-text)]">
           {error}
         </p>
       ) : null}
@@ -449,7 +449,7 @@ export function GoalForm({
       <button
         type="submit"
         disabled={isSaving}
-        className="mt-6 inline-flex w-full items-center justify-center rounded-full border-2 border-black bg-[#c5ff6f] px-5 py-3.5 text-sm font-bold uppercase tracking-[0.12em] text-black shadow-[4px_4px_0_#000] transition hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_#000] disabled:cursor-not-allowed disabled:opacity-55"
+        className="mt-6 inline-flex w-full items-center justify-center rounded-full border-2 border-[var(--border-default)] bg-[var(--color-accent)] px-5 py-3.5 text-sm font-bold uppercase tracking-[0.12em] text-[var(--color-accent-contrast)] shadow-[4px_4px_0_#000] transition hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_#000] disabled:cursor-not-allowed disabled:opacity-55"
       >
         {isSaving ? 'Saving...' : isEditing ? 'Save changes' : 'Create goal'}
       </button>

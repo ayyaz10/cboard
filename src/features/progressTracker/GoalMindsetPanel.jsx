@@ -39,14 +39,14 @@ export function GoalPinnedQuote({ goal, quotes }) {
   }
 
   return (
-    <section className="rounded-[1.75rem] border-2 border-black bg-[#fff0b8] p-5 shadow-[5px_5px_0_#000] sm:p-6">
-      <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
+    <section className="rounded-[1.75rem] border-2 border-[var(--border-default)] bg-[var(--color-warning-soft)] p-5 shadow-[5px_5px_0_#000] sm:p-6">
+      <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
         Pinned quote
       </p>
-      <blockquote className="mt-3 break-words text-2xl font-bold leading-8 tracking-[-0.04em] text-black sm:text-3xl sm:leading-10">
+      <blockquote className="mt-3 break-words text-2xl font-bold leading-8 tracking-[-0.04em] text-[var(--color-text)] sm:text-3xl sm:leading-10">
         {pinnedQuote.content}
       </blockquote>
-      <p className="mt-4 text-xs font-bold uppercase tracking-[0.14em] text-black/55">
+      <p className="mt-4 text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-muted)]">
         {goal.title}
       </p>
     </section>
@@ -134,24 +134,24 @@ export function GoalVisionPanel({
   }
 
   return (
-    <section className="rounded-[1.75rem] border-2 border-black bg-[#fff0b8] p-5 sm:p-6">
+    <section className="rounded-[1.75rem] border-2 border-[var(--border-default)] bg-[var(--color-warning-soft)] p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
             Vision
           </p>
-          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-black">
+          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-[var(--color-text)]">
             Vision and quotes
           </h2>
         </div>
-        <span className="rounded-full border-2 border-black bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-black">
+        <span className="rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text)]">
           Per-goal
         </span>
       </div>
 
       <form onSubmit={handleSubmit} className="mt-5 grid gap-4">
         <label className="block">
-          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
             Goal vision
           </span>
           <textarea
@@ -163,7 +163,7 @@ export function GoalVisionPanel({
         </label>
 
         {error ? (
-          <p className="rounded-[1rem] border-2 border-black bg-[#ffe0de] px-4 py-3 text-sm font-bold text-black">
+          <p className="rounded-[1rem] border-2 border-[var(--border-default)] bg-[var(--color-danger-soft)] px-4 py-3 text-sm font-bold text-[var(--color-text)]">
             {error}
           </p>
         ) : null}
@@ -171,7 +171,7 @@ export function GoalVisionPanel({
         <button
           type="submit"
           disabled={!isDirty || isSaving}
-          className="inline-flex w-full items-center justify-center rounded-full border-2 border-black bg-[#c5ff6f] px-5 py-3.5 text-sm font-bold uppercase tracking-[0.12em] text-black shadow-[4px_4px_0_#000] transition hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_#000] disabled:cursor-not-allowed disabled:opacity-55"
+          className="inline-flex w-full items-center justify-center rounded-full border-2 border-[var(--border-default)] bg-[var(--color-accent)] px-5 py-3.5 text-sm font-bold uppercase tracking-[0.12em] text-[var(--color-accent-contrast)] shadow-[4px_4px_0_#000] transition hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_#000] disabled:cursor-not-allowed disabled:opacity-55"
         >
           {isSaving ? 'Saving...' : isDirty ? 'Save vision' : 'Vision saved'}
         </button>
@@ -180,24 +180,24 @@ export function GoalVisionPanel({
       <div className="mt-6 border-t-2 border-black/20 pt-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
               Quotes
             </p>
-            <h3 className="mt-2 text-xl font-bold tracking-[-0.04em] text-black">
+            <h3 className="mt-2 text-xl font-bold tracking-[-0.04em] text-[var(--color-text)]">
               Dashboard quote stack
             </h3>
           </div>
-          <span className="rounded-full border-2 border-black bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-black">
+          <span className="rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text)]">
             {sortedQuotes.length}
           </span>
         </div>
 
         <form
           onSubmit={handleQuoteSubmit}
-          className="mt-4 rounded-[1.35rem] border-2 border-black bg-[#fffdf8] p-4 shadow-[4px_4px_0_#000]"
+          className="mt-4 rounded-[1.35rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-4 shadow-[4px_4px_0_#000]"
         >
           <label className="block">
-            <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+            <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
               Quote or affirmation
             </span>
             <textarea
@@ -208,25 +208,25 @@ export function GoalVisionPanel({
             />
           </label>
 
-          <label className="mt-4 flex items-center justify-between gap-4 rounded-[1.35rem] border-2 border-black bg-[#f8f3ea] p-4">
+          <label className="mt-4 flex items-center justify-between gap-4 rounded-[1.35rem] border-2 border-[var(--border-default)] bg-[var(--surface-primary)] p-4">
             <span>
-              <span className="block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+              <span className="block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
                 Show on dashboard
               </span>
-              <span className="mt-1 block text-sm font-semibold leading-6 text-black/65">
+              <span className="mt-1 block text-sm font-semibold leading-6 text-[var(--color-text-secondary)]">
                 Pin this quote at the top of the selected goal dashboard.
               </span>
             </span>
             <button
               type="button"
               onClick={() => setPinQuote((current) => !current)}
-              className={`relative h-8 w-16 shrink-0 rounded-full border-2 border-black transition ${
-                pinQuote ? 'bg-[#c5ff6f]' : 'bg-white'
+              className={`relative h-8 w-16 shrink-0 rounded-full border-2 border-[var(--border-default)] transition ${
+                pinQuote ? 'bg-[var(--color-accent)]' : 'bg-[var(--surface-elevated)]'
               }`}
               aria-pressed={pinQuote}
             >
               <span
-                className={`absolute top-1 h-5 w-5 rounded-full border-2 border-black bg-black transition ${
+                className={`absolute top-1 h-5 w-5 rounded-full border-2 border-[var(--border-default)] bg-black transition ${
                   pinQuote ? 'left-9' : 'left-1'
                 }`}
               />
@@ -234,7 +234,7 @@ export function GoalVisionPanel({
           </label>
 
           {quoteError ? (
-            <p className="mt-4 rounded-[1rem] border-2 border-black bg-[#ffe0de] px-4 py-3 text-sm font-bold text-black">
+            <p className="mt-4 rounded-[1rem] border-2 border-[var(--border-default)] bg-[var(--color-danger-soft)] px-4 py-3 text-sm font-bold text-[var(--color-text)]">
               {quoteError}
             </p>
           ) : null}
@@ -243,7 +243,7 @@ export function GoalVisionPanel({
             <button
               type="submit"
               disabled={isQuoteSaving}
-              className="inline-flex flex-1 items-center justify-center rounded-full border-2 border-black bg-[#c5ff6f] px-5 py-3 text-sm font-bold uppercase tracking-[0.12em] text-black shadow-[4px_4px_0_#000] transition hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_#000] disabled:cursor-not-allowed disabled:opacity-55"
+              className="inline-flex flex-1 items-center justify-center rounded-full border-2 border-[var(--border-default)] bg-[var(--color-accent)] px-5 py-3 text-sm font-bold uppercase tracking-[0.12em] text-[var(--color-accent-contrast)] shadow-[4px_4px_0_#000] transition hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_#000] disabled:cursor-not-allowed disabled:opacity-55"
             >
               {isQuoteSaving ? 'Saving...' : editingQuote ? 'Update quote' : 'Add quote'}
             </button>
@@ -251,7 +251,7 @@ export function GoalVisionPanel({
               <button
                 type="button"
                 onClick={resetQuoteForm}
-                className="rounded-full border-2 border-black bg-white px-5 py-3 text-sm font-bold uppercase tracking-[0.12em] text-black"
+                className="rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-5 py-3 text-sm font-bold uppercase tracking-[0.12em] text-[var(--color-text)]"
               >
                 Cancel
               </button>
@@ -260,7 +260,7 @@ export function GoalVisionPanel({
         </form>
 
         {sortedQuotes.length === 0 ? (
-          <div className="mt-5 rounded-[1.35rem] border-2 border-black bg-white px-4 py-5 text-sm font-bold leading-6 text-black/70">
+          <div className="mt-5 rounded-[1.35rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-5 text-sm font-bold leading-6 text-[var(--color-text-secondary)]">
             No quotes yet. Add one and pin it to show it on the dashboard.
           </div>
         ) : (
@@ -268,16 +268,16 @@ export function GoalVisionPanel({
             {sortedQuotes.map((quote) => (
               <article
                 key={quote.id}
-                className={`rounded-[1.35rem] border-2 border-black p-4 ${
-                  quote.isPinned ? 'bg-[#c5ff6f]' : 'bg-[#fffdf8]'
+                className={`rounded-[1.35rem] border-2 border-[var(--border-default)] p-4 ${
+                  quote.isPinned ? 'bg-[var(--color-accent)]' : 'bg-[var(--surface-elevated)]'
                 }`}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <p className="break-words text-base font-bold leading-7 tracking-[-0.03em] text-black">
+                    <p className="break-words text-base font-bold leading-7 tracking-[-0.03em] text-[var(--color-text)]">
                       {quote.content}
                     </p>
-                    <span className="mt-3 inline-flex rounded-full border-2 border-black bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-black">
+                    <span className="mt-3 inline-flex rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text)]">
                       {quote.isPinned ? 'Shown on dashboard' : 'Saved quote'}
                     </span>
                   </div>
@@ -287,7 +287,7 @@ export function GoalVisionPanel({
                       <button
                         type="button"
                         onClick={() => onPinQuote(quote)}
-                        className="rounded-full border-2 border-black bg-[#ffd166] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-black"
+                        className="rounded-full border-2 border-[var(--border-default)] bg-[#ffd166] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text)]"
                       >
                         Pin
                       </button>
@@ -295,14 +295,14 @@ export function GoalVisionPanel({
                     <button
                       type="button"
                       onClick={() => startEditingQuote(quote)}
-                      className="rounded-full border-2 border-black bg-white px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-black"
+                      className="rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text)]"
                     >
                       Edit
                     </button>
                     <button
                       type="button"
                       onClick={() => onDeleteQuote(quote.id)}
-                      className="danger-action rounded-full border-2 border-black px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] transition"
+                      className="danger-action rounded-full border-2 border-[var(--border-default)] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] transition"
                     >
                       Delete
                     </button>
@@ -385,28 +385,28 @@ export function GoalJournalPanel({
   }
 
   return (
-    <section className="rounded-[1.75rem] border-2 border-black bg-[#9fe3ff] p-5 sm:p-6">
+    <section className="rounded-[1.75rem] border-2 border-[var(--border-default)] bg-[#9fe3ff] p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
             Journal
           </p>
-          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-black">
+          <h2 className="mt-2 text-2xl font-bold tracking-[-0.04em] text-[var(--color-text)]">
             Goal reflections
           </h2>
         </div>
-        <span className="rounded-full border-2 border-black bg-white px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-black">
+        <span className="rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text)]">
           {journalEntries.length}
         </span>
       </div>
 
       <form
         onSubmit={handleSubmit}
-        className="mt-5 rounded-[1.35rem] border-2 border-black bg-[#fffdf8] p-4 shadow-[4px_4px_0_#000]"
+        className="mt-5 rounded-[1.35rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-4 shadow-[4px_4px_0_#000]"
       >
         <div className="grid gap-4 md:grid-cols-[0.55fr_1fr]">
           <label className="block">
-            <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+            <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
               Date
             </span>
             <ThemedDatePicker
@@ -416,7 +416,7 @@ export function GoalJournalPanel({
           </label>
 
           <label className="block">
-            <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+            <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
               Mood or tag
             </span>
             <input
@@ -429,7 +429,7 @@ export function GoalJournalPanel({
         </div>
 
         <label className="mt-4 block">
-          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-black/70">
+          <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
             Reflection
           </span>
           <textarea
@@ -441,7 +441,7 @@ export function GoalJournalPanel({
         </label>
 
         {error ? (
-          <p className="mt-4 rounded-[1rem] border-2 border-black bg-[#ffe0de] px-4 py-3 text-sm font-bold text-black">
+          <p className="mt-4 rounded-[1rem] border-2 border-[var(--border-default)] bg-[var(--color-danger-soft)] px-4 py-3 text-sm font-bold text-[var(--color-text)]">
             {error}
           </p>
         ) : null}
@@ -450,7 +450,7 @@ export function GoalJournalPanel({
           <button
             type="submit"
             disabled={isSaving}
-            className="inline-flex flex-1 items-center justify-center rounded-full border-2 border-black bg-[#c5ff6f] px-5 py-3 text-sm font-bold uppercase tracking-[0.12em] text-black shadow-[4px_4px_0_#000] transition hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_#000] disabled:cursor-not-allowed disabled:opacity-55"
+            className="inline-flex flex-1 items-center justify-center rounded-full border-2 border-[var(--border-default)] bg-[var(--color-accent)] px-5 py-3 text-sm font-bold uppercase tracking-[0.12em] text-[var(--color-accent-contrast)] shadow-[4px_4px_0_#000] transition hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_#000] disabled:cursor-not-allowed disabled:opacity-55"
           >
             {isSaving ? 'Saving...' : editingEntry ? 'Update journal' : 'Add journal'}
           </button>
@@ -458,7 +458,7 @@ export function GoalJournalPanel({
             <button
               type="button"
               onClick={resetForm}
-              className="rounded-full border-2 border-black bg-white px-5 py-3 text-sm font-bold uppercase tracking-[0.12em] text-black"
+              className="rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-5 py-3 text-sm font-bold uppercase tracking-[0.12em] text-[var(--color-text)]"
             >
               Cancel
             </button>
@@ -467,7 +467,7 @@ export function GoalJournalPanel({
       </form>
 
       {sortedEntries.length === 0 ? (
-        <div className="mt-5 rounded-[1.35rem] border-2 border-black bg-white px-4 py-5 text-sm font-bold leading-6 text-black/70">
+        <div className="mt-5 rounded-[1.35rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-5 text-sm font-bold leading-6 text-[var(--color-text-secondary)]">
           No journal entries for this goal yet.
         </div>
       ) : (
@@ -475,15 +475,15 @@ export function GoalJournalPanel({
           {sortedEntries.map((entry) => (
             <article
               key={entry.id}
-              className="rounded-[1.35rem] border-2 border-black bg-[#fffdf8] p-4"
+              className="rounded-[1.35rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-4"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-black/55">
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--color-text-muted)]">
                     {entry.entryDate}
                   </p>
                   {entry.mood ? (
-                    <span className="mt-2 inline-flex rounded-full border-2 border-black bg-[#ffd166] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-black">
+                    <span className="mt-2 inline-flex rounded-full border-2 border-[var(--border-default)] bg-[#ffd166] px-3 py-1 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-text)]">
                       {entry.mood}
                     </span>
                   ) : null}
@@ -493,21 +493,21 @@ export function GoalJournalPanel({
                   <button
                     type="button"
                     onClick={() => startEditing(entry)}
-                    className="rounded-full border-2 border-black bg-[#c5ff6f] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-black"
+                    className="rounded-full border-2 border-[var(--border-default)] bg-[var(--color-accent)] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-[var(--color-accent-contrast)]"
                   >
                     Edit
                   </button>
                   <button
                     type="button"
                     onClick={() => onDeleteJournalEntry(entry.id)}
-                    className="danger-action rounded-full border-2 border-black px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] transition"
+                    className="danger-action rounded-full border-2 border-[var(--border-default)] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] transition"
                   >
                     Delete
                   </button>
                 </div>
               </div>
 
-              <p className="mt-4 whitespace-pre-wrap rounded-[1rem] border-2 border-black bg-white px-3 py-2 text-sm font-semibold leading-6 text-black/70">
+              <p className="mt-4 whitespace-pre-wrap rounded-[1rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2 text-sm font-semibold leading-6 text-[var(--color-text-secondary)]">
                 {entry.content}
               </p>
             </article>

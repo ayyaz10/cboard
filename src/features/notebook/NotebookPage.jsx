@@ -120,27 +120,27 @@ export function NotebookPage() {
 
         <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
           <span className="pill">Notebook</span>
-          <span className="text-xs font-bold uppercase tracking-[0.18em] text-black/55">
+          <span className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
             {notes.length} saved / {linkedNoteCount} tracker linked
           </span>
         </div>
 
-        <h1 className="mt-6 max-w-3xl text-4xl font-bold text-black sm:text-5xl lg:text-6xl">
+        <h1 className="mt-6 max-w-3xl text-4xl font-bold text-[var(--color-text)] sm:text-5xl lg:text-6xl">
           Notes that stay connected
         </h1>
 
-        <p className="mt-3 max-w-2xl text-base font-medium leading-7 text-black/70 sm:text-lg">
+        <p className="mt-3 max-w-2xl text-base font-medium leading-7 text-[var(--color-text-secondary)] sm:text-lg">
           Write rich notes, attach media, and link any note back to a progress tracker.
         </p>
 
         {error ? (
-          <p className="mt-5 rounded-[1rem] border-2 border-black bg-[#ffe0de] px-4 py-3 text-sm font-bold text-black">
+          <p className="mt-5 rounded-[1rem] border-2 border-[var(--border-default)] bg-[var(--color-danger-soft)] px-4 py-3 text-sm font-bold text-[var(--color-text)]">
             {error}
           </p>
         ) : null}
 
         {isLoading ? (
-          <div className="mt-8 rounded-[1.75rem] border-2 border-black bg-[#fffdf8] p-6 text-lg font-bold text-black">
+          <div className="mt-8 rounded-[1.75rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-6 text-lg font-bold text-[var(--color-text)]">
             Loading notebook...
           </div>
         ) : (

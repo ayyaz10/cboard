@@ -3,6 +3,8 @@ import { getPreference, setPreference } from '../../services/preferenceService';
 import { RecipeLink, secondaryButton } from './RecipeComponents';
 import { calculateMealPlan, MACROS } from './mealPlanData';
 import { readRoutinePresets, saveRoutinePreset } from './routinePresets';
+import { Button } from '../../components/ui/Button.jsx';
+import { Card, Panel } from '../../components/ui/Card.jsx';
 
 const KEY = 'recipes:routine-presets:v1';
 const units = {
@@ -83,12 +85,13 @@ export function QuickRoutines({
   }
   const blocked = busy || disabled;
   return (
-    <section
-      className="space-y-4 rounded-2xl border-2 border-black p-5"
+    <Panel
+      as="section"
+      className="space-y-4 p-5"
       aria-label="Quick routines"
     >
       <h2 className="text-2xl font-bold">Quick routines</h2>
-      <p className="text-sm text-black/70">
+      <p className="text-sm text-[var(--color-text-secondary)]">
         Save different meal combinations here, then use one whenever you need
         it. Presets keep recipe choices and portions; totals use the latest
         recipe macros.
@@ -123,7 +126,7 @@ export function QuickRoutines({
             )}
           </div>
           {!presets.length && (
-            <p className="text-sm text-black/70">
+            <p className="text-sm text-[var(--color-text-secondary)]">
               No presets yet. Choose your meals below, give the routine a name,
               then save the combination here.
             </p>
@@ -135,8 +138,9 @@ export function QuickRoutines({
                 recipes,
               );
               return (
-                <article
-                  className="min-w-0 space-y-3 rounded-2xl border-2 border-black bg-white p-4"
+                <Card
+                  as="article"
+                  className="min-w-0 space-y-3 p-4"
                   key={preset.id}
                 >
                   <ul
@@ -159,13 +163,13 @@ export function QuickRoutines({
                                 src={meal.recipe.image}
                                 alt={meal.recipe.title}
                                 loading="lazy"
-                                className="h-full w-full rounded-lg border border-black object-cover"
+                                className="h-full w-full rounded-lg border border-[var(--border-default)] object-cover"
                               />
                             ) : (
                               <span
                                 role="img"
                                 aria-label={`${meal.recipe.title}: no photo`}
-                                className="flex h-full w-full items-center justify-center rounded-lg border border-black bg-white p-1 text-center text-[10px] leading-tight text-black/70"
+                                className="ui-media-placeholder flex h-full w-full items-center justify-center rounded-lg border p-1 text-center text-[10px] leading-tight"
                               >
                                 No photo
                               </span>
@@ -175,7 +179,7 @@ export function QuickRoutines({
                           <span
                             role="img"
                             aria-label="Recipe no longer available: no photo"
-                            className="flex h-full w-full items-center justify-center rounded-lg border border-black bg-white p-1 text-center text-[10px] leading-tight text-black/70"
+                            className="ui-media-placeholder flex h-full w-full items-center justify-center rounded-lg border p-1 text-center text-[10px] leading-tight"
                           >
                             No photo
                           </span>
@@ -191,7 +195,7 @@ export function QuickRoutines({
                       Editing this preset below
                     </p>
                   )}
-                  <ul className="space-y-1 text-sm text-black/70">
+                  <ul className="space-y-1 text-sm text-[var(--color-text-secondary)]">
                     {meals.map((meal) => (
                       <li key={meal.id}>
                         {meal.meal}:{' '}
@@ -217,8 +221,8 @@ export function QuickRoutines({
                     ).join(' · ')}
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    <button
-                      className={secondaryButton}
+                    <Button
+                      variant="secondary"
                       disabled={blocked}
                       onClick={() => {
                         if (dirty) setPending({ type: 'use', preset });
@@ -229,9 +233,9 @@ export function QuickRoutines({
                       }}
                     >
                       Use routine
-                    </button>
-                    <button
-                      className={secondaryButton}
+                    </Button>
+                    <Button
+                      variant="secondary"
                       disabled={blocked}
                       onClick={() => {
                         if (dirty) setPending({ type: 'edit', preset });
@@ -242,17 +246,17 @@ export function QuickRoutines({
                       }}
                     >
                       Edit preset
-                    </button>
-                    <button
-                      className={secondaryButton}
+                    </Button>
+                    <Button
+                      variant="secondary"
                       disabled={blocked}
                       onClick={() => setPending({ type: 'delete', preset })}
                     >
                       Delete preset
-                    </button>
+                    </Button>
                   </div>
                   {pending?.preset.id === preset.id && (
-                    <div className="space-y-3 border-t border-black pt-3">
+                    <div className="space-y-3 border-t border-[var(--border-default)] pt-3">
                       <p>
                         {pending.type === 'delete'
                           ? `Delete preset “${preset.name}”? Your current routine will stay unchanged.`
@@ -300,7 +304,7 @@ export function QuickRoutines({
                       </div>
                     </div>
                   )}
-                </article>
+                </Card>
               );
             })}
           </div>
@@ -308,6 +312,6 @@ export function QuickRoutines({
       )}
       {error && <p role="alert">{error}</p>}
       {message && <p role="status">{message}</p>}
-    </section>
+    </Panel>
   );
 }
