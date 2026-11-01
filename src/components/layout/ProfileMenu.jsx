@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, LogOut } from 'lucide-react';
+import { ChevronDown, LogOut, RefreshCw } from 'lucide-react';
 import { getAppHref } from '../../app/useRoute';
 import { useAuth } from '../../contexts/AuthContext';
 import { getProfileInitials } from '../../services/profileService';
+import { requestPwaUpdateCheck } from '../../pwa/updateCheckEvents.js';
 
 export function ProfileMenu() {
   const { displayName, user, profile, signOut } = useAuth();
@@ -30,6 +31,7 @@ export function ProfileMenu() {
     {open && <div className="profile-menu-popover" role="region" aria-label="Account">
       <div className="profile-menu-account"><strong>{displayName}</strong><small>{user.email}</small></div>
       <a href={getAppHref('/account')} onClick={() => setOpen(false)}>View profile</a>
+      <button type="button" onClick={() => { setOpen(false); requestPwaUpdateCheck(); }}><RefreshCw size={15} aria-hidden="true" />Check for updates</button>
       <div className="profile-menu-divider" />
       <button type="button" onClick={() => { setOpen(false); void signOut(); }}><LogOut size={15} aria-hidden="true" />Log out</button>
     </div>}

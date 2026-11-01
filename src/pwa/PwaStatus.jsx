@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { AlertCircle, Ellipsis, RefreshCw, X } from 'lucide-react';
 import { CONNECTION_EVENT } from './network.js';
 import { registerPwa } from './register.js';
+import { PWA_UPDATE_CHECK_EVENT } from './updateCheckEvents.js';
 import './pwa.css';
 
 export function PwaStatus() {
@@ -16,6 +17,8 @@ export function PwaStatus() {
   const [portalTarget, setPortalTarget] = useState(() => document.getElementById('app-shell-status') || document.body);
   const lastConnection = useRef(connection);
   const statusRef = useRef(null);
+  const checkForUpdatesRef = useRef(null);
+  const pendingCheckRef = useRef(false);
   useEffect(() => {
     const changeConnection = next => {
       if (next === 'online' && lastConnection.current !== 'online') setRecovered(true);
@@ -28,12 +31,25 @@ export function PwaStatus() {
     const cloud = event => {
       changeConnection(event.detail);
     };
+    const requestCheck = () => {
+      setOpen(true);
+      if (checkForUpdatesRef.current) checkForUpdatesRef.current();
+      else pendingCheckRef.current = true;
+    };
     window.addEventListener('online', online);
     window.addEventListener('offline', offline);
     window.addEventListener(CONNECTION_EVENT, cloud);
+    window.addEventListener(PWA_UPDATE_CHECK_EVENT, requestCheck);
     const cleanup = registerPwa(state => {
       if (state.update) { setUpdate(() => state.update); setOpen(false); }
-      if (state.check) setCheckForUpdates(() => state.check);
+      if (state.check) {
+        checkForUpdatesRef.current = state.check;
+        setCheckForUpdates(() => state.check);
+        if (pendingCheckRef.current) {
+          pendingCheckRef.current = false;
+          state.check();
+        }
+      }
       if (typeof state.checking === 'boolean') setChecking(state.checking);
       if (state.message) setMessage(state.message);
       else if (state.checking) setMessage('');
@@ -43,6 +59,7 @@ export function PwaStatus() {
       window.removeEventListener('online', online);
       window.removeEventListener('offline', offline);
       window.removeEventListener(CONNECTION_EVENT, cloud);
+      window.removeEventListener(PWA_UPDATE_CHECK_EVENT, requestCheck);
     };
   }, []);
   useEffect(() => {
