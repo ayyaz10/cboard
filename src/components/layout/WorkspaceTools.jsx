@@ -1,6 +1,7 @@
 import { NoteEditor } from '../../features/notebook/NotesPanel';
 import { sanitizeNoteHtml, getTextFromHtml } from '../../features/notebook/noteContent';
 import { useEffect, useRef, useState } from 'react';
+import { Plus, X } from 'lucide-react';
 import { APP_MODULES } from './appModules.js';
 import { AppPicker } from './AppPicker.jsx';
 import { Button } from '../ui/Button.jsx';
@@ -67,7 +68,7 @@ export function WorkspaceTools({ route, userId }) {
   return <>
     <div className="workspace-tools" role="group" aria-label="Workspace utilities">
       <AppPicker apps={apps} onChoose={choose} />
-      <Button size="sm" className="workspace-note-trigger" title="Add a note for this app" onClick={() => setOpen(!open)} aria-expanded={open} aria-controls="app-note-box">{open ? 'Close' : '+ Note'}</Button>
+      <Button size="sm" className="workspace-note-trigger" title={open ? 'Close app note' : 'Add a note for this app'} aria-label={open ? 'Close app note' : 'Add a note for this app'} onClick={() => setOpen(!open)} aria-expanded={open} aria-controls="app-note-box">{open ? <X size={15} aria-hidden="true" /> : <Plus size={15} aria-hidden="true" />}<span>{open ? 'Close' : 'Note'}</span></Button>
       {open && <form id="app-note-box" className={`workspace-note${editingNote ? ' workspace-note-editing' : ''}`} onSubmit={editingNote ? saveExisting : save}>
         <strong>{app.label} notes</strong>
         {editingNote ? <><NoteEditor value={editingNote.contentHtml} onChange={contentHtml => setEditingNote(current => ({ ...current, contentHtml }))} media={editingNote.media} onMediaChange={media => setEditingNote(current => ({ ...current, media }))} onError={setMessage} /><Button type="submit" disabled={busy}>Save app note</Button><Button type="button" disabled={busy} onClick={() => setEditingNote(null)}>Cancel edit</Button></> : <>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { ArrowDown, ArrowUp } from 'lucide-react';
 export function ScrollControls() {
   const [useful, setUseful] = useState(false);
   useEffect(() => {
@@ -10,5 +11,5 @@ export function ScrollControls() {
   }, []);
   if (!useful) return null;
   const scroll = bottom => window.scrollTo({ top: bottom ? document.documentElement.scrollHeight : 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
-  return <nav className="global-scroll-controls" aria-label="Page scroll"><button type="button" aria-label="Go to top" onClick={() => scroll(false)}>↑ Top</button><button type="button" aria-label="Go to bottom" onClick={() => scroll(true)}>↓ Bottom</button></nav>;
+  return <nav className="global-scroll-controls" aria-label="Page scroll"><button type="button" aria-label="Go to top" onClick={() => scroll(false)}><ArrowUp size={16} aria-hidden="true" />Top</button><button type="button" aria-label="Go to bottom" onClick={() => scroll(true)}><ArrowDown size={16} aria-hidden="true" />Bottom</button></nav>;
 }

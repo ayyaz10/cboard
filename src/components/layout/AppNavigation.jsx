@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useId, useRef, useState } from 'react';
+import { ChevronDown, Menu, X } from 'lucide-react';
 import { getAppHref } from '../../app/useRoute';
 import { primaryNavItems } from './appModules.js';
 
@@ -114,7 +115,7 @@ function AppNavigationView({ route = '', activePath }) {
         {primaryNavItems.slice(0, DESKTOP_NAV_COUNT).map(item => <NavLink key={item.path} item={item} activePath={currentPath} />)}
         <div className="global-nav-more" ref={moreRef}>
           <button type="button" className={`global-nav-link global-nav-more-trigger${activeInOverflow ? ' is-active' : ''}`} aria-expanded={moreOpen} aria-haspopup="true" onClick={() => setMoreOpen(open => !open)}>
-            More <span aria-hidden="true">⌄</span>
+            More <ChevronDown size={14} aria-hidden="true" />
           </button>
           {moreOpen && <div className="global-nav-overflow" role="region" aria-label="More apps">
             {overflowItems.map(item => <NavLink key={item.path} item={item} activePath={currentPath} onNavigate={() => setMoreOpen(false)} className="global-nav-overflow-link" />)}
@@ -126,14 +127,14 @@ function AppNavigationView({ route = '', activePath }) {
         </div>
       </div>
         <button ref={drawerTriggerRef} type="button" className="global-nav-menu-trigger" aria-label="Open navigation menu" title="Menu" aria-expanded={drawerOpen} aria-controls={drawerId} onClick={openDrawer}>
-        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 7h16M4 12h16M4 17h16" /></svg>
+        <Menu size={19} aria-hidden="true" />
         <span>Menu</span>
       </button>
     </nav>
     {drawerOpen && <div className="global-nav-drawer-layer">
       <button type="button" className="global-nav-backdrop" aria-label="Close navigation" onClick={closeDrawer} />
       <aside id={drawerId} ref={drawerRef} className="global-nav-drawer" role="dialog" aria-modal="true" aria-label="Application navigation">
-        <div className="global-nav-drawer-heading"><strong>Navigate</strong><button type="button" aria-label="Close navigation" onClick={closeDrawer}>×</button></div>
+        <div className="global-nav-drawer-heading"><strong>Navigate</strong><button type="button" aria-label="Close navigation" onClick={closeDrawer}><X size={18} aria-hidden="true" /></button></div>
         <nav aria-label="All apps" className="global-nav-drawer-links">
           {primaryNavItems.map(item => <NavLink key={item.path} item={item} activePath={currentPath} onNavigate={closeDrawer} />)}
         </nav>

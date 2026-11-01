@@ -1,20 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeDashboardCardSizes, updateDashboardCardSize } from './dashboardLayout.js';
+import { normalizeDashboardViewSize } from './dashboardLayout.js';
 
-const modules = [{ id: 'finance' }, { id: 'notes' }];
-
-test('normalizes saved sizes to known modules and supported values', () => {
-  assert.deepEqual(normalizeDashboardCardSizes({ finance: 'large', notes: 'small', unknown: 'large', groceries: 'huge' }, modules), {
-    finance: 'large', notes: 'small',
-  });
-  assert.deepEqual(normalizeDashboardCardSizes(['large'], modules), {});
+test('accepts the three dashboard-wide view sizes', () => {
+  for (const size of ['small', 'medium', 'large']) assert.equal(normalizeDashboardViewSize(size), size);
 });
 
-test('updates one known card size and removes medium overrides', () => {
-  const initial = { finance: 'large', notes: 'small' };
-  assert.deepEqual(updateDashboardCardSize(initial, 'finance', 'small', modules), { finance: 'small', notes: 'small' });
-  assert.deepEqual(updateDashboardCardSize(initial, 'finance', 'medium', modules), { notes: 'small' });
-  assert.equal(updateDashboardCardSize(initial, 'unknown', 'large', modules), initial);
-  assert.equal(updateDashboardCardSize(initial, 'finance', 'huge', modules), initial);
+test('defaults invalid saved dashboard view values to medium', () => {
+  for (const value of [null, undefined, {}, [], 'huge', 2]) assert.equal(normalizeDashboardViewSize(value), 'medium');
 });

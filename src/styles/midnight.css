@@ -507,6 +507,7 @@ html[data-theme="midnight"] .food-diary .diary-view-tabs button[aria-selected="t
 html[data-theme="midnight"] .food-diary .diary-report-tabs button[aria-selected="true"] { background: var(--surface-selected) !important; color: var(--color-accent) !important; border-color: var(--border-focus) !important; box-shadow: inset 0 -2px var(--color-accent); }
 html[data-theme="midnight"] .global-scroll-controls button,
 html[data-theme="midnight"] .reminder-toggle { border-color: var(--border-strong) !important; background: var(--surface-elevated) !important; }
+html[data-theme="midnight"] .global-scroll-controls button { display:flex; align-items:center; gap:.35rem; }
 html[data-theme="midnight"] .reminder-toggle,
 html[data-theme="midnight"] .reminder-toggle.ui-button--primary,
 html[data-theme="midnight"] .reminder-toggle.ui-button--warning { background: var(--surface-elevated) !important; color: var(--color-text) !important; }
@@ -529,8 +530,9 @@ html[data-theme="midnight"] .global-nav-link.is-active { border-color: var(--bor
 html[data-theme="midnight"] .global-nav-link.is-active::after { background: var(--color-accent); }
 html[data-theme="midnight"] .global-nav-overflow,
 html[data-theme="midnight"] .profile-menu-popover,
-html[data-theme="midnight"] .app-board-settings-menu,
-html[data-theme="midnight"] .board-card-size-options { border-color: var(--border-strong); background: var(--surface-elevated); }
+html[data-theme="midnight"] .app-board-view-control { color:var(--color-text); }
+html[data-theme="midnight"] .dashboard-view-options { border-color:var(--border-default); }
+html[data-theme="midnight"] .dashboard-view-options button[aria-pressed="true"] { background:var(--surface-selected); color:var(--color-accent); }
 html[data-theme="midnight"] .app-shell-focus { border-color: var(--interaction-primary); background: var(--interaction-primary); color: var(--color-accent-contrast); }
 html[data-theme="midnight"] .app-shell-focus:hover { background: var(--interaction-primary-hover); }
 html[data-theme="midnight"] .app-shell-utilities-trigger,

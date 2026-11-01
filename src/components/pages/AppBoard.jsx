@@ -3,62 +3,61 @@ import { getAppHref } from '../../app/useRoute';
 import { useAuth } from '../../contexts/AuthContext';
 import { getPreference, setPreference } from '../../services/preferenceService.js';
 import { notify } from '../../lib/notifications.js';
+import { ArrowRight, Grid2X2, PanelsTopLeft, Rows3 } from 'lucide-react';
 import { PageShell } from '../layout/PageShell';
 import { dashboardModules } from '../layout/appModules.js';
-import { DASHBOARD_CARD_SIZES, normalizeDashboardCardSizes, updateDashboardCardSize } from '../layout/dashboardLayout.js';
+import { DASHBOARD_VIEW_SIZES, DEFAULT_DASHBOARD_VIEW_SIZE, normalizeDashboardViewSize } from '../layout/dashboardLayout.js';
 
-const SIZE_KEY = 'cboard:dashboard-card-sizes:v1';
+const VIEW_KEY = 'cboard:dashboard-view-size:v1';
 
 export function AppBoard({ calculators }) {
   const { user } = useAuth();
-  const [sizes, setSizes] = useState({});
-  const sizesRef = useRef(sizes);
+  const [viewSize, setViewSize] = useState(DEFAULT_DASHBOARD_VIEW_SIZE);
+  const viewSizeRef = useRef(viewSize);
   const userIdRef = useRef(user?.id);
   const saveQueue = useRef(Promise.resolve());
-  sizesRef.current = sizes;
+  const viewChangeRef = useRef(0);
+  viewSizeRef.current = viewSize;
   userIdRef.current = user?.id;
 
   useEffect(() => {
     let active = true;
-    setSizes({});
-    sizesRef.current = {};
-    getPreference(SIZE_KEY, {}).then(value => {
-      if (!active) return;
-      const stored = normalizeDashboardCardSizes(value, dashboardModules);
-      sizesRef.current = stored;
-      setSizes(stored);
+    const startingRevision = viewChangeRef.current;
+    setViewSize(DEFAULT_DASHBOARD_VIEW_SIZE);
+    viewSizeRef.current = DEFAULT_DASHBOARD_VIEW_SIZE;
+    getPreference(VIEW_KEY, DEFAULT_DASHBOARD_VIEW_SIZE).then(value => {
+      if (!active || viewChangeRef.current !== startingRevision) return;
+      const stored = normalizeDashboardViewSize(value);
+      viewSizeRef.current = stored;
+      setViewSize(stored);
     }).catch(error => {
-      if (active) notify.error(`Dashboard card sizes could not be loaded: ${error.message || 'Please try again.'}`);
+      if (active) notify.error(`Dashboard view could not be loaded: ${error.message || 'Please try again.'}`);
     });
     return () => { active = false; };
   }, [user?.id]);
 
-  function saveSizes(next) {
-    const previous = sizesRef.current;
-    if (JSON.stringify(previous) === JSON.stringify(next)) return;
-    const snapshot = { ...next };
+  function saveViewSize(next) {
+    const previous = viewSizeRef.current;
+    if (previous === next) return;
+    viewChangeRef.current += 1;
     const owner = user?.id;
-    sizesRef.current = snapshot;
-    setSizes(snapshot);
+    viewSizeRef.current = next;
+    setViewSize(next);
     const operation = saveQueue.current.catch(() => {}).then(() => {
       if (userIdRef.current !== owner) return;
-      return setPreference(SIZE_KEY, snapshot);
+      return setPreference(VIEW_KEY, next);
     });
     saveQueue.current = operation;
     operation.catch(error => {
-      if (userIdRef.current === owner && sizesRef.current === snapshot) {
-        sizesRef.current = previous;
-        setSizes(previous);
+      if (userIdRef.current === owner && viewSizeRef.current === next) {
+        viewSizeRef.current = previous;
+        setViewSize(previous);
       }
-      notify.error(`Dashboard layout could not be saved: ${error.message || 'Please try again.'}`);
+      notify.error(`Dashboard view could not be saved: ${error.message || 'Please try again.'}`);
     });
   }
 
-  function setCardSize(id, size) {
-    saveSizes(updateDashboardCardSize(sizesRef.current, id, size, dashboardModules));
-  }
-
-  const hasCustomSizes = Object.keys(sizes).length > 0;
+  const viewIcons = { small: Grid2X2, medium: PanelsTopLeft, large: Rows3 };
   return (
     <PageShell>
       <section className="panel app-board-panel">
@@ -67,40 +66,31 @@ export function AppBoard({ calculators }) {
             <h1>CBoard</h1>
             <p>Pick a workspace to get started.</p>
           </div>
-          <details className="app-board-settings">
-            <summary aria-label="Dashboard settings" title="Dashboard settings">⋯</summary>
-            <div className="app-board-settings-menu">
-              <strong>Dashboard settings</strong>
-              <button type="button" disabled={!hasCustomSizes} onClick={() => saveSizes({})}>Reset card sizes</button>
+          <div className="app-board-view-control">
+            <span>View</span>
+            <div className="dashboard-view-options" role="group" aria-label="Dashboard view size">
+              {DASHBOARD_VIEW_SIZES.map(option => {
+                const ViewIcon = viewIcons[option];
+                return <button key={option} type="button" aria-label={`${option[0].toUpperCase() + option.slice(1)} view`} aria-pressed={viewSize === option} onClick={() => saveViewSize(option)}>
+                  <ViewIcon size={15} aria-hidden="true" /><span>{option[0].toUpperCase() + option.slice(1)}</span>
+                </button>;
+              })}
             </div>
-          </details>
+          </div>
         </header>
 
-        <div className="dashboard-grid" aria-label="CBoard workspaces">
-          {dashboardModules.map(module => {
-            const size = sizes[module.id] || 'medium';
-            return <article key={module.id} className="board-card theme-color-card" data-card-size={size} data-theme-color={module.colorKey} style={{ '--theme-card-bg': module.color }}>
+        <div className="dashboard-grid" data-view-size={viewSize} role="list" aria-label="CBoard workspaces">
+          {dashboardModules.map(module => <article key={module.id} className="board-card theme-color-card" role="listitem" data-theme-color={module.colorKey} style={{ '--theme-card-bg': module.color }}>
               <a href={getAppHref(module.path)} className="board-card-link">
                 <p className="board-card-label">{module.label}</p>
                 <h2>{module.name}</h2>
                 <p className="board-card-description">{module.description}</p>
                 <span className="board-card-footer">
                   <span className="board-card-tag">{module.id === 'calculator-board' ? `${calculators.length} calculators` : module.countLabel}</span>
-                  <span className="board-card-arrow" aria-hidden="true">→</span>
+                  <ArrowRight className="board-card-arrow" size={19} aria-hidden="true" />
                 </span>
               </a>
-              <details className="board-card-size-menu">
-                <summary aria-label={`Set ${module.name} card size`} title="Card size">⋯</summary>
-                <div className="board-card-size-options" aria-label={`${module.name} card size`}>
-                  <strong>Card size</strong>
-                  {DASHBOARD_CARD_SIZES.map(option => <button key={option} type="button" aria-pressed={size === option} onClick={event => {
-                    setCardSize(module.id, option);
-                    event.currentTarget.closest('details')?.removeAttribute('open');
-                  }}>{option[0].toUpperCase() + option.slice(1)}</button>)}
-                </div>
-              </details>
-            </article>;
-          })}
+            </article>)}
         </div>
       </section>
     </PageShell>

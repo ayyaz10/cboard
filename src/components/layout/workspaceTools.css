@@ -20,7 +20,7 @@
   .app-picker-trigger span { display:none; }
   .app-picker-trigger.ui-button { width:2.25rem; justify-content:center; padding:.4rem; }
   .workspace-note-trigger.ui-button { width:2.25rem; padding:.35rem; font-size:0; }
-  .workspace-note-trigger::before { content:"+"; font-size:1.1rem; font-weight:750; }
+  .workspace-note-trigger span { display:none; }
 }
 @media(max-width:640px){
   .workspace-note { right:-5rem; }

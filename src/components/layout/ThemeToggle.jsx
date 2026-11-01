@@ -1,11 +1,12 @@
 import { useTheme } from '../../contexts/ThemeContext';
+import { Moon } from 'lucide-react';
 
 export function ThemeToggle() {
   const { theme, setTheme, themes } = useTheme();
 
   return (
     <label className="theme-toggle" title={`Current theme: ${themes.find(item => item.id === theme)?.name || theme}`}>
-      <span className="theme-toggle-icon" aria-hidden="true">◐</span>
+      <Moon className="theme-toggle-icon" size={15} aria-hidden="true" />
       <select
         value={theme}
         onChange={(event) => setTheme(event.target.value)}

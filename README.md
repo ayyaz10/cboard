@@ -118,7 +118,7 @@ src/
 ## How to add more app sections later
 
 1. Add the route in `src/app/App.jsx`.
-2. Add the app card metadata in `src/components/pages/AppBoard.jsx`.
+2. Add the app module metadata in `src/components/layout/appModules.js` so navigation, the app launcher, and dashboard stay in sync.
 3. Keep feature-specific state and components inside `src/features/<featureName>/`.
 
 This keeps each app isolated while sharing the same board, layout, and visual system.
