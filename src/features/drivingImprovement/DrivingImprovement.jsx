@@ -7,10 +7,10 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog.jsx';
 import { Dialog } from '../../components/ui/Dialog.jsx';
 import { notify } from '../../lib/notifications.js';
 import { loadDrivingWorkspace, saveDrivingWorkspace } from '../../services/drivingImprovementService.js';
-import { HABIT_STATUS_LABELS, HABIT_STATUSES, getHabitSummary, getItemsForHabit, makeImprovementItem, sortImprovementItems, validateHabitData } from './drivingData.js';
+import { HABIT_STATUS_LABELS, HABIT_STATUSES, IMPROVEMENT_PRIORITIES, IMPROVEMENT_PRIORITY_LABELS, getHabitSummary, getItemsForHabit, makeImprovementItem, sortImprovementItems, validateHabitData } from './drivingData.js';
 import './drivingImprovement.css';
 
-const blankForm = item => ({ title: item?.title || '', description: item?.description || '', categoryId: item?.categoryId || '', correction: item?.correction || '', cause: item?.cause || '', status: item?.status || 'NEEDS_WORK' });
+const blankForm = item => ({ title: item?.title || '', description: item?.description || '', categoryId: item?.categoryId || '', correction: item?.correction || '', cause: item?.cause || '', status: item?.status || 'NEEDS_WORK', priority: item?.priority || 'MEDIUM' });
 
 export function HabitImprovementDetail({ userId, habitSlug }) {
   const [data, setData] = useState(null), [revision, setRevision] = useState(0), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [error, setError] = useState('');
@@ -62,6 +62,10 @@ export function HabitImprovementDetail({ userId, habitSlug }) {
     if (status === item.status) return;
     await commit({ ...data, mistakes: data.mistakes.map(saved => saved.id === item.id ? { ...saved, status, updatedAt: new Date().toISOString() } : saved) }, 'Status updated.');
   }
+  async function changePriority(item, priority) {
+    if (priority === item.priority) return;
+    await commit({ ...data, mistakes: data.mistakes.map(saved => saved.id === item.id ? { ...saved, priority, updatedAt: new Date().toISOString() } : saved) }, 'Priority updated.');
+  }
   async function deleteItem(item) {
     if (await commit({ ...data, mistakes: data.mistakes.filter(saved => saved.id !== item.id) }, 'Improvement deleted.')) { setConfirm(null); setExpanded(''); }
   }
@@ -104,16 +108,17 @@ export function HabitImprovementDetail({ userId, habitSlug }) {
         {reviewItems.length ? <div className="di-list">{reviewItems.map(item => <article className="di-review-card" key={item.id}><span className="di-category">{categoryById(item.categoryId)}</span><h3>{item.title}</h3><span className="di-eyebrow">What I'll do differently</span><p className="di-correction">{item.correction || 'Action not added yet'}</p></article>)}</div> : <p className="di-empty">Nothing to review right now. Add an item with Needs Work or Improving status when a pattern comes up.</p>}
       </section> : <>
         <div className="di-summary" aria-label={`${habit.name} improvement summary`}>{[['ALL', 'Total', summary.total], ...HABIT_STATUSES.map(status => [status, HABIT_STATUS_LABELS[status], summary[status]])].map(([key, label, count]) => <button type="button" key={key} aria-pressed={filter === key} onClick={() => setFilter(filter === key && key !== 'ALL' ? 'ALL' : key)} className="di-stat"><span>{label}</span><strong>{count}</strong></button>)}</div>
-        <div className="di-toolbar"><h2>Things to improve <span>{shown.length}</span></h2><Button onClick={() => setDialog({ type: 'categories' })}>Manage categories</Button></div>
+        <div className="di-toolbar"><h2>Things to improve</h2><Button onClick={() => setDialog({ type: 'categories' })}>Manage categories</Button></div>
         {shown.length ? <div className="di-list">{shown.map(item => { const isOpen = expanded === item.id; return <article className="di-card" key={item.id}>
           <button type="button" className="di-card-toggle" aria-expanded={isOpen} aria-controls={`di-details-${item.id}`} onClick={() => setExpanded(isOpen ? '' : item.id)}>
-            <span className="di-category">{categoryById(item.categoryId)}</span><span className="di-card-title-row"><strong>{item.title}</strong><span className={`di-status di-status-${item.status.toLowerCase()}`}>{HABIT_STATUS_LABELS[item.status]}</span></span>
+            <span className="di-category">{categoryById(item.categoryId)}</span><span className="di-card-title-row"><strong>{item.title}</strong><span className="di-card-badges"><span className={`di-priority di-priority-${(item.priority || 'MEDIUM').toLowerCase()}`}>{IMPROVEMENT_PRIORITY_LABELS[item.priority || 'MEDIUM']} priority</span><span className={`di-status di-status-${item.status.toLowerCase()}`}>{HABIT_STATUS_LABELS[item.status]}</span></span></span>
             {item.correction && <span className="di-preview"><b>What I'll do differently:</b> {item.correction}</span>}
           </button>
           {isOpen && <div id={`di-details-${item.id}`} className="di-details"><div className="di-detail-correction"><span className="di-eyebrow">What I'll do differently</span><p>{item.correction || <em>Action not added yet</em>}</p>{!item.correction && <button type="button" className="di-text-button" onClick={() => openItem(item)}>Add an action</button>}</div>
             {item.description && <div className="di-pattern"><span className="di-eyebrow">More context</span><p>{item.description}</p></div>}
             <div className="di-detail-cause"><span className="di-eyebrow">Why it happens</span><p>{item.cause || <em>Not recorded</em>}</p></div>
             <label className="di-status-control">Status<select value={item.status} disabled={busy} onChange={event => changeStatus(item, event.target.value)}>{HABIT_STATUSES.map(status => <option key={status} value={status}>{HABIT_STATUS_LABELS[status]}</option>)}</select></label>
+            <label className="di-status-control">Priority<select value={item.priority || 'MEDIUM'} disabled={busy} onChange={event => changePriority(item, event.target.value)}>{IMPROVEMENT_PRIORITIES.map(priority => <option key={priority} value={priority}>{IMPROVEMENT_PRIORITY_LABELS[priority]}</option>)}</select></label>
             <div className="di-actions"><Button onClick={() => openItem(item)}>Edit</Button><Button variant="danger" onClick={() => setConfirm(item)}>Delete</Button></div>
           </div>}
         </article>; })}</div> : <div className="di-empty"><h3>{items.length ? 'No items in this status' : 'No improvements added yet.'}</h3><p>{items.length ? 'Choose another status above to see the rest.' : `Add an improvement to ${habit.name}. You can create a category while adding the first one.`}</p>{!items.length && <Button variant="primary" onClick={() => openItem()}>+ Add Improvement</Button>}</div>}
@@ -128,6 +133,7 @@ export function HabitImprovementDetail({ userId, habitSlug }) {
     <button type="button" className="di-text-button" onClick={() => { setCategoryName(''); setDialog(current => ({ ...current, categoryDialog: true })); }}>+ New category</button>
     <label>Why does it happen?<textarea rows="2" maxLength={5000} value={form.cause} onChange={event => setForm({ ...form, cause: event.target.value })} /></label>
     <label>What will I do differently?<textarea rows="3" maxLength={5000} value={form.correction} onChange={event => setForm({ ...form, correction: event.target.value })} placeholder="Add an action now or later" /></label>
+    <label>Priority<select value={form.priority} onChange={event => setForm({ ...form, priority: event.target.value })}>{IMPROVEMENT_PRIORITIES.map(priority => <option key={priority} value={priority}>{IMPROVEMENT_PRIORITY_LABELS[priority]}</option>)}</select></label>
     <label>Status<select value={form.status} onChange={event => setForm({ ...form, status: event.target.value })}>{HABIT_STATUSES.map(status => <option key={status} value={status}>{HABIT_STATUS_LABELS[status]}</option>)}</select></label>
     <div className="di-actions"><Button variant="primary" type="submit" disabled={busy || !form.categoryId}>{dialog?.item ? 'Save changes' : 'Add Improvement'}</Button><Button type="button" onClick={() => setDialog(null)}>Cancel</Button></div>
   </form></Dialog>

@@ -9,7 +9,7 @@ const at = '2026-10-31T00:00:00.000Z';
 
 test('new workspaces contain no seeded habits, categories, improvements, or reminders', () => {
   assert.deepEqual(createInitialHabitData(), {
-    version: 1, habitVersion: 2, habits: [], categories: [], mistakes: [], reminders: [], guidanceNotes: [],
+    version: 1, habitVersion: 3, habits: [], categories: [], mistakes: [], reminders: [], guidanceNotes: [],
   });
 });
 

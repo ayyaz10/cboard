@@ -2,13 +2,17 @@ export const HABIT_STATUSES = ['NEEDS_WORK', 'IMPROVING', 'STABLE'];
 export const HABIT_STATUS_LABELS = {
   NEEDS_WORK: 'Needs Work', IMPROVING: 'Improving', STABLE: 'Stable',
 };
+export const IMPROVEMENT_PRIORITIES = ['HIGH', 'MEDIUM', 'LOW'];
+export const IMPROVEMENT_PRIORITY_LABELS = {
+  HIGH: 'High', MEDIUM: 'Medium', LOW: 'Low',
+};
 
 const uuid = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 export function createInitialHabitData() {
   return {
     version: 1,
-    habitVersion: 2,
+    habitVersion: 3,
     habits: [],
     categories: [],
     mistakes: [],
@@ -53,7 +57,7 @@ export function migrateHabitData(data, userId) {
     throw new Error('Habit Improvement data is invalid.');
   }
   const next = structuredClone(data);
-  let changed = next.habitVersion !== 2 || !Array.isArray(next.habits);
+  let changed = next.habitVersion !== 3 || !Array.isArray(next.habits);
   if (!Array.isArray(next.habits)) next.habits = [];
   const knownHabitIds = new Set(next.habits.map(habit => habit.id));
   if (next.categories.length && (next.habits.length === 0 || next.categories.some(category => !knownHabitIds.has(category.habitId)))) {
@@ -65,8 +69,12 @@ export function migrateHabitData(data, userId) {
       item.status = 'STABLE';
       changed = true;
     }
+    if (item && (item.priority === undefined || item.priority === null)) {
+      item.priority = 'MEDIUM';
+      changed = true;
+    }
   }
-  if (changed) next.habitVersion = 2;
+  if (changed) next.habitVersion = 3;
   return { data: validateHabitData(next), changed };
 }
 
@@ -85,7 +93,7 @@ export function validateHabitData(data) {
   }
   const itemIds = new Set();
   for (const item of data.mistakes) {
-    if (!item || typeof item.id !== 'string' || itemIds.has(item.id) || typeof item.title !== 'string' || !item.title.trim() || item.title.length > 160 || !categoryIds.has(item.categoryId) || !HABIT_STATUSES.includes(item.status) || typeof item.cause !== 'string' || typeof item.correction !== 'string' || (item.description !== undefined && typeof item.description !== 'string')) throw new Error('Improvement item data is invalid.');
+    if (!item || typeof item.id !== 'string' || itemIds.has(item.id) || typeof item.title !== 'string' || !item.title.trim() || item.title.length > 160 || !categoryIds.has(item.categoryId) || !HABIT_STATUSES.includes(item.status) || !IMPROVEMENT_PRIORITIES.includes(item.priority) || typeof item.cause !== 'string' || typeof item.correction !== 'string' || (item.description !== undefined && typeof item.description !== 'string')) throw new Error('Improvement item data is invalid.');
     if (item.cause.length > 5000 || item.correction.length > 5000 || (item.description || '').length > 2000) throw new Error('Improvement item notes are too long.');
     itemIds.add(item.id);
   }
@@ -100,8 +108,9 @@ export function validateHabitData(data) {
 }
 
 export function sortImprovementItems(items) {
-  const priority = { NEEDS_WORK: 0, IMPROVING: 1, STABLE: 2 };
-  return [...items].sort((a, b) => priority[a.status] - priority[b.status] || (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+  const priority = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+  const status = { NEEDS_WORK: 0, IMPROVING: 1, STABLE: 2 };
+  return [...items].sort((a, b) => (priority[a.priority] ?? 1) - (priority[b.priority] ?? 1) || status[a.status] - status[b.status] || (b.updatedAt || '').localeCompare(a.updatedAt || ''));
 }
 
 export function getHabitSummary(items) {
@@ -125,5 +134,5 @@ export function removeHabitArea(data, habitId) {
 }
 
 export function makeImprovementItem(input, userId, now = new Date().toISOString()) {
-  return { id: uuid(), userId, categoryId: input.categoryId, title: input.title.trim(), description: (input.description || '').trim(), cause: input.cause.trim(), correction: input.correction.trim(), status: input.status || 'NEEDS_WORK', createdAt: now, updatedAt: now };
+  return { id: uuid(), userId, categoryId: input.categoryId, title: input.title.trim(), description: (input.description || '').trim(), cause: input.cause.trim(), correction: input.correction.trim(), status: input.status || 'NEEDS_WORK', priority: input.priority || 'MEDIUM', createdAt: now, updatedAt: now };
 }
