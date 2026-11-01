@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { AlertCircle, RefreshCw, X } from 'lucide-react';
 import { CONNECTION_EVENT } from './network.js';
 import { registerPwa } from './register.js';
-import { PWA_UPDATE_PANEL_EVENT } from './updateCheckEvents.js';
+import { PWA_UPDATE_PANEL_EVENT, setPwaUpdateAvailable } from './updateCheckEvents.js';
 import './pwa.css';
 
 export function PwaStatus() {
@@ -36,7 +36,10 @@ export function PwaStatus() {
     window.addEventListener(CONNECTION_EVENT, cloud);
     window.addEventListener(PWA_UPDATE_PANEL_EVENT, openUpdatePanel);
     const cleanup = registerPwa(state => {
-      if (state.update) setUpdate(() => state.update);
+      if (state.update) {
+        setPwaUpdateAvailable(true);
+        setUpdate(() => state.update);
+      }
       if (state.check) {
         setCheckForUpdates(() => state.check);
       }

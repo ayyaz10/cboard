@@ -59,6 +59,8 @@
 .profile-menu-account small { overflow:hidden; color:var(--color-text-muted); text-overflow:ellipsis; }
 .profile-menu-popover > a,.profile-menu-popover > button { min-height:2.4rem; display:flex; align-items:center; gap:.45rem; padding:.55rem .65rem; border:0; border-radius:var(--radius-sm); background:transparent; color:var(--color-text); font:inherit; font-size:.85rem; text-align:left; text-decoration:none; }
 .profile-menu-popover > :is(a,button):hover { background:var(--color-surface-interactive); }
+.profile-menu-update-icon { position:relative; display:inline-flex; flex:0 0 auto; }
+.profile-menu-update-dot { position:absolute; top:-.16rem; right:-.2rem; width:.55rem; height:.55rem; border:2px solid var(--color-surface-raised); border-radius:50%; background:#f28a3c; box-shadow:0 0 0 1px color-mix(in srgb,#f28a3c 35%,transparent); }
 .profile-menu-divider { height:1px; margin:.15rem 0; background:var(--color-border); }
 .app-shell-content { min-width:0; }
 
