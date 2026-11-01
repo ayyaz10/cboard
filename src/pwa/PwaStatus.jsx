@@ -14,7 +14,6 @@ export function PwaStatus() {
   const [checkForUpdates, setCheckForUpdates] = useState(null);
   const [checking, setChecking] = useState(false);
   const [open, setOpen] = useState(false);
-  const [portalTarget, setPortalTarget] = useState(() => document.getElementById('app-shell-status') || document.body);
   const lastConnection = useRef(connection);
   const statusRef = useRef(null);
   useEffect(() => {
@@ -65,18 +64,7 @@ export function PwaStatus() {
       document.removeEventListener('pointerdown', close);
     };
   }, [open]);
-  useEffect(() => {
-    const syncPortalTarget = () => {
-      const nextTarget = document.getElementById('app-shell-status') || document.body;
-      setPortalTarget(current => current === nextTarget ? current : nextTarget);
-    };
-    const observer = new MutationObserver(syncPortalTarget);
-    observer.observe(document.body, { childList: true, subtree: true });
-    syncPortalTarget();
-    return () => observer.disconnect();
-  }, []);
-  const floating = portalTarget === document.body;
-  return createPortal(<aside ref={statusRef} className={`pwa-status${floating ? ' is-floating' : ''}`} aria-label="App connection and updates">
+  return createPortal(<aside ref={statusRef} className="pwa-status" aria-label="App connection and updates">
     {open && <div className="pwa-status-panel" role="dialog" aria-modal="false" aria-label="App updates">
       <div className="pwa-update-check"><div><strong>App updates</strong><span>Check that you’re using the latest version.</span></div><button type="button" onClick={() => setOpen(false)} aria-label="Close app updates"><X size={18} aria-hidden="true" /></button></div>
       <button type="button" disabled={!checkForUpdates || checking || connection !== 'online'} onClick={() => checkForUpdates?.()}><RefreshCw size={14} aria-hidden="true" />{checking ? 'Checking for updates…' : 'Check for updates'}</button>
@@ -85,5 +73,5 @@ export function PwaStatus() {
       {update && <div><p role="status">New version available. Save your work before updating; this reloads the app.</p><button type="button" disabled={connection !== 'online'} onClick={update}>Update</button><button type="button" onClick={() => setUpdate(null)}>Later</button></div>}
       {message && <div><p role="status">{message}</p><button type="button" onClick={() => setMessage('')}>Dismiss</button></div>}
     </div>}
-  </aside>, portalTarget);
+  </aside>, document.body);
 }
