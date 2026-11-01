@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useId, useRef, useState } from 'react';
-import { ChevronDown, Menu, X } from 'lucide-react';
+import { ArrowRight, Calculator, ChartColumn, ChevronDown, Percent, Ruler, TrendingUp, Menu, X } from 'lucide-react';
 import { getAppHref } from '../../app/useRoute';
 import { primaryNavItems } from './appModules.js';
 
@@ -11,33 +11,33 @@ const DESKTOP_NAV_COUNT = 4;
 
 const relatedCalculators = {
   '/training': [
-    { path: '/calculators/protein-intake', label: 'Protein calculator' },
+    { path: '/calculators/protein-intake', label: 'Protein calculator', icon: Calculator },
   ],
   '/recipes': [
-    { path: '/calculators/protein-intake', label: 'Protein calculator' },
-    { path: '/calculators/calorie', label: 'Calorie portions' },
-    { path: '/calculators/mass', label: 'Unit converter' },
+    { path: '/calculators/protein-intake', label: 'Protein calculator', icon: Calculator },
+    { path: '/calculators/calorie', label: 'Calorie portions', icon: Calculator },
+    { path: '/calculators/mass', label: 'Unit converter', icon: Ruler },
   ],
   '/food-diary': [
-    { path: '/calculators/protein-intake', label: 'Protein calculator' },
-    { path: '/calculators/calorie', label: 'Calorie portions' },
+    { path: '/calculators/protein-intake', label: 'Protein calculator', icon: Calculator },
+    { path: '/calculators/calorie', label: 'Calorie portions', icon: Calculator },
   ],
   '/groceries': [
-    { path: '/calculators/calorie', label: 'Calorie portions' },
-    { path: '/calculators/mass', label: 'Unit converter' },
+    { path: '/calculators/calorie', label: 'Calorie portions', icon: Calculator },
+    { path: '/calculators/mass', label: 'Unit converter', icon: Ruler },
   ],
   '/weight-progress': [
-    { path: '/calculators/protein-intake', label: 'Protein calculator' },
-    { path: '/calculators/mass', label: 'Unit converter' },
+    { path: '/calculators/protein-intake', label: 'Protein calculator', icon: Calculator },
+    { path: '/calculators/mass', label: 'Unit converter', icon: Ruler },
   ],
   '/progress-tracker': [
-    { path: '/calculators/percentage', label: 'Percentage calculator' },
+    { path: '/calculators/percentage', label: 'Percentage calculator', icon: Percent },
   ],
   '/finance': [
-    { path: '/calculators/savings-planner', label: 'Savings goal planner' },
-    { path: '/calculators/position-size', label: 'Position size' },
-    { path: '/calculators/crypto-futures', label: 'Futures trade' },
-    { path: '/calculators/percentage', label: 'Percentage calculator' },
+    { path: '/calculators/savings-planner', label: 'Savings goal planner', icon: TrendingUp },
+    { path: '/calculators/position-size', label: 'Position size', icon: ChartColumn },
+    { path: '/calculators/crypto-futures', label: 'Futures trade', icon: ChartColumn },
+    { path: '/calculators/percentage', label: 'Percentage calculator', icon: Percent },
   ],
 };
 
@@ -52,6 +52,19 @@ function NavLink({ item, activePath, onNavigate, className = '' }) {
   return <a href={getAppHref(item.path)} aria-current={active ? 'page' : undefined} className={`global-nav-link${active ? ' is-active' : ''} ${className}`.trim()} onClick={onNavigate}>
     {item.label}
   </a>;
+}
+
+function RelatedTools({ items, onNavigate }) {
+  return <section className="global-nav-related" aria-label="Related tools">
+    <div className="global-nav-related-heading"><Calculator size={15} aria-hidden="true" /><span>Related tools</span></div>
+    <div className="global-nav-related-list">
+      {items.map(({ path, label, icon: Icon }) => <a key={path} href={getAppHref(path)} className="global-nav-related-link" onClick={onNavigate}>
+        <span className="global-nav-related-icon"><Icon size={16} strokeWidth={1.8} aria-hidden="true" /></span>
+        <span className="global-nav-related-label">{label}</span>
+        <ArrowRight className="global-nav-related-arrow" size={15} aria-hidden="true" />
+      </a>)}
+    </div>
+  </section>;
 }
 
 export function AppNavigation(props) {
@@ -119,10 +132,7 @@ function AppNavigationView({ route = '', activePath }) {
           </button>
           {moreOpen && <div className="global-nav-overflow" role="region" aria-label="More apps">
             {overflowItems.map(item => <NavLink key={item.path} item={item} activePath={currentPath} onNavigate={() => setMoreOpen(false)} className="global-nav-overflow-link" />)}
-            {relatedCalculators[currentPath] && <div className="global-nav-related" aria-label="Related tools">
-              <span>Related tools</span>
-              {relatedCalculators[currentPath].map(item => <a key={item.path} href={getAppHref(item.path)} className="global-nav-overflow-link" onClick={() => setMoreOpen(false)}>{item.label}</a>)}
-            </div>}
+            {relatedCalculators[currentPath] && <RelatedTools items={relatedCalculators[currentPath]} onNavigate={() => setMoreOpen(false)} />}
           </div>}
         </div>
       </div>
@@ -138,7 +148,7 @@ function AppNavigationView({ route = '', activePath }) {
         <nav aria-label="All apps" className="global-nav-drawer-links">
           {primaryNavItems.map(item => <NavLink key={item.path} item={item} activePath={currentPath} onNavigate={closeDrawer} />)}
         </nav>
-        {relatedCalculators[currentPath] && <div className="global-nav-related"><span>Related tools</span>{relatedCalculators[currentPath].map(item => <a key={item.path} href={getAppHref(item.path)} className="global-nav-link" onClick={closeDrawer}>{item.label}</a>)}</div>}
+        {relatedCalculators[currentPath] && <RelatedTools items={relatedCalculators[currentPath]} onNavigate={closeDrawer} />}
       </aside>
     </div>}
   </>;
