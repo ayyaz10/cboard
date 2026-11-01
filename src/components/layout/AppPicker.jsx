@@ -33,7 +33,10 @@ export function AppPicker({ apps, onChoose }) {
   }, []);
   function choose(item) { if (onChoose(item) !== false) setOpen(false); }
   return <>
-    <Button size="sm" className="app-picker-trigger" onClick={() => setOpen(true)} aria-label="Switch app (slash)">Apps /</Button>
+    <Button size="sm" className="app-picker-trigger" onClick={() => setOpen(true)} aria-label="Open app launcher" title="Apps (keyboard shortcut: /)">
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h7v7H3zm11 0h7v7h-7zM3 14h7v7H3zm11 0h7v7h-7z" /></svg>
+      <span>Apps</span>
+    </Button>
     <Dialog open={open} onClose={() => setOpen(false)} labelledBy={`${id}-title`} className="workspace-switcher">
       <div className="workspace-switcher-heading"><strong id={`${id}-title`}>Open an app</strong><IconButton label="Close app launcher" onClick={() => setOpen(false)}>×</IconButton></div>
       <input ref={input} className="ui-control" aria-label="Search apps" role="combobox" aria-expanded="true" aria-controls={`${id}-results`} aria-activedescendant={matches[active] ? `${id}-result-${active}` : undefined} autoComplete="off" value={query} onChange={event => { setQuery(event.target.value); setActive(0); }} onKeyDown={event => {

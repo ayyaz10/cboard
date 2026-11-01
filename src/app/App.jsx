@@ -8,7 +8,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { migrateLocalStorageData } from '../services/dataMigrationService';
 import { navigateTo, useRoute } from './useRoute';
 import { observeWorkspaceSetup } from './workspaceSetup';
-import { WorkspaceTools } from '../components/layout/WorkspaceTools';
 import { CalculatorBoard } from '../features/calculators/CalculatorBoard';
 import {
   calculators,
@@ -28,10 +27,7 @@ const HabitImprovementHome = lazy(() => import('../features/drivingImprovement/H
 const HabitImprovementDetail = lazy(() => import('../features/drivingImprovement/DrivingImprovement.jsx').then(module => ({ default: module.HabitImprovementDetail })));
 
 export default function App() {
-  const { isAuthenticated, user } = useAuth();
-  const route = useRoute();
-  const authRoutes = ['/login', '/forgot-password', '/reset-password'];
-  return <><AppContent />{isAuthenticated && route !== '/' && !authRoutes.includes(route) && <WorkspaceTools key={user.id} userId={user.id} route={route} />}</>;
+  return <AppContent />;
 }
 
 function AppContent() {

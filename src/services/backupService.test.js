@@ -96,7 +96,7 @@ test('legacy Driving Improvement backups restore under one parent habit and map 
   assert.equal(restored.data.habits[0].slug, 'driving-improvement');
   assert.equal(restored.data.categories[0].habitId, restored.data.habits[0].id);
   assert.equal(restored.data.habits[0].userId, 'new-account');
-  assert.deepEqual(restored.data.mistakes[0], { ...item, userId: 'new-account', status: 'STABLE' });
+  assert.deepEqual(restored.data.mistakes[0], { ...item, userId: 'new-account', status: 'STABLE', priority: 'MEDIUM' });
   assert.equal(backupModuleRegistry.find(module => module.moduleId === 'drivingImprovement').displayName, 'Habit Improvement');
 });
 

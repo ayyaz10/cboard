@@ -1,57 +1,51 @@
+import { useEffect, useRef, useState } from 'react';
 import { ScrollControls } from './ScrollControls';
-import { getAppHref } from '../../app/useRoute';
 import { BrandBadge } from './BrandBadge';
 import { ThemeToggle } from './ThemeToggle';
 import { useAuth } from '../../contexts/AuthContext';
-import { getProfileInitials } from '../../services/profileService';
+import { useRoute, getAppHref } from '../../app/useRoute';
+import { AppNavigation, AppNavigationScope } from './AppNavigation.jsx';
+import { WorkspaceTools } from './WorkspaceTools.jsx';
+import { ProfileMenu } from './ProfileMenu.jsx';
+import './appShell.css';
 
 export function PageShell({ children }) {
-  const { displayName, user, profile, signOut } = useAuth();
+  const { user } = useAuth();
+  const route = useRoute();
+  const [utilitiesOpen, setUtilitiesOpen] = useState(false);
+  const headerRef = useRef(null);
+
+  useEffect(() => {
+    if (!utilitiesOpen) return undefined;
+    const close = event => {
+      if (event.key === 'Escape' || (headerRef.current && !headerRef.current.contains(event.target))) setUtilitiesOpen(false);
+    };
+    document.addEventListener('keydown', close);
+    document.addEventListener('pointerdown', close);
+    return () => {
+      document.removeEventListener('keydown', close);
+      document.removeEventListener('pointerdown', close);
+    };
+  }, [utilitiesOpen]);
 
   return (
-    <main className="page-shell min-h-screen px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 lg:py-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <BrandBadge />
-
-          <div className="page-shell-topbar-actions flex flex-wrap items-center justify-end gap-3">
-            {user ? (
-              <>
-                <div className="page-shell-identity-group">
-                  <div aria-label={`Signed in as ${displayName}`} title={`Signed in as ${displayName}`} className="account-avatar-link">
-                    <span className="account-avatar-small">{profile?.avatarUrl ? <img src={profile.avatarUrl} alt=""/> : getProfileInitials(displayName,user.email)}</span>
-                    <span className="max-w-[10rem] truncate">{displayName}</span>
-                  </div>
-                </div>
-                <div className="page-shell-quick-actions">
-                  <a
-                    href={getAppHref('/notes')}
-                    className="page-shell-quick-action rounded-full border-2 border-black bg-[#9fe3ff] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[3px_3px_0_#000] transition hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_#000]"
-                  >
-                    Notes
-                  </a>
-                  <a
-                    href={getAppHref('/focus-timer')}
-                    className="page-shell-quick-action page-shell-quick-action--primary rounded-full border-2 border-black bg-[#c5ff6f] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[3px_3px_0_#000] transition hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_#000]"
-                  >
-                    Start Focus
-                  </a>
-                </div>
-              </>
-            ) : null}
-            <div className="page-shell-preference-actions">
+    <main className="page-shell min-h-screen px-4 pb-6 sm:px-6 lg:px-8">
+      <div className="page-shell-layout mx-auto flex max-w-6xl flex-col gap-4">
+        <header className="app-shell-header" ref={headerRef} data-utilities-open={utilitiesOpen}>
+          <div className="app-shell-header-row">
+            <BrandBadge />
+            <AppNavigation route={route} />
+            {user && <a href={getAppHref('/focus-timer')} className="app-shell-focus" title="Start a focus session" aria-label="Start a focus session"><span aria-hidden="true">▶</span><span className="app-shell-focus-label">Focus</span></a>}
+            <button type="button" className="app-shell-utilities-trigger" aria-expanded={utilitiesOpen} aria-controls="app-shell-utilities" onClick={() => setUtilitiesOpen(value => !value)}><span aria-hidden="true">⋯</span><span>Tools</span></button>
+            <div className="app-shell-utilities" id="app-shell-utilities" role="group" aria-label="Quick tools">
+              {user && <WorkspaceTools key={user.id} userId={user.id} route={route} />}
               <ThemeToggle />
-              {user && <button
-                type="button"
-                onClick={signOut}
-                className="page-shell-logout rounded-full border-2 border-black bg-white px-3 py-1.5 text-xs font-bold uppercase tracking-[0.12em] text-black shadow-[3px_3px_0_#000] transition hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_#000]"
-              >
-                Logout
-              </button>}
+              <div id="app-shell-status" />
             </div>
+            {user && <ProfileMenu />}
           </div>
-        </div>
-        {children}
+        </header>
+        <AppNavigationScope value={true}>{children}</AppNavigationScope>
         <ScrollControls />
       </div>
     </main>

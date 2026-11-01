@@ -519,3 +519,26 @@ html[data-theme="midnight"] .page-shell-quick-action--primary { border-color: va
 html[data-theme="midnight"] .page-shell-quick-action--primary:hover { border-color: var(--interaction-primary-hover) !important; background: var(--interaction-primary-hover) !important; }
 html[data-theme="midnight"] .page-shell-logout { border: 1px solid transparent !important; background: transparent !important; color: var(--color-text-muted) !important; box-shadow: none !important; }
 html[data-theme="midnight"] .page-shell-logout:hover { border-color: var(--border-default) !important; background: var(--surface-hover) !important; color: var(--color-text) !important; }
+
+/* The compact shared shell replaces the former stacked page header and nav rows. */
+html[data-theme="midnight"] .app-shell-header { border-color: var(--border-subtle); background: var(--color-bg); }
+html[data-theme="midnight"] .brand-badge { border-color: var(--border-default); background: var(--surface-primary); }
+html[data-theme="midnight"] .global-nav-link { color: var(--color-text-secondary); }
+html[data-theme="midnight"] .global-nav-link:hover,
+html[data-theme="midnight"] .global-nav-link.is-active { border-color: var(--border-subtle); background: var(--surface-hover); color: var(--color-text); }
+html[data-theme="midnight"] .global-nav-link.is-active::after { background: var(--color-accent); }
+html[data-theme="midnight"] .global-nav-overflow,
+html[data-theme="midnight"] .profile-menu-popover,
+html[data-theme="midnight"] .app-board-settings-menu,
+html[data-theme="midnight"] .board-card-size-options { border-color: var(--border-strong); background: var(--surface-elevated); }
+html[data-theme="midnight"] .app-shell-focus { border-color: var(--interaction-primary); background: var(--interaction-primary); color: var(--color-accent-contrast); }
+html[data-theme="midnight"] .app-shell-focus:hover { background: var(--interaction-primary-hover); }
+html[data-theme="midnight"] .app-shell-utilities-trigger,
+html[data-theme="midnight"] .global-nav-menu-trigger,
+html[data-theme="midnight"] .profile-menu-trigger,
+html[data-theme="midnight"] .theme-toggle { border-color: var(--border-default); background: var(--surface-elevated); color: var(--color-text); }
+html[data-theme="midnight"] .app-board-heading h1,
+html[data-theme="midnight"] .board-card-link h2 { color: var(--color-text); }
+html[data-theme="midnight"] .board-card { overflow:visible !important; border-color:var(--border-default) !important; border-left:2px solid var(--color-accent) !important; border-radius:var(--radius-card) !important; background:linear-gradient(110deg,rgb(242 138 71 / .055),transparent 38%),var(--surface-primary) !important; box-shadow:var(--shadow-sm) !important; }
+html[data-theme="midnight"] .board-card:hover { border-color:var(--border-interactive) !important; border-left-color:var(--color-accent) !important; background-color:var(--surface-secondary) !important; }
+html[data-theme="midnight"] .board-card-description { color: var(--color-text-secondary); }

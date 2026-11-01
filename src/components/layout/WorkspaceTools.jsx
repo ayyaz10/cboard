@@ -1,7 +1,7 @@
 import { NoteEditor } from '../../features/notebook/NotesPanel';
 import { sanitizeNoteHtml, getTextFromHtml } from '../../features/notebook/noteContent';
 import { useEffect, useRef, useState } from 'react';
-import { primaryNavItems } from './AppNavigation';
+import { APP_MODULES } from './appModules.js';
 import { AppPicker } from './AppPicker.jsx';
 import { Button } from '../ui/Button.jsx';
 import { calculators } from '../../features/calculators/registry';
@@ -9,7 +9,7 @@ import { getAppHref, navigateTo } from '../../app/useRoute';
 import { appendAppNote, getAppNote, subscribeToNotes, updateNote } from '../../services/noteService';
 import './workspaceTools.css';
 
-const apps = [...primaryNavItems, ...calculators.map(item => ({ path: item.path, label: item.name }))];
+const apps = [...APP_MODULES.filter(item => item.appLauncher !== false).map(({ path, label }) => ({ path, label })), ...calculators.map(item => ({ path: item.path, label: item.name }))];
 const escapeHtml = value => value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 
 export function WorkspaceTools({ route, userId }) {
@@ -65,9 +65,9 @@ export function WorkspaceTools({ route, userId }) {
     finally { lock.current = false; setBusy(false); }
   }
   return <>
-    <div className="workspace-tools">
+    <div className="workspace-tools" role="group" aria-label="Workspace utilities">
       <AppPicker apps={apps} onChoose={choose} />
-      <Button size="sm" onClick={() => setOpen(!open)} aria-expanded={open} aria-controls="app-note-box">{open ? 'Close note' : '+ App note'}</Button>
+      <Button size="sm" className="workspace-note-trigger" title="Add a note for this app" onClick={() => setOpen(!open)} aria-expanded={open} aria-controls="app-note-box">{open ? 'Close' : '+ Note'}</Button>
       {open && <form id="app-note-box" className={`workspace-note${editingNote ? ' workspace-note-editing' : ''}`} onSubmit={editingNote ? saveExisting : save}>
         <strong>{app.label} notes</strong>
         {editingNote ? <><NoteEditor value={editingNote.contentHtml} onChange={contentHtml => setEditingNote(current => ({ ...current, contentHtml }))} media={editingNote.media} onMediaChange={media => setEditingNote(current => ({ ...current, media }))} onError={setMessage} /><Button type="submit" disabled={busy}>Save app note</Button><Button type="button" disabled={busy} onClick={() => setEditingNote(null)}>Cancel edit</Button></> : <>
