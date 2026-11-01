@@ -9,6 +9,8 @@ import {
   getFoodDiary,
   saveFoodDiary,
 } from "../../services/foodDiaryService";
+import { loadWeightForDate } from '../../services/weightService.js';
+import { DEFAULT_WEIGHT_FOOD_PAIRING, getWeightDateForFoodDiary, normalizeWeightFoodPairing, WEIGHT_FOOD_PAIRING_KEY } from '../../services/weightFoodPairing.js';
 import { getPreference, setPreference } from "../../services/preferenceService";
 import { readMealRoutine } from "../recipes/mealPlanData";
 import { RecipeLink } from "../recipes/RecipeComponents";
@@ -24,7 +26,7 @@ import { prepareDiaryCatalogItems } from './diaryCatalog.js';
 import { notify } from '../../lib/notifications.js';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog.jsx';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog.js';
-import { navigateTo } from '../../app/useRoute.js';
+import { getAppHref, navigateTo } from '../../app/useRoute.js';
 import {
   MEALS,
   REQUIRED_MEALS,
@@ -82,7 +84,14 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
   const { user } = useAuth();
   const { confirm: confirmDiscard, dialog: discardDialog } = useConfirmDialog();
   const [today, setToday] = useState(localDate);
-  const [date, setDate] = useState(localDate);
+  const [date, setDate] = useState(() => {
+    const requested = new URLSearchParams(window.location.search).get('date');
+    return validDate(requested) && requested <= localDate() ? requested : localDate();
+  });
+  const [pairingMode, setPairingMode] = useState(DEFAULT_WEIGHT_FOOD_PAIRING);
+  const [pairingReady, setPairingReady] = useState(false);
+  const [pairingError, setPairingError] = useState('');
+  const [linkedWeight, setLinkedWeight] = useState({ date: null, entry: null, loading: false, error: '' });
   const [days, setDays] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -112,6 +121,8 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
   const diaryTopRef = useRef(null);
   const mealsRef = useRef(null);
   const day = days.find((entry) => entry.date === date) || emptyDay(date);
+  const relatedWeightDate = getWeightDateForFoodDiary(date, pairingMode);
+  const relatedWeight = linkedWeight.date === relatedWeightDate ? linkedWeight : { date: relatedWeightDate, entry: null, loading: pairingReady, error: '' };
   const streak = streaks(days, today);
   const foodLibrary = useMemo(() => buildSavedFoods(recipes, days, foodCatalog), [days, recipes, foodCatalog]);
   const disabled = busy || Boolean(draft) || Boolean(routine) || pastOpen;
@@ -162,6 +173,31 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
       generation.current++;
     };
   }, [user.id]);
+  useEffect(() => {
+    let active = true;
+    const syncPairing = () => getPreference(WEIGHT_FOOD_PAIRING_KEY, DEFAULT_WEIGHT_FOOD_PAIRING)
+      .then(value => { if (active) { setPairingMode(normalizeWeightFoodPairing(value)); setPairingError(''); } })
+      .catch(() => { if (active) { setPairingMode(DEFAULT_WEIGHT_FOOD_PAIRING); setPairingError('Pairing setting could not load. Using the recommended previous-day setting.'); } })
+      .finally(() => { if (active) setPairingReady(true); });
+    syncPairing();
+    window.addEventListener('focus', syncPairing);
+    return () => { active = false; window.removeEventListener('focus', syncPairing); };
+  }, [user.id]);
+  useEffect(() => {
+    if (!pairingReady) return undefined;
+    const relatedDate = getWeightDateForFoodDiary(date, pairingMode);
+    if (!relatedDate) return undefined;
+    let active = true;
+    const refresh = () => {
+      setLinkedWeight(current => ({ ...current, date: relatedDate, loading: true, error: '' }));
+      loadWeightForDate(relatedDate, user.id)
+        .then(entry => { if (active) setLinkedWeight({ date: relatedDate, entry, loading: false, error: '' }); })
+        .catch(err => { if (active) setLinkedWeight({ date: relatedDate, entry: null, loading: false, error: err.message || 'Related weigh-in could not load.' }); });
+    };
+    refresh();
+    window.addEventListener('focus', refresh);
+    return () => { active = false; window.removeEventListener('focus', refresh); };
+  }, [date, pairingMode, pairingReady, user.id]);
   useEffect(() => {
     const timer = setInterval(() => setToday(localDate()), 30000);
     return () => clearInterval(timer);
@@ -612,6 +648,15 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
           meals={day.meals}
           goals={goals}
         />
+        <div className="diary-linked-weight" aria-label="Related weigh-in">
+          <div><span>{pairingMode === 'previous-day' ? 'Next morning weight' : 'Same-day weight'}</span>
+            <strong>{!pairingReady ? 'Loading pairing…' : relatedWeight.loading ? 'Loading weigh-in…' : relatedWeight.error ? 'Weigh-in unavailable' : relatedWeight.entry ? `${new Intl.NumberFormat(undefined,{maximumFractionDigits:2}).format(Number(relatedWeight.entry.weight_kg))} kg` : pairingMode === 'previous-day' ? 'No next-morning weight recorded' : 'No same-day weigh-in recorded'}</strong>
+            {relatedWeight.entry && relatedWeight.date && <small>{new Intl.DateTimeFormat(undefined,{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}).format(new Date(`${relatedWeight.date}T12:00:00Z`))}{pairingMode === 'previous-day' ? ' morning weigh-in' : ' weigh-in'}</small>}
+            {relatedWeight.error && <small role="status">{relatedWeight.error}</small>}
+            {pairingError && <small role="status">{pairingError}</small>}
+          </div>
+          {relatedWeight.entry && relatedWeight.date && <a href={getAppHref(`/weight-progress?date=${relatedWeight.date}`)} onClick={event=>{event.preventDefault();navigateTo(`/weight-progress?date=${relatedWeight.date}`)}}>View Weight Progress</a>}
+        </div>
       </section>
       {error && (
         <div className="diary-error" role="alert">

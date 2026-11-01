@@ -314,7 +314,7 @@ export const backupModuleRegistry = [
   focus,
   tableModule({ id: 'savedCalculations', name: 'Saved calculations', tables: ['calculator_results'] }),
   tableModule({ id: 'trading', name: 'Trading journal', tables: ['crypto_futures_trades'] }),
-  preferenceModule({ id: 'preferences', name: 'App preferences', patterns: ['mass-unit-usage'] }),
+  preferenceModule({ id: 'preferences', name: 'App preferences', patterns: ['mass-unit-usage', 'weight-food-pairing:v1'] }),
   profile,
 ].map(module => Object.freeze(module));
 

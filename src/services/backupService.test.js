@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { backupModuleRegistry, exportBackupData, importBackupModule } from './backupRegistry.js';
+import { backupModuleRegistry, exportBackupData, getBackupModule, importBackupModule } from './backupRegistry.js';
 import { BACKUP_FORMAT, BACKUP_VERSION, expandDependencies, parseBackupFile } from './backupService.js';
 
 const canonical = value => Array.isArray(value) ? value.map(canonical) : value && typeof value === 'object'
@@ -64,6 +64,11 @@ test('registry is extensible and each recoverable module supplies all required h
     assert.ok(Number.isInteger(module.schemaVersion));
     for (const handler of ['exportData', 'importData', 'validate']) assert.equal(typeof module[handler], 'function', `${module.moduleId}.${handler}`);
   }
+});
+
+test('weight and Food Diary pairing preference is included in App Preferences backups', () => {
+  const preferences = getBackupModule('preferences');
+  assert.doesNotThrow(() => preferences.validate({ rows: [{ key: 'weight-food-pairing:v1', value: 'same-day' }] }));
 });
 
 test('one-app backup keeps a selective scope and round-trips the source data', async () => {

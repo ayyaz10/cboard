@@ -17,6 +17,12 @@ export async function loadWeights() {
   }
   return { entries, userId };
 }
+export async function loadWeightForDate(date, expectedUserId) {
+  const { client, userId } = await scoped(expectedUserId);
+  const result = await client.from('weight_entries').select('date,weight_kg').eq('user_id', userId).eq('date', date).maybeSingle();
+  assertSupabaseResult(result);
+  return result.data;
+}
 export async function weightPhotoUrl(path, userId) {
   const {client} = await scoped(userId);
   const result = await client.storage.from(bucket).createSignedUrl(path, 3600);

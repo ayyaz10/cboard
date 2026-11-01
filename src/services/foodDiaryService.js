@@ -1,7 +1,7 @@
 import { loadGroceries } from './groceryService';
 import { reconcileInventory } from '../features/groceries/inventory.js';
 import { getUserScopedClient, assertSupabaseResult } from "./supabaseCrud";
-import { validateDay } from "../features/diary/diaryData.js";
+import { validDate, validateDay } from "../features/diary/diaryData.js";
 import { getFoodCatalog } from './foodCatalogService.js';
 import { createSingleFlightByKey } from '../utils/singleFlight.js';
 import { notify } from '../lib/notifications.js';
@@ -35,6 +35,28 @@ export async function getFoodDiary(expectedUserId) {
         );
       return { ...day, updatedAt: row.updated_at };
     });
+  });
+}
+export async function getFoodDiaryDays(dates, expectedUserId) {
+  const uniqueDates = [...new Set(dates)].filter(validDate);
+  if (!uniqueDates.length) return [];
+  const { client, userId } = await getUserScopedClient();
+  if (userId !== expectedUserId) throw new Error("Your account changed. Reload the diary.");
+  const rows = [];
+  for (let from = 0; from < uniqueDates.length; from += 80) {
+    const keys = uniqueDates.slice(from, from + 80).map(date => `${PREFIX}${date}`);
+    const result = await client.from("user_tool_preferences")
+      .select("key,value,updated_at")
+      .eq("user_id", userId)
+      .in("key", keys)
+      .order("key");
+    assertSupabaseResult(result);
+    rows.push(...result.data);
+  }
+  return rows.map(row => {
+    const day = validateDay(row.value);
+    if (row.key !== `${PREFIX}${day.date}`) throw new Error("A diary date is invalid. Your saved records have not been changed.");
+    return { ...day, updatedAt: row.updated_at };
   });
 }
 async function commitDay(day, expectedUserId, deleting = false) {

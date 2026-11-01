@@ -1,8 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { AppNavigation } from '../../components/layout/AppNavigation';
 import { PageShell } from '../../components/layout/PageShell';
 import { loadWeights, saveWeight, deleteWeight, weightPhotoUrl, removeWeightPhoto } from '../../services/weightService';
+import { getFoodDiaryDays } from '../../services/foodDiaryService.js';
+import { getPreference, setPreference } from '../../services/preferenceService.js';
+import { DEFAULT_WEIGHT_FOOD_PAIRING, getFoodDiaryDateForWeight, getLinkedCaloriesForWeight, normalizeWeightFoodPairing, SAME_DAY_PAIRING, WEIGHT_FOOD_PAIRING_KEY } from '../../services/weightFoodPairing.js';
+import { getAppHref, navigateTo } from '../../app/useRoute.js';
 import { readRecipeImage } from '../recipes/recipeImage';
 import { displayWeight, localDate, weightInKg, weightSummary } from './weightData';
 import './weightProgress.css';
@@ -24,6 +28,8 @@ export function WeightProgress() {
   const [unit,setUnit]=useState('kg'),[form,setForm]=useState(blank),[editing,setEditing]=useState(null),[photo,setPhoto]=useState(null),[reading,setReading]=useState(false);
   const [confirm,setConfirm]=useState(null),[compare,setCompare]=useState(['','']),[cleanup,setCleanup]=useState([]);
   const [photoViewer,setPhotoViewer]=useState(false),[compareMode,setCompareMode]=useState(false),[activePhotoId,setActivePhotoId]=useState(null);
+  const [pairingMode,setPairingMode]=useState(DEFAULT_WEIGHT_FOOD_PAIRING),[pairingReady,setPairingReady]=useState(false),[pairingSaving,setPairingSaving]=useState(false),[pairingError,setPairingError]=useState('');
+  const [diaryDays,setDiaryDays]=useState([]),[diaryLoading,setDiaryLoading]=useState(false),[diaryError,setDiaryError]=useState('');
   const lock=useRef(false),mounted=useRef(true),imageJob=useRef(0),formRef=useRef(null),photoDialog=useRef(null);
   useEffect(()=>{mounted.current=true;reload();return()=>{mounted.current=false;imageJob.current++}},[]);
   useEffect(()=>{
@@ -32,12 +38,34 @@ export function WeightProgress() {
     if(photoViewer&&!dialog.open)dialog.showModal();
     else if(!photoViewer&&dialog.open)dialog.close();
   },[photoViewer]);
+  useEffect(()=>{
+    const requested=new URLSearchParams(window.location.search).get('date');
+    if(data?.entries.some(entry=>entry.date===requested))window.requestAnimationFrame(()=>document.getElementById(`weight-date-${requested}`)?.scrollIntoView({behavior:'smooth',block:'center'}));
+  },[data]);
   async function reload(){
     if(lock.current)return;
     lock.current=true;setBusy(true);setError('');
-    try{const result=await loadWeights();if(mounted.current)setData(result)}
+    try{
+      const result=await loadWeights();
+      if(mounted.current)setData(result);
+      const dateKeys=[...new Set(result.entries.flatMap(entry=>[
+        getFoodDiaryDateForWeight(entry.date,DEFAULT_WEIGHT_FOOD_PAIRING),
+        getFoodDiaryDateForWeight(entry.date,SAME_DAY_PAIRING),
+      ]).filter(Boolean))];
+      if(mounted.current){setDiaryLoading(true);setDiaryError('');}
+      const [savedPairing,savedDays]=await Promise.allSettled([
+        getPreference(WEIGHT_FOOD_PAIRING_KEY,DEFAULT_WEIGHT_FOOD_PAIRING),
+        getFoodDiaryDays(dateKeys,result.userId),
+      ]);
+      if(!mounted.current)return;
+      if(savedPairing.status==='fulfilled')setPairingMode(normalizeWeightFoodPairing(savedPairing.value));
+      else setPairingError('Pairing preference could not load. Using the recommended previous-day setting.');
+      setPairingReady(true);
+      if(savedDays.status==='fulfilled')setDiaryDays(savedDays.value);
+      else setDiaryError(savedDays.reason?.message||'Food Diary data could not load.');
+    }
     catch(e){if(mounted.current)setError(e.message)}
-    finally{lock.current=false;if(mounted.current)setBusy(false)}
+    finally{lock.current=false;if(mounted.current){setBusy(false);setDiaryLoading(false)}}
   }
   function reset(){imageJob.current++;setReading(false);setEditing(null);setForm(blank());setPhoto(null)}
   function addCleanup(path){if(path)setCleanup(paths=>[...new Set([...paths,path])])}
@@ -48,6 +76,12 @@ export function WeightProgress() {
       const result=await saveWeight({date:form.date,weight_kg:editing&&Number(form.weight)===displayWeight(editing.weight_kg,unit)?Number(editing.weight_kg):weightInKg(form.weight,unit),note:form.note,photo_path:form.photo_path},editing,photo,data.userId);
       if(!mounted.current)return;
       setData(d=>({...d,entries:[...d.entries.filter(x=>x.id!==result.entry.id),result.entry].sort((a,b)=>b.date.localeCompare(a.date))}));
+      const relatedDates=[getFoodDiaryDateForWeight(result.entry.date,DEFAULT_WEIGHT_FOOD_PAIRING),getFoodDiaryDateForWeight(result.entry.date,SAME_DAY_PAIRING)].filter(Boolean);
+      setDiaryLoading(true);
+      getFoodDiaryDays(relatedDates,data.userId)
+        .then(days=>{if(mounted.current)setDiaryDays(current=>[...new Map([...current,...days].map(day=>[day.date,day])).values()])})
+        .catch(err=>{if(mounted.current)setDiaryError(err.message||'Food Diary data could not load.')})
+        .finally(()=>{if(mounted.current)setDiaryLoading(false)});
       addCleanup(result.cleanup);reset();setNotice('Weigh-in saved.');
     }catch(e){if(mounted.current){setError(e.message);addCleanup(e.cleanup)}}
     finally{lock.current=false;if(mounted.current)setBusy(false)}
@@ -68,7 +102,38 @@ export function WeightProgress() {
     }
     setUnit(next);
   }
+  async function savePairingMode(next){
+    if(next===pairingMode||pairingSaving)return;
+    setPairingSaving(true);setPairingError('');
+    try{await setPreference(WEIGHT_FOOD_PAIRING_KEY,next);if(mounted.current)setPairingMode(next)}
+    catch(e){if(mounted.current)setPairingError(e.message||'Pairing preference could not be saved.')}
+    finally{if(mounted.current)setPairingSaving(false)}
+  }
   const entries=data?.entries||[],stats=weightSummary(entries),photos=entries.filter(e=>e.photo_path).sort((a,b)=>a.date.localeCompare(b.date));
+  const diaryByDate=useMemo(()=>new Map(diaryDays.map(day=>[day.date,day])),[diaryDays]);
+  const linkedDiaryByWeightDate=useMemo(()=>new Map(entries.map(entry=>[entry.date,getLinkedCaloriesForWeight(entry,diaryByDate,pairingMode)])),[entries,diaryByDate,pairingMode]);
+  useEffect(()=>{
+    if(!data?.userId||diaryLoading)return undefined;
+    let active=true,lastRefresh=0;
+    const refresh=async()=>{
+      if(document.visibilityState==='hidden'||Date.now()-lastRefresh<1000)return;
+      lastRefresh=Date.now();
+      const dates=[...new Set(entries.flatMap(entry=>[
+        getFoodDiaryDateForWeight(entry.date,DEFAULT_WEIGHT_FOOD_PAIRING),
+        getFoodDiaryDateForWeight(entry.date,SAME_DAY_PAIRING),
+      ]).filter(Boolean))];
+      const [preference,linkedDays]=await Promise.allSettled([
+        getPreference(WEIGHT_FOOD_PAIRING_KEY,DEFAULT_WEIGHT_FOOD_PAIRING),
+        getFoodDiaryDays(dates,data.userId),
+      ]);
+      if(preference.status==='fulfilled'&&active){setPairingMode(normalizeWeightFoodPairing(preference.value));setPairingError('')}
+      else if(active)setPairingError('Pairing preference could not refresh. Using the last saved setting.');
+      if(linkedDays.status==='fulfilled'&&active){setDiaryDays(linkedDays.value);setDiaryError('')}
+      else if(active)setDiaryError(linkedDays.reason?.message||'Food Diary data could not load.');
+    };
+    window.addEventListener('focus',refresh);
+    return()=>{active=false;window.removeEventListener('focus',refresh)};
+  },[data?.userId,entries,diaryLoading]);
   const activePhotoIndex=photos.findIndex(entry=>entry.id===activePhotoId);
   const activePhoto=photos[activePhotoIndex]||photos.at(-1);
   const earlierPhoto=photos.find(entry=>entry.id===compare[0])||photos[0];
@@ -92,6 +157,16 @@ export function WeightProgress() {
         <div><small>Change since first weigh-in</small><strong>{stats.change>0?'+':''}{format(stats.change)}</strong></div>
         <div><small>Weigh-ins</small><strong>{stats.count}</strong></div>
       </div>}
+      <section className="weight-pairing-setting" aria-labelledby="weight-pairing-title">
+        <div><span className="weight-eyebrow">Daily context</span><h2 id="weight-pairing-title">Weight ↔ Food Diary</h2><p>Morning weigh-ins are usually paired with the previous day’s food intake.</p></div>
+        <fieldset disabled={!pairingReady||pairingSaving}>
+          <legend>Pair weigh-ins with</legend>
+          <label><input type="radio" name="weight-food-pairing" value="previous-day" checked={pairingMode==='previous-day'} onChange={()=>savePairingMode('previous-day')}/>Previous day’s intake — Recommended</label>
+          <label><input type="radio" name="weight-food-pairing" value="same-day" checked={pairingMode==='same-day'} onChange={()=>savePairingMode('same-day')}/>Same day’s intake</label>
+        </fieldset>
+        {pairingSaving&&<span role="status">Saving setting…</span>}
+        {pairingError&&<span className="weight-pairing-error" role="status">{pairingError}</span>}
+      </section>
       <div className="weight-columns">
         <form className="weight-card weight-form" ref={formRef} onSubmit={submit}>
           <h2>{editing?'Edit weigh-in':'Add a weigh-in'}</h2>
@@ -130,11 +205,17 @@ export function WeightProgress() {
           </>}
         </>}
       </dialog>
-      <section className="weight-card"><div className="weight-card-heading"><div><span className="weight-eyebrow">Entries</span><h2>Weigh-in history</h2></div><span className="weight-count">{entries.length} total</span></div>{!entries.length?<p className="weight-muted">No weigh-ins yet. Start with today's weight, or add an earlier date.</p>:<div className="weight-history">{entries.map(entry=><article key={entry.id}>
-        <div><strong>{format(entry.weight_kg)}</strong><p>{entry.date}{entry.photo_path?' / Photo attached':''}</p>{entry.note&&<p className="weight-note">{entry.note}</p>}</div>
+      <section className="weight-card"><div className="weight-card-heading"><div><span className="weight-eyebrow">Entries</span><h2>Weigh-in history</h2></div><span className="weight-count">{entries.length} total</span></div>{!entries.length?<p className="weight-muted">No weigh-ins yet. Start with today's weight, or add an earlier date.</p>:<div className="weight-history">{entries.map(entry=>{
+        const linked=linkedDiaryByWeightDate.get(entry.date);
+        const linkedLabel=pairingMode==='previous-day'?'Previous day intake':'Same day intake';
+        const linkedDateLabel=linked?.date?new Intl.DateTimeFormat(undefined,{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}).format(new Date(`${linked.date}T12:00:00Z`)):'';
+        return <article key={entry.id} id={`weight-date-${entry.date}`} tabIndex={-1} className={new URLSearchParams(window.location.search).get('date')===entry.date?'is-linked-date':undefined}>
+        <div><strong>{format(entry.weight_kg)}</strong><p>{entry.date}{entry.photo_path?' / Photo attached':''}</p>{entry.note&&<p className="weight-note">{entry.note}</p>}
+          <div className="weight-linked-nutrition"><div><small>{linkedLabel}</small><strong>{diaryError?'Food Diary data unavailable':diaryLoading?'Loading linked intake…':linked?.report?.calories==null?'Not logged':`${new Intl.NumberFormat(undefined,{maximumFractionDigits:1}).format(linked.report.calories)} kcal${linked.report.missing?' logged · partial':!linked.day?.complete?' logged':''}`}</strong><span>{diaryError?'Try reloading Weight Progress.':diaryLoading?'Loading Food Diary data…':linked?.day?linkedDateLabel:`No Food Diary data for ${linkedDateLabel||'the paired date'}`}</span></div><a href={getAppHref(`/food-diary?date=${linked?.date||''}`)} onClick={event=>{event.preventDefault();if(linked?.date)navigateTo(`/food-diary?date=${linked.date}`)}}>View Food Diary</a></div>
+        </div>
         <div className="weight-actions"><button disabled={busy||reading} onClick={()=>{imageJob.current++;setPhoto(null);setEditing(entry);setForm({date:entry.date,weight:String(displayWeight(entry.weight_kg,unit)),note:entry.note,photo_path:entry.photo_path});setError('');formRef.current?.scrollIntoView({behavior:'smooth',block:'start'})}}>Edit{entry.photo_path?' / view photo':''}</button><button className="danger-action" disabled={busy} onClick={()=>setConfirm(entry.id)}>Delete</button></div>
         {confirm===entry.id&&<div className="weight-alert">Delete this weigh-in{entry.photo_path?' and its photo':''}? <button className="danger-action" disabled={busy} onClick={()=>remove(entry)}>Delete permanently</button><button disabled={busy} onClick={()=>setConfirm(null)}>Cancel</button></div>}
-      </article>)}</div>}</section>
+      </article>})}</div>}</section>
     </>}
   </section></PageShell>;
 }
