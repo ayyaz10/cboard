@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AlertCircle, Ellipsis, RefreshCw, X } from 'lucide-react';
+import { AlertCircle, RefreshCw, X } from 'lucide-react';
 import { CONNECTION_EVENT } from './network.js';
 import { registerPwa } from './register.js';
-import { PWA_UPDATE_CHECK_EVENT } from './updateCheckEvents.js';
+import { PWA_UPDATE_PANEL_EVENT } from './updateCheckEvents.js';
 import './pwa.css';
 
 export function PwaStatus() {
@@ -17,8 +17,6 @@ export function PwaStatus() {
   const [portalTarget, setPortalTarget] = useState(() => document.getElementById('app-shell-status') || document.body);
   const lastConnection = useRef(connection);
   const statusRef = useRef(null);
-  const checkForUpdatesRef = useRef(null);
-  const pendingCheckRef = useRef(false);
   useEffect(() => {
     const changeConnection = next => {
       if (next === 'online' && lastConnection.current !== 'online') setRecovered(true);
@@ -31,24 +29,17 @@ export function PwaStatus() {
     const cloud = event => {
       changeConnection(event.detail);
     };
-    const requestCheck = () => {
+    const openUpdatePanel = () => {
       setOpen(true);
-      if (checkForUpdatesRef.current) checkForUpdatesRef.current();
-      else pendingCheckRef.current = true;
     };
     window.addEventListener('online', online);
     window.addEventListener('offline', offline);
     window.addEventListener(CONNECTION_EVENT, cloud);
-    window.addEventListener(PWA_UPDATE_CHECK_EVENT, requestCheck);
+    window.addEventListener(PWA_UPDATE_PANEL_EVENT, openUpdatePanel);
     const cleanup = registerPwa(state => {
-      if (state.update) { setUpdate(() => state.update); setOpen(false); }
+      if (state.update) setUpdate(() => state.update);
       if (state.check) {
-        checkForUpdatesRef.current = state.check;
         setCheckForUpdates(() => state.check);
-        if (pendingCheckRef.current) {
-          pendingCheckRef.current = false;
-          state.check();
-        }
       }
       if (typeof state.checking === 'boolean') setChecking(state.checking);
       if (state.message) setMessage(state.message);
@@ -59,7 +50,7 @@ export function PwaStatus() {
       window.removeEventListener('online', online);
       window.removeEventListener('offline', offline);
       window.removeEventListener(CONNECTION_EVENT, cloud);
-      window.removeEventListener(PWA_UPDATE_CHECK_EVENT, requestCheck);
+      window.removeEventListener(PWA_UPDATE_PANEL_EVENT, openUpdatePanel);
     };
   }, []);
   useEffect(() => {
@@ -84,14 +75,12 @@ export function PwaStatus() {
     syncPortalTarget();
     return () => observer.disconnect();
   }, []);
-  const statusLabel = update ? 'Update available' : connection !== 'online' ? 'App status: connection issue' : 'App status and updates';
   const floating = portalTarget === document.body;
   return createPortal(<aside ref={statusRef} className={`pwa-status${floating ? ' is-floating' : ''}`} aria-label="App connection and updates">
-    <button type="button" className={`pwa-status-toggle${update ? ' has-update' : ''}${connection !== 'online' ? ' is-offline' : ''}`} aria-label={statusLabel} title={statusLabel} aria-expanded={open} onClick={() => setOpen(value => !value)}>{connection !== 'online' ? <AlertCircle size={17} aria-hidden="true" /> : <Ellipsis size={18} aria-hidden="true" />}{update && <i aria-hidden="true" />}</button>
-    {open && <div className="pwa-status-panel">
-      <div className="pwa-update-check"><strong>App status</strong><button type="button" onClick={() => setOpen(false)} aria-label="Close app status"><X size={16} aria-hidden="true" /></button></div>
+    {open && <div className="pwa-status-panel" role="dialog" aria-modal="false" aria-label="App updates">
+      <div className="pwa-update-check"><div><strong>App updates</strong><span>Check that you’re using the latest version.</span></div><button type="button" onClick={() => setOpen(false)} aria-label="Close app updates"><X size={18} aria-hidden="true" /></button></div>
       <button type="button" disabled={!checkForUpdates || checking || connection !== 'online'} onClick={() => checkForUpdates?.()}><RefreshCw size={14} aria-hidden="true" />{checking ? 'Checking for updates…' : 'Check for updates'}</button>
-      {connection !== 'online' && <p role="status">{connection === 'offline' ? 'You are offline.' : 'Cloud services are unreachable.'} Reconnect to load or save cloud data.</p>}
+      {connection !== 'online' && <p role="status"><AlertCircle size={15} aria-hidden="true" />{connection === 'offline' ? 'You are offline. Reconnect to check for updates.' : 'Cloud services are unreachable. Check your connection and try again.'}</p>}
       {connection === 'online' && recovered && <div><p role="status">Connection restored. You can retry loading data. Check interrupted saves before submitting again.</p><button type="button" onClick={() => setRecovered(false)}>Dismiss</button></div>}
       {update && <div><p role="status">New version available. Save your work before updating; this reloads the app.</p><button type="button" disabled={connection !== 'online'} onClick={update}>Update</button><button type="button" onClick={() => setUpdate(null)}>Later</button></div>}
       {message && <div><p role="status">{message}</p><button type="button" onClick={() => setMessage('')}>Dismiss</button></div>}

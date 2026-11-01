@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Ellipsis, Play } from 'lucide-react';
+import { Play, SlidersHorizontal } from 'lucide-react';
 import { ScrollControls } from './ScrollControls';
 import { BrandBadge } from './BrandBadge';
 import { ThemeToggle } from './ThemeToggle';
@@ -37,7 +37,7 @@ export function PageShell({ children }) {
             <BrandBadge />
             <AppNavigation route={route} />
             {user && <a href={getAppHref('/focus-timer')} className="app-shell-focus" title="Start a focus session" aria-label="Start a focus session"><Play size={14} fill="currentColor" aria-hidden="true" /><span className="app-shell-focus-label">Focus</span></a>}
-            <button type="button" className="app-shell-utilities-trigger" aria-label="Open quick tools" title="Quick tools" aria-expanded={utilitiesOpen} aria-controls="app-shell-utilities" onClick={() => setUtilitiesOpen(value => !value)}><Ellipsis size={18} aria-hidden="true" /><span>Tools</span></button>
+            <button type="button" className="app-shell-utilities-trigger" aria-label="Open quick tools" title="Quick tools" aria-expanded={utilitiesOpen} aria-controls="app-shell-utilities" onClick={() => setUtilitiesOpen(value => !value)}><SlidersHorizontal size={18} aria-hidden="true" /><span>Tools</span></button>
             <div className="app-shell-utilities" id="app-shell-utilities" role="group" aria-label="Quick tools">
               {user && <WorkspaceTools key={user.id} userId={user.id} route={route} />}
               <ThemeToggle />

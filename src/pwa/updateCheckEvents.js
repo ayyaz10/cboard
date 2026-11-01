@@ -1,5 +1,5 @@
-export const PWA_UPDATE_CHECK_EVENT = 'cboard:pwa-check-updates';
+export const PWA_UPDATE_PANEL_EVENT = 'cboard:pwa-open-update-panel';
 
-export function requestPwaUpdateCheck() {
-  window.dispatchEvent(new Event(PWA_UPDATE_CHECK_EVENT));
+export function openPwaUpdatePanel() {
+  window.dispatchEvent(new Event(PWA_UPDATE_PANEL_EVENT));
 }
