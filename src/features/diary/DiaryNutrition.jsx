@@ -2,7 +2,7 @@ import { NUTRIENTS } from "../nutrition/nutrients";
 import { diaryTotals, itemNutrition } from "./diaryData";
 const format = (n) =>
   new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(n);
-export function NutritionTotals({ meals, goals, compact = false }) {
+export function NutritionTotals({ meals, goals, compact = false, dense = false }) {
   const totals = diaryTotals(meals);
   const primaryNutrients = NUTRIENTS.slice(0, 5);
   const missingDetails = meals.flatMap((meal) =>
@@ -29,7 +29,7 @@ export function NutritionTotals({ meals, goals, compact = false }) {
             {total.missing === 1 ? "" : "s"} missing
           </small>
         )}
-        {!compact && target > 0 && (
+        {!compact && !dense && target > 0 && (
           <>
             <progress
               aria-label={`${label} towards daily target${total.missing ? ", partial data" : ""}`}
@@ -49,7 +49,7 @@ export function NutritionTotals({ meals, goals, compact = false }) {
   }
   return (
     <>
-      <div className="diary-macros">{primaryNutrients.map(nutrient)}</div>
+      <div className={`diary-macros${dense ? " diary-macros-dense" : ""}`}>{primaryNutrients.map(nutrient)}</div>
       {compact && missingDetails.length > 0 && (
         <details className="diary-partial-nutrition">
           <summary>
