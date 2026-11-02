@@ -1,0 +1,26 @@
+.f-expense-category-report h3{font-size:clamp(1.25rem,3vw,1.8rem)}
+.f-expense-period-controls{justify-content:flex-start;margin-top:1rem}
+.f-expense-period-controls .f-report-year input{width:auto;min-width:9.5rem;border:2px solid #111;border-radius:.85rem;background:#fff;padding:.65rem;color:#111;font-weight:750}
+.f-expense-period-label{margin-left:auto;font-variant-numeric:tabular-nums}
+.f-expense-total{display:flex;align-items:baseline;gap:.8rem;flex-wrap:wrap;margin-top:1rem;border-block:1px solid currentColor;padding:.8rem 0}
+.f-expense-total>span{font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em}
+.f-expense-total>strong{font-size:clamp(1.8rem,5vw,2.6rem);font-variant-numeric:tabular-nums;letter-spacing:-.04em}
+.f-expense-total>.f-help{flex-basis:100%}
+.f-expense-category-list{display:grid;gap:.55rem}
+.f-expense-category-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;align-items:center;gap:.35rem .8rem;width:100%;border:1.5px solid currentColor;border-radius:.9rem;background:transparent;padding:.75rem .85rem;text-align:left;color:inherit;cursor:pointer}
+.f-expense-category-row:hover,.f-expense-category-row:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+.f-expense-category-name{font-weight:800;overflow-wrap:anywhere}
+.f-expense-category-amount{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.f-expense-category-percent{min-width:3.6rem;text-align:right;color:var(--color-text-muted,#777);font-size:.78rem;font-variant-numeric:tabular-nums}
+.f-expense-category-bar{grid-column:1/4;height:.45rem;margin:0;border-color:currentColor;background:color-mix(in srgb,currentColor 12%,transparent)}
+.f-expense-category-bar span{border-radius:inherit;background:var(--color-accent,var(--f-green))}
+.f-expense-category-open{grid-column:4;grid-row:1/3;font-size:1.4rem;font-weight:800}
+.f-expense-category-detail h4{font-size:1.25rem;font-weight:800}
+html[data-theme="midnight"] .finance :is(.f-expense-category-report,.f-expense-category-detail .f-item){border-color:var(--mid-border);background:var(--mid-surface);color:var(--mid-text)}
+html[data-theme="midnight"] .finance .f-expense-category-row{border-color:var(--mid-border-strong);background:var(--mid-raised);color:var(--mid-text)}
+html[data-theme="midnight"] .finance :is(.f-expense-period-controls input,.f-expense-period-controls select){border-color:var(--mid-border-strong);background:var(--mid-raised);color:var(--mid-text)}
+html[data-theme="midnight"] .finance .f-expense-category-bar span{background:var(--mid-accent)}
+html[data-theme="matrix"] .finance .f-expense-category-row{border-color:var(--matrix-border-strong);background:var(--matrix-surface-raised);color:var(--matrix-text)}
+html[data-theme="matrix"] .finance :is(.f-expense-period-controls input,.f-expense-period-controls select){border-color:var(--matrix-border-strong);background:var(--matrix-surface-raised);color:var(--matrix-text)}
+html[data-theme="matrix"] .finance .f-expense-category-bar span{background:var(--matrix-accent)}
+@media(max-width:600px){.f-expense-category-row{grid-template-columns:minmax(0,1fr) auto auto}.f-expense-category-bar{grid-column:1/3}.f-expense-category-open{grid-column:3;grid-row:1/3}.f-expense-period-label{flex-basis:100%;margin-left:0}.f-expense-category-detail .f-item{align-items:flex-start}.f-expense-category-detail .f-item>.f-actions{width:100%;justify-content:flex-start}}

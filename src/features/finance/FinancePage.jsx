@@ -31,6 +31,7 @@ import { donationRulePreviewAmount, donationSummary, donationTransactions, refre
 import { matchingTransactions, shouldShowTransactionSuggestions } from './transactionSuggestions.js';
 import { donationDue, payDonationDue, accrueDonation, removeDonationPayment, canMarkDonationPaymentUnpaid, markDonationPaymentUnpaid, reopenedDonationDues } from './donationAccounting.js';
 import './finance.css';
+import './financeExpenseCategories.css';
 
 const tabs = [['overview','Overview'],['reports','Monthly Reports'],['timeline','Money Timeline'],['picture','Bigger Picture'],['transactions','Transactions'],['merchants','Merchant logos'],['bank-connections','Bank Connections'],['budget','Monthly Budget'],['goals','Goals'],['investments','Investments'],['debts','Money to Pay Back'],['converter','Currency Converter'],['donations','Donations'],['automation','Auto Deductions'],['categories','Categories']];
 const tabGroups = [

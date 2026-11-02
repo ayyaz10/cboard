@@ -75,6 +75,50 @@ export function monthlyFinanceReports(state, currentMonth = monthKey()) {
   return months.reverse().map((month) => monthlyFinanceReport(state, month));
 }
 
+/**
+ * Derive category spending from the active Finance transaction ledger.
+ * Finance's summary is the source of truth for booked, non-reversed records;
+ * this selector only narrows that accepted set to actual expense payments.
+ * Debt repayments remain in the existing separate "Repaid" report total.
+ */
+export function expenseCategoryReport(state, { mode = 'month', month = monthKey(), year = month.slice(0, 4) } = {}) {
+  const accepted = financeSummary(state, null).transactions;
+  const categoriesById = new Map((state.categories || [])
+    .filter(category => category.type === 'expense' || category.type === 'donation')
+    .map(category => [category.id, category]));
+  const withinPeriod = date => {
+    const value = String(date || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    if (mode === 'month') return value.slice(0, 7) === month;
+    if (mode === 'year') return value.slice(0, 4) === year;
+    return true;
+  };
+  const transactions = accepted
+    .filter(item => (item.type === 'expense' || item.type === 'donation') && withinPeriod(item.date))
+    .sort((left, right) => String(right.date).localeCompare(String(left.date)) || String(right.createdAt || '').localeCompare(String(left.createdAt || '')));
+  const categories = new Map();
+  let total = 0;
+  for (const transaction of transactions) {
+    total += transaction.amount;
+    const category = categoriesById.get(transaction.categoryId);
+    const id = category?.id || 'uncategorized';
+    const row = categories.get(id) || {
+      id,
+      name: category?.name || 'Uncategorised',
+      archived: Boolean(category?.archived),
+      amount: 0,
+      transactions: [],
+    };
+    row.amount += transaction.amount;
+    row.transactions.push(transaction);
+    categories.set(id, row);
+  }
+  const breakdown = [...categories.values()]
+    .map(row => ({ ...row, percentage: total ? (row.amount / total) * 100 : 0 }))
+    .sort((left, right) => right.amount - left.amount || left.name.localeCompare(right.name));
+  return { mode, month, year, total, categories: breakdown, transactions };
+}
+
 export function markGoalCompletion(goal, date) {
   if (goal.saved >= goal.target) {
     goal.status = 'completed';
