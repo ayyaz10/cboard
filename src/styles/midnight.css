@@ -527,7 +527,6 @@ html[data-theme="midnight"] .brand-badge { border-color: var(--border-default); 
 html[data-theme="midnight"] .global-nav-link { color: var(--color-text-secondary); }
 html[data-theme="midnight"] .global-nav-link:hover,
 html[data-theme="midnight"] .global-nav-link.is-active { border-color: var(--border-subtle); background: var(--surface-hover); color: var(--color-text); }
-html[data-theme="midnight"] .global-nav-link.is-active::after { background: var(--color-accent); }
 html[data-theme="midnight"] .global-nav-overflow,
 html[data-theme="midnight"] .profile-menu-popover,
 html[data-theme="midnight"] .app-board-view-control { color:var(--color-text); }
