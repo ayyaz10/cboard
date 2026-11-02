@@ -58,6 +58,11 @@ export function debtPaymentDue(state, debtId = '') {
   return Math.min(accrued, debtRemainingAmount(state, debtId));
 }
 
+export function debtPayoffReady(state, debtId) {
+  const remaining = debtRemainingAmount(state, debtId);
+  return remaining > 0 && debtPaymentDue(state, debtId) >= remaining;
+}
+
 export function debtPaymentSummary(state, debtId, month = null) {
   const accruals = (state.debtAccruals || []).filter(item => item.debtId === debtId && item.status !== 'reversed');
   const payments = (state.debtPayments || []).filter(item => item.debtId === debtId && !item.reversedAt);
@@ -253,6 +258,42 @@ export function markDebtPaymentUnpaid(state, transactionId, date, debtIdOverride
       id: id(), debtId: debt.id, amount, accruedAmount: amount, paidAmount: 0,
       effectiveDate: date, sourceType: 'legacy_payment_correction', linkedPaymentId: payment.id,
       linkedFinanceTransactionId: transaction.id, status: 'outstanding', note: 'Payment marked unpaid',
+    });
+  }
+  return true;
+}
+
+export function markOrphanDebtPaymentUnpaid(state, paymentId, date) {
+  const payment = (state.debtPayments || []).find(item => item.id === paymentId && !item.reversedAt);
+  if (!payment || (state.transactions || []).some(item => item.id === payment.transactionId)) return false;
+  const debt = (state.debts || []).find(item => item.id === payment.debtId);
+  const amount = cents(payment.amount);
+  if (!debt || !amount) return false;
+
+  const timestamp = new Date().toISOString();
+  payment.reversedAt = timestamp;
+  payment.reversalDate = date;
+  const remaining = debtRemainingAmount(state, debt.id);
+  debt.remaining = remaining;
+  if (Number.isSafeInteger(debt.sourceRemaining)) debt.sourceRemaining = debtRemainingSourceAmount(state, debt.id);
+  debt.status = remaining ? 'open' : 'paid';
+  if (debt.repaymentPlanStatus === 'completed') {
+    debt.repaymentPlanStatus = (state.allocationRules || []).some(rule => rule.targetType === 'debt' && rule.targetId === debt.id && rule.active) ? 'active' : 'not_started';
+  }
+
+  const restored = new Map((payment.sourceAccruals || []).map(item => [item.accrualId, cents(item.amount)]));
+  for (const accrual of state.debtAccruals || []) {
+    const restoredAmount = restored.get(accrual.id) || 0;
+    if (!restoredAmount) continue;
+    accrual.paidAmount = Math.max(0, cents(accrual.paidAmount) - restoredAmount);
+    accrual.status = accrual.paidAmount >= cents(accrual.accruedAmount ?? accrual.amount) ? 'fully_paid' : accrual.paidAmount ? 'partially_paid' : 'outstanding';
+  }
+  if (!restored.size) {
+    state.debtAccruals ||= [];
+    state.debtAccruals.push({
+      id: id(), debtId: debt.id, amount, accruedAmount: amount, paidAmount: 0,
+      effectiveDate: date, sourceType: 'legacy_payment_correction', linkedPaymentId: payment.id,
+      status: 'outstanding', note: 'Unlinked payment marked unpaid',
     });
   }
   return true;

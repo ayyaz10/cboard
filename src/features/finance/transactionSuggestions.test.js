@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { matchingTransactions } from './transactionSuggestions.js';
+import { matchingTransactions, shouldShowTransactionSuggestions } from './transactionSuggestions.js';
 
 const transactions = [
   { id: 'old', title: 'Spice of India', amount: 30000, type: 'expense', date: '2026-01-05' },
@@ -23,4 +23,11 @@ test('suggestions omit the transaction being edited and enforce the result limit
 test('suggestions appear from the first typed character and return no results for unrelated names', () => {
   assert.deepEqual(matchingTransactions(transactions, 's').map(item => item.id), ['newer', 'old', 'other']);
   assert.deepEqual(matchingTransactions(transactions, 'coffee'), []);
+});
+
+test('exact matching recommendations remain visible while the title field is focused', () => {
+  const matches = matchingTransactions(transactions, 'Spice of India');
+  assert.equal(shouldShowTransactionSuggestions(true, matches), true);
+  assert.equal(shouldShowTransactionSuggestions(false, matches), false);
+  assert.equal(shouldShowTransactionSuggestions(true, []), false);
 });

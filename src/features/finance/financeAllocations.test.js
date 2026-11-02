@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyDueMonthlyAllocations, applyIncomeAllocations, reconcileIncomeAllocations, settleAllocation } from './financeAllocations.js';
+import { allocationRuleStartDate, applyDueMonthlyAllocations, applyIncomeAllocations, reconcileIncomeAllocations, settleAllocation } from './financeAllocations.js';
 import { financeSummary } from './financeMath.js';
 import { deriveFinancePosition } from './financeLedger.js';
 import { debtPaymentDue, recordDebtPayment } from './debtAccounting.js';
@@ -8,6 +8,18 @@ import { debtPaymentDue, recordDebtPayment } from './debtAccounting.js';
 function state() {
   return { settings:{monthlyIncome:300000,currency:'GBP'}, budgets:{}, transactions:[], allocationRules:[], goals:[], goalContributions:[], investments:[], debts:[], debtPayments:[], debtAccruals:[] };
 }
+
+test('legacy deduction edits keep the original date shown on the rule card', () => {
+  const rule = { id:'emergency', targetType:'goal' };
+  const transactions = [
+    { id:'later', allocationRuleId:'emergency', date:'2026-11-02' },
+    { id:'other', allocationRuleId:'investment-savings', date:'2026-10-01' },
+    { id:'first', allocationRuleId:'emergency', date:'2026-10-15' },
+  ];
+  assert.equal(allocationRuleStartDate(rule, transactions), '2026-10-15');
+  assert.equal(allocationRuleStartDate({ ...rule, createdAt:'2026-09-20T09:00:00Z' }, transactions), '2026-09-20');
+  assert.equal(allocationRuleStartDate({ ...rule, startedOn:'2026-09-01' }, transactions), '2026-09-01');
+});
 
 test('income rules create deductions once for each income transaction', () => {
   const value=state(),income={id:'pay-1',type:'income',amount:200000,date:'2026-09-25'};

@@ -9,6 +9,16 @@ import { accrueDebtPayment, debtRemainingAmount, reconcileDebtIncome } from './d
 
 export const allocationTargets = ['savings', 'budget', 'goal', 'investment', 'debt', 'donation'];
 
+export function allocationRuleStartDate(rule, transactions = []) {
+  if (rule?.startedOn) return String(rule.startedOn).slice(0, 10);
+  if (rule?.createdAt) return String(rule.createdAt).slice(0, 10);
+  return (Array.isArray(transactions) ? transactions : [])
+    .filter(transaction => transaction?.allocationRuleId === rule?.id && transaction.date)
+    .map(transaction => String(transaction.date).slice(0, 10))
+    .filter(date => /^\d{4}-\d{2}-\d{2}$/.test(date))
+    .sort()[0] || '';
+}
+
 export function eligibleBookedBankIncome(state) {
   return state.transactions.filter(item => item.source === 'bank' && item.type === 'income' && item.providerStatus === 'BOOK' && !item.bankIncomeAllocationsApplied);
 }

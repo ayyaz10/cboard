@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { accrueDebtPayment, canMarkDebtPaymentUnpaid, debtAccrualSettlementStatus, debtPaymentDue, debtPaymentSummary, debtRemainingAmount, editDebtAccumulation, markDebtPaymentUnpaid, migrateLegacyDebtAllocations, reconcileDebtBalance, recordDebtPayment, recordDebtPaymentState, removeDebtAccumulation } from './debtAccounting.js';
+import { accrueDebtPayment, canMarkDebtPaymentUnpaid, debtAccrualSettlementStatus, debtPayoffReady, debtPaymentDue, debtPaymentSummary, debtRemainingAmount, editDebtAccumulation, markDebtPaymentUnpaid, markOrphanDebtPaymentUnpaid, migrateLegacyDebtAllocations, reconcileDebtBalance, recordDebtPayment, recordDebtPaymentState, removeDebtAccumulation } from './debtAccounting.js';
 import { applyIncomeAllocations, reconcileIncomeAllocations } from './financeAllocations.js';
 import { deriveFinancePosition, inspectFinanceIntegrity } from './financeLedger.js';
 import { debtSummary, financeSummary } from './financeMath.js';
@@ -27,6 +27,37 @@ test('income rule accrues due once without creating a payment or moving balances
   assert.equal(debtPaymentDue(state, 'wasik'), 2_203);
   assert.equal(debtSummary(state.debts, state.debtPayments, '2026-10').paidThisMonth, 0);
   assert.equal(deriveFinancePosition(state).totalOwned, 100_000);
+});
+
+test('payoff is available only when ready amount covers the remaining debt', () => {
+  const state = makeState();
+  state.debts[0].original = 8_800;
+  state.debts[0].remaining = 8_800;
+  accrueDebtPayment(state, { debtId: 'wasik', amount: 8_799, effectiveDate: '2026-10-01' });
+  assert.equal(debtPayoffReady(state, 'wasik'), false);
+  accrueDebtPayment(state, { debtId: 'wasik', amount: 1, effectiveDate: '2026-10-02' });
+  assert.equal(debtPaymentDue(state, 'wasik'), 8_800);
+  assert.equal(debtPayoffReady(state, 'wasik'), true);
+  recordDebtPayment(state, { debtId: 'wasik', amount: 8_800, date: '2026-10-03' });
+  assert.equal(debtPayoffReady(state, 'wasik'), false);
+});
+
+test('unlinked legacy payments can be marked unpaid and returned to the timeline due', () => {
+  const state = makeState();
+  state.debts[0].original = 8_800;
+  state.debts[0].remaining = 0;
+  state.debts[0].status = 'paid';
+  state.debts[0].repaymentPlanStatus = 'completed';
+  const payment = { id: 'orphan-payment', debtId: 'wasik', amount: 8_800, date: '2026-10-05', transactionId: 'missing-transaction' };
+  state.debtPayments.push(payment);
+  assert.equal(debtRemainingAmount(state, 'wasik'), 0);
+  assert.equal(markOrphanDebtPaymentUnpaid(state, payment.id, '2026-10-25'), true);
+  assert.equal(payment.reversalDate, '2026-10-25');
+  assert.equal(debtRemainingAmount(state, 'wasik'), 8_800);
+  assert.equal(state.debts[0].status, 'open');
+  assert.equal(debtPaymentDue(state, 'wasik'), 8_800);
+  assert.equal(state.debtAccruals[0].sourceType, 'legacy_payment_correction');
+  assert.equal(markOrphanDebtPaymentUnpaid(state, payment.id, '2026-10-25'), false);
 });
 
 test('income percentage and fixed accruals cap at debt remaining and current due', () => {

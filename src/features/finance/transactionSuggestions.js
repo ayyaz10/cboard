@@ -21,3 +21,7 @@ export function matchingTransactions(transactions, title, { excludeId = '', limi
     })
     .slice(0, Math.max(0, limit));
 }
+
+export function shouldShowTransactionSuggestions(isTitleFocused, suggestions) {
+  return Boolean(isTitleFocused && suggestions?.length);
+}

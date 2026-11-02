@@ -117,13 +117,13 @@ export function ReceiptEditor({ receipt, onChange, onExtract, total, currency, o
   }
 
   return <section className="f-receipt" aria-label="Receipt scanning and items">
-    <div className="f-between"><div><h3 className="font-bold">Start with a receipt</h3><p className="f-help">OCR.Space scans first. If it cannot read enough, CBoard tries the existing local OCR. You can also enter the transaction manually below.</p></div><button type="button" className="f-button" onClick={() => { manualEntryRef?.current?.scrollIntoView({ behavior:'smooth', block:'center' }); manualEntryRef?.current?.focus(); }}>Enter manually</button></div>
-    <div className="f-form mt-3">
-      <p className="f-help">Choose a photo or open the camera. OCR.Space processes the image online. CBoard does not save or attach the photo. Choose “Try existing local OCR” to scan on this device.</p>
+    <div className="f-between f-receipt-header"><div><h3 className="font-bold">Add a receipt <span className="f-receipt-optional">Optional</span></h3><p className="f-help">Scan a photo to prefill the merchant, date, amount and items.</p></div><button type="button" className="f-button f-receipt-skip" onClick={() => { manualEntryRef?.current?.scrollIntoView({ behavior:'smooth', block:'center' }); manualEntryRef?.current?.focus(); }}>Enter details manually</button></div>
+    <div className="f-receipt-body">
       <div className="f-actions f-receipt-choices">
         <label className="f-primary f-receipt-pick">Take receipt photo<input aria-label="Take receipt photo" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" disabled={busy} onChange={choose}/></label>
         <label className="f-button f-receipt-pick">Choose receipt photo<input aria-label="Choose receipt photo" type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={choose}/></label>
       </div>
+      <p className="f-help f-receipt-privacy">OCR.Space scans online. CBoard doesn’t attach the photo to your transaction; local OCR is available after upload.</p>
       {image && <details><summary>View original receipt</summary><img className="f-receipt-image" src={image} alt="Original receipt for comparison"/></details>}
       {file && <div className="f-actions"><label>Scan rotation<select value={rotation} disabled={busy} onChange={event => setRotation(Number(event.target.value))}>{[0,90,180,270].map(value => <option key={value} value={value}>{value}°</option>)}</select></label><button type="button" className="f-button" disabled={busy} onClick={() => scan(file,'cloud')}>{receipt ? 'Rescan with OCR.Space' : 'Scan with OCR.Space'}</button><button type="button" className="f-button" disabled={busy} onClick={() => scan(file,'local')}>Try existing local OCR</button></div>}
       {progress && <p role="status">{progress}</p>}{busy && <button type="button" className="f-button" onClick={cancel}>Cancel scan</button>}{error && <p role="alert" className="f-alert">{error}</p>}
@@ -135,7 +135,7 @@ export function ReceiptEditor({ receipt, onChange, onExtract, total, currency, o
         <pre className="f-receipt-raw">{JSON.stringify({ classifiedLines:debugData.parsed?.classifiedLines, unresolvedLines:debugData.parsed?.unresolvedLines, reconciliation:reconcileReceipt(debugData.parsed || {}) }, null, 2)}</pre>
         <button type="button" className="f-button" onClick={copyDiagnostics}>Copy redacted receipt diagnostics</button>{copyStatus && <p role="status" className="f-help">{copyStatus}</p>}
       </details>}
-      {!receipt && <button type="button" className="f-button" disabled={busy} onClick={() => onExtract({ merchantName:'', date:'', time:'', currency:'', subtotal:null, tax:null, discounts:null, total:null, items:[], classifiedLines:[], unresolvedLines:[] }, false)}>Enter receipt items manually</button>}
+      {!receipt && <button type="button" className="f-button f-receipt-manual" disabled={busy} onClick={() => onExtract({ merchantName:'', date:'', time:'', currency:'', subtotal:null, tax:null, discounts:null, total:null, items:[], classifiedLines:[], unresolvedLines:[] }, false)}>Add receipt items manually</button>}
       {receipt && <>
         <p className="f-help">Merchant, date and total use the transaction fields above. Existing manual corrections are preserved when rescanning matching product codes. Unresolved lines stay visible until you review them.</p>
         <div className="f-row"><label>Receipt time<input type="time" value={receipt.time || ''} onChange={event => changeReceipt({ time:event.target.value },'time')}/></label><label>Receipt currency<input maxLength={3} value={receipt.currency || currency} onChange={event => changeReceipt({ currency:event.target.value.toUpperCase() },'currency')}/></label></div>
