@@ -7,14 +7,14 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog.jsx';
 import { Dialog } from '../../components/ui/Dialog.jsx';
 import { notify } from '../../lib/notifications.js';
 import { loadDrivingWorkspace, saveDrivingWorkspace, getCachedDrivingWorkspace, publishCachedDrivingWorkspace } from '../../services/drivingImprovementService.js';
-import { BACKLOG_TYPE_LABELS, BACKLOG_TYPES, HABIT_STATUS_LABELS, HABIT_STATUSES, IMPROVEMENT_PRIORITIES, getActiveHabits, getBacklogItems, getHabitSummary, getItemsForHabit, makeBacklogItem, makeHabitArea, promoteBacklogItem, moveHabitToBacklog, removeHabitArea, archiveBacklogEntry, deleteBacklogEntry, validateHabitData } from './drivingData.js';
+import { BACKLOG_TYPE_LABELS, BACKLOG_TYPES, HABIT_STATUS_LABELS, HABIT_STATUSES, IMPROVEMENT_PRIORITIES, getActiveHabits, getBacklogItems, getHabitSummary, getItemsForHabit, makeBacklogItem, makeHabitArea, promoteBacklogItem, moveHabitToBacklog, archiveHabitArea, removeHabitArea, archiveBacklogEntry, deleteBacklogEntry, validateHabitData } from './drivingData.js';
 import './drivingImprovement.css';
 
 export function HabitImprovementHome({ userId, view = 'active' }) {
   const [cached] = useState(() => getCachedDrivingWorkspace(userId));
   const [data, setData] = useState(cached?.data || null), [revision, setRevision] = useState(cached?.revision || 0), [loading, setLoading] = useState(!cached), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [dialog, setDialog] = useState(null), [form, setForm] = useState({ name: '', description: '' }), [confirmHabit, setConfirmHabit] = useState(null), [habitSearch, setHabitSearch] = useState('');
-  const [backlogForm, setBacklogForm] = useState({ title: '', note: '', type: '', priority: '' }), [backlogQuery, setBacklogQuery] = useState(''), [showPromoted, setShowPromoted] = useState(false), [confirmBacklog, setConfirmBacklog] = useState(null), [moveHabit, setMoveHabit] = useState(null);
+  const [backlogForm, setBacklogForm] = useState({ title: '', note: '', type: '', priority: '' }), [backlogQuery, setBacklogQuery] = useState(''), [showPromoted, setShowPromoted] = useState(false), [confirmBacklog, setConfirmBacklog] = useState(null), [moveHabit, setMoveHabit] = useState(null), [archiveHabit, setArchiveHabit] = useState(null);
   const lock = useRef(false), active = useRef(true);
 
   async function reload(force = false) {
@@ -60,6 +60,9 @@ export function HabitImprovementHome({ userId, view = 'active' }) {
   }
   async function pauseHabit(habit) {
     if (await commit(moveHabitToBacklog(data, habit.id), 'Moved to Backlog. Your improvement tree was preserved.')) setMoveHabit(null);
+  }
+  async function archiveArea(habit) {
+    if (await commit(archiveHabitArea(data, habit.id), 'Habit archived. Its improvement data is preserved.')) setArchiveHabit(null);
   }
 
   function openBacklogItem(item = null) {
@@ -130,7 +133,7 @@ export function HabitImprovementHome({ userId, view = 'active' }) {
           <p className="di-habit-total">{summary.total} {summary.total === 1 ? 'thing' : 'things'} to improve</p>
           <div className="di-habit-statuses" aria-label={`${habit.name} status summary`}>{HABIT_STATUSES.map(status => <span key={status}><strong>{summary[status]}</strong> {HABIT_STATUS_LABELS[status]}</span>)}</div>
           <p className="di-habit-focus">Focus: {items.filter(item => item.focusNow && !item.archivedAt).length}</p>
-          <div className="di-habit-actions"><Button variant="primary" onClick={() => navigateTo(`/habit-improvement/${habit.slug}`)}>Open</Button><details className="di-overflow"><summary>More</summary><div><Button onClick={() => setMoveHabit(habit)}>Move to Backlog</Button><Button onClick={() => openHabit(habit)}>Edit habit</Button><Button variant="danger" onClick={() => setConfirmHabit(habit)}>Delete</Button></div></details></div>
+          <div className="di-habit-actions"><Button variant="primary" onClick={() => navigateTo(`/habit-improvement/${habit.slug}`)}>Open</Button><details className="di-overflow"><summary>More</summary><div><Button onClick={() => setMoveHabit(habit)}>Move to Backlog</Button><Button onClick={() => setArchiveHabit(habit)}>Archive Habit</Button><Button onClick={() => openHabit(habit)}>Edit habit</Button><Button variant="danger" onClick={() => setConfirmHabit(habit)}>Delete</Button></div></details></div>
         </article>;
       })}</div> : habits.length ? <div className="di-empty"><h3>No matching habits.</h3><p>Try another search or clear the search field.</p><Button onClick={() => setHabitSearch('')}>Clear search</Button></div> : <div className="di-empty"><h3>No active improvements.</h3><p>Start improving something from your Backlog or create a new Habit.</p><div className="di-actions"><Button onClick={() => navigateTo('/habit-improvement/backlog')}>Browse Backlog</Button><Button variant="primary" onClick={() => openHabit()}>+ New Habit</Button></div></div>}
     </section>}
@@ -152,6 +155,7 @@ export function HabitImprovementHome({ userId, view = 'active' }) {
   <Dialog open={dialog?.type === 'promote'} onClose={() => setDialog(null)} labelledBy="di-promote-title" className="di-dialog"><h2 id="di-promote-title">Start improving</h2><p className="di-muted">This creates an active Habit Improvement area. You can add recursive improvements after it is created.</p><form className="di-form" onSubmit={event => { event.preventDefault(); promote(dialog.item); }}><label>Habit Improvement name<input autoFocus required maxLength={100} value={dialog?.habitName || ''} onChange={event => setDialog(current => ({ ...current, habitName: event.target.value }))} /></label>{dialog?.item?.note && <p className="di-backlog-note">Your note will be saved as the habit description: {dialog.item.note}</p>}<div className="di-actions"><Button variant="primary" type="submit" disabled={busy || !dialog?.habitName?.trim()}>Start Improving</Button><Button type="button" onClick={() => setDialog(null)}>Cancel</Button></div></form></Dialog>
 
   <Dialog open={Boolean(moveHabit)} onClose={() => setMoveHabit(null)} labelledBy="di-move-backlog-title" className="di-dialog di-transition-dialog"><h2 id="di-move-backlog-title">Move “{moveHabit?.name}” to Backlog?</h2><p>Your improvement tree, notes, statuses and progress will be preserved. It will be removed from Active Habits and Quick Review until you resume improving it.</p><div className="di-actions"><Button variant="primary" onClick={() => moveHabit && pauseHabit(moveHabit)} disabled={busy}>Move to Backlog</Button><Button onClick={() => setMoveHabit(null)}>Cancel</Button></div></Dialog>
+  <Dialog open={Boolean(archiveHabit)} onClose={() => setArchiveHabit(null)} labelledBy="di-archive-habit-title" className="di-dialog di-transition-dialog"><h2 id="di-archive-habit-title">Archive “{archiveHabit?.name}”?</h2><p>This removes the Habit from Active and Backlog. Its improvement tree, notes and progress remain preserved in your data.</p><div className="di-actions"><Button variant="primary" onClick={() => archiveHabit && archiveArea(archiveHabit)} disabled={busy}>Archive Habit</Button><Button onClick={() => setArchiveHabit(null)}>Cancel</Button></div></Dialog>
 
   <ConfirmDialog isOpen={Boolean(confirmHabit)} title="Delete habit?" message={confirmHabit ? `${confirmHabit.name} contains ${getItemsForHabit(data, confirmHabit.id).length} improvements. Deleting it will remove those tracker records.` : ''} confirmLabel="Delete Habit" onCancel={() => setConfirmHabit(null)} onConfirm={() => confirmHabit && deleteHabit(confirmHabit)} />
   <ConfirmDialog isOpen={Boolean(confirmBacklog)} title={confirmBacklog?.type === 'archive' ? 'Archive idea?' : 'Delete idea?'} message={confirmBacklogMessage} confirmLabel={confirmBacklog?.type === 'archive' ? 'Archive idea' : confirmBacklogHabit ? 'Delete idea & Habit' : 'Delete idea'} onCancel={() => setConfirmBacklog(null)} onConfirm={() => confirmBacklog?.type === 'archive' ? archiveIdea(confirmBacklog.item) : confirmBacklog && deleteIdea(confirmBacklog.item)} />

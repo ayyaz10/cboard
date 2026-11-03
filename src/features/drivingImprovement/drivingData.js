@@ -75,6 +75,21 @@ export function moveHabitToBacklog(data, habitId, now = new Date().toISOString()
   return validateHabitData(next);
 }
 
+export function archiveHabitArea(data, habitId, now = new Date().toISOString()) {
+  const habit = data.habits.find(entry => entry.id === habitId && !entry.archivedAt);
+  if (!habit) return data;
+  const linked = data.backlogItems.find(item => item.promotedHabitId === habitId);
+  const archivedIdea = linked
+    ? { ...linked, state: 'ARCHIVED', promotedHabitId: undefined, promotedAt: undefined, backloggedAt: undefined, archivedAt: now, updatedAt: now }
+    : { ...makeBacklogItem({ title: habit.name, note: habit.description }, habit.userId, now), state: 'ARCHIVED', archivedAt: now };
+  const next = {
+    ...data,
+    habits: data.habits.map(entry => entry.id === habitId ? { ...entry, archivedAt: now, updatedAt: now } : entry),
+    backlogItems: linked ? data.backlogItems.map(item => item.id === linked.id ? archivedIdea : item) : [...data.backlogItems, archivedIdea],
+  };
+  return validateHabitData(next);
+}
+
 export const getActiveHabits = data => (data.habits || []).filter(habit => !habit.archivedAt && habit.lifecycleState !== 'BACKLOG');
 export const getBacklogItems = data => (data.backlogItems || []).filter(item => item.state === 'BACKLOG');
 

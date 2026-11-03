@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   createInitialHabitData, getHabitSummary, getItemsForHabit, makeHabitArea, makeImprovementNode, makeBacklogItem, promoteBacklogItem, moveHabitToBacklog, getActiveHabits, getBacklogItems, getQuickReviewItemsForHabit, archiveBacklogItem, deleteBacklogItem,
   migrateHabitData, removeHabitArea, getDescendantNodes, getNodePath, getNodeProgress,
-  getQuickReviewItems, archiveNodeBranch, deleteNodeBranch, setNodeParent, validateHabitData, HABIT_STATUSES, archiveBacklogEntry, deleteBacklogEntry,
+  getQuickReviewItems, archiveNodeBranch, deleteNodeBranch, setNodeParent, validateHabitData, HABIT_STATUSES, archiveBacklogEntry, deleteBacklogEntry, archiveHabitArea,
 } from './drivingData.js';
 
 const at = '2026-10-31T00:00:00.000Z';
@@ -85,6 +85,17 @@ test('archiving a previously active Backlog entry preserves but hides Habit reco
   assert.deepEqual(deleted.habits, []);
   assert.deepEqual(deleted.nodes, []);
   assert.deepEqual(deleted.backlogItems, []);
+});
+
+test('archiving an active Habit preserves its full tree while removing it from active counts and Quick Review', () => {
+  const data = createInitialHabitData(), habit = makeHabitArea({ name: 'Sleep Improvement' }, [], 'user-a', at);
+  const root = makeImprovementNode({ habitId: habit.id, parentId: null, title: 'Evening routine', status: 'NEEDS_WORK' }, 'user-a', at);
+  data.habits.push(habit); data.nodes.push(root);
+  const archived = archiveHabitArea(data, habit.id, at);
+  assert.deepEqual(getActiveHabits(archived), []);
+  assert.deepEqual(archived.nodes, data.nodes);
+  assert.equal(archived.backlogItems[0].state, 'ARCHIVED');
+  assert.deepEqual(getQuickReviewItemsForHabit(archived, habit.id), []);
 });
 
 test('legacy category and item records migrate idempotently to recursive nodes preserving content and IDs', () => {
