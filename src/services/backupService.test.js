@@ -116,7 +116,7 @@ test('older Habit Improvement backup schema upgrades its flat records to recursi
   backup.integrity.digest = await digest(backup.data);
   const parsed = await parseBackupFile(await asFile(backup));
   const module = parsed.modules[0];
-  assert.equal(module.schemaVersion, 4);
+  assert.equal(module.schemaVersion, 5);
   assert.equal(module.displayName, 'Habit Improvement');
   assert.equal(module.data.workspace.data.categories.length, 0);
   assert.equal(module.data.workspace.data.nodes[0].title, 'Roundabouts');
@@ -128,7 +128,7 @@ test('Habit Improvement backups preserve backlog promotion linkage and remap its
   const habit = { id: 'habit-promoted', userId: 'old-account', name: 'Negotiation Improvement', slug: 'negotiation-improvement', description: 'Practice calmly', createdAt: '2026-11-03T00:00:00.000Z', updatedAt: '2026-11-03T00:00:00.000Z', archivedAt: null };
   const item = { id: 'idea-negotiation', userId: 'old-account', title: 'Negotiation', note: 'Practice calmly', type: 'SKILL', priority: 'MEDIUM', state: 'PROMOTED', promotedHabitId: habit.id, promotedAt: '2026-11-03T00:00:00.000Z', createdAt: '2026-11-01T00:00:00.000Z', updatedAt: '2026-11-03T00:00:00.000Z', archivedAt: null };
   const client = new FinanceMemoryClient();
-  await importBackupModule('drivingImprovement', { workspace: { data: { version: 1, habitVersion: 5, habits: [habit], nodes: [], categories: [], mistakes: [], reminders: [], guidanceNotes: [], backlogItems: [item] }, revision: 2 } }, { client, userId: 'new-account' });
+  await importBackupModule('drivingImprovement', { workspace: { data: { version: 1, habitVersion: 6, habits: [habit], nodes: [], categories: [], mistakes: [], reminders: [], guidanceNotes: [], backlogItems: [item] }, revision: 2 } }, { client, userId: 'new-account' });
   const restored = client.rows[0].data;
   assert.equal(restored.backlogItems[0].promotedHabitId, habit.id);
   assert.equal(restored.backlogItems[0].state, 'PROMOTED');

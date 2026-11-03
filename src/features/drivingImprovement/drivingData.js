@@ -5,6 +5,7 @@ export const IMPROVEMENT_PRIORITY_LABELS = { HIGH: 'High', MEDIUM: 'Medium', LOW
 export const BACKLOG_TYPES = ['HABIT', 'SKILL', 'BEHAVIOR', 'GENERAL'];
 export const BACKLOG_TYPE_LABELS = { HABIT: 'Habit', SKILL: 'Skill', BEHAVIOR: 'Behavior', GENERAL: 'General Improvement' };
 export const BACKLOG_STATES = ['BACKLOG', 'PROMOTED', 'ARCHIVED'];
+export const HABIT_LIFECYCLE_STATES = ['ACTIVE', 'BACKLOG'];
 
 const uuid = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 const validStatus = status => HABIT_STATUSES.includes(status);
@@ -20,7 +21,7 @@ const normalizedNode = (node, habitId) => ({
 });
 
 export function createInitialHabitData() {
-  return { version: 1, habitVersion: 5, habits: [], nodes: [], categories: [], mistakes: [], reminders: [], guidanceNotes: [], backlogItems: [] };
+  return { version: 1, habitVersion: 6, habits: [], nodes: [], categories: [], mistakes: [], reminders: [], guidanceNotes: [], backlogItems: [] };
 }
 
 export function slugifyHabitName(name) {
@@ -31,7 +32,7 @@ export function makeHabitArea(input, existingHabits = [], userId, now = new Date
   const base = slugifyHabitName(input.name), used = new Set(existingHabits.map(habit => habit.slug));
   let slug = base, suffix = 2;
   while (used.has(slug)) slug = `${base}-${suffix++}`;
-  return { id: uuid(), userId, name: input.name.trim(), slug, description: (input.description || '').trim(), createdAt: now, updatedAt: now, archivedAt: null };
+  return { id: uuid(), userId, name: input.name.trim(), slug, description: (input.description || '').trim(), lifecycleState: 'ACTIVE', activatedAt: now, createdAt: now, updatedAt: now, archivedAt: null };
 }
 
 export function makeBacklogItem(input, userId, now = new Date().toISOString()) {
@@ -43,21 +44,44 @@ export function promoteBacklogItem(data, itemId, habitName, userId, now = new Da
   if (!item) throw new Error('Backlog idea was not found.');
   if (item.state === 'PROMOTED') {
     const existing = data.habits.find(habit => habit.id === item.promotedHabitId);
-    if (existing) return { data, habit: existing, changed: false };
+    if (existing?.lifecycleState !== 'BACKLOG' && existing && !existing.archivedAt) return { data, habit: existing, changed: false };
     throw new Error('The linked Habit Improvement area could not be found.');
   }
   if (item.state !== 'BACKLOG') throw new Error('Archived ideas cannot be promoted.');
   const name = habitName.trim();
   if (!name || name.length > 100) throw new Error('Enter a Habit Improvement name under 100 characters.');
-  const habit = data.habits.find(entry => !entry.archivedAt && entry.name.toLocaleLowerCase() === name.toLocaleLowerCase()) || makeHabitArea({ name, description: item.note }, data.habits, userId, now);
-  const next = { ...data, habits: data.habits.some(entry => entry.id === habit.id) ? data.habits : [...data.habits, habit], backlogItems: data.backlogItems.map(entry => entry.id === item.id ? { ...entry, state: 'PROMOTED', promotedHabitId: habit.id, promotedAt: now, updatedAt: now } : entry) };
+  if (item.promotedHabitId) {
+    const existing = data.habits.find(habit => habit.id === item.promotedHabitId);
+    if (!existing || existing.archivedAt || existing.lifecycleState !== 'BACKLOG') throw new Error('The linked Habit Improvement area could not be resumed.');
+    const habit = { ...existing, name, description: item.note, lifecycleState: 'ACTIVE', activatedAt: existing.activatedAt || now, backloggedAt: null, updatedAt: now };
+    const next = { ...data, habits: data.habits.map(saved => saved.id === habit.id ? habit : saved), backlogItems: data.backlogItems.map(entry => entry.id === item.id ? { ...entry, state: 'PROMOTED', promotedAt: entry.promotedAt || now, backloggedAt: null, archivedAt: null, updatedAt: now } : entry) };
+    return { data: validateHabitData(next), habit, changed: true, resumed: true };
+  }
+  const habit = data.habits.find(entry => !entry.archivedAt && entry.lifecycleState !== 'BACKLOG' && !data.backlogItems.some(link => link.promotedHabitId === entry.id) && entry.name.toLocaleLowerCase() === name.toLocaleLowerCase()) || makeHabitArea({ name, description: item.note }, data.habits, userId, now);
+  const activeHabit = { ...habit, lifecycleState: 'ACTIVE', activatedAt: now, backloggedAt: null };
+  const next = { ...data, habits: data.habits.some(entry => entry.id === habit.id) ? data.habits.map(entry => entry.id === habit.id ? activeHabit : entry) : [...data.habits, activeHabit], backlogItems: data.backlogItems.map(entry => entry.id === item.id ? { ...entry, state: 'PROMOTED', promotedHabitId: habit.id, promotedAt: now, updatedAt: now } : entry) };
   return { data: validateHabitData(next), habit, changed: true };
 }
+
+export function moveHabitToBacklog(data, habitId, now = new Date().toISOString()) {
+  const habit = data.habits.find(entry => entry.id === habitId);
+  if (!habit || habit.archivedAt) throw new Error('Active Habit was not found.');
+  if (habit.lifecycleState === 'BACKLOG') return data;
+  const linked = data.backlogItems.find(item => item.promotedHabitId === habitId);
+  const backlogItem = linked
+    ? { ...linked, title: habit.name, note: habit.description || linked.note || '', state: 'BACKLOG', promotedAt: linked.promotedAt || habit.activatedAt || habit.createdAt, backloggedAt: now, archivedAt: null, updatedAt: now }
+    : { ...makeBacklogItem({ title: habit.name, note: habit.description }, habit.userId, now), promotedHabitId: habit.id, promotedAt: habit.activatedAt || habit.createdAt, backloggedAt: now };
+  const next = { ...data, habits: data.habits.map(entry => entry.id === habitId ? { ...entry, lifecycleState: 'BACKLOG', backloggedAt: now, updatedAt: now } : entry), backlogItems: linked ? data.backlogItems.map(item => item.id === linked.id ? backlogItem : item) : [...data.backlogItems, backlogItem] };
+  return validateHabitData(next);
+}
+
+export const getActiveHabits = data => (data.habits || []).filter(habit => !habit.archivedAt && habit.lifecycleState !== 'BACKLOG');
+export const getBacklogItems = data => (data.backlogItems || []).filter(item => item.state === 'BACKLOG');
 
 function ensureLegacyDrivingArea(data, userId) {
   let area = data.habits.find(habit => habit.slug === 'driving-improvement');
   if (!area) {
-    area = { id: 'habit-driving-improvement-v1', userId: userId || data.categories.find(category => category.userId)?.userId || null, name: 'Driving Improvement', slug: 'driving-improvement', description: '', createdAt: data.categories[0]?.createdAt || data.mistakes[0]?.createdAt || new Date(0).toISOString(), updatedAt: new Date().toISOString(), archivedAt: null };
+    area = { id: 'habit-driving-improvement-v1', userId: userId || data.categories.find(category => category.userId)?.userId || null, name: 'Driving Improvement', slug: 'driving-improvement', description: '', lifecycleState: 'ACTIVE', createdAt: data.categories[0]?.createdAt || data.mistakes[0]?.createdAt || new Date(0).toISOString(), updatedAt: new Date().toISOString(), archivedAt: null };
     data.habits.push(area);
   }
   const habitIds = new Set(data.habits.map(habit => habit.id));
@@ -69,7 +93,12 @@ export function migrateHabitData(data, userId) {
   const next = structuredClone(data);
   next.categories ||= []; next.mistakes ||= []; next.habits ||= []; next.reminders ||= []; next.guidanceNotes ||= [];
   next.backlogItems ||= [];
-  let changed = next.habitVersion !== 5 || !Array.isArray(next.nodes) || !Array.isArray(data.backlogItems);
+  let changed = next.habitVersion !== 6 || !Array.isArray(next.nodes) || !Array.isArray(data.backlogItems);
+  next.habits = next.habits.map(habit => {
+    if (habit.lifecycleState) return habit;
+    changed = true;
+    return { ...habit, lifecycleState: 'ACTIVE' };
+  });
   if (next.categories.length && (next.habits.length === 0 || next.categories.some(category => !next.habits.some(habit => habit.id === category.habitId)))) {
     ensureLegacyDrivingArea(next, userId); changed = true;
   }
@@ -99,7 +128,7 @@ export function migrateHabitData(data, userId) {
     next.nodes = next.nodes.map(node => normalizedNode(node, node.habitId || next.categories.find(category => category.id === node.id)?.habitId || next.habits[0]?.id));
   }
   if (next.categories.length || next.mistakes.length) { next.categories = []; next.mistakes = []; changed = true; }
-  if (changed) next.habitVersion = 5;
+  if (changed) next.habitVersion = 6;
   return { data: validateHabitData(next), changed };
 }
 
@@ -109,16 +138,18 @@ export function validateHabitData(data) {
   const habitIds = new Set(), habitSlugs = new Set();
   const habitsById = new Map();
   for (const habit of data.habits) {
-    if (!habit || typeof habit.id !== 'string' || habitIds.has(habit.id) || typeof habit.name !== 'string' || !habit.name.trim() || habit.name.length > 100 || typeof habit.slug !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(habit.slug) || habitSlugs.has(habit.slug) || (habit.description !== undefined && (typeof habit.description !== 'string' || habit.description.length > 2000)) || (habit.archivedAt != null && typeof habit.archivedAt !== 'string')) throw new Error('Habit area data is invalid.');
+    if (!habit || typeof habit.id !== 'string' || habitIds.has(habit.id) || typeof habit.name !== 'string' || !habit.name.trim() || habit.name.length > 100 || typeof habit.slug !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(habit.slug) || habitSlugs.has(habit.slug) || (habit.description !== undefined && (typeof habit.description !== 'string' || habit.description.length > 2000)) || (habit.archivedAt != null && typeof habit.archivedAt !== 'string') || (habit.lifecycleState != null && !HABIT_LIFECYCLE_STATES.includes(habit.lifecycleState)) || (habit.backloggedAt != null && typeof habit.backloggedAt !== 'string')) throw new Error('Habit area data is invalid.');
     habitIds.add(habit.id); habitSlugs.add(habit.slug);
     habitsById.set(habit.id, habit);
   }
-  const backlogIds = new Set();
+  const backlogIds = new Set(), linkedHabitIds = new Set();
   for (const item of data.backlogItems) {
-    if (!item || typeof item.id !== 'string' || backlogIds.has(item.id) || typeof item.title !== 'string' || !item.title.trim() || item.title.length > 160 || typeof item.note !== 'string' || item.note.length > 2000 || (item.type !== null && !BACKLOG_TYPES.includes(item.type)) || (item.priority !== null && !IMPROVEMENT_PRIORITIES.includes(item.priority)) || !BACKLOG_STATES.includes(item.state) || (item.archivedAt != null && typeof item.archivedAt !== 'string')) throw new Error('Improvement backlog data is invalid.');
-    if (item.state === 'PROMOTED') {
+    if (!item || typeof item.id !== 'string' || backlogIds.has(item.id) || typeof item.title !== 'string' || !item.title.trim() || item.title.length > 160 || typeof item.note !== 'string' || item.note.length > 2000 || (item.type !== null && !BACKLOG_TYPES.includes(item.type)) || (item.priority !== null && !IMPROVEMENT_PRIORITIES.includes(item.priority)) || !BACKLOG_STATES.includes(item.state) || (item.archivedAt != null && typeof item.archivedAt !== 'string') || (item.backloggedAt != null && typeof item.backloggedAt !== 'string')) throw new Error('Improvement backlog data is invalid.');
+    if (item.state === 'PROMOTED' || (item.state === 'BACKLOG' && item.promotedHabitId)) {
       const linkedHabit = habitsById.get(item.promotedHabitId);
-      if (!linkedHabit || (item.userId && linkedHabit.userId && item.userId !== linkedHabit.userId) || typeof item.promotedAt !== 'string') throw new Error('Improvement backlog promotion link is invalid.');
+      const expectedState = item.state === 'PROMOTED' ? 'ACTIVE' : 'BACKLOG';
+      if (!linkedHabit || linkedHabit.archivedAt || linkedHabit.lifecycleState !== expectedState || (item.userId && linkedHabit.userId && item.userId !== linkedHabit.userId) || typeof item.promotedAt !== 'string' || linkedHabitIds.has(linkedHabit.id)) throw new Error('Improvement backlog promotion link is invalid.');
+      linkedHabitIds.add(linkedHabit.id);
     } else if (item.promotedHabitId != null || item.promotedAt != null) throw new Error('Unpromoted ideas cannot link to an active Habit.');
     backlogIds.add(item.id);
   }
@@ -195,6 +226,11 @@ export function getQuickReviewItems(nodes, includeStable = false) {
     });
 }
 
+export function getQuickReviewItemsForHabit(data, habitId, includeStable = false) {
+  const habit = data.habits.find(item => item.id === habitId && !item.archivedAt && item.lifecycleState !== 'BACKLOG');
+  return habit ? getQuickReviewItems(getItemsForHabit(data, habitId), includeStable) : [];
+}
+
 export function getActiveNodes(nodes, habitId) { return nodes.filter(node => node.habitId === habitId && !getNodePath(nodes, node.id).some(part => part.archivedAt)); }
 
 export function setNodeParent(nodes, nodeId, parentId) {
@@ -236,3 +272,22 @@ export function archiveBacklogItem(items, itemId, now = new Date().toISOString()
 }
 
 export function deleteBacklogItem(items, itemId) { return items.filter(item => item.id !== itemId); }
+
+export function archiveBacklogEntry(data, itemId, now = new Date().toISOString()) {
+  const item = data.backlogItems.find(entry => entry.id === itemId && entry.state === 'BACKLOG');
+  if (!item) return data;
+  const linkedHabitId = item.promotedHabitId;
+  return validateHabitData({
+    ...data,
+    habits: linkedHabitId ? data.habits.map(habit => habit.id === linkedHabitId ? { ...habit, archivedAt: now, updatedAt: now } : habit) : data.habits,
+    backlogItems: data.backlogItems.map(entry => entry.id === itemId ? { ...entry, state: 'ARCHIVED', promotedHabitId: undefined, promotedAt: undefined, backloggedAt: undefined, archivedAt: now, updatedAt: now } : entry),
+  });
+}
+
+export function deleteBacklogEntry(data, itemId) {
+  const item = data.backlogItems.find(entry => entry.id === itemId);
+  if (!item) return data;
+  const linkedHabit = item.promotedHabitId && data.habits.find(habit => habit.id === item.promotedHabitId);
+  const removed = linkedHabit ? removeHabitArea(data, linkedHabit.id) : data;
+  return validateHabitData({ ...removed, backlogItems: removed.backlogItems.filter(entry => entry.id !== itemId) });
+}

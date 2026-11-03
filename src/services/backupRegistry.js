@@ -182,8 +182,8 @@ const training = {
 };
 
 const drivingImprovement = {
-  moduleId: 'drivingImprovement', displayName: 'Habit Improvement', schemaVersion: 4,
-  migrations: [{ fromVersion: 1, toVersion: 2, migrate: data => data }, { fromVersion: 2, toVersion: 3, migrate: data => ({ ...data, workspace: data.workspace ? { ...data.workspace, data: migrateHabitData(data.workspace.data).data } : null }) }, { fromVersion: 3, toVersion: 4, migrate: data => ({ ...data, workspace: data.workspace ? { ...data.workspace, data: migrateHabitData(data.workspace.data).data } : null }) }],
+  moduleId: 'drivingImprovement', displayName: 'Habit Improvement', schemaVersion: 5,
+  migrations: [{ fromVersion: 1, toVersion: 2, migrate: data => data }, { fromVersion: 2, toVersion: 3, migrate: data => ({ ...data, workspace: data.workspace ? { ...data.workspace, data: migrateHabitData(data.workspace.data).data } : null }) }, { fromVersion: 3, toVersion: 4, migrate: data => ({ ...data, workspace: data.workspace ? { ...data.workspace, data: migrateHabitData(data.workspace.data).data } : null }) }, { fromVersion: 4, toVersion: 5, migrate: data => ({ ...data, workspace: data.workspace ? { ...data.workspace, data: migrateHabitData(data.workspace.data).data } : null }) }],
   async exportData({ client, userId }) {
     const result = await client.from('driving_workspaces').select('data,revision,updated_at').eq('user_id', userId).maybeSingle();
     assertSupabaseResult(result);

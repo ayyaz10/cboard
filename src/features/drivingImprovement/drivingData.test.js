@@ -1,17 +1,46 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  createInitialHabitData, getHabitSummary, getItemsForHabit, makeHabitArea, makeImprovementNode, makeBacklogItem, promoteBacklogItem, archiveBacklogItem, deleteBacklogItem,
+  createInitialHabitData, getHabitSummary, getItemsForHabit, makeHabitArea, makeImprovementNode, makeBacklogItem, promoteBacklogItem, moveHabitToBacklog, getActiveHabits, getBacklogItems, getQuickReviewItemsForHabit, archiveBacklogItem, deleteBacklogItem,
   migrateHabitData, removeHabitArea, getDescendantNodes, getNodePath, getNodeProgress,
-  getQuickReviewItems, archiveNodeBranch, deleteNodeBranch, setNodeParent, validateHabitData, HABIT_STATUSES,
+  getQuickReviewItems, archiveNodeBranch, deleteNodeBranch, setNodeParent, validateHabitData, HABIT_STATUSES, archiveBacklogEntry, deleteBacklogEntry,
 } from './drivingData.js';
 
 const at = '2026-10-31T00:00:00.000Z';
 
 test('new workspace has a recursive node collection and no seeded improvements', () => {
   assert.deepEqual(createInitialHabitData(), {
-    version: 1, habitVersion: 5, habits: [], nodes: [], categories: [], mistakes: [], reminders: [], guidanceNotes: [], backlogItems: [],
+    version: 1, habitVersion: 6, habits: [], nodes: [], categories: [], mistakes: [], reminders: [], guidanceNotes: [], backlogItems: [],
   });
+});
+
+test('moving a Habit to Backlog and resuming it preserves identity, recursive progress, notes and Quick Review eligibility', () => {
+  const data = createInitialHabitData(), habit = makeHabitArea({ name: 'Driving Improvement', description: 'Road confidence' }, [], 'user-a', at);
+  const root = makeImprovementNode({ habitId: habit.id, parentId: null, title: 'Roundabouts', status: 'IMPROVING', priority: 'HIGH', focusNow: true, richNotes: '<p>Watch approach speed.</p>' }, 'user-a', at);
+  const child = makeImprovementNode({ habitId: habit.id, parentId: root.id, title: 'Lane selection', status: 'STABLE', priority: 'LOW', whatIDoDifferently: '<p>Choose early.</p>' }, 'user-a', at);
+  data.habits.push(habit); data.nodes = [root, child];
+  const beforeNodes = structuredClone(data.nodes);
+  const paused = moveHabitToBacklog(data, habit.id, '2026-11-03T12:00:00.000Z');
+  assert.strictEqual(moveHabitToBacklog(paused, habit.id), paused);
+  assert.deepEqual(getActiveHabits(paused), []);
+  assert.equal(getBacklogItems(paused).length, 1);
+  assert.equal(paused.habits[0].id, habit.id);
+  assert.deepEqual(paused.nodes, beforeNodes);
+  assert.deepEqual(getQuickReviewItemsForHabit(paused, habit.id), []);
+  const item = getBacklogItems(paused)[0];
+  const resumed = promoteBacklogItem(paused, item.id, habit.name, 'user-a', '2026-11-04T12:00:00.000Z');
+  const resumedAgain = promoteBacklogItem(resumed.data, item.id, 'Ignored duplicate', 'user-a', '2026-11-05T12:00:00.000Z');
+  assert.equal(resumed.resumed, true);
+  assert.equal(resumed.data.habits.length, 1);
+  assert.equal(resumed.habit.id, habit.id);
+  assert.equal(resumedAgain.changed, false);
+  assert.equal(resumedAgain.data.habits.length, 1);
+  assert.deepEqual(resumed.data.nodes, beforeNodes);
+  assert.equal(getActiveHabits(resumed.data)[0].id, habit.id);
+  assert.equal(getBacklogItems(resumed.data).length, 0);
+  assert.deepEqual(getQuickReviewItemsForHabit(resumed.data, habit.id).map(node => node.id), [root.id]);
+  assert.equal(resumed.data.backlogItems[0].promotedHabitId, habit.id);
+  validateHabitData(resumed.data);
 });
 
 test('backlog ideas stay separate until explicit promotion and promote idempotently with preserved context', () => {
@@ -42,6 +71,22 @@ test('backlog edit helpers archive or delete only unpromoted ideas', () => {
   assert.deepEqual(deleteBacklogItem(archived, b.id).map(item => item.id), [a.id]);
 });
 
+test('archiving a previously active Backlog entry preserves but hides Habit records; deleting it cascades explicitly', () => {
+  const data = createInitialHabitData(), habit = makeHabitArea({ name: 'Focus Improvement' }, [], 'user-a', at);
+  const node = makeImprovementNode({ habitId: habit.id, parentId: null, title: 'Phone distraction', status: 'IMPROVING' }, 'user-a', at);
+  data.habits.push({ ...habit, lifecycleState: 'BACKLOG', backloggedAt: at }); data.nodes.push(node);
+  const item = makeBacklogItem({ title: habit.name }, 'user-a', at);
+  data.backlogItems.push({ ...item, promotedHabitId: habit.id, promotedAt: at, backloggedAt: at });
+  const archived = archiveBacklogEntry(data, item.id, at);
+  assert.equal(archived.habits[0].archivedAt, at);
+  assert.deepEqual(archived.nodes, data.nodes);
+  assert.equal(archived.backlogItems[0].state, 'ARCHIVED');
+  const deleted = deleteBacklogEntry(data, item.id);
+  assert.deepEqual(deleted.habits, []);
+  assert.deepEqual(deleted.nodes, []);
+  assert.deepEqual(deleted.backlogItems, []);
+});
+
 test('legacy category and item records migrate idempotently to recursive nodes preserving content and IDs', () => {
   const names = ['Mirrors', 'Roundabouts'];
   const legacy = {
@@ -54,6 +99,7 @@ test('legacy category and item records migrate idempotently to recursive nodes p
   assert.equal(first.changed, true); assert.equal(second.changed, false);
   assert.deepEqual(first.data.categories, []); assert.deepEqual(first.data.mistakes, []);
   assert.equal(driving.name, 'Driving Improvement');
+  assert.equal(driving.lifecycleState, 'ACTIVE');
   assert.equal(root.parentId, null); assert.equal(root.habitId, driving.id);
   assert.equal(child.parentId, root.id); assert.equal(child.id, 'item-1');
   assert.equal(child.whyItHappens, '<p>Late decision</p>');
