@@ -88,16 +88,18 @@ function fileToDataUrl(file) {
 export function NoteEditor({
   value,
   onChange,
-  media,
-  onMediaChange,
-  onError,
+  media = [],
+  onMediaChange = () => {},
+  onError = () => {},
+  compact = false,
+  ariaLabel = 'Note content',
 }) {
   const editorRef = useRef(null);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (editorRef.current && editorRef.current.innerHTML !== value) {
-      editorRef.current.innerHTML = value || '';
+      editorRef.current.innerHTML = sanitizeNoteHtml(value || '');
     }
   }, [value]);
 
@@ -164,7 +166,7 @@ export function NoteEditor({
   }
 
   return (
-    <div className="rounded-[1.35rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-3 shadow-[4px_4px_0_#000]">
+    <div className={`rounded-[1.35rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-3 shadow-[4px_4px_0_#000] ${compact ? 'habit-rich-editor' : ''}`}>
       <div className="flex flex-wrap gap-2 border-b-2 border-black/15 pb-3">
         <select
           className="field-input w-auto min-w-36 px-3 py-2 text-sm shadow-none"
@@ -286,11 +288,14 @@ export function NoteEditor({
       <div
         ref={editorRef}
         contentEditable
+        role="textbox"
+        aria-label={ariaLabel}
+        aria-multiline="true"
         suppressContentEditableWarning
         onInput={syncContent}
         onBlur={syncContent}
         onPaste={handlePaste}
-        className="note-editor mt-4 min-h-80 rounded-[1rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3 text-base font-medium leading-7 text-[var(--color-text)] outline-none focus:shadow-[4px_4px_0_#000]"
+        className={`note-editor mt-4 ${compact ? 'min-h-24' : 'min-h-80'} rounded-[1rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3 text-base font-medium leading-7 text-[var(--color-text)] outline-none focus:shadow-[4px_4px_0_#000]`}
         data-placeholder="Start writing..."
       />
     </div>

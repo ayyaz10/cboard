@@ -36,6 +36,20 @@ function AppContent() {
   const [isMigrating, setIsMigrating] = useState(false);
   const [migrationError, setMigrationError] = useState('');
   const workspaceSetupRef = useRef(null);
+  const cachedUserIdRef = useRef(null);
+
+  useEffect(() => {
+    const accountChanged = cachedUserIdRef.current && cachedUserIdRef.current !== user?.id;
+    cachedUserIdRef.current = user?.id || null;
+    if (accountChanged) import('../services/drivingImprovementService.js').then(({ clearDrivingWorkspaceCache }) => clearDrivingWorkspaceCache());
+    try {
+      for (let index = sessionStorage.length - 1; index >= 0; index -= 1) {
+        const key = sessionStorage.key(index);
+        const belongsToCurrentUser = user?.id && (key?.startsWith(`habit-ui:${user.id}:`) || key?.startsWith(`habit-tree:${user.id}:`));
+        if ((key?.startsWith('habit-ui:') || key?.startsWith('habit-tree:')) && (user?.id ? !belongsToCurrentUser : !isLoading)) sessionStorage.removeItem(key);
+      }
+    } catch {}
+  }, [user?.id, isLoading]);
 
   useEffect(() => {
     if (route === '/driving-improvement') navigateTo('/habit-improvement/driving-improvement', { replace: true });
@@ -162,10 +176,10 @@ function AppContent() {
   if (route === '/account') return <ProfilePage key={user.id} />;
   if (route === '/training') return <Suspense fallback={<main className="panel m-6 p-6" role="status">Loading Training…</main>}><Training key={user.id} /></Suspense>;
   if (route === '/driving-improvement') return <main className="panel m-6 p-6" role="status">Opening Driving Improvement...</main>;
-  if (route === '/habit-improvement') return <Suspense fallback={<main className="panel m-6 p-6" role="status">Loading Habit Improvement...</main>}><HabitImprovementHome key={user.id} userId={user.id} /></Suspense>;
+  if (route === '/habit-improvement' || route === '/habit-improvement/backlog') return <Suspense fallback={<main className="panel m-6 p-6" role="status">Loading Habit Improvement...</main>}><HabitImprovementHome key={user.id} userId={user.id} view={route.endsWith('/backlog') ? 'backlog' : 'active'} /></Suspense>;
   if (route.startsWith('/habit-improvement/')) {
-    const habitSlug = route.slice('/habit-improvement/'.length).split('/')[0];
-    return <Suspense fallback={<main className="panel m-6 p-6" role="status">Loading improvement area...</main>}><HabitImprovementDetail key={`${user.id}:${habitSlug}`} userId={user.id} habitSlug={habitSlug} /></Suspense>;
+    const [habitSlug, nodeId = ''] = route.slice('/habit-improvement/'.length).split('/').map(part => decodeURIComponent(part));
+    return <Suspense fallback={<main className="panel m-6 p-6" role="status">Loading improvement area...</main>}><HabitImprovementDetail key={`${user.id}:${habitSlug}`} userId={user.id} habitSlug={habitSlug} nodeId={nodeId} /></Suspense>;
   }
 
   if (route === '/food-diary') {

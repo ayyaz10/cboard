@@ -1,6 +1,7 @@
 import { getUserScopedClient, assertSupabaseResult } from './supabaseCrud.js';
 import { validateState as validateTrainingState } from '../features/training/trainingData.js';
 import { migrateHabitData } from '../features/drivingImprovement/drivingData.js';
+import { clearDrivingWorkspaceCache } from './drivingImprovementService.js';
 
 const PAGE_SIZE = 500;
 const secretField = key => /^(password|password_hash|passwd|session_token|access_token|refresh_token|auth_token|reset_token|cookie|auth_cookie|token|private_key|api_key|service_role_key|credentials|provider_id|user_id)$/i.test(key.replace(/([a-z])([A-Z])/g, '$1_$2'));
@@ -181,12 +182,14 @@ const training = {
 };
 
 const drivingImprovement = {
-  moduleId: 'drivingImprovement', displayName: 'Habit Improvement', schemaVersion: 2,
-  migrations: [{ fromVersion: 1, toVersion: 2, migrate: data => data }],
+  moduleId: 'drivingImprovement', displayName: 'Habit Improvement', schemaVersion: 4,
+  migrations: [{ fromVersion: 1, toVersion: 2, migrate: data => data }, { fromVersion: 2, toVersion: 3, migrate: data => ({ ...data, workspace: data.workspace ? { ...data.workspace, data: migrateHabitData(data.workspace.data).data } : null }) }, { fromVersion: 3, toVersion: 4, migrate: data => ({ ...data, workspace: data.workspace ? { ...data.workspace, data: migrateHabitData(data.workspace.data).data } : null }) }],
   async exportData({ client, userId }) {
     const result = await client.from('driving_workspaces').select('data,revision,updated_at').eq('user_id', userId).maybeSingle();
     assertSupabaseResult(result);
-    return { workspace: result.data || null };
+    if (!result.data) return { workspace: null };
+    const migrated = migrateHabitData(result.data.data, userId).data;
+    return { workspace: { ...result.data, data: migrated } };
   },
   validate(data) {
     if (!data || !(data.workspace === null || (typeof data.workspace === 'object' && data.workspace.data))) throw new Error('Habit Improvement backup data is invalid.');
@@ -194,16 +197,19 @@ const drivingImprovement = {
   },
   async importData({ client, userId, data }) {
     const removed = await client.from('driving_workspaces').delete().eq('user_id', userId); assertSupabaseResult(removed);
+    clearDrivingWorkspaceCache();
     if (!data.workspace) return;
     const restored = migrateHabitData(data.workspace.data, userId).data;
     restored.habits = restored.habits.map(habit => ({ ...habit, userId }));
     restored.categories = restored.categories.map(category => ({ ...category, userId }));
     restored.mistakes = restored.mistakes.map(mistake => ({ ...mistake, userId }));
+    restored.nodes = (restored.nodes || []).map(node => ({ ...node, userId }));
+    restored.backlogItems = (restored.backlogItems || []).map(item => ({ ...item, userId }));
     restored.reminders = (restored.reminders || []).map(reminder => ({ ...reminder, userId }));
     const result = await client.from('driving_workspaces').insert({ user_id: userId, data: restored, revision: Math.max(1, Number(data.workspace.revision) || 1) });
     assertSupabaseResult(result);
   },
-  recordCount(data) { return (data.workspace?.data?.habits?.length || 0) + (data.workspace?.data?.categories?.length || 0) + (data.workspace?.data?.mistakes?.length || 0) + (data.workspace?.data?.reminders?.length || 0); },
+  recordCount(data) { return (data.workspace?.data?.habits?.length || 0) + (data.workspace?.data?.nodes?.length || 0) + (data.workspace?.data?.backlogItems?.length || 0) + (data.workspace?.data?.reminders?.length || 0); },
 };
 
 const focus = {

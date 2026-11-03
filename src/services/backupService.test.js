@@ -94,27 +94,47 @@ test('legacy Driving Improvement backups restore under one parent habit and map 
   const restored = client.rows[0];
   assert.equal(restored.user_id, 'new-account');
   assert.equal(restored.revision, 7);
-  assert.equal(restored.data.categories[0].id, category.id);
-  assert.equal(restored.data.categories[0].name, 'Mirrors');
+  assert.equal(restored.data.categories.length, 0);
   assert.equal(restored.data.habits.length, 1);
   assert.equal(restored.data.habits[0].name, 'Driving Improvement');
   assert.equal(restored.data.habits[0].slug, 'driving-improvement');
-  assert.equal(restored.data.categories[0].habitId, restored.data.habits[0].id);
   assert.equal(restored.data.habits[0].userId, 'new-account');
-  assert.deepEqual(restored.data.mistakes[0], { ...item, userId: 'new-account', status: 'STABLE', priority: 'MEDIUM' });
+  assert.equal(restored.data.nodes.find(node => node.id === category.id).title, 'Mirrors');
+  assert.equal(restored.data.nodes.find(node => node.id === category.id).parentId, null);
+  assert.equal(restored.data.nodes.find(node => node.id === item.id).parentId, category.id);
+  assert.equal(restored.data.nodes.every(node => node.userId === 'new-account'), true);
+  assert.equal(restored.data.mistakes.length, 0);
+  assert.equal(restored.data.nodes.find(node => node.id === item.id).whyItHappens, item.cause);
+  assert.equal(restored.data.nodes.find(node => node.id === item.id).whatIDoDifferently, item.correction);
   assert.equal(backupModuleRegistry.find(module => module.moduleId === 'drivingImprovement').displayName, 'Habit Improvement');
 });
 
-test('older Driving Improvement backup schema remains parseable through the parent-area upgrade', async () => {
+test('older Habit Improvement backup schema upgrades its flat records to recursive nodes', async () => {
   const legacyData = { workspace: { data: { version: 1, categories: [{ id: 'cat-old', name: 'Roundabouts' }], mistakes: [] }, revision: 4 } };
   const backup = await backupFor(['drivingImprovement'], { drivingImprovement: legacyData });
   backup.data.drivingImprovement.schemaVersion = 1;
   backup.integrity.digest = await digest(backup.data);
   const parsed = await parseBackupFile(await asFile(backup));
   const module = parsed.modules[0];
-  assert.equal(module.schemaVersion, 2);
+  assert.equal(module.schemaVersion, 4);
   assert.equal(module.displayName, 'Habit Improvement');
-  assert.equal(module.data.workspace.data.categories[0].name, 'Roundabouts');
+  assert.equal(module.data.workspace.data.categories.length, 0);
+  assert.equal(module.data.workspace.data.nodes[0].title, 'Roundabouts');
+  assert.equal(module.data.workspace.data.nodes[0].parentId, null);
+  assert.deepEqual(module.data.workspace.data.backlogItems, []);
+});
+
+test('Habit Improvement backups preserve backlog promotion linkage and remap its owner on restore', async () => {
+  const habit = { id: 'habit-promoted', userId: 'old-account', name: 'Negotiation Improvement', slug: 'negotiation-improvement', description: 'Practice calmly', createdAt: '2026-11-03T00:00:00.000Z', updatedAt: '2026-11-03T00:00:00.000Z', archivedAt: null };
+  const item = { id: 'idea-negotiation', userId: 'old-account', title: 'Negotiation', note: 'Practice calmly', type: 'SKILL', priority: 'MEDIUM', state: 'PROMOTED', promotedHabitId: habit.id, promotedAt: '2026-11-03T00:00:00.000Z', createdAt: '2026-11-01T00:00:00.000Z', updatedAt: '2026-11-03T00:00:00.000Z', archivedAt: null };
+  const client = new FinanceMemoryClient();
+  await importBackupModule('drivingImprovement', { workspace: { data: { version: 1, habitVersion: 5, habits: [habit], nodes: [], categories: [], mistakes: [], reminders: [], guidanceNotes: [], backlogItems: [item] }, revision: 2 } }, { client, userId: 'new-account' });
+  const restored = client.rows[0].data;
+  assert.equal(restored.backlogItems[0].promotedHabitId, habit.id);
+  assert.equal(restored.backlogItems[0].state, 'PROMOTED');
+  assert.equal(restored.backlogItems[0].userId, 'new-account');
+  assert.equal(restored.habits[0].userId, 'new-account');
+  assert.equal(getBackupModule('drivingImprovement').recordCount({ workspace: { data: restored } }), 2);
 });
 
 test('multi-app backup preserves linked identifiers between selected modules', async () => {
