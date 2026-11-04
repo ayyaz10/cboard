@@ -52,6 +52,7 @@ export function MonthlyReports({ data, month, setMonth, setTab, openTransaction,
         <div><span>Spent</span><strong><ReportMoney amount={selected.expenses} currency={currency}/></strong></div>
         <div><span>Saved</span><strong><ReportMoney amount={selected.savings} currency={currency}/></strong></div>
         <div><span>Invested</span><strong><ReportMoney amount={selected.investments} currency={currency}/></strong></div>
+        <div><span>Credit payments</span><strong><ReportMoney amount={selected.creditPayments} currency={currency}/></strong></div>
         <div><span>Remaining</span><strong className={selected.remaining < 0 ? 'f-negative' : 'f-positive'}><ReportMoney amount={selected.remaining} currency={currency}/></strong></div>
       </div>
       <div className="f-report-goals mt-4"><strong>Goals achieved</strong>{selected.achievedGoals.length ? selected.achievedGoals.map((goal) => <span className="f-tag" key={goal.id}>✓ {goal.title}</span>) : <span className="f-help">No goals completed in this month.</span>}</div>
@@ -90,6 +91,12 @@ export function MonthlyReports({ data, month, setMonth, setTab, openTransaction,
         <ActivityList items={selected.debtActivity} currency={currency} empty="No repayments recorded this month."/>
       </article>
       <article className="f-card">
+        <div className="f-between"><div><p className="f-meta">Purchase finance</p><h3>Credit payments</h3></div><strong className="f-report-section-total"><ReportMoney amount={selected.creditPayments} currency={currency}/></strong></div>
+        <p className="f-help">Actual cash payments only. Principal is not included in purchase-category spending.</p>
+        {selected.creditFinanceCosts > 0 && <p className="f-help">Finance costs paid this month: <strong><ReportMoney amount={selected.creditFinanceCosts} currency={currency}/></strong></p>}
+        <ActivityList items={selected.creditPaymentActivity} currency={currency} empty="No credit payments recorded this month." meta={item => `${item.date} · ${item.creditPaymentKind === 'extra' ? 'Extra principal' : item.creditPaymentKind === 'settlement' ? 'Early settlement' : item.creditPaymentKind === 'scheduled' ? 'Instalment' : 'Payment'}${item.creditFinanceCostAmount ? ` · finance cost ${formatMoney(item.creditFinanceCostAmount, currency)}` : ''}`}/>
+      </article>
+      <article className="f-card">
         <div className="f-between"><div><p className="f-meta">Giving</p><h3>Donations</h3></div><strong className="f-report-section-total"><ReportMoney amount={selected.donations} currency={currency}/></strong></div>
         <ActivityList items={selected.donationActivity} currency={currency} empty="No donations recorded this month."/>
       </article>
@@ -97,7 +104,7 @@ export function MonthlyReports({ data, month, setMonth, setTab, openTransaction,
 
     <div className="f-report-table-wrap mt-5" role="region" aria-label="Monthly finance report table" tabIndex="0">
       <table className="f-table f-report-table">
-        <thead><tr><th>Month</th><th>Income</th><th>Spent</th><th>Saved</th><th>Goals funded</th><th>Invested</th><th>Repaid</th><th>Donated</th><th>Remaining</th><th>Goals achieved</th><th></th></tr></thead>
+        <thead><tr><th>Month</th><th>Income</th><th>Spent</th><th>Saved</th><th>Goals funded</th><th>Invested</th><th>Debt repaid</th><th>Credit paid</th><th>Donated</th><th>Remaining</th><th>Goals achieved</th><th></th></tr></thead>
         <tbody>{visible.map((report) => <tr key={report.month} data-current={report.month === monthKey()}>
           <td data-label="Month"><div className="f-report-month-cell"><strong>{monthLabel(report.month)}</strong>{report.month === monthKey() && <span className="f-tag">Current</span>}</div></td>
           <td data-label="Income"><ReportMoney amount={report.income} currency={currency}/></td>
@@ -106,6 +113,7 @@ export function MonthlyReports({ data, month, setMonth, setTab, openTransaction,
           <td data-label="Goals funded"><ReportMoney amount={report.goalSavings} currency={currency}/></td>
           <td data-label="Invested"><ReportMoney amount={report.investments} currency={currency}/></td>
           <td data-label="Repaid"><ReportMoney amount={report.debtPayments} currency={currency}/></td>
+          <td data-label="Credit paid"><ReportMoney amount={report.creditPayments} currency={currency}/></td>
           <td data-label="Donated"><ReportMoney amount={report.donations} currency={currency}/></td>
           <td data-label="Remaining" className={report.remaining < 0 ? 'f-negative' : ''}><ReportMoney amount={report.remaining} currency={currency}/></td>
           <td data-label="Goals achieved">{report.achievedGoals.length ? report.achievedGoals.map((goal) => goal.title).join(', ') : '—'}</td>

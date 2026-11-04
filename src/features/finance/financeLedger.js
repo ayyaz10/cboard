@@ -50,6 +50,13 @@ function movement(transaction, funds, reserves, owned, cash, stateGoals, stateIn
     else cash -= amount;
     return { owned: owned - amount, cash };
   }
+  if (type === 'creditPayment') {
+    const rawFundId = transaction.paidFromFundId || '';
+    const fundId = rawFundId && Object.hasOwn(funds, rawFundId) ? rawFundId : rawFundId && Object.hasOwn(funds, `goal:${rawFundId}`) ? `goal:${rawFundId}` : '';
+    if (fundId) funds[fundId] -= amount;
+    else cash -= amount;
+    return { owned: owned - amount, cash };
+  }
   if (type === 'investment' && !['allocated', 'cancelled', 'planned'].includes(status) && (transaction.accountingKind === 'tracked-asset-transfer' || stateInvestments.some(item => item.id === transaction.targetId))) return { owned, cash: cash - amount };
   if (FUND_TYPES.has(type)) {
     const fundId = (type === 'goal' ? goalFor(transaction, stateGoals)?.id : '') || transaction.targetId || transaction.goalId || type;
@@ -193,6 +200,23 @@ export function inspectFinanceIntegrity(state) {
     ['goal contribution', state.goalContributions || [], item => item.transactionId],
     ['debt payment', state.debtPayments || [], item => item.transactionId],
   ]) for (const record of records) if (record.transactionId && !ids.has(record.transactionId)) issues.push({ type: 'orphan-link', ledger: name, id: record.id, transactionId: record.transactionId });
+
+  const agreementIds = new Set((state.creditAgreements || []).map(item => item.id));
+  const creditPaymentIds = new Map();
+  for (const transaction of transactions) {
+    if (transaction.creditAgreementId && !agreementIds.has(transaction.creditAgreementId)) issues.push({ type: 'orphan-credit-agreement-link', transactionId: transaction.id, agreementId: transaction.creditAgreementId });
+    if (transaction.type !== 'creditPayment') continue;
+    const paymentId = transaction.creditPaymentId;
+    if (paymentId) creditPaymentIds.set(paymentId, (creditPaymentIds.get(paymentId) || 0) + 1);
+    const principal = money(transaction.creditPrincipalAmount), financeCost = money(transaction.creditFinanceCostAmount);
+    if (principal + financeCost !== money(transaction.amount)) issues.push({ type: 'credit-payment-split-mismatch', transactionId: transaction.id, amount: money(transaction.amount), principal, financeCost });
+  }
+  for (const [paymentId, count] of creditPaymentIds) if (count > 1) issues.push({ type: 'duplicate-credit-payment-id', paymentId, count });
+  for (const agreement of state.creditAgreements || []) {
+    if (money(agreement.financedAmount) + money(agreement.financeCharge) !== money(agreement.totalRepayable)) issues.push({ type: 'credit-agreement-total-mismatch', agreementId: agreement.id });
+    const schedule = agreement.schedule || [];
+    if (schedule.some(item => money(item.amount) !== money(item.principalAmount) + money(item.financeCostAmount))) issues.push({ type: 'credit-schedule-split-mismatch', agreementId: agreement.id });
+  }
 
   for (const goal of state.goals || []) {
     const eventTotal = transactions.filter(item => item.type === 'goal' && goalFor(item, state.goals || [])?.id === goal.id)

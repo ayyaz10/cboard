@@ -79,6 +79,17 @@ test('one-app backup keeps a selective scope and round-trips the source data', a
   assert.equal(parsed.modules[0].data.workspace.state.transactions[0].id, 'stable-tx-1');
 });
 
+test('Finance schema v1 backup restores with an empty credit agreement list', async () => {
+  const finance = { workspace: { state: { transactions: [{ id: 'legacy', type: 'income', amount: 100 }], debts: [] }, updated_at: '2026-10-05T09:00:00Z' } };
+  const backup = await backupFor(['finance'], { finance });
+  backup.data.finance.schemaVersion = 1;
+  backup.integrity.digest = await digest(backup.data);
+  const parsed = await parseBackupFile(await asFile(backup));
+  assert.equal(parsed.modules[0].schemaVersion, 2);
+  assert.deepEqual(parsed.modules[0].data.workspace.state.creditAgreements, []);
+  assert.equal(parsed.modules[0].data.workspace.state.transactions[0].id, 'legacy');
+});
+
 test('legacy Driving Improvement backups restore under one parent habit and map CONFIDENT to STABLE', async () => {
   const category = { id: 'driving-category-1', name: 'Mirrors', createdAt: '2025-01-02T00:00:00.000Z' };
   const item = {

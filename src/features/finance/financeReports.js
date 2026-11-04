@@ -49,6 +49,8 @@ export function monthlyFinanceReport(state, month) {
   return {
     month,
     ...summary,
+    creditPaymentActivity: transactionActivity('creditPayment'),
+    creditFinanceCostActivity: transactionActivity('creditPayment').filter(item => item.creditFinanceCostAmount > 0),
     goalSavings,
     savedTotal: summary.savings + goalSavings,
     achievedGoals,

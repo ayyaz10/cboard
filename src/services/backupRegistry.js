@@ -105,7 +105,8 @@ function tableModule({ id, name, tables, validateData = () => {}, dependencies =
 }
 
 const finance = {
-  moduleId: 'finance', displayName: 'Finance', schemaVersion: 1,
+  moduleId: 'finance', displayName: 'Finance', schemaVersion: 2,
+  migrations: [{ fromVersion: 1, toVersion: 2, migrate: data => data?.workspace?.state ? { ...data, workspace: { ...data.workspace, state: { ...data.workspace.state, creditAgreements: Array.isArray(data.workspace.state.creditAgreements) ? data.workspace.state.creditAgreements : [] } } } : data }],
   async exportData({ client, userId }) {
     const result = await client.from('finance_workspaces').select('state,updated_at').eq('user_id', userId).maybeSingle();
     assertSupabaseResult(result); return { workspace: result.data || null };
@@ -118,7 +119,8 @@ const finance = {
   recordCount(data) {
     const state = data.workspace?.state;
     if (!state) return 0;
-    return ['categories', 'donationCategories', 'donationTargets', 'donationAccruals', 'donationPayments', 'donationReversals', 'transactions', 'merchantProfiles', 'budgetPresets', 'goals', 'goalContributions', 'investments', 'debts', 'debtPayments', 'debtAccruals', 'recurring', 'transactionPresets', 'allocationRules'].reduce((count, key) => count + (Array.isArray(state[key]) ? state[key].length : 0), 0)
+    return ['categories', 'donationCategories', 'donationTargets', 'donationAccruals', 'donationPayments', 'donationReversals', 'transactions', 'merchantProfiles', 'budgetPresets', 'goals', 'goalContributions', 'investments', 'debts', 'debtPayments', 'debtAccruals', 'creditAgreements', 'recurring', 'transactionPresets', 'allocationRules'].reduce((count, key) => count + (Array.isArray(state[key]) ? state[key].length : 0), 0)
+      + (Array.isArray(state.creditAgreements) ? state.creditAgreements.reduce((total, item) => total + (Array.isArray(item.schedule) ? item.schedule.length : 0), 0) : 0)
       + (state.budgets && typeof state.budgets === 'object' ? Object.keys(state.budgets).length : 0);
   },
 };

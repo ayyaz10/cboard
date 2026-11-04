@@ -1,4 +1,4 @@
-export const transactionTypes = ['income', 'expense', 'donation', 'investment', 'debt', 'savings', 'budget', 'goal', 'transfer'];
+export const transactionTypes = ['income', 'expense', 'donation', 'investment', 'debt', 'creditPayment', 'savings', 'budget', 'goal', 'transfer'];
 
 export function parseMoney(value) {
   if (typeof value === 'number' && Number.isSafeInteger(value)) return value;
@@ -50,13 +50,16 @@ export function financeSummary(state, selectedMonth) {
   const donations = transactions.filter(item => item.type === 'donation' || (item.type === 'expense' && (item.financeGroup === 'donation' || donationCategoryIds.has(item.categoryId)))).reduce((total,item)=>total+item.amount,0);
   const investments = sum('investment');
   const debtPayments = sum('debt');
+  const creditPayments = sum('creditPayment');
+  const creditPrincipalPaid = transactions.filter(item => item.type === 'creditPayment').reduce((total, item) => total + (Number.isSafeInteger(item.creditPrincipalAmount) ? item.creditPrincipalAmount : 0), 0);
+  const creditFinanceCosts = transactions.filter(item => item.type === 'creditPayment').reduce((total, item) => total + (Number.isSafeInteger(item.creditFinanceCostAmount) ? item.creditFinanceCostAmount : 0), 0);
   const saved = sum('savings');
   const budgetAllocated = sum('budget');
   const goalContributions = sum('goal');
   const transfers = transactions.filter(item => item.type === 'transfer');
   const transferIn = transfers.filter(item => item.transferKind === 'external-in').reduce((total, item) => total + item.amount, 0);
   const transferOut = transfers.filter(item => item.transferKind === 'external-out').reduce((total, item) => total + item.amount, 0);
-  const outflow = expenses + donations + investments + debtPayments + saved + budgetAllocated + goalContributions + transferOut;
+  const outflow = expenses + donations + investments + debtPayments + creditPayments + saved + budgetAllocated + goalContributions + transferOut;
   const remaining = income + transferIn - outflow;
   const savings = saved;
   const budgetMonths = allTime ? Object.keys(state.budgets) : [selectedMonth];
@@ -65,7 +68,7 @@ export function financeSummary(state, selectedMonth) {
     return total + (state.budgets[month] || []).reduce((sum, item) => sum + budgetTarget(item, monthIncome || state.settings.monthlyIncome), 0);
   }, 0);
   return {
-    income, expenses, donations, investments, debtPayments, remaining, savings, budgetAllocated, goalContributions, transferIn, transferOut,
+    income, expenses, donations, investments, debtPayments, creditPayments, creditPrincipalPaid, creditFinanceCosts, remaining, savings, budgetAllocated, goalContributions, transferIn, transferOut,
     savingsRate: income ? Math.round(saved * 10000 / income) : 0,
     budgetPlanned,
     budgetUsed: budgetPlanned ? Math.round(expenses * 10000 / budgetPlanned) : 0,
