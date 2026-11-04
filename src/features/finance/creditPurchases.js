@@ -186,6 +186,26 @@ function scheduledRows(state, agreement) {
   return (agreement.schedule || []).filter(item => !item.supersededAt).map(instalment => ({ agreement, instalment, ...getCreditInstalmentAmounts(state, agreement, instalment) }));
 }
 
+export function getCreditAgreementRepaymentSummary(state, agreement) {
+  if (!agreement) return { totalRepayable: 0, actualPaid: 0, remainingBalance: 0, totalInstallments: 0, completedInstallments: 0, remainingInstallments: 0, futureSchedule: [], nextPayment: null, progressPercent: 0 };
+  const balances = getCreditAgreementBalances(state, agreement);
+  const rows = scheduledRows(state, agreement).sort((left, right) => left.instalment.dueDate.localeCompare(right.instalment.dueDate) || left.instalment.sequence - right.instalment.sequence);
+  const completedInstallments = rows.filter(row => row.remaining === 0 && row.paid > 0).length;
+  const futureSchedule = rows.filter(row => row.remaining > 0);
+  const totalInstallments = Number.isInteger(agreement.term) ? agreement.term : rows.length;
+  return {
+    totalRepayable: agreement.totalRepayable || 0,
+    actualPaid: balances.paidTotal,
+    remainingBalance: balances.totalRemaining,
+    totalInstallments,
+    completedInstallments,
+    remainingInstallments: futureSchedule.length,
+    futureSchedule,
+    nextPayment: futureSchedule[0] || null,
+    progressPercent: agreement.totalRepayable ? Math.min(100, Number((balances.paidTotal * 100 / agreement.totalRepayable).toFixed(2))) : 0,
+  };
+}
+
 export function getNextCreditPayment(state, asOfDate = new Date().toISOString().slice(0, 10)) {
   return (state.creditAgreements || []).filter(item => getCreditAgreementStatus(state, item) === 'active')
     .flatMap(agreement => scheduledRows(state, agreement).filter(row => row.remaining > 0).map(row => ({ ...row, status: getCreditInstalmentStatus(state, agreement, row.instalment, asOfDate) })))
@@ -496,7 +516,15 @@ export function updateCreditAgreement(state, agreementId, changes, asOfDate = ne
   const nextTitle = String(changes.title ?? agreement.title).trim();
   if (!nextTitle) throw new Error('Enter a name for this purchase.');
   const currentScheduleCount = (agreement.schedule || []).filter(item => !item.supersededAt).length;
-  const scheduleChanged = purchaseTermsChanged || nextFinanceCharge !== agreement.financeCharge || totalTerm !== currentScheduleCount || frequency !== agreement.frequency || customDays !== agreement.customDays || firstPaymentDate !== (activeFuture[0]?.dueDate || agreement.firstPaymentDate) || nextUpfrontCounts !== Boolean(agreement.upfrontCountsAsFirstInstalment) || nextScheduleMode !== (agreement.scheduleMode || 'auto');
+  const currentEditableCustomRows = (agreement.schedule || [])
+    .filter(item => !item.supersededAt && item.dueDate > asOfDate && getCreditInstalmentAmounts(state, agreement, item).paid === 0)
+    .sort((left, right) => left.dueDate.localeCompare(right.dueDate))
+    .map(({ id, dueDate, amount }) => ({ id, dueDate, amount }));
+  const nextEditableCustomRows = (changes.customSchedule || [])
+    .map(({ id, dueDate, amount }) => ({ id: id || '', dueDate, amount }))
+    .sort((left, right) => left.dueDate.localeCompare(right.dueDate));
+  const customScheduleChanged = nextScheduleMode === 'custom' && JSON.stringify(currentEditableCustomRows) !== JSON.stringify(nextEditableCustomRows);
+  const scheduleChanged = purchaseTermsChanged || nextFinanceCharge !== agreement.financeCharge || totalTerm !== currentScheduleCount || frequency !== agreement.frequency || customDays !== agreement.customDays || firstPaymentDate !== (activeFuture[0]?.dueDate || agreement.firstPaymentDate) || nextUpfrontCounts !== Boolean(agreement.upfrontCountsAsFirstInstalment) || nextScheduleMode !== (agreement.scheduleMode || 'auto') || customScheduleChanged;
   if (!scheduleChanged) {
     agreement.title = nextTitle;
     agreement.merchant = String(changes.merchant ?? agreement.merchant).trim();

@@ -213,7 +213,8 @@ export function inspectFinanceIntegrity(state) {
   }
   for (const [paymentId, count] of creditPaymentIds) if (count > 1) issues.push({ type: 'duplicate-credit-payment-id', paymentId, count });
   for (const agreement of state.creditAgreements || []) {
-    if (money(agreement.financedAmount) + money(agreement.financeCharge) !== money(agreement.totalRepayable)) issues.push({ type: 'credit-agreement-total-mismatch', agreementId: agreement.id });
+    const repaymentPrincipal = agreement.upfrontCountsAsFirstInstalment ? money(agreement.cashPrice) : money(agreement.financedAmount);
+    if (repaymentPrincipal + money(agreement.financeCharge) !== money(agreement.totalRepayable)) issues.push({ type: 'credit-agreement-total-mismatch', agreementId: agreement.id });
     const schedule = agreement.schedule || [];
     if (schedule.some(item => money(item.amount) !== money(item.principalAmount) + money(item.financeCostAmount))) issues.push({ type: 'credit-schedule-split-mismatch', agreementId: agreement.id });
   }

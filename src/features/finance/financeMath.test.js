@@ -5,6 +5,8 @@ import { budgetTarget, debtSummary, financeSummary, goalProjection, investmentSu
 test('money input is stored exactly in integer minor units', () => {
   assert.equal(parseMoney('1,234.56'), 123456);
   assert.equal(parseMoney('0.01'), 1);
+  assert.equal(parseMoney('0.00', { allowZero: true }), 0);
+  assert.throws(() => parseMoney('0.00'), /greater than zero/);
   for (const value of ['0', '-1', '1.001', 'abc', '']) assert.throws(() => parseMoney(value));
 });
 

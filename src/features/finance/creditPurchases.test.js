@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { initialFinanceState, normalizeFinanceState } from './financeData.js';
-import { deriveFinancePosition } from './financeLedger.js';
+import { deriveFinancePosition, inspectFinanceIntegrity } from './financeLedger.js';
 import { financeSummary } from './financeMath.js';
 import {
   archiveCreditAgreement, cancelCreditAgreement, createCreditAgreement, deleteUnusedCreditAgreement, generateCreditSchedule, getCreditAgreementBalances, getCreditAgreementStatus,
-  getCreditDueSoon, getCreditInstalmentAmounts, getMonthlyCreditCommitment, getOverdueCreditPayments, recordCreditPayment,
+  getCreditAgreementRepaymentSummary, getCreditDueSoon, getCreditInstalmentAmounts, getMonthlyCreditCommitment, getOverdueCreditPayments, recordCreditPayment,
   calculateRemainingBalance, calculateRemainingInstallmentCount, generateCustomCreditSchedule, mutateCreditState, restoreCreditAgreement, reverseCreditPayment, settleCreditAgreement, updateCreditAgreement, updateCreditInstalment, updateCreditPayment, validateCustomSchedule,
 } from './creditPurchases.js';
 
@@ -90,6 +90,14 @@ test('an existing deposit plan can explicitly convert to an upfront first instal
   assert.equal(getCreditAgreementBalances(state, agreement).totalRemaining, 5_850);
   assert.equal(deriveFinancePosition(state).totalOwned, before);
   assert.equal(state.transactions.filter(item => item.creditAgreementId === agreement.id).length, 1);
+  assert.equal(agreement.schedule.filter(item => getCreditInstalmentAmounts(state, agreement, item).remaining === 0).length, 1);
+  assert.equal(agreement.schedule.filter(item => getCreditInstalmentAmounts(state, agreement, item).remaining > 0).length, 2);
+  assert.equal(agreement.schedule.filter(item => !item.upfrontPayment).reduce((sum, item) => sum + item.amount, 0), 5_850);
+  assert.deepEqual(
+    (({ totalRepayable, actualPaid, remainingBalance, totalInstallments, completedInstallments, remainingInstallments, progressPercent }) => ({ totalRepayable, actualPaid, remainingBalance, totalInstallments, completedInstallments, remainingInstallments, progressPercent }))(getCreditAgreementRepaymentSummary(state, agreement)),
+    { totalRepayable: 10_350, actualPaid: 4_500, remainingBalance: 5_850, totalInstallments: 3, completedInstallments: 1, remainingInstallments: 2, progressPercent: 43.48 },
+  );
+  assert.equal(inspectFinanceIntegrity(state).some(issue => issue.type === 'credit-agreement-total-mismatch'), false);
 });
 
 test('correcting a counted upfront amount updates its paid schedule row and reconciles the remainder', () => {
@@ -166,6 +174,20 @@ test('an existing auto agreement can switch to an exact custom schedule and back
   updateCreditAgreement(state, agreement.id, { scheduleMode: 'auto', term: 3, firstPaymentDate: '2026-02-15' }, '2026-01-20');
   assert.equal(agreement.scheduleMode, 'auto');
   assert.deepEqual(agreement.schedule.map(item => item.amount), [3_450, 3_450, 3_450]);
+  assert.equal(agreement.schedule.reduce((sum, item) => sum + item.amount, 0), 10_350);
+});
+
+test('editing an existing custom schedule persists changed dates and amounts', () => {
+  const { state, agreement } = makeAgreement({
+    cashPrice: 10_350, deposit: 0, financedAmount: 10_350, term: 2, scheduleMode: 'custom', firstPaymentDate: '2026-02-15',
+    customSchedule: [{ dueDate: '2026-02-15', amount: 5_000 }, { dueDate: '2026-03-15', amount: 5_350 }],
+  });
+  const updatedRows = agreement.schedule.map((item, index) => ({ id: item.id, dueDate: item.dueDate, amount: item.amount + (index === 0 ? 100 : -100) }));
+  updatedRows[0].dueDate = '2026-02-20';
+  updateCreditAgreement(state, agreement.id, { scheduleMode: 'custom', customSchedule: updatedRows, term: 2, firstPaymentDate: '2026-02-15' }, '2026-01-20');
+  assert.deepEqual(agreement.schedule.map(({ dueDate, amount }) => ({ dueDate, amount })), [
+    { dueDate: '2026-02-20', amount: 5_100 }, { dueDate: '2026-03-15', amount: 5_250 },
+  ]);
   assert.equal(agreement.schedule.reduce((sum, item) => sum + item.amount, 0), 10_350);
 });
 

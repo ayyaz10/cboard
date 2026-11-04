@@ -1,12 +1,12 @@
 export const transactionTypes = ['income', 'expense', 'donation', 'investment', 'debt', 'creditPayment', 'savings', 'budget', 'goal', 'transfer'];
 
-export function parseMoney(value) {
+export function parseMoney(value, { allowZero = false } = {}) {
   if (typeof value === 'number' && Number.isSafeInteger(value)) return value;
   const text = String(value ?? '').trim().replace(/,/g, '');
   if (!/^\d+(?:\.\d{0,2})?$/.test(text)) throw new Error('Enter a valid amount with up to 2 decimal places.');
   const [whole, decimal = ''] = text.split('.');
   const amount = Number(whole) * 100 + Number(decimal.padEnd(2, '0'));
-  if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error('Amount must be greater than zero.');
+  if (!Number.isSafeInteger(amount) || amount < 0 || (!allowZero && amount === 0)) throw new Error('Amount must be greater than zero.');
   return amount;
 }
 
