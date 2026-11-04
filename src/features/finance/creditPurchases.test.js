@@ -4,9 +4,9 @@ import { initialFinanceState, normalizeFinanceState } from './financeData.js';
 import { deriveFinancePosition } from './financeLedger.js';
 import { financeSummary } from './financeMath.js';
 import {
-  cancelCreditAgreement, createCreditAgreement, generateCreditSchedule, getCreditAgreementBalances, getCreditAgreementStatus,
+  archiveCreditAgreement, cancelCreditAgreement, createCreditAgreement, deleteUnusedCreditAgreement, generateCreditSchedule, getCreditAgreementBalances, getCreditAgreementStatus,
   getCreditDueSoon, getCreditInstalmentAmounts, getOverdueCreditPayments, recordCreditPayment,
-  mutateCreditState, settleCreditAgreement, updateCreditAgreement,
+  mutateCreditState, restoreCreditAgreement, reverseCreditPayment, settleCreditAgreement, updateCreditAgreement, updateCreditInstalment, updateCreditPayment,
 } from './creditPurchases.js';
 
 const agreementInput = overrides => ({
@@ -145,6 +145,116 @@ test('editing terms preserves paid and past rows while replacing only future row
   assert.equal(getCreditInstalmentAmounts(state, agreement, first).remaining, 0);
   assert.equal(agreement.title, 'Phone updated');
   assert.equal(agreement.schedule.filter(item => !item.supersededAt).length, 3);
+});
+
+test('metadata-only agreement edits preserve the schedule and its IDs', () => {
+  const { state, agreement } = makeAgreement({ deposit: 0, financedAmount: 120_000 });
+  const original = structuredClone(agreement.schedule);
+  updateCreditAgreement(state, agreement.id, { title: 'MacBook Air', merchant: 'Correct Store', notes: 'Corrected metadata' }, '2026-01-20');
+  assert.equal(agreement.title, 'MacBook Air');
+  assert.deepEqual(agreement.schedule, original);
+});
+
+test('a future instalment edit changes date and amount while keeping the remaining schedule reconciled', () => {
+  const { state, agreement } = makeAgreement({ deposit: 0, cashPrice: 30_000, financedAmount: 30_000, term: 3 });
+  const target = agreement.schedule[0];
+  updateCreditInstalment(state, agreement.id, target.id, { dueDate: '2026-02-20', amount: 12_000 }, '2026-01-20');
+  assert.equal(target.dueDate, '2026-02-20');
+  assert.equal(target.amount, 12_000);
+  assert.deepEqual(agreement.schedule.map(item => item.amount), [12_000, 9_000, 9_000]);
+  assert.equal(agreement.schedule.reduce((sum, item) => sum + item.amount, 0), getCreditAgreementBalances(state, agreement).totalRemaining);
+});
+
+test('a scheduled credit payment can be corrected in place without changing its Finance transaction ID', () => {
+  const { state, agreement } = makeAgreement({ deposit: 0, cashPrice: 30_000, financedAmount: 30_000, term: 3 });
+  const instalment = agreement.schedule[0];
+  const before = deriveFinancePosition(state).totalOwned;
+  const payment = recordCreditPayment(state, { agreementId: agreement.id, amount: 10_000, date: instalment.dueDate, instalmentId: instalment.id, paymentId: 'correctable', transactionId: 'stable-tx' });
+  updateCreditPayment(state, payment.id, { amount: 8_000, date: '2026-02-16', paidFromFundId: 'savings', note: 'Corrected receipt' });
+  assert.equal(payment.id, 'stable-tx');
+  assert.equal(payment.amount, 8_000);
+  assert.equal(payment.date, '2026-02-16');
+  assert.equal(payment.note, 'Corrected receipt');
+  assert.equal(getCreditAgreementBalances(state, agreement).totalRemaining, 22_000);
+  assert.equal(deriveFinancePosition(state).totalOwned, before - 8_000);
+  assert.equal(state.transactions.filter(item => item.creditPaymentId === 'correctable').length, 1);
+});
+
+test('reversing a manual payment restores the balance and leaves its transaction as audit history', () => {
+  const { state, agreement } = makeAgreement({ deposit: 0, cashPrice: 30_000, financedAmount: 30_000, term: 3 });
+  const instalment = agreement.schedule[0];
+  const payment = recordCreditPayment(state, { agreementId: agreement.id, amount: 10_000, date: instalment.dueDate, instalmentId: instalment.id, paymentId: 'reverse-me', transactionId: 'reverse-tx' });
+  reverseCreditPayment(state, payment.id, '2026-02-17');
+  assert.equal(payment.reversedAt != null, true);
+  assert.equal(payment.reversalDate, '2026-02-17');
+  assert.equal(getCreditAgreementBalances(state, agreement).totalRemaining, 30_000);
+  assert.equal(getCreditInstalmentAmounts(state, agreement, instalment).remaining, instalment.amount);
+  assert.equal(financeSummary(state, '2026-02').creditPayments, 0);
+  assert.equal(state.transactions.find(item => item.id === 'reverse-tx').id, payment.id);
+});
+
+test('unused zero-deposit agreements can be archived, restored, and safely deleted', () => {
+  const { state, agreement } = makeAgreement({ deposit: 0, financedAmount: 120_000 });
+  archiveCreditAgreement(state, agreement.id, '2026-01-20');
+  assert.equal(agreement.archivedAt, '2026-01-20');
+  restoreCreditAgreement(state, agreement.id);
+  assert.equal(agreement.archivedAt, undefined);
+  deleteUnusedCreditAgreement(state, agreement.id);
+  assert.equal(state.creditAgreements.some(item => item.id === agreement.id), false);
+});
+
+test('agreements with a real deposit cannot be hard deleted', () => {
+  const { state, agreement } = makeAgreement();
+  assert.throws(() => deleteUnusedCreditAgreement(state, agreement.id), /linked financial activity/);
+});
+
+test('correcting a deposit updates its linked Finance transaction and regenerates the unused agreement', () => {
+  const { state, agreement } = makeAgreement();
+  const deposit = state.transactions.find(item => item.id === 'deposit');
+  updateCreditAgreement(state, agreement.id, { title: agreement.title, cashPrice: 130_000, deposit: 10_000, financeCharge: 0, term: 3, firstPaymentDate: '2026-02-15' }, '2026-01-20');
+  assert.equal(deposit.id, 'deposit');
+  assert.equal(deposit.amount, 10_000);
+  assert.equal(agreement.cashPrice, 130_000);
+  assert.equal(agreement.deposit, 10_000);
+  assert.equal(agreement.financedAmount, 120_000);
+  assert.equal(agreement.schedule.reduce((sum, item) => sum + item.amount, 0), 120_000);
+});
+
+test('deposit corrected to zero reverses the linked Finance transaction instead of deleting it', () => {
+  const { state, agreement } = makeAgreement();
+  const deposit = state.transactions.find(item => item.id === 'deposit');
+  updateCreditAgreement(state, agreement.id, { title: agreement.title, cashPrice: agreement.cashPrice, deposit: 0, financeCharge: 0, term: 3, firstPaymentDate: '2026-02-15' }, '2026-01-20');
+  assert.ok(deposit.reversedAt);
+  assert.equal(deposit.reversalReason, 'credit_deposit_corrected');
+  assert.equal(state.transactions.some(item => item.id === deposit.id), true);
+  assert.equal(agreement.financedAmount, 120_000);
+});
+
+test('a settled agreement can be reopened by reversing its linked settlement transaction', () => {
+  const { state, agreement } = makeAgreement({ deposit: 0, financedAmount: 120_000 });
+  const payment = settleCreditAgreement(state, { agreementId: agreement.id, settlementAmount: 120_000, date: '2026-02-01', paymentId: 'settlement-to-reverse', transactionId: 'settlement-tx' });
+  assert.equal(getCreditAgreementStatus(state, agreement), 'settled_early');
+  reverseCreditPayment(state, payment.id, '2026-02-02');
+  assert.equal(getCreditAgreementStatus(state, agreement), 'active');
+  assert.equal(getCreditAgreementBalances(state, agreement).totalRemaining, 120_000);
+  assert.ok(agreement.schedule.every(item => !item.supersededAt));
+});
+
+test('reversing an extra payment redistributes only the remaining schedule', () => {
+  const { state, agreement } = makeAgreement({ deposit: 0, financedAmount: 120_000 });
+  const payment = recordCreditPayment(state, { agreementId: agreement.id, amount: 10_000, date: '2026-01-20', paymentId: 'extra-to-reverse', transactionId: 'extra-reversal-tx' });
+  reverseCreditPayment(state, payment.id, '2026-01-21');
+  assert.equal(getCreditAgreementBalances(state, agreement).principalRemaining, 120_000);
+  assert.equal(agreement.schedule.filter(item => !item.supersededAt).reduce((sum, item) => sum + item.amount, 0), 120_000);
+});
+
+test('bank-booked credit payments cannot be edited or reversed through the agreement', () => {
+  const { state, agreement } = makeAgreement({ deposit: 0, financedAmount: 120_000 });
+  const payment = recordCreditPayment(state, { agreementId: agreement.id, amount: 10_000, date: '2026-02-15', instalmentId: agreement.schedule[0].id, paymentId: 'bank-linked', transactionId: 'bank-credit-tx' });
+  payment.source = 'bank';
+  payment.providerStatus = 'BOOK';
+  assert.throws(() => updateCreditPayment(state, payment.id, { note: 'changed' }), /Bank-booked/);
+  assert.throws(() => reverseCreditPayment(state, payment.id), /Bank-booked/);
 });
 
 test('editing an agreement can update or remove its product link', () => {

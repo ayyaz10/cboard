@@ -20,8 +20,9 @@ export function useFinance() {
     const before = current.current;
     try {
       const next = transform(structuredClone(before.state));
-      const retained = new Set(next.transactions.map(item => item.id));
-      for (const item of before.state.transactions) {
+      const nextTransactions = Array.isArray(next?.transactions) ? next.transactions : [];
+      const retained = new Set(nextTransactions.map(item => item.id));
+      for (const item of Array.isArray(before.state.transactions) ? before.state.transactions : []) {
         if (item.source === 'bank' && !retained.has(item.id)) await setBankTransactionHidden(item.id, true);
       }
       setData(next);

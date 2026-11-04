@@ -95,12 +95,30 @@ export function FinanceTimeline({ data, month, setMonth, change, transactionScop
     const creditAgreementEvents = (data.creditAgreements || []).flatMap(agreement => {
       const created = agreement.createdAt?.slice(0, 10);
       const events = created && (allTime || created.startsWith(month)) ? [{ id: `credit-created-${agreement.id}`, date: created, title: `${agreement.title} finance agreement started`, kind: 'CREDIT STARTED', amount: 0, type: 'credit-created' }] : [];
+      const historyEvents = (agreement.history || []).filter(entry => {
+        const date = entry.date || entry.createdAt?.slice(0, 10);
+        return date && (allTime || date.startsWith(month));
+      }).map((entry, index) => {
+        const date = entry.date || entry.createdAt.slice(0, 10);
+        const labels = {
+          payment_reversed: ['CREDIT PAYMENT REVERSED', `Credit payment marked unpaid · ${agreement.title}`, Number(entry.amount || 0)],
+          payment_corrected: ['CREDIT PAYMENT CORRECTED', `Credit payment corrected · ${agreement.title}`, 0],
+          deposit_corrected: ['CREDIT DEPOSIT CORRECTED', `Credit purchase deposit corrected · ${agreement.title}`, 0],
+          instalment_updated: ['CREDIT SCHEDULE UPDATED', `Future instalment changed · ${agreement.title}`, 0],
+          schedule_updated: ['CREDIT SCHEDULE UPDATED', `Future repayment schedule updated · ${agreement.title}`, 0],
+          agreement_cancelled: ['CREDIT CANCELLED', `Credit agreement cancelled · ${agreement.title}`, 0],
+          agreement_archived: ['CREDIT ARCHIVED', `Credit agreement archived · ${agreement.title}`, 0],
+          agreement_restored: ['CREDIT RESTORED', `Credit agreement restored · ${agreement.title}`, 0],
+        };
+        const [kind, title, amount] = labels[entry.type] || [];
+        return kind ? { id: `credit-history-${agreement.id}-${entry.type}-${entry.createdAt || date}-${index}`, date, title, kind, amount, type: 'credit-history' } : null;
+      }).filter(Boolean);
       const due = (agreement.schedule || []).filter(instalment => !instalment.supersededAt && (allTime || instalment.dueDate?.startsWith(month))).map(instalment => {
         const outstanding = getCreditInstalmentAmounts(data, agreement, instalment).remaining;
         if (!outstanding) return null;
         return { id: `credit-due-${instalment.id}`, date: instalment.dueDate, title: `${agreement.title} credit payment scheduled`, kind: 'CREDIT DUE', amount: outstanding, type: 'credit-due' };
       }).filter(Boolean);
-      return [...events, ...due];
+      return [...events, ...historyEvents, ...due];
     });
     const debtReversalEvents = (data.debtPayments || []).filter(item => item.reversedAt && (allTime || item.reversalDate?.startsWith(month))).map(item => ({ id: `debt-undo-${item.id}`, date: item.reversalDate, title: `${data.debts.find(debt => debt.id === item.debtId)?.name || 'Debt'} payment marked unpaid · returned to due`, kind: 'UNDO', amount: Number(item.amount || 0), type: 'debt-reversal' }));
     return [...transactionEvents, ...reversalEvents, ...accrualEvents, ...goalEvents, ...debtAccrualEvents, ...debtReversalEvents, ...creditAgreementEvents].filter(item => item.date).sort((a,b) => String(b.date).localeCompare(String(a.date)) || a.id.localeCompare(b.id));
