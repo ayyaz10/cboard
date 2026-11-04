@@ -7,6 +7,11 @@ const cents = value => Number.isSafeInteger(value) && value >= 0;
 const creditPaymentTransactions = state => (state.transactions || []).filter(item => item.type === 'creditPayment' && (!item.source || item.providerStatus === 'BOOK'));
 const activeTransactions = state => creditPaymentTransactions(state).filter(item => !item.reversedAt);
 
+export function mutateCreditState(state, mutation) {
+  mutation(state);
+  return state;
+}
+
 function cleanProductUrl(value) {
   const raw = String(value || '').trim();
   if (!raw) return '';

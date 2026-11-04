@@ -3,7 +3,7 @@ import { deriveFinancePosition } from './financeLedger.js';
 import { formatMoney, moneyInput, parseMoney } from './financeMath.js';
 import { id, today } from './financeData.js';
 import { useReminders } from '../focusTimer/ReminderProvider.jsx';
-import { cancelCreditAgreement, createCreditAgreement, generateCreditSchedule, getCreditAgreementBalances, getCreditAgreementStatus, getCreditDueSoon, getCreditInstalmentAmounts, getCreditInstalmentStatus, getCreditOverview, getCreditPaymentTransactions, getOverdueCreditPayments, recordCreditPayment, settleCreditAgreement, updateCreditAgreement } from './creditPurchases.js';
+import { cancelCreditAgreement, createCreditAgreement, generateCreditSchedule, getCreditAgreementBalances, getCreditAgreementStatus, getCreditDueSoon, getCreditInstalmentAmounts, getCreditInstalmentStatus, getCreditOverview, getCreditPaymentTransactions, getOverdueCreditPayments, mutateCreditState, recordCreditPayment, settleCreditAgreement, updateCreditAgreement } from './creditPurchases.js';
 
 const moneyDate = value => value ? new Date(`${value}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : 'Date not set';
 const statusLabels = { active: 'Active', cancelled: 'Cancelled', paid_off: 'Paid off', settled_early: 'Settled early', due: 'Due today', due_soon: 'Due soon', overdue: 'Overdue', partial: 'Partially paid', partial_overdue: 'Part-paid · overdue', paid: 'Paid', upcoming: 'Upcoming', superseded: 'Superseded' };
@@ -88,7 +88,7 @@ export function FinanceCreditPurchases({ data, change, busy, confirmAction, setT
       if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(draft.purchaseDate)) throw new Error('Choose the purchase date.');
       if (!Number.isInteger(term) || term < 1 || term > 600) throw new Error('Choose 1 to 600 instalments.');
       const agreementId = id(), created = new Date().toISOString();
-      const saved = await change(state => createCreditAgreement(state, { id: agreementId, title: draft.title, merchant: draft.merchant, reference: draft.reference, productUrl: draft.productUrl, notes: draft.notes, purchaseDate: draft.purchaseDate, depositDate: today(), cashPrice, deposit, categoryId: draft.categoryId, depositPaidFromFundId: draft.depositPaidFromFundId, financedAmount: cashPrice - deposit, financeCharge, interestMode: financeCharge ? 'fixed_fee' : 'zero', term, frequency: draft.frequency, customDays, firstPaymentDate: draft.firstPaymentDate, createdAt: created }, { transactionId: deposit ? id() : '', dateCreated: today() }), 'Credit purchase added');
+      const saved = await change(state => mutateCreditState(state, next => createCreditAgreement(next, { id: agreementId, title: draft.title, merchant: draft.merchant, reference: draft.reference, productUrl: draft.productUrl, notes: draft.notes, purchaseDate: draft.purchaseDate, depositDate: today(), cashPrice, deposit, categoryId: draft.categoryId, depositPaidFromFundId: draft.depositPaidFromFundId, financedAmount: cashPrice - deposit, financeCharge, interestMode: financeCharge ? 'fixed_fee' : 'zero', term, frequency: draft.frequency, customDays, firstPaymentDate: draft.firstPaymentDate, createdAt: created }, { transactionId: deposit ? id() : '', dateCreated: today() })), 'Credit purchase added');
       if (saved) { setCreating(false); setDraft(blankDraft(data.categories.find(item => item.type === 'expense' && !item.archived)?.id || '')); setView('active'); setSelectedId(agreementId); }
     } catch (error) { setCreateError(error.message || 'The credit purchase could not be saved.'); }
   }
@@ -104,7 +104,7 @@ export function FinanceCreditPurchases({ data, change, busy, confirmAction, setT
     event.preventDefault(); setActionError('');
     try {
       const amount = parseMoney(paymentDraft.amount), paymentId = id(), transactionId = id();
-      const saved = await change(state => recordCreditPayment(state, { agreementId: selected.id, amount, date: paymentDraft.date, paidFromFundId: paymentDraft.paidFromFundId, note: paymentDraft.note, instalmentId: paymentMode === 'scheduled' ? paymentDraft.instalmentId : '', paymentId, transactionId }), 'Credit payment recorded');
+      const saved = await change(state => mutateCreditState(state, next => recordCreditPayment(next, { agreementId: selected.id, amount, date: paymentDraft.date, paidFromFundId: paymentDraft.paidFromFundId, note: paymentDraft.note, instalmentId: paymentMode === 'scheduled' ? paymentDraft.instalmentId : '', paymentId, transactionId })), 'Credit payment recorded');
       if (saved) { setShowPaymentForm(false); setPaymentDraft({ instalmentId: '', amount: '', date: today(), paidFromFundId: '', note: '' }); }
     } catch (error) { setActionError(error.message || 'The payment could not be recorded.'); }
   }
@@ -122,7 +122,7 @@ export function FinanceCreditPurchases({ data, change, busy, confirmAction, setT
       const ok = await confirmAction({ title: 'Settle this credit agreement early?', message: 'This records one real Finance payment. Remaining scheduled instalments will be marked superseded and their history will stay available.', confirmLabel: 'Record settlement' });
       if (!ok) return;
       const paymentId = id(), transactionId = id();
-      const saved = await change(state => settleCreditAgreement(state, { agreementId: selected.id, settlementAmount, settlementFee, date: settlementDraft.date, paidFromFundId: settlementDraft.paidFromFundId, note: settlementDraft.note, paymentId, transactionId }), 'Credit agreement settled early');
+      const saved = await change(state => mutateCreditState(state, next => settleCreditAgreement(next, { agreementId: selected.id, settlementAmount, settlementFee, date: settlementDraft.date, paidFromFundId: settlementDraft.paidFromFundId, note: settlementDraft.note, paymentId, transactionId })), 'Credit agreement settled early');
       if (saved) { setShowSettlementForm(false); setSettlementDraft({ amount: '', fee: '', date: today(), paidFromFundId: '', note: '' }); }
     } catch (error) { setActionError(error.message || 'The settlement could not be recorded.'); }
   }
@@ -139,7 +139,7 @@ export function FinanceCreditPurchases({ data, change, busy, confirmAction, setT
       const changes = { ...editDraft, term: Number(editDraft.term), customDays: Number(editDraft.customDays), financeCharge: editDraft.financeCharge ? parseMoney(editDraft.financeCharge) : 0 };
       const ok = await confirmAction({ title: 'Update this agreement?', message: 'Future unpaid instalments will be recalculated. Past due dates and actual payments will remain unchanged.', confirmLabel: 'Update future schedule' });
       if (!ok) return;
-      const saved = await change(state => updateCreditAgreement(state, selected.id, changes), 'Credit agreement updated');
+      const saved = await change(state => mutateCreditState(state, next => updateCreditAgreement(next, selected.id, changes)), 'Credit agreement updated');
       if (saved) setEditDraft(null);
     } catch (error) { setActionError(error.message || 'The agreement could not be updated.'); }
   }
@@ -147,7 +147,7 @@ export function FinanceCreditPurchases({ data, change, busy, confirmAction, setT
   async function cancelAgreement(agreement) {
     const ok = await confirmAction({ title: 'Cancel this agreement?', message: 'This keeps the agreement and schedule history. Any deposit already paid remains in Finance, and an agreement with actual repayments cannot be cancelled.', confirmLabel: 'Cancel agreement' });
     if (!ok) return;
-    try { await change(state => cancelCreditAgreement(state, agreement.id), 'Credit agreement cancelled'); }
+    try { await change(state => mutateCreditState(state, next => cancelCreditAgreement(next, agreement.id)), 'Credit agreement cancelled'); }
     catch (error) { setActionError(error.message || 'The agreement could not be cancelled.'); }
   }
   function remindForNextPayment(agreement) {

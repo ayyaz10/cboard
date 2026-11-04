@@ -6,7 +6,7 @@ import { financeSummary } from './financeMath.js';
 import {
   cancelCreditAgreement, createCreditAgreement, generateCreditSchedule, getCreditAgreementBalances, getCreditAgreementStatus,
   getCreditDueSoon, getCreditInstalmentAmounts, getOverdueCreditPayments, recordCreditPayment,
-  settleCreditAgreement, updateCreditAgreement,
+  mutateCreditState, settleCreditAgreement, updateCreditAgreement,
 } from './creditPurchases.js';
 
 const agreementInput = overrides => ({
@@ -23,6 +23,14 @@ function makeAgreement(overrides = {}) {
   const agreement = createCreditAgreement(state, agreementInput(overrides), { transactionId: 'deposit', dateCreated: '2026-01-15' });
   return { state, agreement };
 }
+
+test('credit mutation adapter returns the updated Finance state when operation returns an entity', () => {
+  const state = initialFinanceState();
+  const returned = mutateCreditState(state, next => createCreditAgreement(next, agreementInput({ deposit: 0, financedAmount: 120_000 })));
+  assert.equal(returned, state);
+  assert.equal(returned.creditAgreements.length, 1);
+  assert.ok(Array.isArray(returned.transactions));
+});
 
 test('monthly schedule splits cents exactly and clamps end-of-month dates', () => {
   const schedule = generateCreditSchedule({ agreementId: 'x', principalAmount: 100, financeCharge: 2, term: 3, firstPaymentDate: '2026-01-31' });
