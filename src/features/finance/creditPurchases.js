@@ -38,8 +38,47 @@ function addMonths(date, count) {
 }
 
 function distribute(total, count) {
+  // Match the existing Finance convention: any remainder is assigned to the earliest rows.
   const base = Math.floor(total / count), remainder = total % count;
   return Array.from({ length: count }, (_, index) => base + (index < remainder ? 1 : 0));
+}
+
+export function calculateRemainingBalance(totalRepayable, paidAmount) {
+  if (!cents(totalRepayable) || !cents(paidAmount)) throw new Error('Amounts must be valid integer minor units.');
+  return Math.max(0, totalRepayable - paidAmount);
+}
+
+export function calculateRemainingInstallmentCount(totalCount, paidCount) {
+  if (!Number.isInteger(totalCount) || totalCount < 0 || !Number.isInteger(paidCount) || paidCount < 0) throw new Error('Payment counts must be non-negative whole numbers.');
+  return Math.max(0, totalCount - paidCount);
+}
+
+export function validateCustomSchedule({ principalAmount, financeCharge = 0, rows }) {
+  if (!cents(principalAmount) || !cents(financeCharge) || !Array.isArray(rows)) throw new Error('Enter a valid custom schedule.');
+  const expected = principalAmount + financeCharge;
+  const scheduled = rows.reduce((sum, row) => {
+    if (!row || !validDate(row.dueDate) || !Number.isSafeInteger(row.amount) || row.amount <= 0) throw new Error('Every custom payment needs a valid date and positive amount.');
+    return sum + row.amount;
+  }, 0);
+  if (!Number.isSafeInteger(scheduled) || scheduled !== expected) throw new Error(`Custom payments must total ${expected} minor units; currently allocated ${scheduled}.`);
+  return { scheduled, remaining: expected - scheduled };
+}
+
+export function generateCustomCreditSchedule({ agreementId, principalAmount, financeCharge = 0, rows }) {
+  validateCustomSchedule({ principalAmount, financeCharge, rows });
+  const sorted = rows.map(row => ({ ...row })).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  let feeRemaining = financeCharge, principalRemaining = principalAmount;
+  return sorted.map((row, index) => {
+    const fee = Math.min(feeRemaining, row.amount);
+    const principal = row.amount - fee;
+    feeRemaining -= fee;
+    principalRemaining -= principal;
+    return { id: row.id || `${agreementId}:custom:${index + 1}`, sequence: index + 1, dueDate: row.dueDate, amount: row.amount, principalAmount: principal, financeCostAmount: fee };
+  });
+}
+
+function activeDepositTransaction(state, agreementId) {
+  return (state.transactions || []).find(item => item.creditAgreementId === agreementId && item.creditPaymentKind === 'deposit' && !item.reversedAt);
 }
 
 export function generateCreditSchedule({ agreementId, principalAmount, financeCharge = 0, term, frequency = 'monthly', customDays = 30, firstPaymentDate }) {
@@ -93,19 +132,27 @@ export function deleteUnusedCreditAgreement(state, agreementId) {
 export function getCreditAgreementBalances(state, agreement) {
   if (!agreement) return { principalRemaining: 0, financeCostRemaining: 0, totalRemaining: 0, paidPrincipal: 0, paidFinanceCost: 0, paidTotal: 0 };
   const payments = activeTransactions(state).filter(item => item.creditAgreementId === agreement.id);
-  const paidPrincipal = payments.reduce((sum, item) => sum + (Number.isSafeInteger(item.creditPrincipalAmount) ? item.creditPrincipalAmount : 0), 0);
+  const upfrontRow = (agreement.schedule || []).find(item => item.upfrontPayment);
+  const upfrontTransaction = agreement.upfrontCountsAsFirstInstalment ? activeDepositTransaction(state, agreement.id) : null;
+  const upfrontRowPayments = upfrontRow ? payments.filter(item => item.scheduledInstalmentId === upfrontRow.id) : [];
+  const ordinaryPayments = upfrontRow ? payments.filter(item => item.scheduledInstalmentId !== upfrontRow.id) : payments;
+  const upfrontPaid = upfrontTransaction?.amount || upfrontRowPayments.reduce((sum, item) => sum + item.amount, 0);
+  const paidPrincipal = ordinaryPayments.reduce((sum, item) => sum + (Number.isSafeInteger(item.creditPrincipalAmount) ? item.creditPrincipalAmount : 0), upfrontPaid);
   const paidFinanceCost = payments.reduce((sum, item) => sum + (Number.isSafeInteger(item.creditFinanceCostAmount) ? item.creditFinanceCostAmount : 0), 0);
-  const paidTotal = payments.reduce((sum, item) => sum + item.amount, 0);
+  const paidTotal = ordinaryPayments.reduce((sum, item) => sum + item.amount, upfrontPaid);
   if (agreement.settledEarlyAt || agreement.status === 'cancelled') return { principalRemaining: 0, financeCostRemaining: 0, totalRemaining: 0, paidPrincipal, paidFinanceCost, paidTotal };
-  const principalRemaining = Math.max(0, agreement.financedAmount - paidPrincipal);
+  const principalBase = agreement.financedAmount + (agreement.upfrontCountsAsFirstInstalment ? agreement.deposit || 0 : 0);
+  const principalRemaining = Math.max(0, principalBase - paidPrincipal);
   const financeCostRemaining = Math.max(0, agreement.financeCharge - paidFinanceCost);
   return { principalRemaining, financeCostRemaining, totalRemaining: principalRemaining + financeCostRemaining, paidPrincipal, paidFinanceCost, paidTotal };
 }
 
 export function getCreditInstalmentAmounts(state, agreement, instalment) {
   const payments = activeTransactions(state).filter(item => item.creditAgreementId === agreement.id && item.scheduledInstalmentId === instalment.id);
-  const paid = payments.reduce((sum, item) => sum + item.amount, 0);
-  const paidPrincipal = payments.reduce((sum, item) => sum + (item.creditPrincipalAmount || 0), 0);
+  const upfront = instalment.upfrontPayment && agreement.upfrontCountsAsFirstInstalment && activeDepositTransaction(state, agreement.id);
+  const upfrontPaid = upfront && upfront.id === instalment.upfrontTransactionId ? upfront.amount : 0;
+  const paid = payments.reduce((sum, item) => sum + item.amount, upfrontPaid);
+  const paidPrincipal = payments.reduce((sum, item) => sum + (item.creditPrincipalAmount || 0), upfrontPaid);
   const paidFinanceCost = payments.reduce((sum, item) => sum + (item.creditFinanceCostAmount || 0), 0);
   return {
     paid,
@@ -157,12 +204,14 @@ export function getCreditDueSoon(state, asOfDate = new Date().toISOString().slic
     .sort((left, right) => left.instalment.dueDate.localeCompare(right.instalment.dueDate));
 }
 
-export function getMonthlyCreditCommitment(state) {
+export function getMonthlyCreditCommitment(state, asOfDate = new Date().toISOString().slice(0, 10)) {
   return (state.creditAgreements || []).filter(item => getCreditAgreementStatus(state, item) === 'active').reduce((sum, agreement) => {
-    const first = (agreement.schedule || []).find(item => !item.supersededAt);
+    const rows = scheduledRows(state, agreement).filter(row => row.remaining > 0).sort((a, b) => a.instalment.dueDate.localeCompare(b.instalment.dueDate));
+    if (agreement.scheduleMode === 'custom') return sum + rows.filter(row => row.instalment.dueDate >= asOfDate && row.instalment.dueDate <= addDays(asOfDate, 30)).reduce((total, row) => total + row.remaining, 0);
+    const first = rows[0];
     if (!first) return sum;
     const numerator = agreement.frequency === 'weekly' ? 52 : agreement.frequency === 'fortnightly' ? 26 : agreement.frequency === 'custom' ? Math.round(36500 / agreement.customDays) : 12;
-    return sum + Math.round(first.amount * numerator / 12);
+    return sum + Math.round(first.remaining * numerator / 12);
   }, 0);
 }
 
@@ -189,9 +238,20 @@ export function createCreditAgreement(state, agreement, { transactionId = '', da
   state.creditAgreements ||= [];
   if (state.creditAgreements.some(item => item.id === agreement.id)) throw new Error('This credit agreement already exists.');
   const cashPrice = agreement.cashPrice, deposit = agreement.deposit || 0, financedAmount = cashPrice - deposit;
-  if (!agreement.id || !String(agreement.title || '').trim() || !validDate(agreement.purchaseDate) || !cents(cashPrice) || cashPrice <= 0 || !cents(deposit) || deposit >= cashPrice || !cents(agreement.financeCharge || 0) || !Number.isSafeInteger(financedAmount + (agreement.financeCharge || 0))) throw new Error('Enter a purchase price, a smaller deposit, and a valid finance charge.');
-  const schedule = generateCreditSchedule({ agreementId: agreement.id, principalAmount: financedAmount, financeCharge: agreement.financeCharge || 0, term: agreement.term, frequency: agreement.frequency, customDays: agreement.customDays, firstPaymentDate: agreement.firstPaymentDate });
-  const result = { ...agreement, title: String(agreement.title).trim(), merchant: String(agreement.merchant || '').trim(), reference: String(agreement.reference || '').trim(), productUrl: cleanProductUrl(agreement.productUrl), notes: String(agreement.notes || '').trim(), cashPrice, deposit, financedAmount, totalRepayable: financedAmount + (agreement.financeCharge || 0), schedule, createdAt: agreement.createdAt || new Date().toISOString(), status: 'active' };
+  const financeCharge = agreement.financeCharge || 0;
+  const upfrontCounts = agreement.upfrontCountsAsFirstInstalment === true;
+  const scheduleMode = agreement.scheduleMode === 'custom' ? 'custom' : 'auto';
+  if (!agreement.id || !String(agreement.title || '').trim() || !validDate(agreement.purchaseDate) || !cents(cashPrice) || cashPrice <= 0 || !cents(deposit) || deposit >= cashPrice || !cents(financeCharge) || !Number.isSafeInteger(financedAmount + financeCharge)) throw new Error('Enter a purchase price, a smaller upfront payment, and a valid finance charge.');
+  if (upfrontCounts && deposit <= 0) throw new Error('Enter an actual upfront payment before counting it as the first instalment.');
+  const futureTerm = agreement.term - (upfrontCounts ? 1 : 0);
+  if (!Number.isInteger(agreement.term) || agreement.term < 1 || agreement.term > 600 || futureTerm < 1) throw new Error('Choose enough total payments to cover both the upfront payment and remaining balance.');
+  const futureRows = scheduleMode === 'custom'
+    ? generateCustomCreditSchedule({ agreementId: agreement.id, principalAmount: financedAmount, financeCharge, rows: agreement.customSchedule || [] })
+    : generateCreditSchedule({ agreementId: agreement.id, principalAmount: financedAmount, financeCharge, term: futureTerm, frequency: agreement.frequency, customDays: agreement.customDays, firstPaymentDate: agreement.firstPaymentDate });
+  if (futureRows.length !== futureTerm) throw new Error('Custom schedule row count must match the total payment count.');
+  const schedule = upfrontCounts ? [{ id: `${agreement.id}:upfront`, sequence: 1, dueDate: agreement.depositDate || agreement.purchaseDate, amount: deposit, principalAmount: deposit, financeCostAmount: 0, upfrontPayment: true, upfrontTransactionId: transactionId }, ...futureRows.map((row, index) => ({ ...row, sequence: index + 2 }))] : futureRows;
+  const totalRepayable = (upfrontCounts ? cashPrice : financedAmount) + financeCharge;
+  const result = { ...agreement, title: String(agreement.title).trim(), merchant: String(agreement.merchant || '').trim(), reference: String(agreement.reference || '').trim(), productUrl: cleanProductUrl(agreement.productUrl), notes: String(agreement.notes || '').trim(), cashPrice, deposit, financedAmount, financeCharge, upfrontCountsAsFirstInstalment: upfrontCounts, scheduleMode, customSchedule: scheduleMode === 'custom' ? futureRows.map(({ id, dueDate, amount }) => ({ id, dueDate, amount })) : [], totalRepayable, schedule, term: schedule.length, createdAt: agreement.createdAt || new Date().toISOString(), status: 'active' };
   if (deposit > 0) {
     if (!transactionId || !validDate(agreement.depositDate || dateCreated)) throw new Error('A deposit must be recorded as a dated Finance transaction.');
     if ((state.transactions || []).some(item => item.id === transactionId)) throw new Error('This Finance transaction identifier is already in use.');
@@ -389,6 +449,8 @@ export function updateCreditAgreement(state, agreementId, changes, asOfDate = ne
   if (!validDate(nextPurchaseDate) || !validDate(nextDepositDate)) throw new Error('Choose valid purchase and deposit dates.');
   const nextDepositFundId = String(changes.depositPaidFromFundId ?? agreement.depositPaidFromFundId ?? '');
   const nextCategoryId = String(changes.categoryId ?? agreement.categoryId ?? '');
+  const nextUpfrontCounts = changes.upfrontCountsAsFirstInstalment ?? agreement.upfrontCountsAsFirstInstalment ?? false;
+  const nextScheduleMode = changes.scheduleMode === 'custom' || changes.scheduleMode === 'auto' ? changes.scheduleMode : agreement.scheduleMode || 'auto';
   const existingDeposit = (state.transactions || []).find(item => item.creditAgreementId === agreementId && item.creditPaymentKind === 'deposit' && !item.reversedAt);
   if ((purchaseTermsChanged || depositDetailsChanged) && existingDeposit && (existingDeposit.source === 'bank' || existingDeposit.sourceType === 'bank_import')) throw new Error('Bank-imported deposits cannot be edited here. Correct or unlink the bank record while keeping its provenance.');
   if (purchaseTermsChanged && nextDeposit > 0 && !existingDeposit && !changes.depositTransactionId) throw new Error('A transaction ID is required to add the corrected deposit to Finance.');
@@ -427,13 +489,14 @@ export function updateCreditAgreement(state, agreementId, changes, asOfDate = ne
   const customDays = changes.customDays ?? agreement.customDays;
   const activeFuture = (agreement.schedule || []).filter(item => !item.supersededAt && item.dueDate > asOfDate && getCreditInstalmentAmounts(state, agreement, item).remaining > 0).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   const firstPaymentDate = changes.firstPaymentDate || activeFuture[0]?.dueDate || agreement.firstPaymentDate;
-  const futureTerm = changes.term ?? activeFuture.length;
+  const totalTerm = changes.term ?? (agreement.schedule || []).filter(item => !item.supersededAt).length;
   const priorBalances = getCreditAgreementBalances(state, agreement);
   const nextFinanceCharge = changes.financeCharge ?? agreement.financeCharge;
   const nextProductUrl = cleanProductUrl(changes.productUrl ?? agreement.productUrl);
   const nextTitle = String(changes.title ?? agreement.title).trim();
   if (!nextTitle) throw new Error('Enter a name for this purchase.');
-  const scheduleChanged = purchaseTermsChanged || nextFinanceCharge !== agreement.financeCharge || futureTerm !== activeFuture.length || frequency !== agreement.frequency || customDays !== agreement.customDays || firstPaymentDate !== (activeFuture[0]?.dueDate || agreement.firstPaymentDate);
+  const currentScheduleCount = (agreement.schedule || []).filter(item => !item.supersededAt).length;
+  const scheduleChanged = purchaseTermsChanged || nextFinanceCharge !== agreement.financeCharge || totalTerm !== currentScheduleCount || frequency !== agreement.frequency || customDays !== agreement.customDays || firstPaymentDate !== (activeFuture[0]?.dueDate || agreement.firstPaymentDate) || nextUpfrontCounts !== Boolean(agreement.upfrontCountsAsFirstInstalment) || nextScheduleMode !== (agreement.scheduleMode || 'auto');
   if (!scheduleChanged) {
     agreement.title = nextTitle;
     agreement.merchant = String(changes.merchant ?? agreement.merchant).trim();
@@ -444,16 +507,36 @@ export function updateCreditAgreement(state, agreementId, changes, asOfDate = ne
     agreement.updatedAt = new Date().toISOString();
     return agreement;
   }
-  const preserved = (agreement.schedule || []).filter(item => !item.supersededAt && (getCreditInstalmentAmounts(state, agreement, item).paid > 0 || (hasPayments && item.dueDate <= asOfDate)));
+  if (nextUpfrontCounts && (!nextDeposit || !(existingDeposit || activeDepositTransaction(state, agreementId)))) throw new Error('An actual upfront payment is required before it can count as payment one.');
+  const preserved = (agreement.schedule || []).filter(item => !item.supersededAt && (!item.upfrontPayment || nextUpfrontCounts) && (getCreditInstalmentAmounts(state, agreement, item).paid > 0 || (hasPayments && !item.upfrontPayment && item.dueDate <= asOfDate)));
+  const currentUpfrontRow = preserved.find(item => item.upfrontPayment);
+  const upfrontRow = nextUpfrontCounts && !currentUpfrontRow
+    ? { id: `${agreement.id}:upfront`, sequence: 1, dueDate: nextDepositDate, amount: nextDeposit, principalAmount: nextDeposit, financeCostAmount: 0, upfrontPayment: true, upfrontTransactionId: (existingDeposit || activeDepositTransaction(state, agreementId))?.id }
+    : currentUpfrontRow;
+  if (currentUpfrontRow) {
+    currentUpfrontRow.dueDate = nextDepositDate;
+    currentUpfrontRow.amount = nextDeposit;
+    currentUpfrontRow.principalAmount = nextDeposit;
+    currentUpfrontRow.financeCostAmount = 0;
+    currentUpfrontRow.upfrontTransactionId = (existingDeposit || activeDepositTransaction(state, agreementId))?.id || '';
+  }
+  if (upfrontRow && !currentUpfrontRow) preserved.unshift(upfrontRow);
   const preservedDue = preserved.map(item => ({ item, ...getCreditInstalmentAmounts(state, agreement, item) }));
-  const preservedPrincipal = preservedDue.reduce((sum, item) => sum + item.principalRemaining, 0);
-  const preservedCost = preservedDue.reduce((sum, item) => sum + item.financeCostRemaining, 0);
+  const preservedPrincipal = preservedDue.reduce((sum, item) => sum + (item.item.upfrontPayment ? 0 : item.principalRemaining), 0);
+  const preservedCost = preservedDue.reduce((sum, item) => sum + (item.item.upfrontPayment ? 0 : item.financeCostRemaining), 0);
   if (!cents(nextFinanceCharge) || nextFinanceCharge < priorBalances.paidFinanceCost) throw new Error('The updated finance charge cannot be lower than finance costs already paid.');
   const futurePrincipal = priorBalances.principalRemaining - preservedPrincipal;
   const futureCost = nextFinanceCharge - priorBalances.paidFinanceCost - preservedCost;
   if (futurePrincipal < 0 || futureCost < 0) throw new Error('The saved payment history does not reconcile with this agreement; future terms were not changed.');
-  if (!nextTitle || !Number.isInteger(futureTerm) || futureTerm < 1 || futureTerm > 600 || !validDate(firstPaymentDate) || firstPaymentDate < asOfDate) throw new Error('Enter a name, a future first payment date, and 1 to 600 future payments.');
-  const newSchedule = futurePrincipal > 0 || futureCost > 0 ? generateCreditSchedule({ agreementId: agreement.id, principalAmount: futurePrincipal, financeCharge: futureCost, term: futureTerm, frequency, customDays, firstPaymentDate }).map((item, index) => ({ ...item, id: `${agreement.id}:revised:${Date.now()}:${index + 1}`, sequence: preserved.length + index + 1 })) : [];
+  const futureTerm = totalTerm - preserved.length;
+  if (!nextTitle || !Number.isInteger(totalTerm) || totalTerm < 1 || totalTerm > 600 || futureTerm < 0 || (futureTerm === 0 && (futurePrincipal > 0 || futureCost > 0)) || !validDate(firstPaymentDate) || (futureTerm > 0 && firstPaymentDate < asOfDate)) throw new Error('Enter a total payment count that covers all recorded payments and the remaining balance.');
+  const customRows = changes.customSchedule || [];
+  const newSchedule = futurePrincipal > 0 || futureCost > 0
+    ? nextScheduleMode === 'custom'
+      ? generateCustomCreditSchedule({ agreementId: agreement.id, principalAmount: futurePrincipal, financeCharge: futureCost, rows: customRows }).map((item, index) => ({ ...item, id: item.id || `${agreement.id}:custom:${Date.now()}:${index + 1}`, sequence: preserved.length + index + 1 }))
+      : generateCreditSchedule({ agreementId: agreement.id, principalAmount: futurePrincipal, financeCharge: futureCost, term: futureTerm, frequency, customDays, firstPaymentDate }).map((item, index) => ({ ...item, id: `${agreement.id}:revised:${Date.now()}:${index + 1}`, sequence: preserved.length + index + 1 }))
+    : [];
+  if (newSchedule.length !== futureTerm) throw new Error('The total payment count does not match the future schedule.');
   for (const item of agreement.schedule || []) if (!preserved.includes(item) && !item.supersededAt) item.supersededAt = asOfDate;
   agreement.schedule = [...preserved, ...newSchedule];
   agreement.title = nextTitle;
@@ -464,9 +547,12 @@ export function updateCreditAgreement(state, agreementId, changes, asOfDate = ne
   for (const transaction of (state.transactions || []).filter(item => item.creditAgreementId === agreementId && item.creditPaymentKind === 'deposit' && !item.reversedAt)) transaction.title = `Deposit for ${nextTitle}`;
   agreement.frequency = frequency;
   agreement.customDays = customDays;
+  agreement.upfrontCountsAsFirstInstalment = Boolean(nextUpfrontCounts);
+  agreement.scheduleMode = nextScheduleMode;
+  agreement.customSchedule = nextScheduleMode === 'custom' ? newSchedule.map(({ id, dueDate, amount }) => ({ id, dueDate, amount })) : [];
   agreement.firstPaymentDate = firstPaymentDate;
   agreement.financeCharge = nextFinanceCharge;
-  agreement.totalRepayable = agreement.financedAmount + nextFinanceCharge;
+  agreement.totalRepayable = (agreement.upfrontCountsAsFirstInstalment ? agreement.cashPrice : agreement.financedAmount) + nextFinanceCharge;
   agreement.term = preserved.length + newSchedule.length;
   agreement.termsUpdatedAt = new Date().toISOString();
   agreement.history ||= [];
@@ -502,6 +588,8 @@ export function updateCreditInstalment(state, agreementId, instalmentId, changes
   instalment.financeCostAmount = fee;
   instalment.amount = targetAmount;
   remainingRows.forEach((item, index) => { item.principalAmount = otherPrincipals[index]; item.financeCostAmount = otherFees[index]; item.amount = item.principalAmount + item.financeCostAmount; });
+  agreement.scheduleMode = 'custom';
+  agreement.customSchedule = future.filter(item => !item.upfrontPayment).sort((a, b) => a.dueDate.localeCompare(b.dueDate)).map(item => ({ id: item.id, dueDate: item.dueDate, amount: item.amount }));
   agreement.history ||= [];
   agreement.history.push({ type: 'instalment_updated', instalmentId, before, after: { dueDate, amount: targetAmount }, createdAt: new Date().toISOString() });
   return instalment;
