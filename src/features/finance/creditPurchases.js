@@ -7,6 +7,16 @@ const cents = value => Number.isSafeInteger(value) && value >= 0;
 const creditPaymentTransactions = state => (state.transactions || []).filter(item => item.type === 'creditPayment' && (!item.source || item.providerStatus === 'BOOK'));
 const activeTransactions = state => creditPaymentTransactions(state).filter(item => !item.reversedAt);
 
+function cleanProductUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (raw.length > 2048) throw new Error('Product links must be 2,048 characters or fewer.');
+  let parsed;
+  try { parsed = new URL(raw); } catch { throw new Error('Enter a valid product link starting with https:// or http://.'); }
+  if (!['https:', 'http:'].includes(parsed.protocol) || parsed.username || parsed.password) throw new Error('Product links must use HTTP or HTTPS and cannot contain sign-in credentials.');
+  return parsed.href;
+}
+
 function addDays(date, days) {
   const next = new Date(`${date}T12:00:00Z`);
   next.setUTCDate(next.getUTCDate() + days);
@@ -149,7 +159,7 @@ export function createCreditAgreement(state, agreement, { transactionId = '', da
   const cashPrice = agreement.cashPrice, deposit = agreement.deposit || 0, financedAmount = cashPrice - deposit;
   if (!agreement.id || !String(agreement.title || '').trim() || !validDate(agreement.purchaseDate) || !cents(cashPrice) || cashPrice <= 0 || !cents(deposit) || deposit >= cashPrice || !cents(agreement.financeCharge || 0) || !Number.isSafeInteger(financedAmount + (agreement.financeCharge || 0))) throw new Error('Enter a purchase price, a smaller deposit, and a valid finance charge.');
   const schedule = generateCreditSchedule({ agreementId: agreement.id, principalAmount: financedAmount, financeCharge: agreement.financeCharge || 0, term: agreement.term, frequency: agreement.frequency, customDays: agreement.customDays, firstPaymentDate: agreement.firstPaymentDate });
-  const result = { ...agreement, title: String(agreement.title).trim(), merchant: String(agreement.merchant || '').trim(), reference: String(agreement.reference || '').trim(), notes: String(agreement.notes || '').trim(), cashPrice, deposit, financedAmount, totalRepayable: financedAmount + (agreement.financeCharge || 0), schedule, createdAt: agreement.createdAt || new Date().toISOString(), status: 'active' };
+  const result = { ...agreement, title: String(agreement.title).trim(), merchant: String(agreement.merchant || '').trim(), reference: String(agreement.reference || '').trim(), productUrl: cleanProductUrl(agreement.productUrl), notes: String(agreement.notes || '').trim(), cashPrice, deposit, financedAmount, totalRepayable: financedAmount + (agreement.financeCharge || 0), schedule, createdAt: agreement.createdAt || new Date().toISOString(), status: 'active' };
   if (deposit > 0) {
     if (!transactionId || !validDate(agreement.depositDate || dateCreated)) throw new Error('A deposit must be recorded as a dated Finance transaction.');
     if ((state.transactions || []).some(item => item.id === transactionId)) throw new Error('This Finance transaction identifier is already in use.');
@@ -252,6 +262,7 @@ export function updateCreditAgreement(state, agreementId, changes, asOfDate = ne
   const preservedPrincipal = preservedDue.reduce((sum, item) => sum + item.principalRemaining, 0);
   const preservedCost = preservedDue.reduce((sum, item) => sum + item.financeCostRemaining, 0);
   const nextFinanceCharge = changes.financeCharge ?? agreement.financeCharge;
+  const nextProductUrl = cleanProductUrl(changes.productUrl ?? agreement.productUrl);
   if (!cents(nextFinanceCharge) || nextFinanceCharge < priorBalances.paidFinanceCost) throw new Error('The updated finance charge cannot be lower than finance costs already paid.');
   const futurePrincipal = priorBalances.principalRemaining - preservedPrincipal;
   const futureCost = nextFinanceCharge - priorBalances.paidFinanceCost - preservedCost;
@@ -264,6 +275,7 @@ export function updateCreditAgreement(state, agreementId, changes, asOfDate = ne
   agreement.title = nextTitle;
   agreement.merchant = String(changes.merchant ?? agreement.merchant).trim();
   agreement.reference = String(changes.reference ?? agreement.reference).trim();
+  agreement.productUrl = nextProductUrl;
   agreement.notes = String(changes.notes ?? agreement.notes).trim();
   agreement.frequency = frequency;
   agreement.customDays = customDays;

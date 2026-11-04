@@ -48,6 +48,15 @@ test('creating an agreement records only the real deposit as cash outflow', () =
   assert.equal(getCreditAgreementBalances(state, agreement).totalRemaining, 100_000);
 });
 
+test('product links are normalized, optional, and restricted to safe web URLs', () => {
+  const { agreement } = makeAgreement({ productUrl: ' https://shop.example/products/phone ' });
+  assert.equal(agreement.productUrl, 'https://shop.example/products/phone');
+  assert.equal(makeAgreement().agreement.productUrl, '');
+  assert.throws(() => makeAgreement({ productUrl: 'javascript:alert(1)' }), /HTTP or HTTPS/);
+  assert.throws(() => makeAgreement({ productUrl: 'https://user:pass@shop.example/product' }), /sign-in credentials/);
+  assert.throws(() => makeAgreement({ productUrl: `https://shop.example/${'a'.repeat(2048)}` }), /2,048 characters/);
+});
+
 test('the requested £1,200 purchase creates only a £200 cash outflow and ten £100 dues', () => {
   const { state, agreement } = makeAgreement({ cashPrice: 120_000, deposit: 20_000, financedAmount: 100_000, term: 10 });
   assert.equal(deriveFinancePosition(state).totalOwned, 180_000);
@@ -128,6 +137,15 @@ test('editing terms preserves paid and past rows while replacing only future row
   assert.equal(getCreditInstalmentAmounts(state, agreement, first).remaining, 0);
   assert.equal(agreement.title, 'Phone updated');
   assert.equal(agreement.schedule.filter(item => !item.supersededAt).length, 3);
+});
+
+test('editing an agreement can update or remove its product link', () => {
+  const { state, agreement } = makeAgreement({ productUrl: 'https://shop.example/old' });
+  const changes = { title: agreement.title, financeCharge: 0, term: 3, firstPaymentDate: '2026-02-15' };
+  updateCreditAgreement(state, agreement.id, { ...changes, productUrl: 'https://shop.example/new' }, '2026-01-20');
+  assert.equal(agreement.productUrl, 'https://shop.example/new');
+  updateCreditAgreement(state, agreement.id, { ...changes, productUrl: '' }, '2026-01-20');
+  assert.equal(agreement.productUrl, '');
 });
 
 test('future schedule can preserve finance fees after principal is paid early', () => {
