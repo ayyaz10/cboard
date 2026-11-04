@@ -4,8 +4,8 @@ import { initialFinanceState, normalizeFinanceState } from './financeData.js';
 import { deriveFinancePosition, inspectFinanceIntegrity } from './financeLedger.js';
 import { financeSummary } from './financeMath.js';
 import {
-  archiveCreditAgreement, cancelCreditAgreement, createCreditAgreement, deleteUnusedCreditAgreement, generateCreditSchedule, getCreditAgreementBalances, getCreditAgreementStatus,
-  getCreditAgreementRepaymentSummary, getCreditDueSoon, getCreditInstalmentAmounts, getMonthlyCreditCommitment, getOverdueCreditPayments, recordCreditPayment,
+  archiveCreditAgreement, canDeleteCreditPurchase, cancelCreditAgreement, createCreditAgreement, deleteUnusedCreditAgreement, generateCreditSchedule, getCreditAgreementBalances, getCreditAgreementStatus, getCreditPurchaseDeleteBlockReason,
+  getCreditAgreementRepaymentSummary, getCreditDueSoon, getCreditInstalmentAmounts, getCreditOverview, getMonthlyCreditCommitment, getOverdueCreditPayments, recordCreditPayment,
   calculateRemainingBalance, calculateRemainingInstallmentCount, generateCustomCreditSchedule, mutateCreditState, restoreCreditAgreement, reverseCreditPayment, settleCreditAgreement, updateCreditAgreement, updateCreditInstalment, updateCreditPayment, validateCustomSchedule,
 } from './creditPurchases.js';
 
@@ -344,17 +344,48 @@ test('reversing a manual payment restores the balance and leaves its transaction
 
 test('unused zero-deposit agreements can be archived, restored, and safely deleted', () => {
   const { state, agreement } = makeAgreement({ deposit: 0, financedAmount: 120_000 });
+  assert.equal(canDeleteCreditPurchase(state, agreement.id), true);
   archiveCreditAgreement(state, agreement.id, '2026-01-20');
   assert.equal(agreement.archivedAt, '2026-01-20');
   restoreCreditAgreement(state, agreement.id);
   assert.equal(agreement.archivedAt, undefined);
   deleteUnusedCreditAgreement(state, agreement.id);
   assert.equal(state.creditAgreements.some(item => item.id === agreement.id), false);
+  assert.equal(canDeleteCreditPurchase(state, agreement.id), false);
+});
+
+test('archive and restore update the visible plan count while preserving live liabilities', () => {
+  const { state, agreement } = makeAgreement({ deposit: 0, financedAmount: 120_000 });
+  const before = getCreditOverview(state, '2026-01-20');
+  assert.equal(before.activePlans, 1);
+  archiveCreditAgreement(state, agreement.id, '2026-01-20');
+  const archived = getCreditOverview(state, '2026-01-20');
+  assert.equal(archived.activePlans, 0);
+  assert.equal(archived.outstanding, before.outstanding);
+  assert.equal(archived.monthlyCommitment, before.monthlyCommitment);
+  assert.equal(archived.nextPayment?.agreement.id, agreement.id);
+  restoreCreditAgreement(state, agreement.id);
+  const restored = getCreditOverview(state, '2026-01-20');
+  assert.equal(restored.activePlans, 1);
+  assert.equal(restored.outstanding, before.outstanding);
 });
 
 test('agreements with a real deposit cannot be hard deleted', () => {
   const { state, agreement } = makeAgreement();
-  assert.throws(() => deleteUnusedCreditAgreement(state, agreement.id), /linked financial activity/);
+  assert.equal(canDeleteCreditPurchase(state, agreement.id), false);
+  assert.match(getCreditPurchaseDeleteBlockReason(state, agreement.id), /linked Finance transaction/);
+  assert.throws(() => deleteUnusedCreditAgreement(state, agreement.id), /linked Finance transaction/);
+});
+
+test('a linked recorded or reversed payment blocks hard deletion and preserves its references', () => {
+  const { state, agreement } = makeAgreement({ deposit: 0, financedAmount: 120_000 });
+  const payment = recordCreditPayment(state, { agreementId: agreement.id, amount: 1_000, date: '2026-02-15', paymentId: 'keep-history', transactionId: 'keep-history-tx' });
+  payment.reversedAt = new Date().toISOString();
+  assert.equal(canDeleteCreditPurchase(state, agreement.id), false);
+  assert.match(getCreditPurchaseDeleteBlockReason(state, agreement.id), /payment history/);
+  assert.throws(() => deleteUnusedCreditAgreement(state, agreement.id), /payment history/);
+  assert.equal(state.creditAgreements.some(item => item.id === agreement.id), true);
+  assert.equal(state.transactions.some(item => item.id === payment.id), true);
 });
 
 test('correcting a deposit updates its linked Finance transaction and regenerates the unused agreement', () => {

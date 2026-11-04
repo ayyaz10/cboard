@@ -3,7 +3,7 @@ import { deriveFinancePosition } from './financeLedger.js';
 import { formatMoney, moneyInput, parseMoney } from './financeMath.js';
 import { id, today } from './financeData.js';
 import { useReminders } from '../focusTimer/ReminderProvider.jsx';
-import { archiveCreditAgreement, calculateRemainingBalance, calculateRemainingInstallmentCount, cancelCreditAgreement, createCreditAgreement, deleteUnusedCreditAgreement, generateCreditSchedule, getCreditAgreementBalances, getCreditAgreementRepaymentSummary, getCreditAgreementStatus, getCreditDueSoon, getCreditInstalmentAmounts, getCreditInstalmentStatus, getCreditOverview, getCreditPaymentTransactions, getOverdueCreditPayments, mutateCreditState, recordCreditPayment, restoreCreditAgreement, reverseCreditPayment, settleCreditAgreement, updateCreditAgreement, updateCreditInstalment, updateCreditPayment } from './creditPurchases.js';
+import { archiveCreditAgreement, calculateRemainingBalance, calculateRemainingInstallmentCount, canDeleteCreditPurchase, cancelCreditAgreement, createCreditAgreement, deleteUnusedCreditAgreement, generateCreditSchedule, getCreditAgreementBalances, getCreditAgreementRepaymentSummary, getCreditAgreementStatus, getCreditDueSoon, getCreditInstalmentAmounts, getCreditInstalmentStatus, getCreditOverview, getCreditPaymentTransactions, getCreditPurchaseDeleteBlockReason, getOverdueCreditPayments, mutateCreditState, recordCreditPayment, restoreCreditAgreement, reverseCreditPayment, settleCreditAgreement, updateCreditAgreement, updateCreditInstalment, updateCreditPayment } from './creditPurchases.js';
 
 const moneyDate = value => value ? new Date(`${value}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : 'Date not set';
 const statusLabels = { active: 'Active', cancelled: 'Cancelled', paid_off: 'Paid off', settled_early: 'Settled early', due: 'Due today', due_soon: 'Due soon', overdue: 'Overdue', partial: 'Partially paid', partial_overdue: 'Part-paid · overdue', paid: 'Paid', upcoming: 'Upcoming', superseded: 'Superseded' };
@@ -18,6 +18,14 @@ const blankDraft = categoryId => ({ title: '', merchant: '', reference: '', prod
 const monthName = value => new Date(`${value}-15T12:00:00`).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 
 function Money({ amount, currency }) { return <>{formatMoney(amount, currency)}</>; }
+
+export function FinanceCreditPurchasesLoading() {
+  return <section className="f-credit-loading" role="status" aria-live="polite" aria-label="Loading Credit Purchases">
+    <div className="f-credit-loading-label"><span className="f-credit-spinner" aria-hidden="true"/>Loading Credit Purchases…</div>
+    <div className="f-credit-loading-metrics" aria-hidden="true">{Array.from({ length: 3 }, (_, index) => <span key={index}/>)}</div>
+    <div className="f-credit-loading-cards" aria-hidden="true">{Array.from({ length: 3 }, (_, index) => <span key={index}/>)}</div>
+  </section>;
+}
 
 function creditHistoryLabel(entry, currency) {
   const date = moneyDate(entry.date || entry.createdAt?.slice(0, 10));
@@ -58,7 +66,7 @@ export function FinanceCreditPurchases({ data, change, busy, confirmAction, setT
   const summary = useMemo(() => getCreditOverview(data), [data]);
   const [view, setView] = useState('active'), [query, setQuery] = useState(''), [selectedId, setSelectedId] = useState('');
   const [creating, setCreating] = useState(false), [draft, setDraft] = useState(() => blankDraft(data.categories.find(item => item.type === 'expense' && !item.archived)?.id || ''));
-  const [createError, setCreateError] = useState(''), [actionError, setActionError] = useState('');
+  const [createError, setCreateError] = useState(''), [actionError, setActionError] = useState(''), [pendingAction, setPendingAction] = useState('');
   const { reminders, addReminder, cancel: cancelReminder } = useReminders();
   const [paymentMode, setPaymentMode] = useState('scheduled'), [paymentDraft, setPaymentDraft] = useState({ instalmentId: '', amount: '', date: today(), paidFromFundId: '', note: '' });
   const [settlementDraft, setSettlementDraft] = useState({ amount: '', fee: '', date: today(), paidFromFundId: '', note: '' });
@@ -71,7 +79,7 @@ export function FinanceCreditPurchases({ data, change, busy, confirmAction, setT
   const payments = selected ? getCreditPaymentTransactions(data, selected.id).sort((a, b) => b.date.localeCompare(a.date) || (b.sequence || 0) - (a.sequence || 0)) : [];
   const selectedHasPayments = payments.some(item => !item.reversedAt);
   const selectedHasPaymentHistory = payments.length > 0;
-  const selectedHasLinkedActivity = selected && (data.transactions || []).some(item => item.creditAgreementId === selected.id);
+
   const categoryOptions = data.categories.filter(item => item.type === 'expense' && (!item.archived || item.id === draft.categoryId || item.id === editDraft?.categoryId));
   const preview = (() => {
     try {
@@ -139,11 +147,13 @@ export function FinanceCreditPurchases({ data, change, busy, confirmAction, setT
 
   async function savePayment(event) {
     event.preventDefault(); setActionError('');
+    setPendingAction('Recording payment');
     try {
       const amount = parseMoney(paymentDraft.amount), paymentId = id(), transactionId = id();
       const saved = await change(state => mutateCreditState(state, next => recordCreditPayment(next, { agreementId: selected.id, amount, date: paymentDraft.date, paidFromFundId: paymentDraft.paidFromFundId, note: paymentDraft.note, instalmentId: paymentMode === 'scheduled' ? paymentDraft.instalmentId : '', paymentId, transactionId })), 'Credit payment recorded');
       if (saved) { setShowPaymentForm(false); setPaymentDraft({ instalmentId: '', amount: '', date: today(), paidFromFundId: '', note: '' }); }
     } catch (error) { setActionError(error.message || 'The payment could not be recorded.'); }
+    finally { setPendingAction(''); }
   }
 
   function beginSettlement(agreement) {
@@ -172,6 +182,7 @@ export function FinanceCreditPurchases({ data, change, busy, confirmAction, setT
 
   async function saveAgreementEdit(event) {
     event.preventDefault(); setActionError('');
+    setPendingAction('Saving agreement and recalculating schedule');
     try {
       const changes = { ...editDraft, cashPrice: parseMoney(editDraft.cashPrice), deposit: editDraft.deposit ? parseMoney(editDraft.deposit, { allowZero: true }) : 0, term: Number(editDraft.term), customDays: Number(editDraft.customDays), financeCharge: editDraft.financeCharge ? parseMoney(editDraft.financeCharge, { allowZero: true }) : 0, customSchedule: (editDraft.customSchedule || []).map(row => ({ ...row, amount: row.amount ? parseMoney(row.amount, { allowZero: true }) : 0 })) };
       const currentTotalTerm = selectedSchedule.length;
@@ -197,6 +208,7 @@ export function FinanceCreditPurchases({ data, change, busy, confirmAction, setT
         if (oldNextDate && nextRow) updateCreditReminder(selected, oldNextDate, nextRow.dueDate, oldNextAmount, getCreditInstalmentAmounts(updatedState, updatedAgreement, nextRow).remaining);
       }
     } catch (error) { setActionError(error.message || 'The agreement could not be updated.'); }
+    finally { setPendingAction(''); }
   }
 
   async function cancelAgreement(agreement) {
@@ -210,20 +222,37 @@ export function FinanceCreditPurchases({ data, change, busy, confirmAction, setT
   }
 
   async function archiveAgreement(agreement) {
+    if (busy) return;
     if (!await confirmAction({ title: 'Archive this agreement?', message: 'It will leave the normal Credit Purchases list. Its balance, payment history, and reporting will remain unchanged.', confirmLabel: 'Archive agreement' })) return;
-    const saved = await change(state => mutateCreditState(state, next => archiveCreditAgreement(next, agreement.id)), 'Credit agreement archived');
-    if (saved) { setSelectedId(''); setView('archived'); }
+    setPendingAction('Archiving credit purchase');
+    try {
+      const saved = await change(state => mutateCreditState(state, next => archiveCreditAgreement(next, agreement.id)), 'Credit purchase archived');
+      if (saved) { setSelectedId(''); setView('archived'); }
+    } finally { setPendingAction(''); }
   }
 
   async function restoreAgreement(agreement) {
-    const saved = await change(state => mutateCreditState(state, next => restoreCreditAgreement(next, agreement.id)), 'Credit agreement restored');
-    if (saved) setView('active');
+    if (busy) return;
+    setPendingAction('Restoring credit purchase');
+    try {
+      const saved = await change(state => mutateCreditState(state, next => restoreCreditAgreement(next, agreement.id)), 'Credit purchase restored');
+      if (saved) { setSelectedId(''); setView('active'); }
+    } finally { setPendingAction(''); }
   }
 
   async function deleteAgreement(agreement) {
-    if (!await confirmAction({ title: `Delete “${agreement.title}”?`, message: 'This agreement has no linked deposit or payment transactions. Its schedule will be removed permanently.', confirmLabel: 'Delete agreement' })) return;
-    const saved = await change(state => mutateCreditState(state, next => deleteUnusedCreditAgreement(next, agreement.id)), 'Unused agreement deleted');
-    if (saved) { setSelectedId(''); setView('active'); }
+    if (busy) return;
+    const blockReason = getCreditPurchaseDeleteBlockReason(data, agreement.id);
+    if (blockReason) { setActionError(blockReason); return; }
+    if (!await confirmAction({ title: 'Delete credit purchase?', message: 'This permanently removes the agreement and its unpaid future schedule. Its linked reminders will be cancelled. Payment history and linked Finance transactions prevent deletion.', confirmLabel: 'Delete' })) return;
+    setPendingAction('Deleting credit purchase');
+    try {
+      const saved = await change(state => mutateCreditState(state, next => deleteUnusedCreditAgreement(next, agreement.id)), 'Credit purchase deleted');
+      if (saved) {
+        cancelAgreementReminders(agreement);
+        setSelectedId(''); setView(agreement.archivedAt ? 'archived' : 'active');
+      }
+    } finally { setPendingAction(''); }
   }
 
   function beginPaymentEdit(payment) {
@@ -257,6 +286,7 @@ export function FinanceCreditPurchases({ data, change, busy, confirmAction, setT
 
   async function saveScheduleEdit(event) {
     event.preventDefault(); setActionError('');
+    setPendingAction('Updating payment schedule');
     try {
       const instalment = selectedSchedule.find(item => item.id === scheduleEditDraft.id);
       if (!instalment) throw new Error('This instalment could not be found.');
@@ -268,13 +298,14 @@ export function FinanceCreditPurchases({ data, change, busy, confirmAction, setT
       const saved = await change(state => { updatedState = state; updateCreditInstalment(state, selected.id, instalment.id, { dueDate: scheduleEditDraft.dueDate, amount }); return state; }, 'Future instalment updated');
       if (saved) { setScheduleEditDraft(null); const updatedAgreement = updatedState.creditAgreements.find(item => item.id === selected.id), newNext = agreementNextPayment(updatedState, updatedAgreement); if (oldNextDate && newNext) updateCreditReminder(selected, oldNextDate, newNext.dueDate, oldNextAmount, getCreditInstalmentAmounts(updatedState, updatedAgreement, newNext).remaining); }
     } catch (error) { setActionError(error.message || 'The instalment could not be updated.'); }
+    finally { setPendingAction(''); }
   }
   function remindForNextPayment(agreement) {
     const next = agreementNextPayment(data, agreement);
     if (!next) return;
     const dueAmount = getCreditInstalmentAmounts(data, agreement, next).remaining;
     const title = `Credit payment due: ${agreement.title} · ${formatMoney(dueAmount, currency)} (${next.dueDate})`;
-    if (reminders.some(item => item.title.startsWith(`Credit payment due: ${agreement.title}`) && item.title.includes(next.dueDate) && ['waiting', 'ringing'].includes(item.status))) {
+    if (reminders.some(item => (item.creditAgreementId === agreement.id || (!item.creditAgreementId && item.title.startsWith(`Credit payment due: ${agreement.title}`))) && item.title.includes(next.dueDate) && ['waiting', 'ringing'].includes(item.status))) {
       setActionError('A reminder is already active for this payment.');
       return;
     }
@@ -283,13 +314,13 @@ export function FinanceCreditPurchases({ data, change, busy, confirmAction, setT
       setActionError('This payment date has passed. Choose a future instalment to set a reminder.');
       return;
     }
-    addReminder(title, Math.max(60_000, todayAtNine - Date.now()));
+    addReminder(title, Math.max(60_000, todayAtNine - Date.now()), false, { creditAgreementId: agreement.id });
     setActionError('Reminder added to CBoard Reminders for 9:00 on the payment date.');
   }
 
   function cancelAgreementReminders(agreement) {
     const prefix = `Credit payment due: ${agreement.title}`;
-    reminders.filter(item => item.title.startsWith(prefix) && ['waiting', 'ringing'].includes(item.status)).forEach(item => cancelReminder(item.id));
+    reminders.filter(item => (item.creditAgreementId === agreement.id || (!item.creditAgreementId && item.title.startsWith(prefix))) && ['waiting', 'ringing'].includes(item.status)).forEach(item => cancelReminder(item.id));
   }
 
   function updateCreditReminder(agreement, oldDate, newDate, oldAmount, newAmount) {
@@ -298,7 +329,7 @@ export function FinanceCreditPurchases({ data, change, busy, confirmAction, setT
     if (!active.length || !newDate || !newAmount || (oldDate === newDate && oldAmount === newAmount)) return;
     active.forEach(item => cancelReminder(item.id));
     const dueAt = new Date(`${newDate}T09:00:00`).getTime();
-    if (Number.isFinite(dueAt) && newDate >= today()) addReminder(`Credit payment due: ${agreement.title} · ${formatMoney(newAmount, currency)} (${newDate})`, Math.max(60_000, dueAt - Date.now()));
+    if (Number.isFinite(dueAt) && newDate >= today()) addReminder(`Credit payment due: ${agreement.title} · ${formatMoney(newAmount, currency)} (${newDate})`, Math.max(60_000, dueAt - Date.now()), false, { creditAgreementId: agreement.id });
   }
   function beginCreate() {
     setSelectedId(''); setCreateError(''); setDraft(blankDraft(data.categories.find(item => item.type === 'expense' && !item.archived)?.id || '')); setCreating(true);
@@ -374,7 +405,8 @@ export function FinanceCreditPurchases({ data, change, busy, confirmAction, setT
     } catch { return null; }
   })();
 
-  return <section className="f-credit-page" aria-labelledby="credit-purchases-heading">
+  return <section className="f-credit-page" aria-labelledby="credit-purchases-heading" aria-busy={busy}>
+    {busy && <div className="f-credit-loading-banner" role="status" aria-live="polite"><span className="f-credit-spinner" aria-hidden="true"/>{pendingAction || 'Refreshing Finance data'}…</div>}
     {!selected && <>
       <header className="f-credit-header"><div><span className="f-overview-eyebrow">Purchase finance</span><h2 id="credit-purchases-heading">Credit Purchases</h2><p className="f-help">Track instalments and Pay Later plans separately from personal debt.</p></div><button type="button" className="f-primary" onClick={beginCreate}>＋ Credit Purchase</button></header>
       <div className="f-credit-metrics">
@@ -390,12 +422,12 @@ export function FinanceCreditPurchases({ data, change, busy, confirmAction, setT
       </section>}
       <div className="f-credit-tools"><label className="f-credit-search">Search<input value={query} onChange={event => setQuery(event.target.value)} placeholder="Purchase, provider or reference" aria-label="Search credit purchases"/></label><label className="f-credit-filter">Filter<select value={view} onChange={event => setView(event.target.value)}><option value="active">Active</option><option value="due-soon">Due soon</option><option value="overdue">Overdue</option><option value="zero">0% finance</option><option value="interest">Interest-bearing</option><option value="completed">Completed</option><option value="archived">Archived</option></select></label></div>
       <div className="f-credit-section-head"><div><span className="f-overview-eyebrow">{view === 'completed' || view === 'archived' ? 'History' : 'Next payment first'}</span><h3>{view === 'completed' ? 'Completed agreements' : view === 'archived' ? 'Archived agreements' : 'Active plans'}</h3></div><span className="f-credit-count">{plans.length}</span></div>
-      {plans.length ? <div className="f-credit-list">{plans.map(agreement => { const balances = getCreditAgreementBalances(data, agreement), next = agreementNextPayment(data, agreement), nextBalance = next && getCreditInstalmentAmounts(data, agreement, next), status = next ? getCreditInstalmentStatus(data, agreement, next) : getCreditAgreementStatus(data, agreement); return <article className="f-credit-card-entry" key={agreement.id}><button type="button" className="f-credit-plan" onClick={() => openAgreement(agreement)}><span className="f-credit-plan-main"><span className="f-credit-plan-name">{agreement.title}</span><span className="f-credit-plan-meta">{agreement.merchant || 'Credit purchase'} · {agreement.archivedAt ? 'Archived' : statusLabels[status] || statusLabels[getCreditAgreementStatus(data, agreement)]}</span></span><strong className="f-credit-plan-balance"><Money amount={balances.totalRemaining} currency={currency}/> <small>left</small></strong><span className="f-credit-plan-next">{next ? <>Next payment <strong><Money amount={nextBalance.remaining} currency={currency}/></strong> · {moneyDate(next.dueDate)}</> : statusLabels[getCreditAgreementStatus(data, agreement)]}</span><span className="f-credit-plan-progress">{agreement.totalRepayable ? `${Math.min(100, Number((balances.paidTotal * 100 / agreement.totalRepayable).toFixed(2)))}% repaid` : 'No payment history'} · {agreement.term} total payments · {agreement.financeCharge ? 'Fixed finance fee' : '0% finance'}</span><span className="f-credit-plan-open" aria-hidden="true">›</span></button><details className="f-credit-list-more"><summary className="f-button" aria-label={`More actions for ${agreement.title}`}>⋯</summary><div className="f-credit-more-menu"><button type="button" className="f-button" onClick={() => openAgreement(agreement)}>Open details</button><button type="button" className="f-button" onClick={() => { openAgreement(agreement); beginEdit(agreement); }}>Edit agreement</button>{agreement.archivedAt ? <button type="button" className="f-button" onClick={() => restoreAgreement(agreement)}>Restore</button> : <button type="button" className="f-button" onClick={() => archiveAgreement(agreement)}>Archive</button>}{!agreement.deposit && !(data.transactions || []).some(item => item.creditAgreementId === agreement.id) && <button type="button" className="f-button danger-action" onClick={() => deleteAgreement(agreement)}>Delete unused</button>}</div></details></article>; })}</div> : <div className="f-credit-empty"><strong>{view === 'completed' ? 'No completed agreements yet.' : view === 'archived' ? 'No archived agreements yet.' : (data.creditAgreements || []).length ? 'No agreements match this filter.' : 'No credit purchases yet.'}</strong><p>{view === 'completed' ? 'Paid-off and settled plans will be kept here.' : view === 'archived' ? 'Archived agreements stay available here.' : 'Track instalments, Pay Later purchases and financed items here.'}</p>{view === 'active' && <button type="button" className="f-primary" onClick={beginCreate}>＋ Add Credit Purchase</button>}</div>}
+      {plans.length ? <div className="f-credit-list">{plans.map(agreement => { const balances = getCreditAgreementBalances(data, agreement), next = agreementNextPayment(data, agreement), nextBalance = next && getCreditInstalmentAmounts(data, agreement, next), status = next ? getCreditInstalmentStatus(data, agreement, next) : getCreditAgreementStatus(data, agreement); return <article className="f-credit-card-entry" key={agreement.id}><button type="button" className="f-credit-plan" onClick={() => openAgreement(agreement)}><span className="f-credit-plan-main"><span className="f-credit-plan-name">{agreement.title}</span><span className="f-credit-plan-meta">{agreement.merchant || 'Credit purchase'} · {agreement.archivedAt ? 'Archived' : statusLabels[status] || statusLabels[getCreditAgreementStatus(data, agreement)]}</span></span><strong className="f-credit-plan-balance"><Money amount={balances.totalRemaining} currency={currency}/> <small>left</small></strong><span className="f-credit-plan-next">{next ? <>Next payment <strong><Money amount={nextBalance.remaining} currency={currency}/></strong> · {moneyDate(next.dueDate)}</> : statusLabels[getCreditAgreementStatus(data, agreement)]}</span><span className="f-credit-plan-progress">{agreement.totalRepayable ? `${Math.min(100, Number((balances.paidTotal * 100 / agreement.totalRepayable).toFixed(2)))}% repaid` : 'No payment history'} · {agreement.term} total payments · {agreement.financeCharge ? 'Fixed finance fee' : '0% finance'}</span><span className="f-credit-plan-open" aria-hidden="true">›</span></button><details className="f-credit-list-more"><summary className="f-button" aria-label={`More actions for ${agreement.title}`}>⋯</summary><div className="f-credit-more-menu"><button type="button" className="f-button" disabled={busy} onClick={() => openAgreement(agreement)}>Open details</button><button type="button" className="f-button" disabled={busy} onClick={() => { openAgreement(agreement); beginEdit(agreement); }}>Edit agreement</button>{agreement.archivedAt ? <button type="button" className="f-button" disabled={busy} onClick={() => restoreAgreement(agreement)}>{pendingAction === 'Restoring credit purchase' ? 'Restoring…' : 'Restore'}</button> : <button type="button" className="f-button" disabled={busy} onClick={() => archiveAgreement(agreement)}>{pendingAction === 'Archiving credit purchase' ? 'Archiving…' : 'Archive'}</button>}{canDeleteCreditPurchase(data, agreement.id) ? <button type="button" className="f-button danger-action" disabled={busy} onClick={() => deleteAgreement(agreement)}>{pendingAction === 'Deleting credit purchase' ? 'Deleting…' : agreement.archivedAt ? 'Delete permanently' : 'Delete agreement'}</button> : <small className="f-credit-delete-note">Cannot delete: {getCreditPurchaseDeleteBlockReason(data, agreement.id)}</small>}</div></details></article>; })}</div> : <div className="f-credit-empty"><strong>{view === 'completed' ? 'No completed agreements yet.' : view === 'archived' ? 'No archived agreements yet.' : (data.creditAgreements || []).some(item => !item.archivedAt) ? 'No agreements match this filter.' : (data.creditAgreements || []).length ? 'No active credit purchases.' : 'No credit purchases yet.'}</strong><p>{view === 'completed' ? 'Paid-off and settled plans will be kept here.' : view === 'archived' ? 'Archived agreements stay available here.' : (data.creditAgreements || []).some(item => item.archivedAt) ? 'Archived agreements remain available in Archived.' : 'Track instalments, Pay Later purchases and financed items here.'}</p>{view === 'active' && <button type="button" className="f-primary" onClick={beginCreate}>＋ Add Credit Purchase</button>}</div>}
     </>}
 
     {selected && <>
       <div className="f-credit-backline"><button type="button" className="f-button" onClick={() => { setSelectedId(''); setActionError(''); }}>‹ Credit Purchases</button><span className={`f-credit-status f-credit-status-${selectedDisplayStatus}`}>{statusLabels[selectedDisplayStatus]}</span></div>
-      <header className="f-credit-detail-header"><div><span className="f-overview-eyebrow">{selected.merchant || 'Credit agreement'}{selected.reference ? ` · ${selected.reference}` : ''}</span><h2 id="credit-purchases-heading">{selected.title}</h2><strong className="f-credit-detail-total"><Money amount={selectedBalances.totalRemaining} currency={currency}/><small> remaining</small></strong></div><div className="f-credit-detail-actions"><button type="button" className="f-primary" disabled={getCreditAgreementStatus(data, selected) !== 'active' || busy} onClick={() => beginPayment(selected)}>Record Payment</button><details className="f-credit-more"><summary className="f-button" aria-label="More agreement actions">More</summary><div className="f-credit-more-menu"><button type="button" className="f-button" disabled={busy} onClick={() => beginEdit(selected)}>Edit agreement</button>{getCreditAgreementStatus(data, selected) === 'active' && <><button type="button" className="f-button" disabled={busy} onClick={() => beginPayment(selected, 'extra')}>Extra payment</button><button type="button" className="f-button" disabled={busy} onClick={() => beginSettlement(selected)}>Settle early</button></>}{selected.archivedAt ? <button type="button" className="f-button" disabled={busy} onClick={() => restoreAgreement(selected)}>Restore agreement</button> : <button type="button" className="f-button" disabled={busy} onClick={() => archiveAgreement(selected)}>Archive agreement</button>}{getCreditAgreementStatus(data, selected) === 'active' && selectedBalances.paidTotal === 0 && <button type="button" className="f-button" disabled={busy} onClick={() => cancelAgreement(selected)}>Cancel agreement</button>}{!selectedHasLinkedActivity && !selected.deposit && <button type="button" className="f-button danger-action" disabled={busy} onClick={() => deleteAgreement(selected)}>Delete unused agreement</button>}</div></details></div></header>
+      <header className="f-credit-detail-header"><div><span className="f-overview-eyebrow">{selected.merchant || 'Credit agreement'}{selected.reference ? ` · ${selected.reference}` : ''}</span><h2 id="credit-purchases-heading">{selected.title}</h2><strong className="f-credit-detail-total"><Money amount={selectedBalances.totalRemaining} currency={currency}/><small> remaining</small></strong></div><div className="f-credit-detail-actions"><button type="button" className="f-primary" disabled={getCreditAgreementStatus(data, selected) !== 'active' || busy} onClick={() => beginPayment(selected)}>{pendingAction === 'Recording payment' ? 'Recording payment…' : 'Record Payment'}</button><details className="f-credit-more"><summary className="f-button" aria-label="More agreement actions">More</summary><div className="f-credit-more-menu"><button type="button" className="f-button" disabled={busy} onClick={() => beginEdit(selected)}>Edit agreement</button>{getCreditAgreementStatus(data, selected) === 'active' && <><button type="button" className="f-button" disabled={busy} onClick={() => beginPayment(selected, 'extra')}>Extra payment</button><button type="button" className="f-button" disabled={busy} onClick={() => beginSettlement(selected)}>Settle early</button></>}{selected.archivedAt ? <button type="button" className="f-button" disabled={busy} onClick={() => restoreAgreement(selected)}>{pendingAction === 'Restoring credit purchase' ? 'Restoring…' : 'Restore agreement'}</button> : <button type="button" className="f-button" disabled={busy} onClick={() => archiveAgreement(selected)}>{pendingAction === 'Archiving credit purchase' ? 'Archiving…' : 'Archive agreement'}</button>}{getCreditAgreementStatus(data, selected) === 'active' && selectedBalances.paidTotal === 0 && <button type="button" className="f-button" disabled={busy} onClick={() => cancelAgreement(selected)}>Cancel agreement</button>}{canDeleteCreditPurchase(data, selected.id) ? <button type="button" className="f-button danger-action" disabled={busy} onClick={() => deleteAgreement(selected)}>{pendingAction === 'Deleting credit purchase' ? 'Deleting…' : selected.archivedAt ? 'Delete permanently' : 'Delete agreement'}</button> : <small className="f-credit-delete-note">Cannot delete: {getCreditPurchaseDeleteBlockReason(data, selected.id)}</small>}</div></details></div></header>
       <section className="f-credit-progress" aria-label="Credit repayment progress"><div className="f-credit-progress-values"><span>Paid <strong><Money amount={selectedBalances.paidTotal} currency={currency}/></strong></span><span>Remaining <strong><Money amount={selectedBalances.totalRemaining} currency={currency}/></strong></span><span>{paidPercent}% repaid</span></div><div className="f-credit-progress-bar" role="progressbar" aria-label={`${paidPercent}% of credit agreement repaid`} aria-valuemin="0" aria-valuemax="100" aria-valuenow={paidPercent}><span style={{ width: `${paidPercent}%` }}/></div></section>
       <div className="f-credit-detail-metrics"><div><span>Principal remaining</span><strong><Money amount={selectedBalances.principalRemaining} currency={currency}/></strong></div><div><span>Finance cost remaining</span><strong><Money amount={selectedBalances.financeCostRemaining} currency={currency}/></strong></div><div><span>Next payment</span><strong>{agreementNextPayment(data, selected) ? <Money amount={getCreditInstalmentAmounts(data, selected, agreementNextPayment(data, selected)).remaining} currency={currency}/> : '—'}</strong><small>{agreementNextPayment(data, selected) ? moneyDate(agreementNextPayment(data, selected).dueDate) : 'No payment due'}</small>{agreementNextPayment(data, selected) && <button type="button" className="f-button f-credit-reminder-button" onClick={() => remindForNextPayment(selected)}>Set reminder</button>}</div></div>
 
@@ -409,7 +441,7 @@ export function FinanceCreditPurchases({ data, change, busy, confirmAction, setT
       {editDraft && <form className="f-credit-form" onSubmit={saveAgreementEdit}><h3>Edit agreement</h3><p className="f-help">Updating this agreement recalculates future unpaid instalments. Existing payments and historical Finance transactions remain unchanged.</p><div className="f-credit-form-grid"><label>Purchase name<input required maxLength="100" value={editDraft.title} onChange={event => setEditDraft({ ...editDraft, title: event.target.value })}/></label><label>Provider / lender<input maxLength="100" value={editDraft.merchant} onChange={event => setEditDraft({ ...editDraft, merchant: event.target.value })}/></label><label>Reference<input maxLength="120" value={editDraft.reference} onChange={event => setEditDraft({ ...editDraft, reference: event.target.value })}/></label><label>Product page URL (optional)<input type="url" inputMode="url" maxLength="2048" value={editDraft.productUrl} onChange={event => setEditDraft({ ...editDraft, productUrl: event.target.value })} placeholder="https://shop.example/product"/></label><label>Fixed finance charge<input required inputMode="decimal" value={editDraft.financeCharge} onChange={event => setEditDraft({ ...editDraft, financeCharge: event.target.value })}/></label><label>Total payments in plan<input required type="number" min="1" max="600" value={editDraft.term} onChange={event => setEditDraft({ ...editDraft, term: event.target.value })}/></label><label>Schedule mode<select value={editDraft.scheduleMode} onChange={event => changeEditScheduleMode(event.target.value)}><option value="auto">Auto Split</option><option value="custom">Custom Schedule</option></select></label>{editDraft.scheduleMode === 'auto' && <><label>Next payment date<input required type="date" value={editDraft.firstPaymentDate} onChange={event => setEditDraft({ ...editDraft, firstPaymentDate: event.target.value })}/></label><label>Frequency<select value={editDraft.frequency} onChange={event => setEditDraft({ ...editDraft, frequency: event.target.value })}><option value="monthly">Monthly</option><option value="weekly">Weekly</option><option value="fortnightly">Fortnightly</option><option value="custom">Custom interval</option></select></label>{editDraft.frequency === 'custom' && <label>Interval in days<input required type="number" min="1" max="365" value={editDraft.customDays} onChange={event => setEditDraft({ ...editDraft, customDays: event.target.value })}/></label>}</>}<label className="f-credit-notes">Notes<textarea maxLength="1000" value={editDraft.notes} onChange={event => setEditDraft({ ...editDraft, notes: event.target.value })}/></label></div>
       {editDraft.scheduleMode === 'custom' && <section className="f-credit-custom-schedule"><div className="f-between"><div><h4>Future custom payments</h4><p className="f-help">Paid and historical rows remain locked. Future custom amounts must reconcile exactly.</p></div><div className="f-actions"><button type="button" className="f-button" onClick={() => { try { setEditDraft({ ...editDraft, customSchedule: generateEditDraftRows() }); } catch (error) { setActionError(error.message); } }}>Generate rows</button><button type="button" className="f-button" onClick={() => setEditDraft({ ...editDraft, customSchedule: [...editDraft.customSchedule, { id: id(), dueDate: editDraft.firstPaymentDate, amount: '' }] })}>+ Add payment</button></div></div>{editDraft.customSchedule.map((row, index) => <div className="f-credit-custom-row" key={row.id || index}><span>Future {index + 1}</span><label>Due date<input type="date" value={row.dueDate} onChange={event => setEditDraft({ ...editDraft, customSchedule: editDraft.customSchedule.map((item, rowIndex) => rowIndex === index ? { ...item, dueDate: event.target.value } : item) })}/></label><label>Amount<input inputMode="decimal" value={row.amount} onChange={event => setEditDraft({ ...editDraft, customSchedule: editDraft.customSchedule.map((item, rowIndex) => rowIndex === index ? { ...item, amount: event.target.value } : item) })}/></label><button type="button" className="f-button danger-action" onClick={() => setEditDraft({ ...editDraft, customSchedule: editDraft.customSchedule.filter((_, rowIndex) => rowIndex !== index) })}>Remove</button></div>)}<button type="button" className="f-button" disabled={!editPreview || (editPreview.unallocated ?? 0) < 0} onClick={() => splitCustomRemaining(editDraft, setEditDraft, editPreview)}>Split remaining across empty rows</button></section>}
       {editPreview && <div className="f-credit-preview"><h3>Change preview</h3><div><span>Current remaining</span><strong><Money amount={selectedBalances.totalRemaining} currency={currency}/></strong></div><div><span>Updated remaining</span><strong><Money amount={editPreview.remaining} currency={currency}/></strong></div><div><span>Total payments</span><strong>{editPreview.count}</strong></div><div><span>Payments remaining</span><strong>{editPreview.futureCount}</strong></div>{editDraft.scheduleMode === 'custom' && <><div><span>Scheduled</span><strong><Money amount={editPreview.allocated} currency={currency}/></strong></div><div><span>{editPreview.unallocated < 0 ? 'Over-allocated' : 'Still to allocate'}</span><strong><Money amount={Math.abs(editPreview.unallocated)} currency={currency}/></strong></div></>}<p>Existing payments and linked Finance transactions stay unchanged.</p>{!editPreview.valid && <p className="f-alert" role="status">The future schedule must exactly match the remaining balance and payment count.</p>}</div>}
-      <div className="f-actions"><button className="f-primary" disabled={busy || Boolean(editPreview && !editPreview.valid)}>Save agreement</button><button type="button" className="f-button" onClick={() => setEditDraft(null)}>Cancel</button></div></form>}
+      <div className="f-actions"><button className="f-primary" disabled={busy || Boolean(editPreview && !editPreview.valid)}>{pendingAction === 'Saving agreement and recalculating schedule' ? 'Saving…' : 'Save agreement'}</button><button type="button" className="f-button" onClick={() => setEditDraft(null)}>Cancel</button></div></form>}
 
       <div className="f-credit-detail-grid"><section className="f-credit-section"><div className="f-credit-section-head"><div><span className="f-overview-eyebrow">Agreement</span><h3>Purchase &amp; finance terms</h3></div></div><dl className="f-credit-terms"><div><dt>Cash price</dt><dd><Money amount={selected.cashPrice} currency={currency}/></dd></div><div><dt>Upfront payment</dt><dd><Money amount={selected.deposit} currency={currency}/>{selected.upfrontCountsAsFirstInstalment && <small> Counts as payment 1</small>}</dd></div><div><dt>Amount financed</dt><dd><Money amount={selected.financedAmount} currency={currency}/></dd></div><div><dt>Finance cost</dt><dd><Money amount={selected.financeCharge} currency={currency}/></dd></div><div><dt>Total repayable</dt><dd><Money amount={selected.totalRepayable} currency={currency}/></dd></div><div><dt>Rate / fee model</dt><dd>{selected.financeCharge ? 'Fixed finance fee' : '0% interest'}</dd></div><div><dt>Purchase date</dt><dd>{moneyDate(selected.purchaseDate)}</dd></div><div><dt>Payment plan</dt><dd>{selected.term} total · {selected.scheduleMode === 'custom' ? 'Custom Schedule' : 'Auto Split'}</dd></div>{selected.productUrl && <div><dt>Product page</dt><dd><a href={selected.productUrl} target="_blank" rel="noopener noreferrer" aria-label={`Open product page for ${selected.title} in a new tab`}>Open product page ↗</a></dd></div>}{selected.notes && <div><dt>Notes</dt><dd>{selected.notes}</dd></div>}</dl>{selected.settlement && <p className="f-help">Settled {moneyDate(selected.settlement.date)} for {formatMoney(selected.settlement.settlementAmount + selected.settlement.settlementFee, currency)}.</p>}{selected.history?.length > 0 && <details className="f-credit-audit"><summary>Agreement activity ({selected.history.length})</summary><ol>{[...selected.history].reverse().map((entry, index) => <li key={`${entry.type}-${entry.createdAt || entry.date}-${index}`}>{creditHistoryLabel(entry, currency)}</li>)}</ol></details>}</section>
 

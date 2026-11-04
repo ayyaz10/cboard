@@ -168,12 +168,13 @@ function ReminderStore({ userId, children }) {
     }
   }, [reminders]);
 
-  function addReminder(title, duration, repeats = false) {
+  function addReminder(title, duration, repeats = false, metadata = {}) {
     prepareSound();
     const timestamp = Date.now();
     dispatch({ type: 'add', now: timestamp, item: {
       id: crypto.randomUUID(), title, dueAt: timestamp + duration, status: 'waiting',
       repeatMs: repeats ? duration : 0, durationMs: duration,
+      ...(typeof metadata?.creditAgreementId === 'string' ? { creditAgreementId: metadata.creditAgreementId } : {}),
     } });
   }
 

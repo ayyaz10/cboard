@@ -120,11 +120,24 @@ export function restoreCreditAgreement(state, agreementId) {
   return agreement;
 }
 
+export function getCreditPurchaseDeleteBlockReason(state, agreementId) {
+  const agreement = (state.creditAgreements || []).find(item => item.id === agreementId);
+  if (!agreement) return 'This credit purchase could not be found.';
+  const linkedTransactions = (state.transactions || []).filter(item => item.creditAgreementId === agreementId);
+  if (linkedTransactions.some(item => item.type === 'creditPayment')) return 'This agreement has recorded payment history. Archive it to preserve its financial history.';
+  if (linkedTransactions.length || agreement.deposit > 0) return 'This agreement has a linked Finance transaction. Archive it to preserve the financial record.';
+  return '';
+}
+
+export function canDeleteCreditPurchase(state, agreementId) {
+  return !getCreditPurchaseDeleteBlockReason(state, agreementId);
+}
+
 export function deleteUnusedCreditAgreement(state, agreementId) {
   const agreement = (state.creditAgreements || []).find(item => item.id === agreementId);
   if (!agreement) throw new Error('This credit agreement could not be found.');
-  const linked = (state.transactions || []).some(item => item.creditAgreementId === agreementId);
-  if (linked || agreement.deposit > 0 || activeTransactions(state).some(item => item.creditAgreementId === agreementId)) throw new Error('This agreement has linked financial activity and cannot be safely deleted. Archive or cancel it instead.');
+  const blockReason = getCreditPurchaseDeleteBlockReason(state, agreementId);
+  if (blockReason) throw new Error(blockReason);
   state.creditAgreements = state.creditAgreements.filter(item => item.id !== agreementId);
   return agreement;
 }
@@ -237,6 +250,7 @@ export function getMonthlyCreditCommitment(state, asOfDate = new Date().toISOStr
 
 export function getCreditOverview(state, asOfDate = new Date().toISOString().slice(0, 10)) {
   const active = (state.creditAgreements || []).filter(item => getCreditAgreementStatus(state, item) === 'active');
+  const visibleActive = active.filter(item => !item.archivedAt);
   const nextPayment = getNextCreditPayment(state, asOfDate);
   const dueSoon = getCreditDueSoon(state, asOfDate), overdue = getOverdueCreditPayments(state, asOfDate);
   return {
@@ -244,7 +258,7 @@ export function getCreditOverview(state, asOfDate = new Date().toISOString().sli
     principalOutstanding: active.reduce((sum, item) => sum + getCreditAgreementBalances(state, item).principalRemaining, 0),
     financeCostRemaining: active.reduce((sum, item) => sum + getCreditAgreementBalances(state, item).financeCostRemaining, 0),
     monthlyCommitment: getMonthlyCreditCommitment(state),
-    activePlans: active.length,
+    activePlans: visibleActive.length,
     completedPlans: (state.creditAgreements || []).filter(item => ['paid_off', 'settled_early'].includes(getCreditAgreementStatus(state, item))).length,
     nextPayment,
     dueSoon,
