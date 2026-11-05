@@ -17,9 +17,10 @@ export function NutritionTotals({ meals, goals, compact = false, dense = false }
   function nutrient([key, label, unit]) {
     const total = totals[key];
     const target = goals?.[key] ?? goals?.micronutrients?.[key];
+    const displayLabel = dense && key === "calories" ? "Calories logged" : label;
     return (
-      <div key={key} className="diary-nutrient">
-        <span>{label}</span>
+      <div key={key} className={`diary-nutrient diary-nutrient-${key}`}>
+        <span>{displayLabel}</span>
         <strong>
           {total.known ? format(total.value) : "—"} <small>{unit}</small>
         </strong>
@@ -29,7 +30,7 @@ export function NutritionTotals({ meals, goals, compact = false, dense = false }
             {total.missing === 1 ? "" : "s"} missing
           </small>
         )}
-        {!compact && !dense && target > 0 && (
+        {!compact && target > 0 && (
           <>
             <progress
               aria-label={`${label} towards daily target${total.missing ? ", partial data" : ""}`}

@@ -22,6 +22,24 @@ export function orderedTransactions(transactions, newestFirst = true) {
   });
 }
 export const nextTransactionSequence = state => Math.max(0, ...state.transactions.map((item, index) => item.sequence ?? index + 1)) + 1;
-export function filterTransactions(transactions, { month, query = '', type = 'all', category = 'all' }) {
-  return orderedTransactions(transactions).filter(item => (!month || item.date.slice(0, 7) === month) && item.title.toLowerCase().includes(query.toLowerCase()) && (type === 'all' || item.type === type) && (category === 'all' || (category === 'uncategorized' ? !item.categoryId : item.categoryId === category)));
+const receiptSearchText = receipt => {
+  if (!receipt || typeof receipt !== 'object') return '';
+  return [receipt.vendor, receipt.merchant, receipt.store, ...(receipt.items || []).flatMap(item => [item.name, item.description, item.category])]
+    .filter(Boolean).join(' ');
+};
+
+export function transactionSearchText(item, { categories = [], donationCategories = [], linkedNames = [] } = {}) {
+  const category = categories.find(value => value.id === item.categoryId)?.name;
+  const donationCategory = donationCategories.find(value => value.id === item.donationCategoryId)?.name;
+  return [item.title, item.rawMerchantText, item.resolvedMerchantName, item.merchantName, item.note, item.reference, item.paymentMethod, item.providerStatus,
+    category, donationCategory, receiptSearchText(item.receipt), ...linkedNames]
+    .filter(value => typeof value === 'string').join(' ').toLocaleLowerCase();
+}
+
+export function filterTransactions(transactions, { month, query = '', type = 'all', category = 'all', categories = [], donationCategories = [], linkedNamesById = {} }) {
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  return orderedTransactions(transactions).filter(item => (!month || String(item.date || '').slice(0, 7) === month)
+    && (!normalizedQuery || transactionSearchText(item, { categories, donationCategories, linkedNames: linkedNamesById[item.id] || [] }).includes(normalizedQuery))
+    && (type === 'all' || item.type === type)
+    && (category === 'all' || (category === 'uncategorized' ? !item.categoryId : item.categoryId === category)));
 }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { DayButton, DayPicker } from "react-day-picker";
 import "react-day-picker/style.css";
 import { calendarCalorieDays, calendarCalorieStats } from "./diaryCalendarData";
+import { shiftDate } from "./diaryData";
 
 function dateFromKey(value) {
   const [year, month, day] = value.split("-").map(Number);
@@ -17,8 +18,8 @@ function dateKey(value) {
 
 const displayDate = (value) =>
   new Intl.DateTimeFormat(undefined, {
-    day: "2-digit",
-    month: "2-digit",
+    day: "numeric",
+    month: "short",
     year: "numeric",
   }).format(value);
 
@@ -79,7 +80,7 @@ export function DiaryCalendar({ date, today, days, target, disabled, onSelect })
           aria-expanded={open}
           onClick={() => setOpen((value) => !value)}
         >
-          <span>{displayDate(selected)}</span>
+          <span>{date === today ? "Today · " : date === shiftDate(today, -1) ? "Yesterday · " : ""}{displayDate(selected)}</span>
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
         </button>
         {open && (

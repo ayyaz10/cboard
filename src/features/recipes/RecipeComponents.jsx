@@ -472,13 +472,24 @@ export function RecipePage({ recipe, preview = false, onRecipeUpdated, onMatchEx
 }
 
 export function RecipeCard({ recipe, favourite = false, favouritePending = false, onToggleFavourite, onDelete, onEdit, onDuplicate, bulkSelection = false, selected = false, onToggleSelected }) {
+  const actionsRef = useRef(null);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  useEffect(() => {
+    if (!actionsOpen) return undefined;
+    const closeOnOutsidePointer = event => {
+      const menu = actionsRef.current;
+      if (menu?.open && !menu.contains(event.target)) menu.open = false;
+    };
+    document.addEventListener('pointerdown', closeOnOutsidePointer);
+    return () => document.removeEventListener('pointerdown', closeOnOutsidePointer);
+  }, [actionsOpen]);
   return (
     <article className="recipe-card recipe-clickable-card panel relative flex min-w-0 flex-col gap-4 border-[var(--border-default)] p-5 text-[var(--color-text)]">
       {(onDelete || onEdit || onDuplicate || (bulkSelection && onToggleSelected)) && <div className="absolute right-4 top-4 z-10 flex items-center gap-2">
         {bulkSelection && onToggleSelected && <label className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)]" title={`Select ${recipe.title}`}>
           <input type="checkbox" className="h-4 w-4 accent-lime-500" checked={selected} onChange={event => onToggleSelected(recipe.slug, event.target.checked)} aria-label={`Select ${recipe.title}`} />
         </label>}
-        <details className="group relative">
+        <details ref={actionsRef} onToggle={event => setActionsOpen(event.currentTarget.open)} className="recipe-card-actions-menu group relative">
           <summary className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] text-xl font-bold leading-none hover:bg-[var(--color-accent-hover)] focus-visible:outline-2 focus-visible:outline-offset-2" aria-label={`Actions for ${recipe.title}`} title="Recipe actions">⋯</summary>
           <div className="absolute right-0 top-12 z-20 grid min-w-36 gap-1 rounded-xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-2 shadow-[3px_3px_0_#111]">
             {onEdit && <button type="button" className="rounded-lg px-3 py-2 text-left text-sm font-bold hover:bg-[#edffd5]" onClick={event => { event.currentTarget.closest('details').open = false; onEdit(recipe); }}>Edit recipe</button>}

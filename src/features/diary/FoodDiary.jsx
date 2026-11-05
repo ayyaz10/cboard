@@ -574,13 +574,6 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
           Food review
         </button>}
       </nav>
-      {view === "day" && <section className="diary-streak" aria-label="Logging streak">
-        <div>
-          <strong>{streak.current}</strong>
-          <span>day streak</span>
-        </div>
-        <p>Best: <b>{streak.longest} days</b></p>
-      </section>}
       {view !== "review" && <div className="diary-datebar" ref={diaryTopRef}>
         <button
           type="button"
@@ -637,7 +630,7 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
             disabled={busy}
             onClick={() => { setDraft(newMeal()); setError(""); }}
           >
-            + Add meal
+            + Add food
           </button>
           <button type="button" disabled={busy} onClick={openRoutine}>Copy from planner</button>
           <button type="button" disabled={busy} onClick={() => { setPastOpen(true); setPastSelected([]); setError(""); }}>Copy past meal</button>
@@ -645,7 +638,7 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
       )}
       <section className="diary-panel" aria-label="Daily nutrition totals">
         <div className="diary-section-heading">
-          <h2>{date === today ? "Today’s" : date} nutrition</h2>
+          <h2>{date === today ? "Today’s nutrition" : "Daily nutrition"}</h2>
           <span className="pill">
             {day.complete ? "Day complete" : "Day in progress"}
           </span>
@@ -742,6 +735,7 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
             busy={busy}
             onSave={saveMeal}
             onDraftChange={setDraft}
+            startWithFoodLookup={draft.items.length === 0}
             onCancel={() => {
               setDraft(null);
               setError("");
@@ -931,6 +925,10 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
         >
           {day.complete ? "Reopen day" : "Finish day & update streak"}
         </button>
+      </section>
+      <section className="diary-streak" aria-label="Logging streak">
+        <div><strong>{streak.current}</strong><span>day streak</span></div>
+        <p>Best: <b>{streak.longest} days</b></p>
       </section>
       <details className="diary-panel diary-history-panel">
         <summary><h2>Meal history</h2><span>{days.filter((entry) => entry.meals.length || entry.skipped.length).length} days</span></summary>

@@ -77,6 +77,7 @@ export function DiaryMealEditor({
   onCancel,
   onDraftChange,
   foodLibrary = [],
+  startWithFoodLookup = false,
 }) {
   const [draft, setDraft] = useState(() => structuredClone(initial));
   const [notesOpen, setNotesOpen] = useState(() => Boolean(initial.notes));
@@ -100,6 +101,9 @@ export function DiaryMealEditor({
   useLayoutEffect(() => {
     if (lookup && pickerDialog.current && !pickerDialog.current.open) pickerDialog.current.showModal();
   }, [lookup]);
+  useEffect(() => {
+    if (startWithFoodLookup) setLookup('new');
+  }, [startWithFoodLookup]);
   useEffect(() => {
     onDraftChange(draft);
   }, [draft, onDraftChange]);

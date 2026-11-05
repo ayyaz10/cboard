@@ -35,6 +35,7 @@ import { notify } from '../../lib/notifications.js';
 import { getMealPlanFoodReferences } from '../../services/foodReferenceService.js';
 import { mergeFoodRecords } from '../../services/foodMergeService.js';
 import { formatIngredient } from './recipeData';
+import { recipeNutritionDisplay } from './ingredientNutrition.js';
 import { DailyMealPlanner } from './DailyMealPlanner';
 import { FoodDiary } from '../diary/FoodDiary';
 import {
@@ -82,6 +83,7 @@ function RecipesContent({ route, navigationPath }) {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All');
+  const [sortBy, setSortBy] = useState('recent');
   const [favourites, setFavourites] = useState(new Set());
   const [favouritesOnly, setFavouritesOnly] = useState(false);
   const [favouritePending, setFavouritePending] = useState(new Set());
@@ -197,6 +199,10 @@ function RecipesContent({ route, navigationPath }) {
     parts.length === 3 && parts[1] === 'planner' && parts[2] === 'day';
   const diary = parts.length === 3 && parts[1] === 'diary' && parts[2] === 'day';
   const shortcutOrder = ['home', 'foods', 'add', 'planner', 'diary', 'manage'];
+  useEffect(() => {
+    setSelectionMode(manage);
+    if (!manage) setSelectedRecipeSlugs(new Set());
+  }, [manage]);
   function startImport(initial = null, editing = false) {
     setDraft({ initial, editing, key: crypto.randomUUID() });
     navigateTo('/recipes/import');
@@ -389,7 +395,7 @@ function RecipesContent({ route, navigationPath }) {
     ]),
   ];
   const query = search.trim().toLowerCase();
-  const filtered = recipes.filter(
+  const matchingRecipes = recipes.filter(
     (item) =>
       (category === 'All' || item.mealType === category) &&
       (!favouritesOnly || favourites.has(item.slug)) &&
@@ -397,11 +403,30 @@ function RecipesContent({ route, navigationPath }) {
         item.title,
         ...item.ingredients.map((ingredient) => ingredient.name),
         ...item.tags,
+        item.description,
+        item.cuisine,
       ]
         .join(' ')
         .toLowerCase()
         .includes(query),
   );
+  const sortNutrition = sortBy === 'calories' || sortBy === 'protein'
+    ? new Map(matchingRecipes.map(item => [item.slug, recipeNutritionDisplay(item).nutrition]))
+    : null;
+  const filtered = matchingRecipes.sort((a, b) => {
+    if (sortBy === 'name') return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
+    if (sortBy === 'calories' || sortBy === 'protein') {
+      const key = sortBy;
+      const av = sortNutrition.get(a.slug)?.[key];
+      const bv = sortNutrition.get(b.slug)?.[key];
+      if (av == null && bv == null) return a.title.localeCompare(b.title);
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      return av - bv;
+    }
+    return (Date.parse(b.updatedAt || '') || 0) - (Date.parse(a.updatedAt || '') || 0)
+      || a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
+  });
   function setRecipeSelected(slug, checked) {
     setError('');
     setSelectedRecipeSlugs(current => {
@@ -433,7 +458,12 @@ function RecipesContent({ route, navigationPath }) {
     <PageShell>
       <section className="recipe-page-shell panel space-y-7 border-[var(--border-default)] p-5 text-[var(--color-text)] sm:p-8 lg:p-10">
         <AppNavigation activePath={navigationPath} />
-        <DailyNutritionTargets controller={nutritionGoals} />
+        {home || manage ? (
+          <details className="recipe-targets-disclosure">
+            <summary>Daily nutrition targets</summary>
+            <DailyNutritionTargets controller={nutritionGoals} />
+          </details>
+        ) : <DailyNutritionTargets controller={nutritionGoals} />}
         <nav className="recipe-shortcuts mobile-section-nav flex flex-wrap gap-2" aria-label="Recipe shortcuts">
           <button type="button" className={secondaryButton} disabled={loading} onClick={() => setAddingFood(true)}>Add item</button>
           {shortcutOrder.map((item) => {
@@ -521,6 +551,7 @@ function RecipesContent({ route, navigationPath }) {
                       Your meals, ingredients, and alternatives in one place.
                     </p>
                   </div>
+                  {manage && <RecipeLink to="/recipes">Done managing · All recipes</RecipeLink>}
                 </header>
                 {recipes.length > 0 ? (
                   <>
@@ -530,29 +561,35 @@ function RecipesContent({ route, navigationPath }) {
                         <input
                           type="search"
                           className="field-input"
-                          placeholder="Name, ingredient or tag"
+                          placeholder="Name, ingredient, cuisine or tag"
                           value={search}
                           onChange={(event) => setSearch(event.target.value)}
                         />
                       </label>
-                      <div className="flex flex-wrap items-center gap-3" aria-label="Recipe filters and view">
+                      <div className="recipe-library-controls flex flex-wrap items-center gap-3" aria-label="Recipe filters and view">
                         <button type="button" className={`${secondaryButton.replace('bg-[var(--surface-elevated)]', '')} min-h-11 ${!favouritesOnly ? 'bg-[var(--color-accent)]' : 'bg-[var(--surface-elevated)]'}`} aria-pressed={!favouritesOnly} onClick={() => setFavouritesOnly(false)}>All recipes</button>
                         <button type="button" className={`${secondaryButton.replace('bg-[var(--surface-elevated)]', '')} min-h-11 ${favouritesOnly ? 'bg-[var(--color-accent)]' : 'bg-[var(--surface-elevated)]'}`} aria-pressed={favouritesOnly} onClick={() => setFavouritesOnly(true)}><span aria-hidden="true" className="mr-2">♥</span>Favourites ({recipes.filter(item => favourites.has(item.slug)).length})</button>
-                        <label className="recipe-meal-filter inline-flex min-h-11 items-center gap-2 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm font-bold">
-                          <span>Meal type</span>
-                          <select
-                            className="min-w-0 bg-transparent font-bold outline-none"
-                            value={category}
-                            onChange={(event) => setCategory(event.target.value)}
-                          >
-                            <option value="All">All meals</option>
-                            {categories.map((value) => (
-                              <option key={value} value={value}>{value}</option>
-                            ))}
+                        <details className="recipe-filter-disclosure">
+                          <summary className={secondaryButton} aria-label={category === 'All' ? 'Filter recipes' : `Filter recipes, ${category} selected`}>Filter{category !== 'All' ? ` · ${category}` : ''}</summary>
+                          <label className="recipe-meal-filter inline-flex min-h-11 items-center gap-2 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm font-bold">
+                            <span>Meal type</span>
+                            <select className="min-w-0 bg-transparent font-bold outline-none" value={category} onChange={(event) => setCategory(event.target.value)}>
+                              <option value="All">All meals</option>
+                              {categories.map((value) => <option key={value} value={value}>{value}</option>)}
+                            </select>
+                          </label>
+                        </details>
+                        <label className="recipe-sort inline-flex min-h-11 items-center gap-2 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm font-bold">
+                          <span>Sort</span>
+                          <select aria-label="Sort recipes" className="min-w-0 bg-transparent font-bold outline-none" value={sortBy} onChange={event => setSortBy(event.target.value)}>
+                            <option value="recent">Recently updated</option>
+                            <option value="name">Name</option>
+                            <option value="calories">Calories</option>
+                            <option value="protein">Protein</option>
                           </select>
                         </label>
                         <p role="status" className="text-sm text-[var(--color-text-secondary)]">{filtered.length} recipe{filtered.length === 1 ? '' : 's'}</p>
-                        <RecipeCardViewControl />
+                        <span className="recipe-library-view"><RecipeCardViewControl /></span>
                         {!manage && <RecipeLink to="/recipes/manage">Manage recipes</RecipeLink>}
                       </div>
                     </div>
@@ -571,7 +608,7 @@ function RecipesContent({ route, navigationPath }) {
                         <button type="button" className={`${secondaryButton} danger-action`} disabled={!bulkDeleteItems.length || busy} onClick={() => setConfirmBulkDelete(true)}>Delete {bulkDeleteItems.length ? `(${bulkDeleteItems.length})` : 'selected'}</button>
                       </div>}
                     </section>}
-                    <RecipeMasonryGrid className={cardGrid}>
+                    <RecipeMasonryGrid className={`${cardGrid} recipe-library-grid`}>
                       {filtered.map((item) => (
                         <div
                           key={item.slug}
@@ -582,9 +619,9 @@ function RecipesContent({ route, navigationPath }) {
                             favourite={favourites.has(item.slug)}
                             favouritePending={favouritePending.has(item.slug)}
                             onToggleFavourite={toggleFavourite}
-                            onDelete={manage ? setRemoving : undefined}
-                            onEdit={manage ? recipe => startImport(recipe, true) : undefined}
-                            onDuplicate={manage ? recipe => startImport({ ...recipe, title: `${recipe.title} (copy)` }) : undefined}
+                            onDelete={!manage ? setRemoving : undefined}
+                            onEdit={!manage ? recipe => startImport(recipe, true) : undefined}
+                            onDuplicate={!manage ? recipe => startImport({ ...recipe, title: `${recipe.title} (copy)` }) : undefined}
                             bulkSelection={manage && selectionMode}
                             selected={selectedRecipeSlugs.has(item.slug)}
                             onToggleSelected={setRecipeSelected}
@@ -594,7 +631,7 @@ function RecipesContent({ route, navigationPath }) {
                     </RecipeMasonryGrid>
                     {!filtered.length && (
                       <p className="py-8 text-center">
-                        {favouritesOnly ? 'No favourites match this view. Tap a recipe’s heart in All recipes to save it here, or clear your search and meal type.' : 'No matching recipes. Try another search or meal type.'}
+                        {favouritesOnly ? 'No favourites match this view. Tap a recipe’s heart in All recipes to save it here, or clear your search and meal type.' : query ? <>No recipes match “{search.trim()}”. <button type="button" className="font-bold underline underline-offset-4" onClick={() => setSearch('')}>Clear search</button></> : 'No matching recipes. Try another meal type.'}
                       </p>
                     )}
                   </>

@@ -1,5 +1,5 @@
 .food-diary {
-  --diary-accent: #28553c;
+  --diary-accent: var(--color-accent);
   display: grid;
   gap: 1.25rem;
   min-width: 0;
@@ -414,9 +414,9 @@ html[data-theme="midnight"] .food-diary .diary-recipe-confirm .diary-actions { b
 }
 .diary-panel,
 .diary-editor {
-  border: 1px solid var(--g-border);
-  border-radius: 1.4rem;
-  background: #fffdf8;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
   padding: clamp(1rem, 3vw, 1.5rem);
   min-width: 0;
 }
@@ -427,8 +427,8 @@ html[data-theme="midnight"] .food-diary .diary-recipe-confirm .diary-actions { b
   align-items: center;
   gap: 1rem;
   border-radius: 999px;
-  background: #e5f5dc;
-  border: 1px solid #bcd8aa;
+  background: var(--color-success-soft);
+  border: 1px solid var(--color-border);
   padding: 0.45rem 0.9rem;
 }
 .diary-streak > div {
@@ -450,6 +450,12 @@ html[data-theme="midnight"] .food-diary .diary-recipe-confirm .diary-actions { b
   flex-wrap: wrap;
   gap: 0.6rem;
   align-items: end;
+}
+.food-diary .diary-datebar > button {
+  min-width: 2.75rem;
+  border-color: var(--color-border);
+  background: var(--color-surface-interactive);
+  color: var(--color-text);
 }
 .diary-quick-actions { gap:.5rem; margin:0; }
 .food-diary .diary-quick-actions button { min-height:2.75rem; padding:.5rem .8rem; }
@@ -482,9 +488,13 @@ html[data-theme="midnight"] .food-diary .diary-recipe-confirm .diary-actions { b
 .diary-macros-dense .diary-nutrient { gap:.12rem; }
 .diary-macros-dense .diary-nutrient > span { color:var(--color-text-muted); font-size:.74rem; }
 .diary-macros-dense .diary-nutrient strong { font-size:1.08rem; line-height:1.2; }
+.diary-macros-dense .diary-nutrient-calories strong { font-size:1.3rem; }
+.diary-macros-dense .diary-nutrient progress { height:.35rem; }
+.diary-macros-dense .diary-nutrient > small { color:var(--color-text-secondary); font-size:.68rem; line-height:1.25; }
 .diary-linked-weight { margin-top:.5rem; padding:.55rem .7rem; }
 .food-diary [aria-label="Daily nutrition totals"] { padding:clamp(.8rem,2vw,1rem); }
 .food-diary [aria-label="Daily nutrition totals"] > .diary-section-heading { margin-bottom:.75rem; }
+.food-diary [aria-label="Daily nutrition totals"] .diary-section-heading h2 { margin:0; }
 .food-diary .diary-linked-weight { border:0; border-top:1px solid var(--g-border); border-radius:0; background:transparent; padding:.6rem 0 0; }
 .diary-linked-weight > div { display:flex; align-items:baseline; flex-wrap:wrap; gap:.25rem .5rem; }
 .diary-linked-weight strong { font-size:.9rem; }

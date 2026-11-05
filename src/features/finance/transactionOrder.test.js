@@ -43,3 +43,15 @@ test('all-month history includes previous years while retaining search and categ
   assert.deepEqual(filterTransactions(rows,{month:'2026-01',category:'fitness'}).map(row=>row.id),['new']);
   assert.deepEqual(filterTransactions(rows,{month:'2026-02'}),[]);
 });
+
+test('transaction search includes notes, references, categories, receipt items, and linked names', () => {
+  const rows=[
+    {id:'receipt',date:'2026-11-04',type:'expense',title:'ALDI',note:'Weekly shop',reference:'ref-204',categoryId:'groceries',receipt:{vendor:'ALDI',items:[{name:'Oat milk'}]}},
+    {id:'credit',date:'2026-11-03',type:'creditPayment',title:'Monthly repayment',creditAgreementId:'agreement-1'},
+  ];
+  const options={categories:[{id:'groceries',name:'Groceries'}],linkedNamesById:{credit:['Philips trimmer']}};
+  for (const query of ['weekly shop','ref-204','groceries','oat milk','Philips trimmer']) {
+    assert.equal(filterTransactions(rows,{month:null,query,...options}).length,1,query);
+  }
+  assert.equal(filterTransactions(rows,{month:null,query:'  ALDI  ',...options})[0].id,'receipt');
+});
