@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Archive, ArrowLeft, Check, Copy, FilePlus2, Maximize2, Minimize2, MoreHorizontal, Pin, RotateCcw, Search, Trash2, X } from 'lucide-react';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
@@ -11,7 +11,7 @@ import {
 import { createId } from '../progressTracker/progressTrackerStorage';
 import { getTextFromHtml, isSafeNoteMedia } from './noteContent';
 import { getNotesLoadMessage, readNotesCache, reportNotesFailure, shouldShowNotesEmpty, writeNotesCache } from './notesLoadState';
-import { NoteEditor } from './NotesPanel';
+const RichDocumentEditor = lazy(() => import('./RichDocumentEditor').then((module) => ({ default: module.RichDocumentEditor })));
 import './notesLibrary.css';
 
 const PAGE_SIZE = 40;
@@ -61,6 +61,14 @@ function renderSnippet(value) {
     ? <mark key={index}>{piece.slice(9, -7)}</mark>
     : <span key={index}>{piece}</span>);
 }
+
+const NotesListItem = memo(function NotesListItem({ note, selected, onSelect }) {
+  return <button type="button" className="notes-list-item" aria-current={selected ? 'true' : undefined} onClick={() => onSelect(note.id)}>
+    <span className="notes-list-item-top"><strong>{note.title || 'Untitled'}</strong><span>{note.pinnedAt && <Pin size={14} aria-label="Pinned" />}{dateLabel(note.updatedAt || note.createdAt)}</span></span>
+    <span className="notes-preview">{note.contentSnippet ? renderSnippet(note.contentSnippet) : 'No text preview'}</span>
+    {note.tags?.length > 0 && <span className="notes-tags">{note.tags.slice(0, 3).map((tag) => <span key={tag}>{tag}</span>)}</span>}
+  </button>;
+});
 
 export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
   const { confirm, dialog } = useConfirmDialog();
@@ -115,6 +123,9 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
   const detailRequest = useRef(0);
   const editorScrollPositions = useRef(new Map());
   const editorPaneRef = useRef(null);
+  const documentEditorRef = useRef(null);
+  const chooseNoteRef = useRef(null);
+  const handleChooseNote = useCallback((noteId) => chooseNoteRef.current?.(noteId), []);
 
   const updateWorkingNote = useCallback((next) => {
     const value = typeof next === 'function' ? next(workingRef.current) : next;
@@ -286,11 +297,13 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
   const orderedNotes = useMemo(() => notes, [notes]);
 
   function preserveCurrentDraft() {
+    documentEditorRef.current?.flush();
     const note = workingRef.current;
-    if (!note || !userId || getEditorSignature({ ...note, tags: tagText }) === savedSignature.current) return;
+    const currentTags = tagTextRef.current;
+    if (!note || !userId || getEditorSignature({ ...note, tags: currentTags }) === savedSignature.current) return;
     try {
       sessionStorage.setItem(`cboard:note-draft:${userId}:${note.id}`, JSON.stringify({
-        note: { ...note, tags: tagText }, isNewNote, savedAt: Date.now(), baseSignature: savedSignature.current, baseUpdatedAt: note.updatedAt || '',
+        note: { ...note, tags: currentTags }, isNewNote, savedAt: Date.now(), baseSignature: savedSignature.current, baseUpdatedAt: note.updatedAt || '',
       }));
     } catch { setDraftStorageError(true); }
   }
@@ -350,7 +363,9 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
   }, [initialNoteId]);
 
   async function startNewNote() {
-    if (workingNote && getEditorSignature({ ...workingNote, tags: tagText }) !== savedSignature.current) {
+    documentEditorRef.current?.flush();
+    const currentNote = workingRef.current;
+    if (currentNote && getEditorSignature({ ...currentNote, tags: tagTextRef.current }) !== savedSignature.current) {
       preserveCurrentDraft();
       if (!await saveNote()) return;
     }
@@ -371,15 +386,20 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
   }
 
   async function chooseNote(noteId) {
-    if (workingNote && getEditorSignature({ ...workingNote, tags: tagText }) !== savedSignature.current) {
+    documentEditorRef.current?.flush();
+    const currentNote = workingRef.current;
+    if (currentNote && getEditorSignature({ ...currentNote, tags: tagTextRef.current }) !== savedSignature.current) {
       preserveCurrentDraft();
       if (!await saveNote()) return;
     }
     openNote(noteId);
   }
+  chooseNoteRef.current = chooseNote;
 
   async function chooseView(nextView) {
-    if (workingNote && getEditorSignature({ ...workingNote, tags: tagText }) !== savedSignature.current) {
+    documentEditorRef.current?.flush();
+    const currentNote = workingRef.current;
+    if (currentNote && getEditorSignature({ ...currentNote, tags: tagTextRef.current }) !== savedSignature.current) {
       preserveCurrentDraft();
       if (!await saveNote()) return;
     }
@@ -389,6 +409,7 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
   }
 
   async function saveNote() {
+    documentEditorRef.current?.flush();
     const note = workingRef.current;
     if (!note) return true;
     if (recoveryNeedsValidation.current) {
@@ -469,12 +490,14 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
   }, [workingSignature, selectedId, userId, isNewNote, isSaving, saveState]);
 
   async function runLifecycle(action, note = workingNote) {
-    if (!note || !isLifecycleAvailable) return;
+    documentEditorRef.current?.flush();
+    const currentNote = workingRef.current || note;
+    if (!currentNote || !isLifecycleAvailable) return;
     setError('');
     const startedAt = performance.now();
     try {
-      if (workingNote && workingSignature !== savedSignature.current && !await saveNote()) return;
-      const current = workingRef.current || note;
+      if (currentNote && getEditorSignature({ ...currentNote, tags: tagTextRef.current }) !== savedSignature.current && !await saveNote()) return;
+      const current = workingRef.current || currentNote;
       if (action === 'trash') {
         await trashNote(current.id);
         notify.info('Moved to Trash', { action: { label: 'Undo', onClick: () => restoreNote(current.id).then(() => loadLibrary()).catch(() => notify.error('Could not restore this note.')) } });
@@ -505,7 +528,9 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
   }
 
   async function duplicateCurrentNote() {
-    if (workingNote && workingSignature !== savedSignature.current && !await saveNote()) return;
+    documentEditorRef.current?.flush();
+    const currentNote = workingRef.current;
+    if (currentNote && getEditorSignature({ ...currentNote, tags: tagTextRef.current }) !== savedSignature.current && !await saveNote()) return;
     const source = workingRef.current;
     if (!source) return;
     try {
@@ -561,11 +586,7 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
           {isLoading && !orderedNotes.length && <div className="notes-skeleton-list" aria-hidden="true">{Array.from({ length: 5 }, (_, index) => <div className="notes-skeleton-row" key={index}><span className="notes-skeleton notes-skeleton-title" /><span className="notes-skeleton notes-skeleton-preview" /><span className="notes-skeleton notes-skeleton-date" /></div>)}</div>}
           {error && <div className="notes-inline-error" role="alert" data-error-type={errorType}><span>{error}{orderedNotes.length > 0 ? ' Showing the last successfully loaded list.' : ''}</span><button type="button" onClick={() => loadLibrary({ retry: true })} className="underline" disabled={isLoading}>{isLoading ? 'Retrying...' : 'Retry'}</button></div>}
           {shouldShowNotesEmpty({ isLoading, error, notes: orderedNotes }) && <div className="notes-empty"><strong>{query ? 'No notes match this search' : view === 'trash' ? 'Trash is empty' : view === 'archived' ? 'No archived notes' : view === 'pinned' ? 'No pinned notes' : 'No notes yet'}</strong><span>{query ? 'Try another search.' : view === 'active' ? 'Capture ideas, plans, and anything you want to remember.' : ''}</span>{query ? <button type="button" className="notes-secondary-button" onClick={() => setQuery('')}>Clear search</button> : view === 'active' ? <button type="button" className="notes-primary-button" onClick={startNewNote}><FilePlus2 size={16} aria-hidden="true" /> New note</button> : null}</div>}
-          {orderedNotes.map((note) => <button key={note.id} type="button" className="notes-list-item" aria-current={(selectedId || lastSelectedId) === note.id ? 'true' : undefined} onClick={() => chooseNote(note.id)}>
-            <span className="notes-list-item-top"><strong>{note.title || 'Untitled'}</strong><span>{note.pinnedAt && <Pin size={14} aria-label="Pinned" />}{dateLabel(note.updatedAt || note.createdAt)}</span></span>
-            <span className="notes-preview">{note.contentSnippet ? renderSnippet(note.contentSnippet) : 'No text preview'}</span>
-            {note.tags?.length > 0 && <span className="notes-tags">{note.tags.slice(0, 3).map((tag) => <span key={tag}>{tag}</span>)}</span>}
-          </button>)}
+          {orderedNotes.map((note) => <NotesListItem key={note.id} note={note} selected={(selectedId || lastSelectedId) === note.id} onSelect={handleChooseNote} />)}
           {hasMore && <button className="notes-secondary-button notes-load-more" type="button" onClick={() => loadLibrary({ append: true })} disabled={isLoading || isLoadingMore}>{isLoadingMore ? 'Loading...' : 'Load more'}</button>}
           {view === 'trash' && orderedNotes.length > 0 && <button className="notes-danger-button notes-empty-trash" type="button" onClick={handleEmptyTrash}>Empty Trash</button>}
         </div>
@@ -603,7 +624,9 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
               <div className="notes-property"><span>Tags</span>{editingProperties.tags ? <input autoFocus aria-label="Note tags, comma separated" value={tagText} maxLength={1547} onChange={(event) => { tagTextRef.current = event.target.value; setTagText(event.target.value); }} onBlur={() => setEditingProperties((value) => ({ ...value, tags: false }))} onKeyDown={(event) => { if (event.key === 'Escape') event.currentTarget.blur(); }} placeholder="Add tags, separated by commas" /> : <button type="button" aria-label={`Edit tags${tagText.trim() ? `: ${tagText}` : ''}`} onClick={() => setEditingProperties((value) => ({ ...value, tags: true }))}>{tagText.trim() ? tagText.split(',').map((tag) => tag.trim()).filter(Boolean).map((tag) => <span className="notes-property-chip" key={tag}>{tag}</span>) : <span className="notes-property-empty">Add tags</span>}</button>}</div>
             </div>}
             {!goals.length && !tagText.trim() && !editingProperties.tags && <button type="button" className="notes-add-property" onClick={() => setEditingProperties((value) => ({ ...value, tags: true }))}>Add tags</button>}
-            <NoteEditor workspace value={workingNote.contentHtml || ''} onChange={(contentHtml) => updateWorkingNote((current) => ({ ...current, contentHtml }))} media={workingNote.media || []} onMediaChange={(media) => updateWorkingNote((current) => ({ ...current, media }))} onError={setError} ariaLabel="Note content" />
+            <Suspense fallback={<div className="notes-document-loading" role="status">Opening writing tools…</div>}>
+              <RichDocumentEditor editorApiRef={documentEditorRef} value={workingNote.contentHtml || ''} onChange={(contentHtml) => updateWorkingNote((current) => ({ ...current, contentHtml }))} media={workingNote.media || []} onMediaChange={(media) => updateWorkingNote((current) => ({ ...current, media }))} ariaLabel="Note content" />
+            </Suspense>
             {workingNote.media?.length > 0 && <div className="notes-attachments"><strong>Attachments</strong>{workingNote.media.map((item) => <span key={item.id || item.name}>{isSafeNoteMedia(item) ? <a href={item.dataUrl} download={item.name}>{item.name}</a> : <span title='This legacy file type cannot be downloaded safely.'>{item.name} (unsupported)</span>}<button type='button' aria-label={'Remove ' + item.name} onClick={() => updateWorkingNote((current) => ({ ...current, media: current.media.filter((mediaItem) => mediaItem.id !== item.id) }))}><X size={13} aria-hidden='true' /></button></span>)}</div>}
             {error && <p className="notes-inline-error" role="alert">{error}{recoveryNeedsValidation.current && <button type="button" className="underline" onClick={() => validateRecoveredDraft()} disabled={isValidatingRecovered}>{isValidatingRecovered ? 'Retrying...' : 'Retry load'}</button>}</p>}
             <div className="notes-editor-footer"><span>Updated {dateLabel(workingNote.updatedAt || workingNote.createdAt)}</span><button type="submit" className="notes-secondary-button" disabled={isSaving}>{saveState === 'error' ? 'Retry save' : 'Save now'}</button></div>

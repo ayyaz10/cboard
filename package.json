@@ -18,6 +18,20 @@
     "@tesseract.js-data/eng": "^1.0.0",
     "@tesseract.js-data/por": "^1.0.0",
     "@tesseract.js-data/spa": "^1.0.0",
+    "@tiptap/extension-bubble-menu": "^3.33.0",
+    "@tiptap/extension-color": "^3.33.0",
+    "@tiptap/extension-drag-handle": "^3.33.0",
+    "@tiptap/extension-drag-handle-react": "^3.33.0",
+    "@tiptap/extension-highlight": "^3.33.0",
+    "@tiptap/extension-image": "^3.33.0",
+    "@tiptap/extension-list": "^3.33.0",
+    "@tiptap/extension-node-range": "^3.33.0",
+    "@tiptap/extension-text-align": "^3.33.0",
+    "@tiptap/extension-text-style": "^3.33.0",
+    "@tiptap/pm": "^3.33.0",
+    "@tiptap/react": "^3.33.0",
+    "@tiptap/starter-kit": "^3.33.0",
+    "@tiptap/suggestion": "^3.33.0",
     "@zxing/browser": "^0.2.1",
     "lucide-react": "^1.66.0",
     "motion": "^13.4.2",
@@ -31,6 +45,7 @@
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.4",
     "@vitejs/plugin-react": "^5.0.0",
+    "jsdom": "^31.0.0",
     "tailwindcss": "^4.1.4",
     "vite": "^7.1.0"
   }

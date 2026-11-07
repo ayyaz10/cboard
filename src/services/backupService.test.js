@@ -19,16 +19,25 @@ class FinanceMemoryClient {
 }
 class MemoryQuery {
   constructor(client, table) { this.client = client; this.table = table; this.filters = []; this.operation = 'select'; }
-  select(fields) { this.operation = 'select'; this.fields = fields?.split(',').map(field => field.trim()); return this; }
+  select(fields) { this.operation = 'select'; this.fields = fields && fields !== '*' ? fields.split(',').map(field => field.trim()) : null; return this; }
   delete() { this.operation = 'delete'; return this; }
   eq(column, value) { this.filters.push([column, value]); return this; }
-  matches(row) { return this.filters.every(([key, value]) => row[key] === value); }
+  in(column, values) { this.filters.push([column, values]); return this; }
+  order() { return this; }
+  range(from, to) { this.rowRange = [from, to]; return this; }
+  matches(row) { return this.filters.every(([key, value]) => Array.isArray(value) ? value.includes(row[key]) : row[key] === value); }
   async maybeSingle() {
     const row = this.client.rows.find(value => this.matches(value));
     return { data: row && this.fields ? Object.fromEntries(this.fields.filter(key => key in row).map(key => [key, row[key]])) : row || null, error: null };
   }
   insert(row) { this.operation = 'insert'; this.insertRows = Array.isArray(row) ? row : [row]; return Promise.resolve(this.run()); }
   async run() {
+    if (this.operation === 'select') {
+      const [from = 0, to = Number.MAX_SAFE_INTEGER] = this.rowRange || [];
+      const selected = this.client.rows.filter(row => this.matches(row)).slice(from, to + 1);
+      const data = this.fields ? selected.map(row => Object.fromEntries(this.fields.filter(key => key in row).map(key => [key, row[key]]))) : selected;
+      return { data, error: null };
+    }
     if (this.operation === 'delete') this.client.rows = this.client.rows.filter(row => !this.matches(row));
     if (this.operation === 'insert') this.client.rows.push(...this.insertRows);
     return { error: null };
@@ -281,4 +290,28 @@ test('finance, receipt product links, redacted OCR text, grocery purchase ledger
   assert.equal(parsed.modules.find(module=>module.moduleId==='finance').data.workspace.state.transactions[0].receipt.rawText,'ALDI STORES\n[redacted]');
   assert.equal(parsed.modules.find(module=>module.moduleId==='grocery').data.rows[0].value.receiptPurchaseLedger['tx-1:item-1'].stockAmount,1000);
   assert.equal(parsed.modules.find(module=>module.moduleId==='foodLibrary').data.rows[0].value.items[0].receiptMappings[0].productCode,'335763');
+});
+
+
+test('Notes backup restores block-formatted content through export and import', async () => {
+  const note = {
+    id: '42d2c4cb-97a6-438f-9ad9-27d05dbe6df8', title: 'Release plan',
+    content_html: '<h1>Release plan</h1><p><strong>Bold</strong> and <em>italic</em> with <a href="https://example.com/source" target="_blank" rel="noopener noreferrer">a source</a>.</p><ul><li><p>First item</p></li><li><p>Second item</p></li></ul><ul data-type="taskList"><li data-type="taskItem" data-checked="false"><label><input type="checkbox" disabled aria-label="Task: Review"><span></span></label><div><p>Review</p></div></li></ul><blockquote><p>Quote</p></blockquote><hr><img src="https://example.com/chart.png" alt="Growth chart">',
+    content_text: 'Release plan Bold and italic with a source. First item Second item Review Quote Growth chart',
+    lifecycle_state: 'active', state_before_trash: 'active', pinned_at: null, tags: ['release'],
+    created_at: '2026-11-01T10:00:00.000Z', updated_at: '2026-11-05T09:00:00.000Z',
+  };
+  const source = new FinanceMemoryClient();
+  source.rows = [{ ...note, user_id: 'source-user' }];
+  const exported = await exportBackupData(['notes'], { client: source, userId: 'source-user' });
+  const backup = await backupFor(['goals', 'notes'], { notes: exported.notes.data });
+  const parsed = await parseBackupFile(await asFile(backup));
+  const restoredModule = parsed.modules.find(module => module.moduleId === 'notes').data;
+  assert.deepEqual(restoredModule.notes, [note]);
+
+  const target = new FinanceMemoryClient();
+  await importBackupModule('notes', restoredModule, { client: target, userId: 'target-user' });
+  assert.equal(target.rows[0].user_id, 'target-user');
+  const roundTrip = await exportBackupData(['notes'], { client: target, userId: 'target-user' });
+  assert.deepEqual(roundTrip.notes.data.notes, [note]);
 });

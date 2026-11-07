@@ -10,9 +10,13 @@ const allowedTags = new Set([
   'H2',
   'H3',
   'H4',
+  'HR',
   'I',
   'IMG',
+  'INPUT',
+  'LABEL',
   'LI',
+  'MARK',
   'OL',
   'P',
   'PRE',
@@ -29,16 +33,25 @@ const allowedTags = new Set([
 
 const allowedAttributes = new Set([
   'alt',
+  'aria-label',
+  'checked',
   'class',
   'color',
   'controls',
+  'data-checked',
+  'data-color',
+  'data-type',
+  'disabled',
+  'decoding',
   'face',
   'href',
+  'loading',
   'size',
   'src',
   'style',
   'target',
   'title',
+  'type',
 ]);
 
 export function isSafeNoteUrl(value) {
@@ -47,6 +60,25 @@ export function isSafeNoteUrl(value) {
   return /^(https?:|mailto:|#|\/(?!\/))/i.test(url)
     || /^data:image\/(?:png|jpe?g|gif|webp);base64,/i.test(url)
     || /^data:video\/(?:mp4|webm|ogg);base64,/i.test(url);
+}
+
+export function isSafeNoteLink(value) {
+  const url = String(value || '').trim();
+  return Boolean(url) && !/^data:/i.test(url) && isSafeNoteUrl(url);
+}
+
+function isSafeImageSource(value) {
+  const url = String(value || '').trim();
+  return /^data:image\/(?:png|jpe?g|gif|webp);base64,/i.test(url)
+    || (/^https?:/i.test(url) && isSafeNoteUrl(url))
+    || (url.startsWith('/') && !url.startsWith('//') && isSafeNoteUrl(url));
+}
+
+function isSafeVideoSource(value) {
+  const url = String(value || '').trim();
+  return /^data:video\/(?:mp4|webm|ogg);base64,/i.test(url)
+    || (/^https?:/i.test(url) && isSafeNoteUrl(url))
+    || (url.startsWith('/') && !url.startsWith('//') && isSafeNoteUrl(url));
 }
 
 const safeMediaTypes = new Set([
@@ -116,14 +148,45 @@ function cleanNode(node) {
         return;
       }
 
-      if (name === 'class' && value !== 'note-media-block') {
+      if (name === 'class' && (!(child.tagName === 'IMG' || child.tagName === 'VIDEO') || value !== 'note-media-block')) {
         child.removeAttribute(attribute.name);
         return;
       }
 
-      if ((name === 'href' || name === 'src') && !isSafeNoteUrl(value)) {
+      if (name === 'data-type' && !((child.tagName === 'UL' && value === 'taskList') || (child.tagName === 'LI' && value === 'taskItem'))) {
         child.removeAttribute(attribute.name);
+        return;
       }
+
+      if (name === 'data-checked' && !(child.tagName === 'LI' && /^(true|false)$/i.test(value))) {
+        child.removeAttribute(attribute.name);
+        return;
+      }
+
+      if (name === 'data-color' && !(/^(#[\da-f]{3,8}|rgba?\([\d.,%\s]+\)|hsla?\([\d.,%\s]+\)|[a-z]{1,24})$/i.test(value))) {
+        child.removeAttribute(attribute.name);
+        return;
+      }
+
+      if (name === 'href' && (child.tagName !== 'A' || !isSafeNoteLink(value))) {
+        child.removeAttribute(attribute.name);
+        return;
+      }
+      if (name === 'src' && !((child.tagName === 'IMG' && isSafeImageSource(value)) || (child.tagName === 'VIDEO' && isSafeVideoSource(value)))) {
+        child.removeAttribute(attribute.name);
+        return;
+      }
+      if (name === 'target' && (child.tagName !== 'A' || value !== '_blank')) child.removeAttribute(attribute.name);
+      if (name === 'controls' && child.tagName !== 'VIDEO') child.removeAttribute(attribute.name);
+      if (name === 'loading' && (child.tagName !== 'IMG' || !/^(lazy|eager)$/i.test(value))) child.removeAttribute(attribute.name);
+      if (name === 'decoding' && (child.tagName !== 'IMG' || !/^(async|sync|auto)$/i.test(value))) child.removeAttribute(attribute.name);
+      if (name === 'aria-label' && (child.tagName !== 'INPUT' || value.length > 160)) child.removeAttribute(attribute.name);
+      if ((name === 'type' || name === 'checked' || name === 'disabled') && child.tagName !== 'INPUT') child.removeAttribute(attribute.name);
+      if (child.tagName === 'INPUT') {
+        if (name === 'type' && value.toLowerCase() !== 'checkbox') child.removeAttribute(attribute.name);
+        if ((name === 'checked' || name === 'disabled') && value !== '' && value.toLowerCase() !== name) child.removeAttribute(attribute.name);
+      }
+      if ((name === 'color' || name === 'face' || name === 'size') && child.tagName !== 'FONT') child.removeAttribute(attribute.name);
     });
 
     if (child.tagName === 'A') {
@@ -133,6 +196,11 @@ function cleanNode(node) {
 
     if (child.tagName === 'VIDEO') {
       child.setAttribute('controls', 'controls');
+    }
+
+    if (child.tagName === 'INPUT' && child.getAttribute('type') !== 'checkbox') {
+      child.remove();
+      return;
     }
 
     cleanNode(child);
@@ -150,6 +218,31 @@ export function sanitizeNoteHtml(html) {
   return template.innerHTML;
 }
 
+function legacyFontSize(size) {
+  const sizes = { '1': '10px', '2': '13px', '3': '16px', '4': '18px', '5': '24px', '6': '32px', '7': '48px' };
+  return sizes[String(size || '').trim()] || '';
+}
+
+export function prepareNoteHtmlForEditor(html) {
+  if (!html || typeof window === 'undefined') return '';
+  const template = document.createElement('template');
+  template.innerHTML = sanitizeNoteHtml(html);
+  template.content.querySelectorAll('font').forEach((font) => {
+    const span = document.createElement('span');
+    const styles = [];
+    const color = font.getAttribute('color');
+    const family = font.getAttribute('face');
+    const size = legacyFontSize(font.getAttribute('size'));
+    if (color && /^(#[\da-f]{3,8}|rgba?\([\d.,%\s]+\)|hsla?\([\d.,%\s]+\)|[a-z]{1,24})$/i.test(color)) styles.push('color: ' + color);
+    if (family && /^[\w\s,'-]{1,80}$/.test(family)) styles.push('font-family: ' + family);
+    if (size) styles.push('font-size: ' + size);
+    if (styles.length) span.setAttribute('style', styles.join('; '));
+    span.append(...font.childNodes);
+    font.replaceWith(span);
+  });
+  return sanitizeNoteHtml(template.innerHTML);
+}
+
 export function getTextFromHtml(html) {
   if (!html || typeof window === 'undefined') {
     return '';
@@ -157,7 +250,11 @@ export function getTextFromHtml(html) {
 
   const template = document.createElement('template');
   template.innerHTML = sanitizeNoteHtml(html);
-  return (template.content.textContent || '').replace(/\s+/g, ' ').trim();
+  const imageAlt = [...template.content.querySelectorAll('img[alt]')]
+    .map((image) => image.getAttribute('alt') || '')
+    .filter(Boolean)
+    .join(' ');
+  return ((template.content.textContent || '') + ' ' + imageAlt).replace(/\s+/g, ' ').trim();
 }
 
 export function sortNotes(notes) {

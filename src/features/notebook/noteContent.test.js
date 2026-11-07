@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getNoteLifecycleChanges, getNoteSizeIssue, isSafeNoteMedia, isSafeNoteUrl, matchesNoteSearch } from './noteContent.js';
+import { getNoteLifecycleChanges, getNoteSizeIssue, isSafeNoteLink, isSafeNoteMedia, isSafeNoteUrl, matchesNoteSearch } from './noteContent.js';
 
 test('note search matches title, body text, and tags without case sensitivity', () => {
   const note = {
@@ -52,4 +52,15 @@ test('note attachments accept passive allowlisted file data and reject active HT
   assert.equal(isSafeNoteMedia({ type: 'application/pdf', dataUrl: 'data:application/pdf;base64,YWJj' }), true);
   assert.equal(isSafeNoteMedia({ type: 'image/svg+xml', dataUrl: 'data:image/svg+xml;base64,PHN2Zz4=' }), false);
   assert.equal(isSafeNoteMedia({ type: 'text/html', dataUrl: 'data:text/html;base64,PHNjcmlwdD4=' }), false);
+});
+
+
+test('note links reject data URLs and unsafe protocols while accepting safe destinations', () => {
+  assert.equal(isSafeNoteLink('javascript:alert(1)'), false);
+  assert.equal(isSafeNoteLink('data:image/png;base64,AAAA'), false);
+  assert.equal(isSafeNoteLink('//example.com'), false);
+  assert.equal(isSafeNoteLink('https://example.com'), true);
+  assert.equal(isSafeNoteLink('mailto:notes@example.com'), true);
+  assert.equal(isSafeNoteLink('/notes'), true);
+  assert.equal(isSafeNoteLink('#section'), true);
 });
