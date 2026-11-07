@@ -82,6 +82,7 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
   const [lastSelectedId, setLastSelectedId] = useState(initialNoteId || initialUiState.selectedId || '');
   const [workingNote, setWorkingNote] = useState(null);
   const [tagText, setTagText] = useState('');
+  const [editingProperties, setEditingProperties] = useState({ tracker: false, tags: false });
   const [isNewNote, setIsNewNote] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
@@ -323,6 +324,7 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
         return;
       }
       updateWorkingNote(note);
+      setEditingProperties({ tracker: false, tags: false });
       tagTextRef.current = tagsToText(note.tags);
       setTagText(tagTextRef.current);
       setIsNewNote(false);
@@ -356,6 +358,7 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
     if (initialNoteId) navigateTo('/notes');
     const note = emptyNote();
     updateWorkingNote(note);
+    setEditingProperties({ tracker: false, tags: false });
     tagTextRef.current = '';
     setTagText('');
     setSelectedId(note.id);
@@ -595,8 +598,11 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
             {recovered && <p className="notes-recovered" role="status"><RotateCcw size={15} aria-hidden="true" /> Recovered an unsaved draft from this tab.</p>}
             {draftStorageError && <p className="notes-inline-error" role="status">Browser storage is full. The note remains here, but reload recovery is unavailable until storage is freed.</p>}
             <input ref={titleInputRef} className="notes-title-input" aria-label="Note title" maxLength={240} placeholder="Untitled" value={workingNote.title || ''} onChange={(event) => updateWorkingNote((current) => ({ ...current, title: event.target.value }))} />
-            {goals.length > 0 && <label className="notes-tag-field"><span>Progress tracker link</span><select value={workingNote.linkedGoalId || ''} onChange={(event) => updateWorkingNote((current) => ({ ...current, linkedGoalId: event.target.value }))}><option value="">No tracker</option>{goals.map((goal) => <option value={goal.id} key={goal.id}>{goal.title}</option>)}</select></label>}
-            <label className="notes-tag-field"><span>Tags</span><input value={tagText} maxLength={1547} onChange={(event) => { tagTextRef.current = event.target.value; setTagText(event.target.value); }} placeholder="Add tags, separated by commas" /></label>
+            {(goals.length > 0 || tagText.trim() || editingProperties.tags) && <div className="notes-properties" aria-label="Note properties">
+              {goals.length > 0 && <div className="notes-property"><span>Tracker</span>{editingProperties.tracker ? <select autoFocus aria-label="Progress tracker link" value={workingNote.linkedGoalId || ''} onChange={(event) => updateWorkingNote((current) => ({ ...current, linkedGoalId: event.target.value }))} onBlur={() => setEditingProperties((value) => ({ ...value, tracker: false }))} onKeyDown={(event) => { if (event.key === 'Escape') { event.currentTarget.blur(); } }}><option value="">No tracker</option>{goals.map((goal) => <option value={goal.id} key={goal.id}>{goal.title}</option>)}</select> : <button type="button" aria-label={`Edit tracker, currently ${goals.find((goal) => goal.id === workingNote.linkedGoalId)?.title || 'No tracker'}`} onClick={() => setEditingProperties((value) => ({ ...value, tracker: true }))}>{goals.find((goal) => goal.id === workingNote.linkedGoalId)?.title || 'No tracker'}</button>}</div>}
+              <div className="notes-property"><span>Tags</span>{editingProperties.tags ? <input autoFocus aria-label="Note tags, comma separated" value={tagText} maxLength={1547} onChange={(event) => { tagTextRef.current = event.target.value; setTagText(event.target.value); }} onBlur={() => setEditingProperties((value) => ({ ...value, tags: false }))} onKeyDown={(event) => { if (event.key === 'Escape') event.currentTarget.blur(); }} placeholder="Add tags, separated by commas" /> : <button type="button" aria-label={`Edit tags${tagText.trim() ? `: ${tagText}` : ''}`} onClick={() => setEditingProperties((value) => ({ ...value, tags: true }))}>{tagText.trim() ? tagText.split(',').map((tag) => tag.trim()).filter(Boolean).map((tag) => <span className="notes-property-chip" key={tag}>{tag}</span>) : <span className="notes-property-empty">Add tags</span>}</button>}</div>
+            </div>}
+            {!goals.length && !tagText.trim() && !editingProperties.tags && <button type="button" className="notes-add-property" onClick={() => setEditingProperties((value) => ({ ...value, tags: true }))}>Add tags</button>}
             <NoteEditor workspace value={workingNote.contentHtml || ''} onChange={(contentHtml) => updateWorkingNote((current) => ({ ...current, contentHtml }))} media={workingNote.media || []} onMediaChange={(media) => updateWorkingNote((current) => ({ ...current, media }))} onError={setError} ariaLabel="Note content" />
             {workingNote.media?.length > 0 && <div className="notes-attachments"><strong>Attachments</strong>{workingNote.media.map((item) => <span key={item.id || item.name}>{isSafeNoteMedia(item) ? <a href={item.dataUrl} download={item.name}>{item.name}</a> : <span title='This legacy file type cannot be downloaded safely.'>{item.name} (unsupported)</span>}<button type='button' aria-label={'Remove ' + item.name} onClick={() => updateWorkingNote((current) => ({ ...current, media: current.media.filter((mediaItem) => mediaItem.id !== item.id) }))}><X size={13} aria-hidden='true' /></button></span>)}</div>}
             {error && <p className="notes-inline-error" role="alert">{error}{recoveryNeedsValidation.current && <button type="button" className="underline" onClick={() => validateRecoveredDraft()} disabled={isValidatingRecovered}>{isValidatingRecovered ? 'Retrying...' : 'Retry load'}</button>}</p>}

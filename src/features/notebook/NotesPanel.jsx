@@ -237,7 +237,7 @@ export function NoteEditor({
         </select>
 
         <select
-          className="field-input w-auto min-w-28 px-3 py-2 text-sm shadow-none"
+          className={`field-input w-auto min-w-28 px-3 py-2 text-sm shadow-none${workspace ? ' note-toolbar-secondary-select' : ''}`}
           defaultValue="3"
           onChange={(event) => runCommand('fontSize', event.target.value)}
           title="Font size"
@@ -249,7 +249,7 @@ export function NoteEditor({
         </select>
 
         <select
-          className="field-input w-auto min-w-28 px-3 py-2 text-sm shadow-none"
+          className={`field-input w-auto min-w-28 px-3 py-2 text-sm shadow-none${workspace ? ' note-toolbar-secondary-select' : ''}`}
           defaultValue="Instrument Sans"
           onChange={(event) => runCommand('fontName', event.target.value)}
           title="Font family"
@@ -261,8 +261,8 @@ export function NoteEditor({
         </select>
 
         {toolbarGroups.map((group, groupIndex) => (
-          <div key={groupIndex} className="flex gap-1">
-            {group.map((item) => (
+          (!workspace || groupIndex < 2) && <div key={groupIndex} className={`flex gap-1${workspace ? ` note-toolbar-group-${groupIndex}` : ''}`}>
+            {group.filter((item) => !workspace || (groupIndex === 0 ? ['bold', 'italic', 'underline'].includes(item.command) : ['insertUnorderedList', 'insertOrderedList'].includes(item.command))).map((item) => (
               <button
                 key={item.title}
                 type="button"
@@ -271,7 +271,7 @@ export function NoteEditor({
                 title={item.title}
                 aria-label={item.title}
                 aria-pressed={['bold', 'italic', 'underline', 'strikeThrough', 'insertUnorderedList', 'insertOrderedList'].includes(item.command) ? Boolean(formatState[item.command]) : undefined}
-                className={`min-h-11 min-w-11 rounded-full border border-[var(--border-default)] px-3 text-xs font-bold uppercase text-[var(--color-text)] transition hover:bg-[var(--surface-selected)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--border-focus)] ${formatState[item.command] ? 'bg-[var(--surface-selected)]' : 'bg-[var(--surface-elevated)]'}`}
+                className={`min-h-11 min-w-11 rounded-full border border-[var(--border-default)] px-3 text-xs font-bold uppercase text-[var(--color-text)] transition hover:bg-[var(--surface-selected)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--border-focus)]${workspace ? ' note-toolbar-button' : ''} ${formatState[item.command] ? 'bg-[var(--surface-selected)]' : 'bg-[var(--surface-elevated)]'}`}
               >
                 {item.label}
               </button>
@@ -279,8 +279,21 @@ export function NoteEditor({
           </div>
         ))}
 
+        {workspace && <details className="note-toolbar-overflow">
+          <summary aria-label="More formatting options" title="More formatting options">•••</summary>
+          <div className="note-toolbar-overflow-menu" role="group" aria-label="More formatting options">
+            <select aria-label="Font size" defaultValue="3" onChange={(event) => runCommand('fontSize', event.target.value)}>{fontSizeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+            <select aria-label="Font family" defaultValue="Instrument Sans" onChange={(event) => runCommand('fontName', event.target.value)}>{fontFamilyOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+            {toolbarGroups.flatMap((group) => group).filter((item) => !['bold', 'italic', 'underline', 'insertUnorderedList', 'insertOrderedList'].includes(item.command)).map((item) => <button key={item.title} type="button" aria-label={item.title} title={item.title} onMouseDown={(event) => event.preventDefault()} onClick={() => runCommand(item.command, item.value)}>{item.title}</button>)}
+            <label>Text <input type="color" aria-label="Text color" onChange={(event) => runCommand('foreColor', event.target.value)} /></label>
+            <label>Highlight <input type="color" aria-label="Highlight color" defaultValue="#c5ff6f" onChange={(event) => runCommand('hiliteColor', event.target.value)} /></label>
+            <button type="button" onClick={() => runCommand('removeFormat')}>Clear formatting</button>
+            <button type="button" onClick={() => fileInputRef.current?.click()}>Attach media or file</button>
+          </div>
+        </details>}
+
         <label
-          className="flex h-10 items-center gap-2 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-xs font-bold uppercase text-[var(--color-text)]"
+          className={`flex h-10 items-center gap-2 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-xs font-bold uppercase text-[var(--color-text)]${workspace ? ' note-toolbar-hidden-workspace' : ''}`}
           title="Text color"
           aria-label="Text color"
         >
@@ -293,7 +306,7 @@ export function NoteEditor({
         </label>
 
         <label
-          className="flex h-10 items-center gap-2 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-xs font-bold uppercase text-[var(--color-text)]"
+          className={`flex h-10 items-center gap-2 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-xs font-bold uppercase text-[var(--color-text)]${workspace ? ' note-toolbar-hidden-workspace' : ''}`}
           title="Highlight"
           aria-label="Highlight color"
         >
@@ -326,7 +339,7 @@ export function NoteEditor({
           aria-label="Clear formatting"
           title="Clear formatting"
           onClick={() => runCommand('removeFormat')}
-          className="h-10 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-xs font-bold uppercase text-[var(--color-text)] transition hover:bg-[var(--color-danger-soft)]"
+          className={`h-10 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-xs font-bold uppercase text-[var(--color-text)] transition hover:bg-[var(--color-danger-soft)]${workspace ? ' note-toolbar-hidden-workspace' : ''}`}
         >
           Clear
         </button>
@@ -336,7 +349,7 @@ export function NoteEditor({
           aria-label="Attach media or file"
           title="Attach media or file"
           onClick={() => fileInputRef.current?.click()}
-          className="min-h-11 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-selected)] px-3 text-xs font-bold uppercase text-[var(--color-text)] transition hover:bg-[var(--surface-elevated)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--border-focus)]"
+          className={`min-h-11 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-selected)] px-3 text-xs font-bold uppercase text-[var(--color-text)] transition hover:bg-[var(--surface-elevated)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--border-focus)]${workspace ? ' note-toolbar-hidden-workspace' : ''}`}
         >
           Media
         </button>
