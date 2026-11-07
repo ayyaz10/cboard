@@ -10,7 +10,7 @@ import { WorkspaceTools } from './WorkspaceTools.jsx';
 import { ProfileMenu } from './ProfileMenu.jsx';
 import './appShell.css';
 
-export function PageShell({ children }) {
+export function PageShell({ children, workspace = false }) {
   const { user } = useAuth();
   const route = useRoute();
   const [utilitiesOpen, setUtilitiesOpen] = useState(false);
@@ -30,8 +30,8 @@ export function PageShell({ children }) {
   }, [utilitiesOpen]);
 
   return (
-    <main className="page-shell min-h-screen px-4 pb-6 sm:px-6 lg:px-8">
-      <div className="page-shell-layout mx-auto flex max-w-6xl flex-col gap-4">
+    <main className={`page-shell min-h-screen px-4 pb-6 sm:px-6 lg:px-8${workspace ? ' page-shell--workspace' : ''}`}>
+      <div className={`page-shell-layout mx-auto flex max-w-6xl flex-col gap-4${workspace ? ' page-shell-layout--workspace' : ''}`}>
         <header className="app-shell-header" ref={headerRef} data-utilities-open={utilitiesOpen}>
           <div className="app-shell-header-row">
             <BrandBadge />

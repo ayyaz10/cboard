@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Archive, ArrowLeft, Check, Copy, FilePlus2, Pin, RotateCcw, Search, Trash2, X } from 'lucide-react';
+import { Archive, ArrowLeft, Check, Copy, FilePlus2, Maximize2, Minimize2, MoreHorizontal, Pin, RotateCcw, Search, Trash2, X } from 'lucide-react';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog';
 import { getAppHref, navigateTo } from '../../app/useRoute';
@@ -92,6 +92,11 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
   const [recovered, setRecovered] = useState(false);
   const [isValidatingRecovered, setIsValidatingRecovered] = useState(false);
   const [draftStorageError, setDraftStorageError] = useState(false);
+  const [fullWidth, setFullWidth] = useState(() => {
+    if (!userId || typeof window === 'undefined') return false;
+    try { return window.localStorage.getItem(`cboard:notes-full-width:${userId}`) === 'true'; }
+    catch { return false; }
+  });
   const workingRef = useRef(null);
   const tagTextRef = useRef('');
   const savedSignature = useRef('');
@@ -107,6 +112,8 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
   const listRef = useRef(null);
   const restoredScroll = useRef(false);
   const detailRequest = useRef(0);
+  const editorScrollPositions = useRef(new Map());
+  const editorPaneRef = useRef(null);
 
   const updateWorkingNote = useCallback((next) => {
     const value = typeof next === 'function' ? next(workingRef.current) : next;
@@ -209,6 +216,17 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
       }));
     } catch { /* UI state can fall back to defaults if browser storage is unavailable. */ }
   }, [userId, view, query, sortBy, lastSelectedId, initialUiState.scrollTop]);
+
+  useEffect(() => {
+    if (!userId) return;
+    try { window.localStorage.setItem(`cboard:notes-full-width:${userId}`, String(fullWidth)); }
+    catch { /* A width preference is optional and falls back to the comfortable width. */ }
+  }, [fullWidth, userId]);
+
+  useEffect(() => {
+    if (!selectedId || !editorPaneRef.current) return;
+    editorPaneRef.current.scrollTop = editorScrollPositions.current.get(selectedId) || 0;
+  }, [selectedId]);
 
   useEffect(() => {
     if (isLoading || restoredScroll.current || !listRef.current) return;
@@ -515,8 +533,8 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
   const activeViewLabel = views.find((item) => item.id === view)?.label || 'Notes';
 
   return (
-    <section className="notes-library" aria-label="Notes library">
-      <div className={`notes-library-list${isMobileDetail ? ' notes-mobile-hidden' : ''}`}>
+    <section className="notes-library" aria-label="Notes workspace">
+      <aside className={`notes-library-list${isMobileDetail ? ' notes-mobile-hidden' : ''}`} aria-label="Notes library">
         <header className="notes-library-header">
           <div className="notes-library-heading">
             <div><span className="notes-eyebrow">Your workspace</span><h2>{activeViewLabel}</h2></div>
@@ -548,34 +566,44 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
           {hasMore && <button className="notes-secondary-button notes-load-more" type="button" onClick={() => loadLibrary({ append: true })} disabled={isLoading || isLoadingMore}>{isLoadingMore ? 'Loading...' : 'Load more'}</button>}
           {view === 'trash' && orderedNotes.length > 0 && <button className="notes-danger-button notes-empty-trash" type="button" onClick={handleEmptyTrash}>Empty Trash</button>}
         </div>
-      </div>
+      </aside>
 
-      <div className={`notes-library-editor${!isMobileDetail ? ' notes-mobile-hidden' : ''}`}>
+      <section ref={editorPaneRef} className={`notes-library-editor${!isMobileDetail ? ' notes-mobile-hidden' : ''}`} aria-label="Note editor" data-full-width={fullWidth} onScroll={() => {
+        if (selectedId && editorPaneRef.current) editorScrollPositions.current.set(selectedId, editorPaneRef.current.scrollTop);
+      }}>
         {!selectedId && <div className="notes-editor-placeholder"><FilePlus2 size={25} aria-hidden="true" /><strong>Select a note or create one</strong><span>Your notes save automatically as you write.</span></div>}
       {selectedId && <>
           <div className="notes-editor-topbar"><button type="button" className="notes-back-button" onClick={() => { detailRequest.current += 1; if (initialNoteId) navigateTo('/notes'); else setSelectedId(''); }}><ArrowLeft size={17} aria-hidden="true" /><span>Notes</span></button>
+            {workingNote && <div className="notes-editor-heading"><h2>{workingNote.title.trim() || 'Untitled note'}</h2><span className="notes-save-status" role="status" aria-live="polite">{saveState === 'saving' || isSaving ? 'Saving…' : saveState === 'error' ? 'Could not save' : saveState === 'pending' ? 'Unsaved changes' : <><Check size={14} aria-hidden="true" /> Saved</>}</span>{saveState === 'error' && <button type="button" className="notes-save-retry" onClick={saveNote}>Retry</button>}</div>}
             {workingNote && <div className="notes-actions">
-              {isLifecycleAvailable && (view === 'active' || view === 'pinned') ? <><button type="button" aria-label={workingNote.pinnedAt ? 'Unpin note' : 'Pin note'} onClick={() => runLifecycle('pin')}><Pin size={17} aria-hidden="true" /></button><button type="button" aria-label="Duplicate note" onClick={duplicateCurrentNote}><Copy size={17} aria-hidden="true" /></button><button type="button" aria-label="Archive note" onClick={() => runLifecycle('archive')}><Archive size={17} aria-hidden="true" /></button><button type="button" aria-label="Move note to Trash" onClick={() => runLifecycle('trash')}><Trash2 size={17} aria-hidden="true" /></button></> : null}
-              {isLifecycleAvailable && view === 'archived' && <><button type="button" aria-label="Restore from Archive" onClick={() => runLifecycle('unarchive')}><RotateCcw size={17} aria-hidden="true" /></button><button type="button" aria-label="Move note to Trash" onClick={() => runLifecycle('trash')}><Trash2 size={17} aria-hidden="true" /></button></>}
-              {isLifecycleAvailable && view === 'trash' && <><button type="button" aria-label="Restore note" onClick={() => runLifecycle('restore')}><RotateCcw size={17} aria-hidden="true" /></button><button type="button" aria-label="Delete note permanently" onClick={() => runLifecycle('permanent')}><X size={17} aria-hidden="true" /></button></>}
+              <button type="button" className="notes-width-toggle" aria-label={fullWidth ? 'Use comfortable document width' : 'Use full document width'} aria-pressed={fullWidth} title={fullWidth ? 'Comfortable width' : 'Full width'} onClick={() => setFullWidth((value) => !value)}>{fullWidth ? <Minimize2 size={17} aria-hidden="true" /> : <Maximize2 size={17} aria-hidden="true" />}<span>{fullWidth ? 'Comfortable' : 'Full width'}</span></button>
+              {isLifecycleAvailable && (view === 'active' || view === 'pinned') && <button type="button" className="notes-pin-action" aria-label={workingNote.pinnedAt ? 'Unpin note' : 'Pin note'} title={workingNote.pinnedAt ? 'Unpin note' : 'Pin note'} onClick={() => runLifecycle('pin')}><Pin size={17} aria-hidden="true" /></button>}
+              <details className="notes-more-menu" onClick={(event) => { if (event.target.closest('button')) event.currentTarget.open = false; }} onKeyDown={(event) => { if (event.key === 'Escape') event.currentTarget.open = false; }}>
+                <summary aria-label="More note actions"><MoreHorizontal size={18} aria-hidden="true" /><span>More</span></summary>
+                <div className="notes-more-menu-items" role="group" aria-label="More note actions">
+                  <button type="button" onClick={duplicateCurrentNote}><Copy size={15} aria-hidden="true" /> Duplicate note</button>
+                  {isLifecycleAvailable && (view === 'active' || view === 'pinned') && <><button type="button" onClick={() => runLifecycle('archive')}><Archive size={15} aria-hidden="true" /> Archive note</button><button type="button" onClick={() => runLifecycle('trash')}><Trash2 size={15} aria-hidden="true" /> Move to Trash</button></>}
+                  {isLifecycleAvailable && view === 'archived' && <><button type="button" onClick={() => runLifecycle('unarchive')}><RotateCcw size={15} aria-hidden="true" /> Restore from Archive</button><button type="button" onClick={() => runLifecycle('trash')}><Trash2 size={15} aria-hidden="true" /> Move to Trash</button></>}
+                  {isLifecycleAvailable && view === 'trash' && <><button type="button" onClick={() => runLifecycle('restore')}><RotateCcw size={15} aria-hidden="true" /> Restore note</button><button type="button" className="notes-more-menu-danger" onClick={() => runLifecycle('permanent')}><X size={15} aria-hidden="true" /> Delete permanently</button></>}
+                </div>
+              </details>
             </div>}
           </div>
           {isLoadingDetail && <div className="notes-detail-loading" role="status">Opening note...</div>}
           {error && !workingNote && !isLoadingDetail && <p className="notes-inline-error" role="alert">{error}<button type="button" className="underline" onClick={() => openNote(selectedId)}>Retry</button></p>}
-          {workingNote && <form className="notes-writing-surface" onKeyDown={(event) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); saveNote(); } }} onSubmit={(event) => { event.preventDefault(); saveNote(); }}>
+          {workingNote && <form className="notes-writing-surface" data-full-width={fullWidth} onKeyDown={(event) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); saveNote(); } }} onSubmit={(event) => { event.preventDefault(); saveNote(); }}>
             {recovered && <p className="notes-recovered" role="status"><RotateCcw size={15} aria-hidden="true" /> Recovered an unsaved draft from this tab.</p>}
             {draftStorageError && <p className="notes-inline-error" role="status">Browser storage is full. The note remains here, but reload recovery is unavailable until storage is freed.</p>}
-            <div className="notes-save-status" role="status" aria-live="polite">{saveState === 'saving' || isSaving ? 'Saving...' : saveState === 'error' ? 'Could not save. Your changes are still here.' : saveState === 'pending' ? 'Unsaved changes' : <><Check size={14} aria-hidden="true" /> Saved</>}</div>
             <input ref={titleInputRef} className="notes-title-input" aria-label="Note title" maxLength={240} placeholder="Untitled" value={workingNote.title || ''} onChange={(event) => updateWorkingNote((current) => ({ ...current, title: event.target.value }))} />
             {goals.length > 0 && <label className="notes-tag-field"><span>Progress tracker link</span><select value={workingNote.linkedGoalId || ''} onChange={(event) => updateWorkingNote((current) => ({ ...current, linkedGoalId: event.target.value }))}><option value="">No tracker</option>{goals.map((goal) => <option value={goal.id} key={goal.id}>{goal.title}</option>)}</select></label>}
             <label className="notes-tag-field"><span>Tags</span><input value={tagText} maxLength={1547} onChange={(event) => { tagTextRef.current = event.target.value; setTagText(event.target.value); }} placeholder="Add tags, separated by commas" /></label>
-            <NoteEditor value={workingNote.contentHtml || ''} onChange={(contentHtml) => updateWorkingNote((current) => ({ ...current, contentHtml, contentText: getTextFromHtml(contentHtml) }))} media={workingNote.media || []} onMediaChange={(media) => updateWorkingNote((current) => ({ ...current, media }))} onError={setError} ariaLabel="Note content" />
+            <NoteEditor workspace value={workingNote.contentHtml || ''} onChange={(contentHtml) => updateWorkingNote((current) => ({ ...current, contentHtml }))} media={workingNote.media || []} onMediaChange={(media) => updateWorkingNote((current) => ({ ...current, media }))} onError={setError} ariaLabel="Note content" />
             {workingNote.media?.length > 0 && <div className="notes-attachments"><strong>Attachments</strong>{workingNote.media.map((item) => <span key={item.id || item.name}>{isSafeNoteMedia(item) ? <a href={item.dataUrl} download={item.name}>{item.name}</a> : <span title='This legacy file type cannot be downloaded safely.'>{item.name} (unsupported)</span>}<button type='button' aria-label={'Remove ' + item.name} onClick={() => updateWorkingNote((current) => ({ ...current, media: current.media.filter((mediaItem) => mediaItem.id !== item.id) }))}><X size={13} aria-hidden='true' /></button></span>)}</div>}
             {error && <p className="notes-inline-error" role="alert">{error}{recoveryNeedsValidation.current && <button type="button" className="underline" onClick={() => validateRecoveredDraft()} disabled={isValidatingRecovered}>{isValidatingRecovered ? 'Retrying...' : 'Retry load'}</button>}</p>}
             <div className="notes-editor-footer"><span>Updated {dateLabel(workingNote.updatedAt || workingNote.createdAt)}</span><button type="submit" className="notes-secondary-button" disabled={isSaving}>{saveState === 'error' ? 'Retry save' : 'Save now'}</button></div>
           </form>}
         </>}
-      </div>
+      </section>
       <ConfirmDialog isOpen={Boolean(dialog)} {...dialog} />
     </section>
   );

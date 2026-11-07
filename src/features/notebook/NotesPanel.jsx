@@ -92,6 +92,7 @@ export function NoteEditor({
   onMediaChange = () => {},
   onError = () => {},
   compact = false,
+  workspace = false,
   ariaLabel = 'Note content',
 }) {
   const editorRef = useRef(null);
@@ -123,8 +124,9 @@ export function NoteEditor({
     return () => document.removeEventListener('selectionchange', updateFormatState);
   }, []);
 
-  function syncContent() {
-    onChange(sanitizeNoteHtml(editorRef.current?.innerHTML || ''));
+  function syncContent({ sanitize = true } = {}) {
+    const html = editorRef.current?.innerHTML || '';
+    onChange(workspace && !sanitize ? html : sanitizeNoteHtml(html));
   }
 
   function runCommand(command, commandValue = null) {
@@ -220,8 +222,8 @@ export function NoteEditor({
   }
 
   return (
-    <div className={`min-w-0 rounded-[1.35rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-3 ${compact ? 'habit-rich-editor' : ''}`}>
-      <div className="flex flex-wrap gap-2 border-b border-[var(--border-subtle)] pb-3" role="toolbar" aria-label="Text formatting">
+    <div className={`note-editor-shell min-w-0 rounded-[1.35rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-3 ${compact ? 'habit-rich-editor' : ''} ${workspace ? 'note-editor-shell--workspace' : ''}`}>
+      <div className={`note-editor-toolbar flex flex-wrap gap-2 border-b border-[var(--border-subtle)] pb-3${workspace ? ' note-editor-toolbar--workspace' : ''}`} role="toolbar" aria-label="Text formatting">
         <select
           className="field-input w-auto min-w-36 px-3 py-2 text-sm shadow-none"
           defaultValue="p"
@@ -360,11 +362,11 @@ export function NoteEditor({
         aria-label={ariaLabel}
         aria-multiline="true"
         suppressContentEditableWarning
-        onInput={syncContent}
+        onInput={() => syncContent({ sanitize: !workspace })}
         onBlur={syncContent}
         onPaste={handlePaste}
           onKeyDown={handleEditorKeyDown}
-        className={`note-editor mt-4 ${compact ? 'min-h-24' : 'min-h-80'} rounded-[1rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3 text-base font-medium leading-7 text-[var(--color-text)] caret-[var(--color-text)] outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--border-focus)]`}
+        className={`note-editor mt-4 ${compact ? 'min-h-24' : 'min-h-80'} rounded-[1rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3 text-base font-medium leading-7 text-[var(--color-text)] caret-[var(--color-text)] outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--border-focus)]${workspace ? ' note-editor-canvas--workspace' : ''}`}
         data-placeholder="Start writing..."
       />
     </div>
