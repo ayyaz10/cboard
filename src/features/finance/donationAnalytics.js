@@ -13,6 +13,18 @@ export function donationTransactions(state) {
   return (state.transactions || []).filter(transaction => isActualDonation(transaction, categoriesById) && (!transaction.source || transaction.providerStatus === 'BOOK'));
 }
 
+export function donationPaymentHistory(state) {
+  const categoriesById = new Map((state.categories || []).map(category => [category.id, category]));
+  return (state.transactions || []).filter(transaction => {
+    if (!transaction || !['expense', 'donation'].includes(transaction.type)) return false;
+    if (['allocated', 'planned', 'cancelled'].includes(transaction.allocationStatus)) return false;
+    if (transaction.source && transaction.providerStatus !== 'BOOK') return false;
+    return transaction.type === 'donation' || transaction.financeGroup === 'donation'
+      || categoriesById.get(transaction.categoryId)?.type === 'donation'
+      || Boolean(transaction.donationCategoryId);
+  }).sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+}
+
 export function refreshDonationTargetStatus(state, date = new Date().toISOString().slice(0, 10)) {
   const settledReservations=new Set((state.transactions||[]).filter(item=>!item.reversedAt&&item.type==='expense'&&item.linkedReservationId).map(item=>item.linkedReservationId));
   for (const target of state.donationTargets || []) {
@@ -73,6 +85,30 @@ export function donationSummary(state, month, incomeMonth = month) {
   const position = deriveFinancePosition(state);
   const reserved = Number(position.reserves?.donation || 0);
   const targets = (state.donationTargets || []).filter(target => target.active !== false);
+  const accruals = (state.donationAccruals || []).filter(item => item.status !== 'reversed');
+  const inPeriodAccruals = month ? accruals.filter(item => inMonth(item.effectiveDate, month)) : accruals;
+  const categoryTotals = new Map(categories.map(category => [category.id, { due: 0, paid: 0, paidInPeriod: 0 }]));
+  for (const accrual of accruals) {
+    const row = categoryTotals.get(accrual.categoryId);
+    if (row) row.due += Math.max(0, Number(accrual.accruedAmount ?? accrual.amount ?? 0) - Number(accrual.paidAmount || 0));
+  }
+  for (const transaction of all) {
+    const row = categoryTotals.get(transaction.donationCategoryId);
+    if (row) row.paid += transaction.amount;
+  }
+  for (const transaction of selected) {
+    const row = categoryTotals.get(transaction.donationCategoryId);
+    if (row) row.paidInPeriod += transaction.amount;
+  }
+  const ruleByCategory = new Map();
+  for (const rule of state.allocationRules || []) {
+    if (rule.targetType === 'donation' && (rule.donationCategoryId || rule.categoryId) && !ruleByCategory.has(rule.donationCategoryId || rule.categoryId)) ruleByCategory.set(rule.donationCategoryId || rule.categoryId, rule);
+  }
+  const dueByCategory = categories.map(category => ({ id: category.id, name: category.name, archived: Boolean(category.archived), ...categoryTotals.get(category.id), rule: ruleByCategory.get(category.id) || null }))
+    .filter(row => row.due || row.paid || row.rule || row.archived);
+  const categoryNames = new Map(categories.map(category => [category.id, category.name]));
+  const dueHistory = [...accruals].sort((a, b) => String(b.effectiveDate || '').localeCompare(String(a.effectiveDate || '')) || String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+  const reconciliationCount = accruals.filter(item => item.reconciliationRequired).length;
   return {
     month,
     donated,
@@ -85,8 +121,17 @@ export function donationSummary(state, month, incomeMonth = month) {
     categories: breakdown(selected, categories),
     lifetimeCategories: breakdown(all, categories),
     reserved,
+    dueNow: accruals.reduce((sum, item) => sum + Math.max(0, Number(item.accruedAmount ?? item.amount ?? 0) - Number(item.paidAmount || 0)), 0),
+    dueAdded: inPeriodAccruals.reduce((sum, item) => sum + Number(item.accruedAmount ?? item.amount ?? 0), 0),
+    paidInPeriod: donated,
+    dueMovement: inPeriodAccruals.reduce((sum, item) => sum + Number(item.accruedAmount ?? item.amount ?? 0), 0) - donated,
+    dueByCategory,
+    dueHistory,
+    reconciliationCount,
+    categoryNames,
     targets,
     activeRules: (state.allocationRules || []).filter(rule => rule.targetType === 'donation' && rule.active),
+    pausedRules: (state.allocationRules || []).filter(rule => rule.targetType === 'donation' && !rule.active && !rule.pausedByTarget),
   };
 }
 

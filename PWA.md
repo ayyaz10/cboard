@@ -23,6 +23,12 @@ If moving to a different base path, change Vite's `base` and regenerate everythi
 
 The generated manifest declares CBoard, standalone display, a stable ID/start URL/scope and the existing cream theme. Orientation remains flexible. `public/icons/` contains 192px and 512px icons, a separate maskable 512px icon whose artwork fits the central safe zone, and a 180px Apple touch icon. All reuse `src/assets/cal-favicon.png`; no new brand was introduced. The original favicon remains linked.
 
+The manifest also exposes app shortcuts for Notes (`/notes`), Finance (`/finance`), Food Diary (`/food-diary`), Recipes (`/recipes`) and Habit Improvement (`/habit-improvement`). The generated URLs include the configured deployment base, and app paths come from `src/components/layout/appModules.js`. Supported launchers can show these actions on the installed app icon; availability and the number displayed are controlled by each browser and operating system. Notes and Finance also support item links at `/notes/:id` and `/finance/debt/:id`. Protected links show sign-in and return to the requested local route, including its query string.
+
+### Vite development cache recovery
+
+If localhost shows `504 (Outdated Optimize Dep)` or a lazy route reports `Failed to fetch dynamically imported module`, stop the dev server, run `npm install`, remove only `node_modules/.vite`, then restart with `npm run dev -- --force` and hard-refresh the browser. This cache reset is for Vite's development tooling; it does not clear app or PWA data.
+
 - Chromium: use the browser's Install app menu/address-bar affordance when offered.
 - iPhone/iPad Safari: Share → Add to Home Screen, then open the home-screen icon.
 - Supported macOS Safari versions: File → Add to Dock.

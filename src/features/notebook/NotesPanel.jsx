@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createId } from '../progressTracker/progressTrackerStorage';
-import { getTextFromHtml, sanitizeNoteHtml, sortNotes } from './noteContent';
+import { getTextFromHtml, isSafeNoteMedia, isSafeNoteMediaType, matchesNoteSearch, sanitizeNoteHtml, sortNotes } from './noteContent';
 
 const toolbarGroups = [
   [
@@ -96,12 +96,32 @@ export function NoteEditor({
 }) {
   const editorRef = useRef(null);
   const fileInputRef = useRef(null);
+  const [formatState, setFormatState] = useState({});
 
   useEffect(() => {
     if (editorRef.current && editorRef.current.innerHTML !== value) {
       editorRef.current.innerHTML = sanitizeNoteHtml(value || '');
     }
   }, [value]);
+
+  useEffect(() => {
+    function updateFormatState() {
+      if (!editorRef.current?.contains(document.activeElement)) {
+        setFormatState({});
+        return;
+      }
+      setFormatState({
+        bold: document.queryCommandState('bold'),
+        italic: document.queryCommandState('italic'),
+        underline: document.queryCommandState('underline'),
+        strikeThrough: document.queryCommandState('strikeThrough'),
+        insertUnorderedList: document.queryCommandState('insertUnorderedList'),
+        insertOrderedList: document.queryCommandState('insertOrderedList'),
+      });
+    }
+    document.addEventListener('selectionchange', updateFormatState);
+    return () => document.removeEventListener('selectionchange', updateFormatState);
+  }, []);
 
   function syncContent() {
     onChange(sanitizeNoteHtml(editorRef.current?.innerHTML || ''));
@@ -113,21 +133,50 @@ export function NoteEditor({
     syncContent();
   }
 
+  function handleEditorKeyDown(event) {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+    const key = event.key.toLowerCase();
+    const commands = { b: 'bold', i: 'italic', u: 'underline' };
+    if (commands[key]) {
+      event.preventDefault();
+      runCommand(commands[key]);
+    } else if (key === 'k') {
+      event.preventDefault();
+      const href = window.prompt('Paste a link');
+      if (href) runCommand('createLink', href);
+    }
+  }
+
   async function handleFiles(files) {
     const nextFiles = [...files];
     const nextMedia = [];
+    let addedBytes = 0;
 
     for (const file of nextFiles) {
+      if (media.length + nextMedia.length >= 24) {
+        onError('A note can have up to 24 attachments.');
+        continue;
+      }
       if (file.size > 12 * 1024 * 1024) {
         onError(`${file.name} is larger than 12 MB.`);
         continue;
       }
+      const attachmentType = file.type || 'application/octet-stream';
+      if (!isSafeNoteMediaType(attachmentType)) {
+        onError(`${file.name} uses a file type that Notes cannot attach safely.`);
+        continue;
+      }
+      if (media.reduce((total, item) => total + (Number(item.size) || 0), 0) + addedBytes + file.size > 32 * 1024 * 1024) {
+        onError('Attachments in a note can total up to 32 MB.');
+        continue;
+      }
+      addedBytes += file.size;
 
       const dataUrl = await fileToDataUrl(file);
       const attachment = {
         id: createId('media'),
         name: file.name,
-        type: file.type || 'application/octet-stream',
+        type: attachmentType,
         size: file.size,
         dataUrl,
         createdAt: new Date().toISOString(),
@@ -162,17 +211,23 @@ export function NoteEditor({
     }
 
     event.preventDefault();
-    runCommand('insertHTML', html ? sanitizeNoteHtml(html) : text);
+    if (html) runCommand('insertHTML', sanitizeNoteHtml(html));
+    else {
+      editorRef.current?.focus();
+      document.execCommand('insertText', false, text);
+      syncContent();
+    }
   }
 
   return (
-    <div className={`rounded-[1.35rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-3 shadow-[4px_4px_0_#000] ${compact ? 'habit-rich-editor' : ''}`}>
-      <div className="flex flex-wrap gap-2 border-b-2 border-black/15 pb-3">
+    <div className={`min-w-0 rounded-[1.35rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-3 ${compact ? 'habit-rich-editor' : ''}`}>
+      <div className="flex flex-wrap gap-2 border-b border-[var(--border-subtle)] pb-3" role="toolbar" aria-label="Text formatting">
         <select
           className="field-input w-auto min-w-36 px-3 py-2 text-sm shadow-none"
           defaultValue="p"
           onChange={(event) => runCommand('formatBlock', event.target.value)}
           title="Text style"
+          aria-label="Text style"
         >
           {blockOptions.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
@@ -184,6 +239,7 @@ export function NoteEditor({
           defaultValue="3"
           onChange={(event) => runCommand('fontSize', event.target.value)}
           title="Font size"
+          aria-label="Font size"
         >
           {fontSizeOptions.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
@@ -195,6 +251,7 @@ export function NoteEditor({
           defaultValue="Instrument Sans"
           onChange={(event) => runCommand('fontName', event.target.value)}
           title="Font family"
+          aria-label="Font family"
         >
           {fontFamilyOptions.map((option) => (
             <option key={option.value} value={option.value}>{option.label}</option>
@@ -207,9 +264,12 @@ export function NoteEditor({
               <button
                 key={item.title}
                 type="button"
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={() => runCommand(item.command, item.value)}
                 title={item.title}
-                className="h-10 min-w-10 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-xs font-bold uppercase text-[var(--color-text)] transition hover:bg-[var(--color-accent-hover)]"
+                aria-label={item.title}
+                aria-pressed={['bold', 'italic', 'underline', 'strikeThrough', 'insertUnorderedList', 'insertOrderedList'].includes(item.command) ? Boolean(formatState[item.command]) : undefined}
+                className={`min-h-11 min-w-11 rounded-full border border-[var(--border-default)] px-3 text-xs font-bold uppercase text-[var(--color-text)] transition hover:bg-[var(--surface-selected)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--border-focus)] ${formatState[item.command] ? 'bg-[var(--surface-selected)]' : 'bg-[var(--surface-elevated)]'}`}
               >
                 {item.label}
               </button>
@@ -220,6 +280,7 @@ export function NoteEditor({
         <label
           className="flex h-10 items-center gap-2 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-xs font-bold uppercase text-[var(--color-text)]"
           title="Text color"
+          aria-label="Text color"
         >
           Text
           <input
@@ -232,6 +293,7 @@ export function NoteEditor({
         <label
           className="flex h-10 items-center gap-2 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-xs font-bold uppercase text-[var(--color-text)]"
           title="Highlight"
+          aria-label="Highlight color"
         >
           Mark
           <input
@@ -244,6 +306,8 @@ export function NoteEditor({
 
         <button
           type="button"
+          aria-label="Insert or edit link"
+          title="Insert or edit link"
           onClick={() => {
             const href = window.prompt('Paste a link');
             if (href) {
@@ -257,6 +321,8 @@ export function NoteEditor({
 
         <button
           type="button"
+          aria-label="Clear formatting"
+          title="Clear formatting"
           onClick={() => runCommand('removeFormat')}
           className="h-10 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-xs font-bold uppercase text-[var(--color-text)] transition hover:bg-[var(--color-danger-soft)]"
         >
@@ -265,8 +331,10 @@ export function NoteEditor({
 
         <button
           type="button"
+          aria-label="Attach media or file"
+          title="Attach media or file"
           onClick={() => fileInputRef.current?.click()}
-          className="h-10 rounded-full border-2 border-[var(--border-default)] bg-[#9fe3ff] px-3 text-xs font-bold uppercase text-[var(--color-text)] transition hover:bg-[var(--surface-elevated)]"
+          className="min-h-11 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-selected)] px-3 text-xs font-bold uppercase text-[var(--color-text)] transition hover:bg-[var(--surface-elevated)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--border-focus)]"
         >
           Media
         </button>
@@ -295,7 +363,8 @@ export function NoteEditor({
         onInput={syncContent}
         onBlur={syncContent}
         onPaste={handlePaste}
-        className={`note-editor mt-4 ${compact ? 'min-h-24' : 'min-h-80'} rounded-[1rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3 text-base font-medium leading-7 text-[var(--color-text)] outline-none focus:shadow-[4px_4px_0_#000]`}
+          onKeyDown={handleEditorKeyDown}
+        className={`note-editor mt-4 ${compact ? 'min-h-24' : 'min-h-80'} rounded-[1rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-3 text-base font-medium leading-7 text-[var(--color-text)] caret-[var(--color-text)] outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--border-focus)]`}
         data-placeholder="Start writing..."
       />
     </div>
@@ -309,6 +378,7 @@ export function NotesPanel({
   onSaveNote,
   onDeleteNote,
   isSaving = false,
+  autoSave = false,
 }) {
   const loadedNote = useRef(null);
   const [selectedNoteId, setSelectedNoteId] = useState('');
@@ -319,9 +389,17 @@ export function NotesPanel({
   const [tagText, setTagText] = useState('');
   const [media, setMedia] = useState([]);
   const [error, setError] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [saveState, setSaveState] = useState('saved');
+  const savedSignature = useRef('');
+  const saveInFlight = useRef(false);
 
   const sortedNotes = useMemo(() => sortNotes(notes), [notes]);
+  const visibleNotes = useMemo(() => {
+    return sortedNotes.filter((note) => matchesNoteSearch(note, searchQuery));
+  }, [searchQuery, sortedNotes]);
   const selectedNote = draft || sortedNotes.find((note) => note.id === selectedNoteId) || null;
+  const editorSignature = JSON.stringify({ title, contentHtml, linkedGoalId, tagText, media });
   const isGoalLocked = Boolean(activeGoal?.id);
 
   useEffect(() => {
@@ -363,6 +441,14 @@ export function NotesPanel({
     setLinkedGoalId(isGoalLocked ? activeGoal.id : selectedNote.linkedGoalId || '');
     setTagText((selectedNote.tags || []).join(', '));
     setMedia(selectedNote.media || []);
+    savedSignature.current = JSON.stringify({
+      title: selectedNote.title || '',
+      contentHtml: selectedNote.contentHtml || '',
+      linkedGoalId: isGoalLocked ? activeGoal.id : selectedNote.linkedGoalId || '',
+      tagText: (selectedNote.tags || []).join(', '),
+      media: selectedNote.media || [],
+    });
+    setSaveState('saved');
     setError('');
   }, [activeGoal?.id, isGoalLocked, selectedNote?.id, selectedNote?.updatedAt]);
 
@@ -370,14 +456,18 @@ export function NotesPanel({
     const nextDraft = getEmptyDraft(activeGoal?.id || '');
     setDraft(nextDraft);
     setSelectedNoteId(nextDraft.id);
+    savedSignature.current = JSON.stringify({ title: '', contentHtml: '', linkedGoalId: activeGoal?.id || '', tagText: '', media: [] });
+    setSaveState('saved');
   }
 
   async function handleSave(event) {
-    event.preventDefault();
+    event?.preventDefault();
+
+    if (!selectedNote || isSaving || saveInFlight.current) return;
 
     const nextContentHtml = sanitizeNoteHtml(contentHtml);
     const contentText = getTextFromHtml(nextContentHtml);
-    const nextTitle = title.trim() || contentText.slice(0, 54) || 'Untitled note';
+    const nextTitle = title.trim() || 'Untitled note';
 
     if (!contentText && media.length === 0) {
       setError('Write a note or attach media first.');
@@ -385,6 +475,9 @@ export function NotesPanel({
     }
 
     setError('');
+    setSaveState('saving');
+    const signatureAtSave = editorSignature;
+    saveInFlight.current = true;
 
     try {
       const savedNote = await onSaveNote({
@@ -400,13 +493,29 @@ export function NotesPanel({
       });
 
       loadedNote.current = savedNote;
+      savedSignature.current = signatureAtSave;
+      setSaveState('saved');
       setError('');
       setDraft(null);
       setSelectedNoteId(savedNote?.id || selectedNote?.id || '');
     } catch (saveError) {
-      setError(saveError.message);
+      setError(saveError.message?.includes('changed elsewhere')
+        ? saveError.message
+        : 'Could not save changes. Your text is still here. Try again.');
+      setSaveState('error');
+    } finally {
+      saveInFlight.current = false;
     }
   }
+
+  useEffect(() => {
+    if (!autoSave || !selectedNote || editorSignature === savedSignature.current) return undefined;
+    if (!getTextFromHtml(contentHtml) && !title.trim() && media.length === 0) return undefined;
+
+    setSaveState('pending');
+    const timeout = window.setTimeout(() => handleSave(), 850);
+    return () => window.clearTimeout(timeout);
+  }, [autoSave, selectedNote?.id, editorSignature]);
 
   async function handleDelete() {
     if (!selectedNote) {
@@ -433,8 +542,8 @@ export function NotesPanel({
   }
 
   return (
-    <div className="notes-workspace grid items-start gap-5 xl:grid-cols-[0.78fr_1.22fr]">
-      <aside className="notes-sidebar rounded-[1.75rem] border-2 border-[var(--border-default)] bg-[#9fe3ff] p-4 sm:p-5">
+    <div className="notes-workspace grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(18rem,0.78fr)_minmax(0,1.22fr)]">
+      <aside className="notes-sidebar min-w-0 rounded-[1.25rem] border-2 border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 sm:p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--color-text-muted)]">
@@ -453,7 +562,19 @@ export function NotesPanel({
           </button>
         </div>
 
-        <div className="mt-5 grid gap-3">
+        <label className="mt-5 block">
+          <span className="sr-only">Search notes</span>
+          <input
+            className="field-input"
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search notes"
+            aria-label="Search notes"
+          />
+        </label>
+
+        <div className="mt-3 grid gap-3">
           {draft ? (
             <button
               type="button"
@@ -468,13 +589,13 @@ export function NotesPanel({
             </button>
           ) : null}
 
-          {sortedNotes.length === 0 && !draft ? (
+          {visibleNotes.length === 0 && !draft ? (
             <div className="rounded-[1.15rem] border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-5 text-sm font-bold leading-6 text-[var(--color-text-secondary)]">
-              No notes yet.
+              {searchQuery ? 'No notes match this search.' : 'No notes yet.'}
             </div>
           ) : null}
 
-          {sortedNotes.map((note) => {
+          {visibleNotes.map((note) => {
             const isActive = note.id === selectedNoteId && !draft;
             const linkedGoal = goals.find((goal) => goal.id === note.linkedGoalId);
 
@@ -496,8 +617,8 @@ export function NotesPanel({
                 <span className="block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-muted)]">
                   {formatDate(note.updatedAt || note.createdAt)}
                 </span>
-                <span className="mt-2 block break-words text-lg font-bold text-[var(--color-text)]">
-                  {note.title}
+                <span className="mt-2 block break-words text-base font-bold text-[var(--color-text)]">
+                  {note.title || 'Untitled'}
                 </span>
                 <span className="mt-2 line-clamp-2 block text-sm font-semibold leading-6 text-[var(--color-text-secondary)]">
                   {note.contentText || `${note.media.length} media attachment${note.media.length === 1 ? '' : 's'}`}
@@ -513,9 +634,14 @@ export function NotesPanel({
         </div>
       </aside>
 
-      <section className="notes-editor-panel rounded-[1.75rem] border-2 border-[var(--border-default)] bg-[var(--color-warning-soft)] p-4 sm:p-5">
+      <section className="notes-editor-panel min-w-0 rounded-[1.25rem] border-2 border-[var(--border-default)] bg-[var(--surface-secondary)] p-3 sm:p-4">
         {selectedNote ? (
           <form onSubmit={handleSave} className="grid gap-4">
+            {autoSave ? (
+              <p className="text-xs font-semibold text-[var(--color-text-muted)]" role="status" aria-live="polite">
+                {saveState === 'saving' || isSaving ? 'Saving…' : saveState === 'pending' ? 'Unsaved changes' : saveState === 'error' ? 'Couldn’t save changes. Your text is still here.' : 'Saved'}
+              </p>
+            ) : null}
             <div className="grid gap-4 md:grid-cols-[1fr_0.65fr]">
               <label className="block">
                 <span className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
@@ -578,14 +704,9 @@ export function NotesPanel({
                       key={item.id}
                       className="inline-flex items-center gap-2 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-1 text-xs font-bold text-[var(--color-text)]"
                     >
-                      <a
-                        href={item.dataUrl}
-                        download={item.name}
-                        className="max-w-44 truncate underline"
-                        title={item.name}
-                      >
-                        {item.name}
-                      </a>
+                      {isSafeNoteMedia(item)
+                        ? <a href={item.dataUrl} download={item.name} className="max-w-44 truncate underline" title={item.name}>{item.name}</a>
+                        : <span className="max-w-44 truncate" title="This legacy file type cannot be downloaded safely.">{item.name} (unsupported)</span>}
                       <button
                         type="button"
                         onClick={() => setMedia((current) => current.filter((mediaItem) => mediaItem.id !== item.id))}
@@ -612,7 +733,7 @@ export function NotesPanel({
                 disabled={isSaving}
                 className="inline-flex flex-1 items-center justify-center rounded-full border-2 border-[var(--border-default)] bg-[var(--color-accent)] px-5 py-3 text-sm font-bold uppercase tracking-[0.12em] text-[var(--color-accent-contrast)] shadow-[4px_4px_0_#000] transition hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_#000] disabled:cursor-not-allowed disabled:opacity-55"
               >
-                {isSaving ? 'Saving...' : 'Save note'}
+                {isSaving ? 'Saving…' : saveState === 'error' ? 'Retry save' : 'Save note'}
               </button>
               <button
                 type="button"

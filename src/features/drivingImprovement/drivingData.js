@@ -80,14 +80,47 @@ export function archiveHabitArea(data, habitId, now = new Date().toISOString()) 
   if (!habit) return data;
   const linked = data.backlogItems.find(item => item.promotedHabitId === habitId);
   const archivedIdea = linked
-    ? { ...linked, state: 'ARCHIVED', promotedHabitId: undefined, promotedAt: undefined, backloggedAt: undefined, archivedAt: now, updatedAt: now }
-    : { ...makeBacklogItem({ title: habit.name, note: habit.description }, habit.userId, now), state: 'ARCHIVED', archivedAt: now };
+    ? { ...linked, state: 'ARCHIVED', archivedAt: now, updatedAt: now }
+    : { ...makeBacklogItem({ title: habit.name, note: habit.description }, habit.userId, now), state: 'ARCHIVED', promotedHabitId: habit.id, promotedAt: habit.activatedAt || habit.createdAt || now, archivedAt: now };
   const next = {
     ...data,
     habits: data.habits.map(entry => entry.id === habitId ? { ...entry, archivedAt: now, updatedAt: now } : entry),
     backlogItems: linked ? data.backlogItems.map(item => item.id === linked.id ? archivedIdea : item) : [...data.backlogItems, archivedIdea],
   };
   return validateHabitData(next);
+}
+
+export function restoreArchivedHabitArea(data, habitId, now = new Date().toISOString()) {
+  const habit = data.habits.find(entry => entry.id === habitId && entry.archivedAt);
+  if (!habit) return data;
+  const lifecycleState = HABIT_LIFECYCLE_STATES.includes(habit.lifecycleState) ? habit.lifecycleState : 'ACTIVE';
+  let linked = data.backlogItems.find(item => item.promotedHabitId === habitId && item.state === 'ARCHIVED');
+  // Older archive records dropped the relationship; reconnect the matching archive snapshot.
+  if (!linked) {
+    const matchingSnapshots = data.backlogItems.filter(item => item.state === 'ARCHIVED' && !item.promotedHabitId && item.title === habit.name);
+    if (matchingSnapshots.length === 1) linked = matchingSnapshots[0];
+  }
+  const replacement = linked
+    ? { ...linked, state: lifecycleState === 'BACKLOG' ? 'BACKLOG' : 'PROMOTED', promotedHabitId: habit.id, promotedAt: linked.promotedAt || habit.activatedAt || habit.createdAt || now, backloggedAt: lifecycleState === 'BACKLOG' ? linked.backloggedAt || habit.backloggedAt || now : null, archivedAt: null, updatedAt: now }
+    : { ...makeBacklogItem({ title: habit.name, note: habit.description }, habit.userId, now), state: lifecycleState === 'BACKLOG' ? 'BACKLOG' : 'PROMOTED', promotedHabitId: habit.id, promotedAt: habit.activatedAt || habit.createdAt || now, backloggedAt: lifecycleState === 'BACKLOG' ? habit.backloggedAt || now : null };
+  const next = {
+    ...data,
+    habits: data.habits.map(entry => entry.id === habitId ? { ...entry, archivedAt: null, lifecycleState, updatedAt: now } : entry),
+    backlogItems: linked
+      ? data.backlogItems.map(item => item.id === linked.id ? replacement : item)
+      : [...data.backlogItems, replacement],
+  };
+  return validateHabitData(next);
+}
+
+export function restoreArchivedBacklogEntry(data, itemId, now = new Date().toISOString()) {
+  const item = data.backlogItems.find(entry => entry.id === itemId && entry.state === 'ARCHIVED');
+  if (!item) return data;
+  if (item.promotedHabitId) return restoreArchivedHabitArea(data, item.promotedHabitId, now);
+  return validateHabitData({
+    ...data,
+    backlogItems: data.backlogItems.map(entry => entry.id === itemId ? { ...entry, state: 'BACKLOG', archivedAt: null, updatedAt: now } : entry),
+  });
 }
 
 export const getActiveHabits = data => (data.habits || []).filter(habit => !habit.archivedAt && habit.lifecycleState !== 'BACKLOG');
@@ -160,10 +193,11 @@ export function validateHabitData(data) {
   const backlogIds = new Set(), linkedHabitIds = new Set();
   for (const item of data.backlogItems) {
     if (!item || typeof item.id !== 'string' || backlogIds.has(item.id) || typeof item.title !== 'string' || !item.title.trim() || item.title.length > 160 || typeof item.note !== 'string' || item.note.length > 2000 || (item.type !== null && !BACKLOG_TYPES.includes(item.type)) || (item.priority !== null && !IMPROVEMENT_PRIORITIES.includes(item.priority)) || !BACKLOG_STATES.includes(item.state) || (item.archivedAt != null && typeof item.archivedAt !== 'string') || (item.backloggedAt != null && typeof item.backloggedAt !== 'string')) throw new Error('Improvement backlog data is invalid.');
-    if (item.state === 'PROMOTED' || (item.state === 'BACKLOG' && item.promotedHabitId)) {
+    if (item.state === 'PROMOTED' || ((item.state === 'BACKLOG' || item.state === 'ARCHIVED') && item.promotedHabitId)) {
       const linkedHabit = habitsById.get(item.promotedHabitId);
       const expectedState = item.state === 'PROMOTED' ? 'ACTIVE' : 'BACKLOG';
-      if (!linkedHabit || linkedHabit.archivedAt || linkedHabit.lifecycleState !== expectedState || (item.userId && linkedHabit.userId && item.userId !== linkedHabit.userId) || typeof item.promotedAt !== 'string' || linkedHabitIds.has(linkedHabit.id)) throw new Error('Improvement backlog promotion link is invalid.');
+      const archivedPair = item.state === 'ARCHIVED' && linkedHabit?.archivedAt;
+      if (!linkedHabit || (!archivedPair && (linkedHabit.archivedAt || linkedHabit.lifecycleState !== expectedState)) || (item.userId && linkedHabit.userId && item.userId !== linkedHabit.userId) || typeof item.promotedAt !== 'string' || linkedHabitIds.has(linkedHabit.id)) throw new Error('Improvement backlog promotion link is invalid.');
       linkedHabitIds.add(linkedHabit.id);
     } else if (item.promotedHabitId != null || item.promotedAt != null) throw new Error('Unpromoted ideas cannot link to an active Habit.');
     backlogIds.add(item.id);
@@ -227,6 +261,15 @@ export function sortImprovementItems(items) {
   return [...items].sort((a, b) => status[a.status] - status[b.status] || priority[a.priority] - priority[b.priority] || a.sortOrder - b.sortOrder || (b.updatedAt || '').localeCompare(a.updatedAt || ''));
 }
 
+export function searchImprovementNodes(nodes, query) {
+  const normalized = String(query || '').trim().toLocaleLowerCase();
+  if (!normalized) return [...nodes];
+  return nodes.filter(node => [
+    node.title, node.description, node.whyItHappens, node.whatIDoDifferently, node.richNotes,
+    ...getNodePath(nodes, node.id).map(part => part.title),
+  ].some(value => value?.toLocaleLowerCase().includes(normalized)));
+}
+
 export function getQuickReviewItems(nodes, includeStable = false) {
   const active = nodes.filter(node => !node.archivedAt && !getNodePath(nodes, node.id).some(part => part.archivedAt));
   return active.filter(node => {
@@ -268,7 +311,21 @@ export function reorderNode(nodes, nodeId, direction) {
 
 export function archiveNodeBranch(nodes, nodeId, archivedAt = new Date().toISOString()) {
   const ids = new Set([nodeId, ...getDescendantNodes(nodes, nodeId).map(node => node.id)]);
-  return nodes.map(node => ids.has(node.id) ? { ...node, archivedAt, updatedAt: archivedAt } : node);
+  return nodes.map(node => ids.has(node.id) && !node.archivedAt ? { ...node, archivedAt, updatedAt: archivedAt } : node);
+}
+
+export function isNodeBranchArchived(nodes, nodeId) {
+  return getNodePath(nodes, nodeId).some(node => Boolean(node.archivedAt));
+}
+
+export function restoreNodeBranch(nodes, nodeId) {
+  const path = getNodePath(nodes, nodeId);
+  const archivedRoot = path.find(node => node.archivedAt);
+  if (!archivedRoot) return nodes;
+  const ids = new Set([archivedRoot.id, ...getDescendantNodes(nodes, archivedRoot.id).map(node => node.id)]);
+  return nodes.map(node => ids.has(node.id) && node.archivedAt === archivedRoot.archivedAt
+    ? { ...node, archivedAt: null, updatedAt: new Date().toISOString() }
+    : node);
 }
 
 export function deleteNodeBranch(nodes, nodeId) {
@@ -295,7 +352,7 @@ export function archiveBacklogEntry(data, itemId, now = new Date().toISOString()
   return validateHabitData({
     ...data,
     habits: linkedHabitId ? data.habits.map(habit => habit.id === linkedHabitId ? { ...habit, archivedAt: now, updatedAt: now } : habit) : data.habits,
-    backlogItems: data.backlogItems.map(entry => entry.id === itemId ? { ...entry, state: 'ARCHIVED', promotedHabitId: undefined, promotedAt: undefined, backloggedAt: undefined, archivedAt: now, updatedAt: now } : entry),
+    backlogItems: data.backlogItems.map(entry => entry.id === itemId ? { ...entry, state: 'ARCHIVED', archivedAt: now, updatedAt: now } : entry),
   });
 }
 

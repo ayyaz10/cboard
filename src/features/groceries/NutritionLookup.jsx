@@ -72,7 +72,7 @@ export function FoodPicker({ name = '', active, visible, onSelect, onManual, onC
   const [activeIndex, setActiveIndex] = useState(-1);
   useEffect(() => { setQuery(name || ''); }, [name]);
   useEffect(() => {
-    if (!visible || !active || window.matchMedia?.('(pointer: coarse)').matches) return;
+    if (!visible || !active) return;
     const timer = window.setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 60);
     return () => window.clearTimeout(timer);
   }, [visible, active]);

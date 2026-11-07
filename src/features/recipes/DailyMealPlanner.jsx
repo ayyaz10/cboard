@@ -3,12 +3,16 @@ import { useEffect, useRef, useState } from 'react';
 import { getPreference, setPreference } from '../../services/preferenceService';
 import { PrimaryButton } from '../../components/ui/PrimaryButton';
 import { RecipeLink, secondaryButton } from './RecipeComponents';
+import { navigateTo } from '../../app/useRoute.js';
 import {
   MEAL_SLOTS,
   MACROS,
   emptyMealPlan,
   calculateMealPlan,
   readMealRoutine,
+  DATED_PLAN_KEY,
+  readDatedMealPlans,
+  setDatedMealPlan,
 } from './mealPlanData';
 import { MealRoutine } from './MealRoutine';
 import { QuickRoutines } from './QuickRoutines';
@@ -26,6 +30,8 @@ const format = (value) =>
   new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(value);
 
 export function DailyMealPlanner({ recipes, nutritionGoals }) {
+  const requestedDate = new URLSearchParams(window.location.search).get('date') || '';
+  const [planDate, setPlanDate] = useState(() => /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) ? requestedDate : '');
   const [entries, setEntries] = useState(emptyMealPlan);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -48,6 +54,17 @@ export function DailyMealPlanner({ recipes, nutritionGoals }) {
     setLoading(true);
     setLoadError('');
     try {
+      if (planDate) {
+        const dated = readDatedMealPlans(await getPreference(DATED_PLAN_KEY));
+        const entries = dated.dates[planDate] ?? emptyMealPlan();
+        const saved = { version: 1, name: `Plan for ${planDate}`, notes: '', entries };
+        setRoutine(saved);
+        setEntries(entries);
+        setName(saved.name);
+        setNotes('');
+        setEditing(!entries.some(entry => entry.slug));
+        return;
+      }
       const plan = await getPreference(STORAGE_KEY);
       const stored = plan == null ? null : readMealRoutine(plan);
       setRoutine(stored);
@@ -63,7 +80,7 @@ export function DailyMealPlanner({ recipes, nutritionGoals }) {
   }
   useEffect(() => {
     load();
-  }, []);
+  }, [planDate]);
   const update = (next) => {
     setEntries(next);
     setDirty(true);
@@ -88,7 +105,10 @@ export function DailyMealPlanner({ recipes, nutritionGoals }) {
       );
       if (!next.entries.some((entry) => entry.slug))
         throw new Error('Choose at least one recipe for your routine.');
-      await setPreference(STORAGE_KEY, next);
+      if (planDate) {
+        const current = await getPreference(DATED_PLAN_KEY);
+        await setPreference(DATED_PLAN_KEY, setDatedMealPlan(current, planDate, next.entries));
+      } else await setPreference(STORAGE_KEY, next);
       setRoutine(next);
       setEntries(next.entries);
       setName(next.name);
@@ -111,7 +131,9 @@ export function DailyMealPlanner({ recipes, nutritionGoals }) {
     <div className="daily-meal-planner space-y-5">
       <header className="space-y-3">
         <span className="pill">Daily meals</span>
-        <h1 className="text-4xl font-bold">Daily Meal Planner</h1>
+        <h1 className="text-4xl font-bold">{planDate ? `Meal plan · ${planDate}` : 'Daily Meal Planner'}</h1>
+        <label className="inline-flex items-center gap-2 text-sm font-semibold">Plan for a date<input type="date" value={planDate || requestedDate} onChange={event => { const next = event.target.value; if (next) { navigateTo(`/recipes/planner/day?date=${encodeURIComponent(next)}`); setPlanDate(next); } }} /></label>
+        {planDate && <button type="button" className={secondaryButton} onClick={() => { setPlanDate(''); navigateTo('/recipes/planner/day'); }}>Everyday routine</button>}
         <RecipeLink to="/food-diary">Food diary · log meals & view history</RecipeLink>
         <p className="leading-7 text-[var(--color-text-secondary)]">
           Choose your meals to see what you’ll eat and the combined calories,

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { isSupabaseConfigured, requireSupabase, supabase } from '../lib/supabaseClient';
 import { getCurrentProfile, normalizeUsername, saveCurrentProfile } from '../services/profileService';
 
@@ -24,6 +24,15 @@ function withTimeout(promise, timeoutMs, message) {
   });
 }
 
+function clearPrivateNotesListCache() {
+  try {
+    for (let index = window.sessionStorage.length - 1; index >= 0; index -= 1) {
+      const key = window.sessionStorage.key(index);
+      if (key?.startsWith('cboard:notes-library:v1:')) window.sessionStorage.removeItem(key);
+    }
+  } catch { /* Notes cache is optional and user scoped. */ }
+}
+
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [user, setUser] = useState(null);
@@ -34,9 +43,12 @@ export function AuthProvider({ children }) {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [authError, setAuthError] = useState('');
+  const previousUserId = useRef('');
 
   function applySession(nextSession) {
     const nextUser = nextSession?.user ?? null;
+    if (previousUserId.current && nextUser?.id && previousUserId.current !== nextUser.id) clearPrivateNotesListCache();
+    previousUserId.current = nextUser?.id || '';
 
     setSession(nextSession);
     setUser(nextUser);
@@ -122,6 +134,7 @@ export function AuthProvider({ children }) {
         if (!nextSession) {
           setIsPasswordRecovery(false);
           try { window.sessionStorage.removeItem('cboard:password-recovery'); } catch { /* Storage can be disabled in private browsing. */ }
+          clearPrivateNotesListCache();
         }
         applySession(nextSession);
         setIsLoading(false);

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { initialFinanceState, normalizeFinanceState } from './financeData.js';
-import { donationRulePreviewAmount, donationSummary, refreshDonationTargetStatus, targetMonthlyAllocation } from './donationAnalytics.js';
+import { donationPaymentHistory, donationRulePreviewAmount, donationSummary, refreshDonationTargetStatus, targetMonthlyAllocation } from './donationAnalytics.js';
 import { financeSummary } from './financeMath.js';
 import { deriveFinancePosition } from './financeLedger.js';
 
@@ -80,6 +80,50 @@ test('an Expense under the Donation finance category is a donation and reduces o
   state.transactions[1]={...state.transactions[1],categoryId:'default-4',financeGroup:'expense',donationCategoryId:'',linkedDonationTargetId:''};
   assert.equal(donationSummary(state,'2026-10').donated,0);
   assert.equal(financeSummary(state,'2026-10').expenses,2500);
+});
+
+test('Donation summary separates current Due, monthly Due added, actual Paid, and legacy Reserved', () => {
+  const state=initialFinanceState();
+  state.donationCategories.push({id:'zakat',name:'Zakat',archived:false});
+  state.donationAccruals=[
+    {id:'due-oct',categoryId:'zakat',amount:2500,accruedAmount:2500,paidAmount:500,effectiveDate:'2026-10-02',sourceType:'manual',status:'partially_paid'},
+    {id:'due-sep',categoryId:'zakat',amount:1500,accruedAmount:1500,paidAmount:0,effectiveDate:'2026-09-02',sourceType:'income_percentage',status:'outstanding',reconciliationRequired:true},
+  ];
+  state.transactions=[
+    {id:'paid',type:'expense',amount:500,date:'2026-10-04',financeGroup:'donation',donationCategoryId:'zakat',categoryId:'default-20'},
+    {id:'reserve',type:'donation',amount:1000,date:'2026-10-03',allocationStatus:'allocated',donationCategoryId:'zakat'},
+  ];
+  const selected=donationSummary(state,'2026-10');
+  assert.equal(selected.dueNow,3500);
+  assert.equal(selected.dueAdded,2500);
+  assert.equal(selected.paidInPeriod,500);
+  assert.equal(selected.reconciliationCount,1);
+  assert.equal(selected.reserved,1000);
+  assert.equal(selected.dueByCategory.find(row=>row.id==='zakat').due,3500);
+});
+
+test('Donation summaries retain correct totals with 1,000 accruals and 1,000 payments', () => {
+  const state=initialFinanceState();
+  const categoryId='donation-default-general';
+  state.donationAccruals=Array.from({length:1000},(_,index)=>({id:`due-${index}`,categoryId,amount:100,accruedAmount:100,paidAmount:0,effectiveDate:`2026-${String(index%12+1).padStart(2,'0')}-01`,sourceType:'manual',status:'outstanding'}));
+  state.transactions=Array.from({length:1000},(_,index)=>({id:`paid-${index}`,type:'expense',amount:50,date:`2026-${String(index%12+1).padStart(2,'0')}-02`,categoryId:'default-20',financeGroup:'donation',donationCategoryId:categoryId}));
+  const summary=donationSummary(state,null);
+  assert.equal(summary.dueNow,100000);
+  assert.equal(summary.lifetime,50000);
+  assert.equal(summary.transactionCount,1000);
+  assert.equal(summary.dueHistory.length,1000);
+  assert.equal(summary.dueByCategory[0].due,100000);
+});
+
+test('Donation paid history omits legacy reserves and pending bank entries but retains reversals', () => {
+  const state=initialFinanceState();
+  state.transactions=[
+    {id:'reserve',type:'donation',amount:1000,date:'2026-11-01',donationCategoryId:'donation-default-general',allocationStatus:'allocated'},
+    {id:'pending',type:'expense',amount:1000,date:'2026-11-02',donationCategoryId:'donation-default-general',financeGroup:'donation',source:'bank',providerStatus:'PDNG'},
+    {id:'reversed',type:'expense',amount:500,date:'2026-11-03',donationCategoryId:'donation-default-general',financeGroup:'donation',reversedAt:'2026-11-04'},
+    {id:'paid',type:'expense',amount:700,date:'2026-11-05',donationCategoryId:'donation-default-general',financeGroup:'donation'},
+  ];
+  assert.deepEqual(donationPaymentHistory(state).map(item=>item.id),['paid','reversed']);
 });
 
 test('target monthly plans account for linked payments already made and cap the last month', () => {

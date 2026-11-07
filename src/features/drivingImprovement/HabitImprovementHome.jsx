@@ -7,12 +7,13 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog.jsx';
 import { Dialog } from '../../components/ui/Dialog.jsx';
 import { notify } from '../../lib/notifications.js';
 import { loadDrivingWorkspace, saveDrivingWorkspace, getCachedDrivingWorkspace, publishCachedDrivingWorkspace } from '../../services/drivingImprovementService.js';
-import { BACKLOG_TYPE_LABELS, BACKLOG_TYPES, HABIT_STATUS_LABELS, HABIT_STATUSES, IMPROVEMENT_PRIORITIES, getActiveHabits, getBacklogItems, getHabitSummary, getItemsForHabit, makeBacklogItem, makeHabitArea, promoteBacklogItem, moveHabitToBacklog, archiveHabitArea, removeHabitArea, archiveBacklogEntry, deleteBacklogEntry, validateHabitData } from './drivingData.js';
+import { BACKLOG_TYPE_LABELS, BACKLOG_TYPES, HABIT_STATUS_LABELS, HABIT_STATUSES, IMPROVEMENT_PRIORITIES, getActiveHabits, getBacklogItems, getHabitSummary, getItemsForHabit, makeBacklogItem, makeHabitArea, promoteBacklogItem, moveHabitToBacklog, archiveHabitArea, restoreArchivedBacklogEntry, removeHabitArea, archiveBacklogEntry, deleteBacklogEntry, validateHabitData } from './drivingData.js';
 import './drivingImprovement.css';
 
 export function HabitImprovementHome({ userId, view = 'active' }) {
   const [cached] = useState(() => getCachedDrivingWorkspace(userId));
   const [data, setData] = useState(cached?.data || null), [revision, setRevision] = useState(cached?.revision || 0), [loading, setLoading] = useState(!cached), [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const [retryDraft, setRetryDraft] = useState(null);
   const [dialog, setDialog] = useState(null), [form, setForm] = useState({ name: '', description: '' }), [confirmHabit, setConfirmHabit] = useState(null), [habitSearch, setHabitSearch] = useState('');
   const [backlogForm, setBacklogForm] = useState({ title: '', note: '', type: '', priority: '' }), [backlogQuery, setBacklogQuery] = useState(''), [showPromoted, setShowPromoted] = useState(false), [confirmBacklog, setConfirmBacklog] = useState(null), [moveHabit, setMoveHabit] = useState(null), [archiveHabit, setArchiveHabit] = useState(null);
   const lock = useRef(false), active = useRef(true);
@@ -20,14 +21,14 @@ export function HabitImprovementHome({ userId, view = 'active' }) {
   async function reload(force = false) {
     if (!data) setLoading(true); setError('');
     try { const result = await loadDrivingWorkspace(userId, 0, force); if (active.current) { setData(result.data); setRevision(result.revision); } }
-    catch (err) { if (active.current) setError(err.message || 'Could not load Habit Improvement.'); }
+    catch { if (active.current) setError(data ? 'Could not refresh Habit Improvement.' : 'Could not load Habit Improvement.'); }
     finally { if (active.current) setLoading(false); }
   }
   useEffect(() => { active.current = true; reload(); return () => { active.current = false; }; }, [userId]);
 
   async function commit(nextData, successMessage) {
     if (lock.current || !data) return false;
-    lock.current = true; setBusy(true); setError('');
+    lock.current = true; setBusy(true); setError(''); setRetryDraft(null);
     const prior = data;
     try {
       const safe = validateHabitData(nextData); setData(safe); publishCachedDrivingWorkspace(userId, safe, revision);
@@ -35,7 +36,8 @@ export function HabitImprovementHome({ userId, view = 'active' }) {
       if (active.current) { setRevision(nextRevision); if (successMessage) notify.success(successMessage); }
       return true;
     } catch (err) {
-      if (active.current) { setData(prior); setError(err.message || 'Could not save your changes.'); notify.error(err.message || 'Could not save your changes.'); }
+      const conflict = /changed on another device/i.test(err.message || '');
+      if (active.current) { setData(prior); setError(conflict ? 'Habit Improvement data changed elsewhere. Refresh before saving again.' : 'Could not save Habit Improvement. Your previous version is still available.'); if (!conflict) setRetryDraft({ data: nextData, successMessage }); notify.error(conflict ? 'Habit Improvement data changed elsewhere.' : 'Could not save Habit Improvement.'); }
       return false;
     } finally { lock.current = false; if (active.current) setBusy(false); }
   }
@@ -93,6 +95,10 @@ export function HabitImprovementHome({ userId, view = 'active' }) {
   async function archiveIdea(item) {
     if (await commit(archiveBacklogEntry(data, item.id), 'Idea archived.')) setConfirmBacklog(null);
   }
+  async function restoreArchive(item) {
+    const restored = await commit(restoreArchivedBacklogEntry(data, item.id), item.promotedHabitId ? 'Habit restored.' : 'Idea restored to Backlog.');
+    if (restored) setShowPromoted(false);
+  }
   async function deleteIdea(item) {
     if (await commit(deleteBacklogEntry(data, item.id), item.promotedHabitId ? 'Backlog item and its Habit data deleted.' : 'Idea deleted.')) setConfirmBacklog(null);
   }
@@ -104,6 +110,7 @@ export function HabitImprovementHome({ userId, view = 'active' }) {
   const backlogItems = data ? getBacklogItems(data).sort((a, b) => (backlogPriorityRank[a.priority] ?? 3) - (backlogPriorityRank[b.priority] ?? 3) || b.createdAt.localeCompare(a.createdAt)) : [];
   const shownBacklog = backlogItems.filter(item => !backlogQuery.trim() || `${item.title} ${item.note}`.toLocaleLowerCase().includes(backlogQuery.trim().toLocaleLowerCase()));
   const promotedItems = (data?.backlogItems || []).filter(item => item.state === 'PROMOTED');
+  const archivedItems = (data?.backlogItems || []).filter(item => item.state === 'ARCHIVED').sort((a, b) => (b.archivedAt || '').localeCompare(a.archivedAt || ''));
   const confirmBacklogHabit = confirmBacklog?.item?.promotedHabitId ? data?.habits.find(habit => habit.id === confirmBacklog.item.promotedHabitId) : null;
   const confirmBacklogCount = confirmBacklogHabit ? getItemsForHabit(data, confirmBacklogHabit.id).length : 0;
   const confirmBacklogMessage = !confirmBacklog ? '' : confirmBacklog.type === 'archive' && confirmBacklogHabit
@@ -114,13 +121,13 @@ export function HabitImprovementHome({ userId, view = 'active' }) {
       <div className="di-heading-actions di-heading-actions-single">{view === 'backlog' ? <Button variant="primary" onClick={() => openBacklogItem()} disabled={!data}>+ Add idea</Button> : <Button variant="primary" onClick={() => openHabit()} disabled={!data}>+ Add Habit</Button>}</div>
     </header>
     <nav className="di-home-tabs" aria-label="Habit Improvement views"><Button variant={view === 'backlog' ? 'secondary' : 'primary'} aria-current={view !== 'backlog' ? 'page' : undefined} onClick={() => navigateTo('/habit-improvement')}>Active · {habits.length}</Button><Button variant={view === 'backlog' ? 'primary' : 'secondary'} aria-current={view === 'backlog' ? 'page' : undefined} onClick={() => navigateTo('/habit-improvement/backlog')}>Backlog · {backlogItems.length}</Button></nav>
-    {error && <div className="di-error" role="alert"><span>{error}</span>{(!data || /changed on another device/i.test(error)) && <Button onClick={() => reload(true)}>{data ? 'Refresh data' : 'Retry'}</Button>}</div>}
-    {loading && <p role="status" className="di-muted">Loading improvement areas...</p>}
+    {error && <div className="di-error" role="alert"><span>{error}</span>{retryDraft ? <Button onClick={() => commit(retryDraft.data, retryDraft.successMessage)} disabled={busy}>Retry save</Button> : (!data || /changed elsewhere|Could not refresh/i.test(error)) && <Button onClick={() => reload(true)}>{data ? 'Refresh data' : 'Retry'}</Button>}</div>}
+    {loading && <div className="di-skeleton" role="status" aria-label="Loading improvement areas"><span /><span /><span /></div>}
     {!loading && !data && !error && <p className="di-muted">Habit Improvement could not be loaded.</p>}
     {busy && <p className="di-saving" role="status">Saving...</p>}
     {data && view === 'backlog' && <section className="di-habit-section di-backlog" aria-labelledby="di-backlog-heading"><div className="di-section-head"><div><span className="di-eyebrow">Maybe later</span><h2 id="di-backlog-heading">Improvement Backlog</h2></div></div>
       {backlogItems.length > 2 && <label className="di-search"><span className="sr-only">Search ideas</span><input type="search" value={backlogQuery} onChange={event => setBacklogQuery(event.target.value)} placeholder="Search ideas..." /></label>}
-      {shownBacklog.length ? <div className="di-backlog-list">{shownBacklog.map(item => <article className="di-backlog-item" key={item.id}><div className="di-backlog-copy"><h3>{item.title}</h3><p>{[item.promotedHabitId ? 'Previously active' : item.type && BACKLOG_TYPE_LABELS[item.type], item.priority && `${item.priority[0]}${item.priority.slice(1).toLowerCase()} priority`].filter(Boolean).join(' · ') || 'Idea'}{item.note && <span className="di-backlog-note"> · {item.note}</span>}</p></div><div className="di-backlog-actions"><Button variant="primary" onClick={() => setDialog({ type: 'promote', item, habitName: item.promotedHabitId ? data.habits.find(habit => habit.id === item.promotedHabitId)?.name || item.title : /\bimprovement$/i.test(item.title) ? item.title : `${item.title} Improvement` })}>{item.promotedHabitId ? 'Resume Improving' : 'Start Improving'}</Button><details className="di-overflow"><summary>More</summary><div><Button onClick={() => openBacklogItem(item)}>Edit</Button><Button onClick={() => setConfirmBacklog({ type: 'archive', item })}>Archive</Button><Button variant="danger" onClick={() => setConfirmBacklog({ type: 'delete', item })}>Delete</Button></div></details></div></article>)}</div> : <div className="di-empty"><h3>{backlogItems.length ? 'No matching ideas.' : 'Your Backlog is empty.'}</h3><p>{backlogItems.length ? 'Try another search or clear it.' : 'Add habits, skills or behaviors you may want to improve later.'}</p>{backlogItems.length ? <Button onClick={() => setBacklogQuery('')}>Clear search</Button> : <Button variant="primary" onClick={() => openBacklogItem()}>+ Add idea</Button>}</div>}
+      {shownBacklog.length ? <div className="di-backlog-list">{shownBacklog.map(item => <article className="di-backlog-item" key={item.id}><div className="di-backlog-copy"><h3>{item.title}</h3><p>{[item.promotedHabitId ? 'Previously active' : item.type && BACKLOG_TYPE_LABELS[item.type], item.priority && `${item.priority[0]}${item.priority.slice(1).toLowerCase()} priority`].filter(Boolean).join(' · ') || 'Idea'}{item.note && <span className="di-backlog-note"> · {item.note}</span>}</p></div><div className="di-backlog-actions"><Button variant="primary" onClick={() => setDialog({ type: 'promote', item, habitName: item.promotedHabitId ? data.habits.find(habit => habit.id === item.promotedHabitId)?.name || item.title : /\bimprovement$/i.test(item.title) ? item.title : `${item.title} Improvement` })}>{item.promotedHabitId ? 'Resume Improving' : 'Start Improving'}</Button><details className="di-overflow"><summary>More</summary><div><Button onClick={() => openBacklogItem(item)}>Edit</Button><Button onClick={() => setConfirmBacklog({ type: 'archive', item })}>Archive</Button><Button variant="danger" onClick={() => setConfirmBacklog({ type: 'delete', item })}>Delete</Button></div></details></div></article>)}</div> : <div className="di-empty"><h3>{backlogItems.length ? 'No matching ideas.' : 'Nothing in Backlog.'}</h3><p>{backlogItems.length ? 'Try another search or clear it.' : 'Park a Habit, skill or behavior here to revisit later.'}</p>{backlogItems.length ? <Button onClick={() => setBacklogQuery('')}>Clear search</Button> : <Button variant="primary" onClick={() => openBacklogItem()}>+ Add idea</Button>}</div>}
       {promotedItems.length > 0 && <div className="di-promoted-history"><Button onClick={() => setShowPromoted(value => !value)}>{showPromoted ? 'Hide' : 'Show'} started ideas · {promotedItems.length}</Button>{showPromoted && <div className="di-backlog-list">{promotedItems.map(item => { const habit = data.habits.find(saved => saved.id === item.promotedHabitId); return <article className="di-backlog-item di-backlog-promoted" key={item.id}><div className="di-backlog-copy"><h3>{item.title}</h3><p>Started {new Date(item.promotedAt).toLocaleDateString()}</p></div>{habit && <Button onClick={() => navigateTo(`/habit-improvement/${habit.slug}`)}>Open {habit.name}</Button>}</article>; })}</div>}</div>}
     </section>}
     {data && view !== 'backlog' && <section className="di-habit-section" aria-labelledby="di-areas-heading"><div className="di-section-head"><div><span className="di-eyebrow">Your improvement areas</span><h2 id="di-areas-heading">Habits and patterns</h2></div></div>
@@ -135,8 +142,13 @@ export function HabitImprovementHome({ userId, view = 'active' }) {
           <p className="di-habit-focus">Focus: {items.filter(item => item.focusNow && !item.archivedAt).length}</p>
           <div className="di-habit-actions"><Button variant="primary" onClick={() => navigateTo(`/habit-improvement/${habit.slug}`)}>Open</Button><details className="di-overflow"><summary>More</summary><div><Button onClick={() => setMoveHabit(habit)}>Move to Backlog</Button><Button onClick={() => setArchiveHabit(habit)}>Archive Habit</Button><Button onClick={() => openHabit(habit)}>Edit habit</Button><Button variant="danger" onClick={() => setConfirmHabit(habit)}>Delete</Button></div></details></div>
         </article>;
-      })}</div> : habits.length ? <div className="di-empty"><h3>No matching habits.</h3><p>Try another search or clear the search field.</p><Button onClick={() => setHabitSearch('')}>Clear search</Button></div> : <div className="di-empty"><h3>No active improvements.</h3><p>Start improving something from your Backlog or create a new Habit.</p><div className="di-actions"><Button onClick={() => navigateTo('/habit-improvement/backlog')}>Browse Backlog</Button><Button variant="primary" onClick={() => openHabit()}>+ New Habit</Button></div></div>}
+      })}</div> : habits.length ? <div className="di-empty"><h3>No matching habits.</h3><p>Try another search or clear the search field.</p><Button onClick={() => setHabitSearch('')}>Clear search</Button></div> : <div className="di-empty"><h3>No active improvement areas.</h3><p>Start improving something from your Backlog or create a new Habit.</p><div className="di-actions"><Button onClick={() => navigateTo('/habit-improvement/backlog')}>Browse Backlog</Button><Button variant="primary" onClick={() => openHabit()}>+ Add Habit</Button></div></div>}
     </section>}
+    {data && archivedItems.length > 0 && <details className="di-archive-shelf"><summary>Archived <span>{archivedItems.length}</span></summary><div className="di-backlog-list">{archivedItems.map(item => {
+      const linkedHabit = item.promotedHabitId ? data.habits.find(habit => habit.id === item.promotedHabitId) : null;
+      const restoreLabel = linkedHabit?.lifecycleState === 'BACKLOG' ? 'Restore to Backlog' : linkedHabit ? 'Restore to Active' : 'Restore to Backlog';
+      return <article className="di-backlog-item" key={item.id}><div className="di-backlog-copy"><h3>{linkedHabit?.name || item.title}</h3><p>{linkedHabit ? `Archived Habit · will return to ${linkedHabit.lifecycleState === 'BACKLOG' ? 'Backlog' : 'Active'}` : 'Archived Backlog idea'}{item.archivedAt && ` · ${new Date(item.archivedAt).toLocaleDateString()}`}</p></div><Button onClick={() => restoreArchive(item)} disabled={busy}>{restoreLabel}</Button></article>;
+    })}</div></details>}
   </section>
 
   <Dialog open={dialog?.type === 'create' || dialog?.type === 'edit'} onClose={() => setDialog(null)} labelledBy="di-habit-title" className="di-dialog"><h2 id="di-habit-title">{dialog?.type === 'edit' ? 'Edit habit' : 'Add habit'}</h2><form className="di-form" onSubmit={saveHabit}>

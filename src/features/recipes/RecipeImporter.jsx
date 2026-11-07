@@ -19,6 +19,7 @@ export function RecipeImporter({
   onSave,
   onSaveBatch,
   onCancel,
+  onDirtyChange,
   getSlugs,
   onAiCreated,
   ingredientLibrary = [],
@@ -41,6 +42,7 @@ export function RecipeImporter({
   const [aiText, setAiText] = useState('');
   const [generateAiImage, setGenerateAiImage] = useState(false);
   const lock = useRef(false);
+  const markDirty = () => onDirtyChange?.(true);
   async function generateDraftImage() {
     if (mode === 'form') return generateRecipeImage(formData.title);
     const recipes = parseRecipeBatch(text);
@@ -161,6 +163,7 @@ export function RecipeImporter({
     setBusy(true);
     try {
       setText(await file.text());
+      markDirty();
     } catch {
       setError('Could not open this file. Try pasting the JSON instead.');
     } finally {
@@ -241,12 +244,13 @@ export function RecipeImporter({
               <RecipeImageUploader
                 key={preview[selected].imageKey}
                 image={batchImages[preview[selected].imageKey] ?? null}
-                onChange={(value) =>
+                onChange={(value) => {
+                  markDirty();
                   setBatchImages((current) => ({
                     ...current,
                     [preview[selected].imageKey]: value,
-                  }))
-                }
+                  }));
+                }}
                 onBusy={setImageBusy}
                 onGenerate={() => generateRecipeImage(preview[selected].recipe.title)}
                 disabled={busy}
@@ -343,7 +347,7 @@ export function RecipeImporter({
                   maxLength={2000}
                   required
                   value={aiText}
-                  onChange={(event) => setAiText(event.target.value)}
+                  onChange={(event) => { markDirty(); setAiText(event.target.value); }}
                   placeholder="Chicken fried rice. Use 120g chicken, 160g cooked rice…"
                 />
                 <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-[var(--color-text-secondary)]">
@@ -351,7 +355,7 @@ export function RecipeImporter({
                   <span>Includes a short ingredient review with green positives, red points to watch and suggested improvements. AI can make mistakes; check the saved recipe and report.</span>
                 </div>
                 <label className="flex !grid-cols-[auto_1fr] items-start gap-3 rounded-xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-3">
-                  <input className="mt-1 !w-auto" type="checkbox" checked={generateAiImage} onChange={(event) => setGenerateAiImage(event.target.checked)} />
+                  <input className="mt-1 !w-auto" type="checkbox" checked={generateAiImage} onChange={(event) => { markDirty(); setGenerateAiImage(event.target.checked); }} />
                   <span><strong className="block text-[var(--color-text)]">Generate a recipe image with AI</strong><span className="mt-1 block font-normal text-[var(--color-text-secondary)]">Creates a food photo after the recipe is saved. This uses the Cloudflare image allowance configured in Groceries settings; if generation fails, the recipe remains safely saved without an image.</span></span>
                 </label>
                 <PrimaryButton type="button" disabled={busy || !aiText.trim()} onClick={createWithAi}>
@@ -361,12 +365,12 @@ export function RecipeImporter({
             ) : mode === 'form' ? (
               <RecipeFormEditor
                 recipe={formData}
-                onChange={setFormData}
+                onChange={value => { markDirty(); setFormData(value); }}
                 editing={editing}
                 ingredientLibrary={ingredientLibrary}
                 imageEditor={editing ? <RecipeImageUploader
                   image={image}
-                  onChange={setImage}
+                  onChange={value => { markDirty(); setImage(value); }}
                   onBusy={setImageBusy}
                   onGenerate={generateDraftImage}
                   disabled={busy}
@@ -426,14 +430,14 @@ export function RecipeImporter({
                   spellCheck={false}
                   className="field-input min-h-80 font-mono text-sm"
                   value={text ?? ''}
-                  onChange={(event) => setText(event.target.value)}
+                  onChange={(event) => { markDirty(); setText(event.target.value); }}
                 />
               </>
             )}
           </fieldset>
           {mode !== 'ai' && !(editing && mode === 'form') && <RecipeImageUploader
             image={image}
-            onChange={setImage}
+            onChange={value => { markDirty(); setImage(value); }}
             onBusy={setImageBusy}
             onGenerate={generateDraftImage}
             disabled={busy}

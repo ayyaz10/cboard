@@ -36,10 +36,36 @@ export function transactionSearchText(item, { categories = [], donationCategorie
     .filter(value => typeof value === 'string').join(' ').toLocaleLowerCase();
 }
 
-export function filterTransactions(transactions, { month, query = '', type = 'all', category = 'all', categories = [], donationCategories = [], linkedNamesById = {} }) {
+export function isValidFinanceDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))) return false;
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+}
+
+export function dateRangeForPeriod(period, month) {
+  if (period === 'all') return { from: '', to: '' };
+  if (period === 'year') return { from: `${month.slice(0, 4)}-01-01`, to: `${month.slice(0, 4)}-12-31` };
+  if (period === 'previous-month') {
+    const [year, value] = month.split('-').map(Number);
+    const prior = new Date(year, value - 2, 1);
+    const key = `${prior.getFullYear()}-${String(prior.getMonth() + 1).padStart(2, '0')}`;
+    return { from: `${key}-01`, to: `${key}-${String(new Date(prior.getFullYear(), prior.getMonth() + 1, 0).getDate()).padStart(2, '0')}` };
+  }
+  return { from: `${month}-01`, to: `${month}-${String(new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate()).padStart(2, '0')}` };
+}
+
+export function filterTransactions(transactions, { month, from = '', to = '', query = '', type = 'all', category = 'all', source = 'all', linkedType = 'all', minAmount = '', maxAmount = '', reversed = 'all', categories = [], donationCategories = [], linkedNamesById = {} }) {
   const normalizedQuery = query.trim().toLocaleLowerCase();
   return orderedTransactions(transactions).filter(item => (!month || String(item.date || '').slice(0, 7) === month)
+    && (!from || String(item.date || '').slice(0, 10) >= from)
+    && (!to || String(item.date || '').slice(0, 10) <= to)
     && (!normalizedQuery || transactionSearchText(item, { categories, donationCategories, linkedNames: linkedNamesById[item.id] || [] }).includes(normalizedQuery))
     && (type === 'all' || item.type === type)
-    && (category === 'all' || (category === 'uncategorized' ? !item.categoryId : item.categoryId === category)));
+    && (category === 'all' || (category === 'uncategorized' ? !item.categoryId : item.categoryId === category))
+    && (source === 'all' || item.paidFromFundId === source || item.paymentMethod === source)
+    && (linkedType === 'all' || (linkedType === 'donation' ? item.type === 'donation' || item.financeGroup === 'donation' || Boolean(item.donationCategoryId) : linkedType === 'fund' ? ['savings', 'goal', 'budget', 'investment', 'transfer'].includes(item.type) : linkedType === 'debt' ? item.type === 'debt' : linkedType === 'credit' ? item.type === 'creditPayment' : false))
+    && (minAmount === '' || item.amount >= minAmount)
+    && (maxAmount === '' || item.amount <= maxAmount)
+    && (reversed === 'all' || (reversed === 'reversed' ? Boolean(item.reversedAt) : !item.reversedAt)));
 }

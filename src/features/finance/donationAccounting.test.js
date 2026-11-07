@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { accrueDonation, canMarkDonationPaymentUnpaid, canUndoDonationPayment, donationDue, markDonationPaymentUnpaid, payDonationDue, reconcileDonationIncome, reopenedDonationDues, undoDonationPayment } from './donationAccounting.js';
+import { accrueDonation, canMarkDonationPaymentUnpaid, canUndoDonationPayment, canCorrectDonationPayment, donationDue, markDonationPaymentUnpaid, payDonationDue, reconcileDonationIncome, reopenedDonationDues, undoDonationPayment, correctDonationPayment, editDonationAccrual, canDeleteDonationAccrual, deleteDonationAccrual, archiveDonationCategory } from './donationAccounting.js';
 import { applyIncomeAllocations } from './financeAllocations.js';
 import { deriveFinancePosition, inspectFinanceIntegrity } from './financeLedger.js';
 import { donationSummary } from './donationAnalytics.js';
@@ -39,6 +39,54 @@ test('partial payment creates one expense and allocates to the oldest accrual fi
   assert.equal(donationDue(state, 'wasiyat'), 1500);
   assert.equal(deriveFinancePosition({ ...state, transactions: [{ id: 'salary', type: 'income', amount: 10000, date: '2026-10-01' }, payment] }).totalOwned, 6500);
   assert.throws(() => payDonationDue(state, { categoryId: 'wasiyat', amount: 1501, date: '2026-10-11' }), /greater than the amount due/);
+});
+
+test('correcting a linked payment updates the existing Finance transaction and rebalances oldest-first allocations', () => {
+  const state = makeState();
+  accrueDonation(state, { categoryId: 'wasiyat', amount: 3000, effectiveDate: '2026-10-01' });
+  accrueDonation(state, { categoryId: 'wasiyat', amount: 2000, effectiveDate: '2026-10-02' });
+  const payment = payDonationDue(state, { categoryId: 'wasiyat', amount: 4000, date: '2026-10-10', paidFromFundId: 'cash' });
+  const originalId = payment.id;
+  assert.equal(canCorrectDonationPayment(state, payment), true);
+  correctDonationPayment(state, payment.id, { amount: 3500, date: '2026-10-11', paidFromFundId: 'bank', note: 'Corrected receipt' });
+  assert.equal(state.transactions.length, 1);
+  assert.equal(payment.id, originalId);
+  assert.equal(payment.amount, 3500);
+  assert.equal(payment.paidFromFundId, 'bank');
+  assert.deepEqual(state.donationPayments[0].sourceAccruals.map(item => item.amount), [3000, 500]);
+  assert.equal(donationDue(state, 'wasiyat'), 1500);
+  assert.throws(() => correctDonationPayment(state, payment.id, { amount: 6000, date: '2026-10-11' }), /greater than the amount due/);
+});
+
+test('manual Due editing is safe and paid Due cannot be deleted', () => {
+  const state = makeState();
+  accrueDonation(state, { categoryId: 'wasiyat', amount: 3000, effectiveDate: '2026-10-01', sourceType: 'manual' });
+  const accrual = state.donationAccruals[0];
+  editDonationAccrual(state, accrual.id, { categoryId: 'wasiyat', amount: 2500, effectiveDate: '2026-10-02', note: 'updated' });
+  assert.equal(donationDue(state, 'wasiyat'), 2500);
+  assert.equal(canDeleteDonationAccrual(accrual), true);
+  deleteDonationAccrual(state, accrual.id);
+  assert.equal(donationDue(state, 'wasiyat'), 0);
+  accrueDonation(state, { categoryId: 'wasiyat', amount: 3000, effectiveDate: '2026-10-01', sourceType: 'manual' });
+  payDonationDue(state, { categoryId: 'wasiyat', amount: 1000, date: '2026-10-03' });
+  assert.equal(canDeleteDonationAccrual(state, state.donationAccruals[0]), false);
+  assert.throws(() => deleteDonationAccrual(state, state.donationAccruals[0].id), /payment history/);
+});
+
+test('archiving a Donation category preserves Due and pauses its rule; restoring never resumes implicitly', () => {
+  const state = makeState();
+  const rule = { id:'rule', targetType:'donation', donationCategoryId:'wasiyat', mode:'percent', value:1000, timing:'income', active:true };
+  state.allocationRules.push(rule);
+  accrueDonation(state, { categoryId:'wasiyat', amount:2500, effectiveDate:'2026-10-01' });
+  archiveDonationCategory(state, 'wasiyat', true);
+  assert.equal(donationDue(state, 'wasiyat'), 2500);
+  assert.equal(rule.active, false);
+  applyIncomeAllocations(state, { id:'later', amount:10000, date:'2026-10-02' });
+  assert.equal(state.donationAccruals.length, 1);
+  archiveDonationCategory(state, 'wasiyat', false);
+  assert.equal(state.donationCategories[0].archived, false);
+  assert.equal(rule.active, false);
+  assert.equal(state.donationAccruals.length, 1);
 });
 
 test('deleting or editing income after a payment preserves paid history and flags reconciliation', () => {

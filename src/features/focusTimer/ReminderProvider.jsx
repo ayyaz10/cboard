@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useReducer, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useReducer, useRef, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { navigateTo } from '../../app/useRoute';
+import { navigateTo, useRoute } from '../../app/useRoute';
 import { getActiveFocusSession } from '../../services/focusSessionService';
 import {
   focusSessionStatuses,
@@ -20,6 +20,7 @@ export function ReminderProvider({ children }) {
 }
 
 function ReminderStore({ userId, children }) {
+  const route = useRoute();
   const storageKey = `cboard:reminders:${userId}`;
   const [storageError, setStorageError] = useState('');
   const [state, dispatch] = useReducer(reminderReducer, null, () => {
@@ -119,13 +120,13 @@ function ReminderStore({ userId, children }) {
     };
   }, [presetStorageKey, userId]);
 
-  function prepareSound() {
+  const prepareSound = useCallback(() => {
     try {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       if (!audio.current || audio.current.state === 'closed') audio.current = new AudioContext();
       audio.current.resume().catch(() => {});
     } catch { /* Visual alerts remain available when sound is unsupported. */ }
-  }
+  }, []);
 
   function playSound() {
     try {
@@ -168,18 +169,20 @@ function ReminderStore({ userId, children }) {
     }
   }, [reminders]);
 
-  function addReminder(title, duration, repeats = false, metadata = {}) {
+  const addReminder = useCallback((title, duration, repeats = false, metadata = {}) => {
     prepareSound();
     const timestamp = Date.now();
     dispatch({ type: 'add', now: timestamp, item: {
-      id: crypto.randomUUID(), title, dueAt: timestamp + duration, status: 'waiting',
+      id: crypto.randomUUID(), title, dueAt: Number.isFinite(metadata?.dueAt) ? metadata.dueAt : timestamp + duration, status: 'waiting',
       repeatMs: repeats ? duration : 0, durationMs: duration,
       ...(typeof metadata?.creditAgreementId === 'string' ? { creditAgreementId: metadata.creditAgreementId } : {}),
+      ...(typeof metadata?.creditInstalmentId === 'string' ? { creditInstalmentId: metadata.creditInstalmentId } : {}),
+      ...(typeof metadata?.creditReminderEvent === 'string' ? { creditReminderEvent: metadata.creditReminderEvent } : {}),
     } });
-  }
+  }, [prepareSound]);
 
   function dismiss(id) { dispatch({ type: 'dismiss', id, now: Date.now() }); }
-  function cancel(id) { dispatch({ type: 'cancel', id, now: Date.now() }); }
+  const cancel = useCallback((id) => { dispatch({ type: 'cancel', id, now: Date.now() }); }, []);
   function snooze(id) {
     prepareSound();
     dispatch({ type: 'snooze', id, now: Date.now() });
@@ -316,7 +319,7 @@ function ReminderStore({ userId, children }) {
           <button type="button" onClick={() => openReminder(false)} className="ui-button ui-button--sm mt-4 w-full">Open reminder settings</button>
         </aside>
       )}
-      <button
+      {route !== '/food-diary' && <button
         type="button"
         className={`ui-button reminder-toggle fixed right-4 z-50 min-h-12 gap-2 px-4 py-3 font-bold ${ringing.length > 0 ? 'ui-button--warning' : 'ui-button--primary'}`}
         aria-expanded={widgetOpen}
@@ -334,7 +337,7 @@ function ReminderStore({ userId, children }) {
           <path d="M10 21h4" />
         </svg>
         <span>{liveTimerCount > 0 && !liveDockVisible ? 'Show timers' : ringing.length > 0 ? `${ringing.length} due` : 'Reminders'}</span>
-      </button>
+      </button>}
     </ReminderContext.Provider>
   );
 }

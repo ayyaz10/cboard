@@ -7,6 +7,25 @@ const cents = value => Number.isSafeInteger(value) && value >= 0;
 const creditPaymentTransactions = state => (state.transactions || []).filter(item => item.type === 'creditPayment' && (!item.source || item.providerStatus === 'BOOK'));
 const activeTransactions = state => creditPaymentTransactions(state).filter(item => !item.reversedAt);
 
+export function createCreditTransactionIndex(state) {
+  const paymentsByAgreement = new Map(), paymentsByInstalment = new Map(), depositsByAgreement = new Map();
+  for (const item of state.transactions || []) {
+    if (!item || item.reversedAt) continue;
+    if (item.creditPaymentKind === 'deposit') depositsByAgreement.set(item.creditAgreementId, item);
+    if (item.type !== 'creditPayment' || (item.source && item.providerStatus !== 'BOOK')) continue;
+    const agreementPayments = paymentsByAgreement.get(item.creditAgreementId) || [];
+    agreementPayments.push(item);
+    paymentsByAgreement.set(item.creditAgreementId, agreementPayments);
+    if (item.scheduledInstalmentId) {
+      const key = `${item.creditAgreementId}:${item.scheduledInstalmentId}`;
+      const instalmentPayments = paymentsByInstalment.get(key) || [];
+      instalmentPayments.push(item);
+      paymentsByInstalment.set(key, instalmentPayments);
+    }
+  }
+  return { paymentsByAgreement, paymentsByInstalment, depositsByAgreement };
+}
+
 export function mutateCreditState(state, mutation) {
   mutation(state);
   return state;
@@ -38,9 +57,9 @@ function addMonths(date, count) {
 }
 
 function distribute(total, count) {
-  // Match the existing Finance convention: any remainder is assigned to the earliest rows.
-  const base = Math.floor(total / count), remainder = total % count;
-  return Array.from({ length: count }, (_, index) => base + (index < remainder ? 1 : 0));
+  // Keep rows even and let the final row absorb the minor-unit remainder.
+  const base = Math.floor(total / count);
+  return Array.from({ length: count }, (_, index) => index === count - 1 ? total - base * (count - 1) : base);
 }
 
 export function calculateRemainingBalance(totalRepayable, paidAmount) {
@@ -77,7 +96,8 @@ export function generateCustomCreditSchedule({ agreementId, principalAmount, fin
   });
 }
 
-function activeDepositTransaction(state, agreementId) {
+function activeDepositTransaction(state, agreementId, transactionIndex) {
+  if (transactionIndex) return transactionIndex.depositsByAgreement.get(agreementId) || null;
   return (state.transactions || []).find(item => item.creditAgreementId === agreementId && item.creditPaymentKind === 'deposit' && !item.reversedAt);
 }
 
@@ -87,14 +107,14 @@ export function generateCreditSchedule({ agreementId, principalAmount, financeCh
   if (frequency === 'custom' && (!Number.isInteger(customDays) || customDays < 1 || customDays > 365)) throw new Error('Custom payment intervals must be from 1 to 365 days.');
   const total = principalAmount + financeCharge;
   if (!Number.isSafeInteger(total) || total < principalAmount) throw new Error('The total repayable amount is outside the supported range.');
-  const amounts = distribute(total, term), principals = distribute(principalAmount, term);
-  return amounts.map((amount, index) => ({
+  const principals = distribute(principalAmount, term), fees = distribute(financeCharge, term);
+  return principals.map((principalAmountForRow, index) => ({
     id: `${agreementId}:instalment:${index + 1}`,
     sequence: index + 1,
     dueDate: frequency === 'monthly' ? addMonths(firstPaymentDate, index) : addDays(firstPaymentDate, index * (frequency === 'weekly' ? 7 : frequency === 'fortnightly' ? 14 : customDays)),
-    amount,
-    principalAmount: principals[index],
-    financeCostAmount: amount - principals[index],
+    amount: principalAmountForRow + fees[index],
+    principalAmount: principalAmountForRow,
+    financeCostAmount: fees[index],
   }));
 }
 
@@ -142,11 +162,11 @@ export function deleteUnusedCreditAgreement(state, agreementId) {
   return agreement;
 }
 
-export function getCreditAgreementBalances(state, agreement) {
+export function getCreditAgreementBalances(state, agreement, transactionIndex = createCreditTransactionIndex(state)) {
   if (!agreement) return { principalRemaining: 0, financeCostRemaining: 0, totalRemaining: 0, paidPrincipal: 0, paidFinanceCost: 0, paidTotal: 0 };
-  const payments = activeTransactions(state).filter(item => item.creditAgreementId === agreement.id);
+  const payments = transactionIndex.paymentsByAgreement.get(agreement.id) || [];
   const upfrontRow = (agreement.schedule || []).find(item => item.upfrontPayment);
-  const upfrontTransaction = agreement.upfrontCountsAsFirstInstalment ? activeDepositTransaction(state, agreement.id) : null;
+  const upfrontTransaction = agreement.upfrontCountsAsFirstInstalment ? activeDepositTransaction(state, agreement.id, transactionIndex) : null;
   const upfrontRowPayments = upfrontRow ? payments.filter(item => item.scheduledInstalmentId === upfrontRow.id) : [];
   const ordinaryPayments = upfrontRow ? payments.filter(item => item.scheduledInstalmentId !== upfrontRow.id) : payments;
   const upfrontPaid = upfrontTransaction?.amount || upfrontRowPayments.reduce((sum, item) => sum + item.amount, 0);
@@ -160,12 +180,12 @@ export function getCreditAgreementBalances(state, agreement) {
   return { principalRemaining, financeCostRemaining, totalRemaining: principalRemaining + financeCostRemaining, paidPrincipal, paidFinanceCost, paidTotal };
 }
 
-export function getCreditInstalmentAmounts(state, agreement, instalment) {
-  const payments = activeTransactions(state).filter(item => item.creditAgreementId === agreement.id && item.scheduledInstalmentId === instalment.id);
-  const upfront = instalment.upfrontPayment && agreement.upfrontCountsAsFirstInstalment && activeDepositTransaction(state, agreement.id);
+export function getCreditInstalmentAmounts(state, agreement, instalment, transactionIndex = createCreditTransactionIndex(state)) {
+  const payments = transactionIndex.paymentsByInstalment.get(`${agreement.id}:${instalment.id}`) || [];
+  const upfront = instalment.upfrontPayment && agreement.upfrontCountsAsFirstInstalment && activeDepositTransaction(state, agreement.id, transactionIndex);
   const upfrontPaid = upfront && upfront.id === instalment.upfrontTransactionId ? upfront.amount : 0;
-  const paid = payments.reduce((sum, item) => sum + item.amount, upfrontPaid);
-  const paidPrincipal = payments.reduce((sum, item) => sum + (item.creditPrincipalAmount || 0), upfrontPaid);
+  const paid = payments.reduce((sum, item) => sum + (item.scheduledPortionAmount ?? item.amount), upfrontPaid);
+  const paidPrincipal = payments.reduce((sum, item) => sum + (item.scheduledPrincipalAmount ?? item.creditPrincipalAmount ?? 0), upfrontPaid);
   const paidFinanceCost = payments.reduce((sum, item) => sum + (item.creditFinanceCostAmount || 0), 0);
   return {
     paid,
@@ -177,9 +197,9 @@ export function getCreditInstalmentAmounts(state, agreement, instalment) {
   };
 }
 
-export function getCreditInstalmentStatus(state, agreement, instalment, asOfDate = new Date().toISOString().slice(0, 10)) {
+export function getCreditInstalmentStatus(state, agreement, instalment, asOfDate = new Date().toISOString().slice(0, 10), transactionIndex = createCreditTransactionIndex(state)) {
   if (instalment.supersededAt) return 'superseded';
-  const amounts = getCreditInstalmentAmounts(state, agreement, instalment);
+  const amounts = getCreditInstalmentAmounts(state, agreement, instalment, transactionIndex);
   if (!amounts.remaining) return 'paid';
   if (instalment.dueDate < asOfDate) return amounts.paid ? 'partial_overdue' : 'overdue';
   if (amounts.paid) return 'partial';
@@ -188,21 +208,21 @@ export function getCreditInstalmentStatus(state, agreement, instalment, asOfDate
   return 'upcoming';
 }
 
-export function getCreditAgreementStatus(state, agreement) {
+export function getCreditAgreementStatus(state, agreement, transactionIndex = createCreditTransactionIndex(state)) {
   if (agreement.settledEarlyAt) return 'settled_early';
   if (agreement.status === 'cancelled') return 'cancelled';
-  const balances = getCreditAgreementBalances(state, agreement);
+  const balances = getCreditAgreementBalances(state, agreement, transactionIndex);
   return balances.totalRemaining === 0 ? 'paid_off' : 'active';
 }
 
-function scheduledRows(state, agreement) {
-  return (agreement.schedule || []).filter(item => !item.supersededAt).map(instalment => ({ agreement, instalment, ...getCreditInstalmentAmounts(state, agreement, instalment) }));
+function scheduledRows(state, agreement, transactionIndex = createCreditTransactionIndex(state)) {
+  return (agreement.schedule || []).filter(item => !item.supersededAt).map(instalment => ({ agreement, instalment, ...getCreditInstalmentAmounts(state, agreement, instalment, transactionIndex) }));
 }
 
-export function getCreditAgreementRepaymentSummary(state, agreement) {
+export function getCreditAgreementRepaymentSummary(state, agreement, transactionIndex = createCreditTransactionIndex(state)) {
   if (!agreement) return { totalRepayable: 0, actualPaid: 0, remainingBalance: 0, totalInstallments: 0, completedInstallments: 0, remainingInstallments: 0, futureSchedule: [], nextPayment: null, progressPercent: 0 };
-  const balances = getCreditAgreementBalances(state, agreement);
-  const rows = scheduledRows(state, agreement).sort((left, right) => left.instalment.dueDate.localeCompare(right.instalment.dueDate) || left.instalment.sequence - right.instalment.sequence);
+  const balances = getCreditAgreementBalances(state, agreement, transactionIndex);
+  const rows = scheduledRows(state, agreement, transactionIndex).sort((left, right) => left.instalment.dueDate.localeCompare(right.instalment.dueDate) || left.instalment.sequence - right.instalment.sequence);
   const completedInstallments = rows.filter(row => row.remaining === 0 && row.paid > 0).length;
   const futureSchedule = rows.filter(row => row.remaining > 0);
   const totalInstallments = Number.isInteger(agreement.term) ? agreement.term : rows.length;
@@ -219,47 +239,100 @@ export function getCreditAgreementRepaymentSummary(state, agreement) {
   };
 }
 
-export function getNextCreditPayment(state, asOfDate = new Date().toISOString().slice(0, 10)) {
-  return (state.creditAgreements || []).filter(item => getCreditAgreementStatus(state, item) === 'active')
-    .flatMap(agreement => scheduledRows(state, agreement).filter(row => row.remaining > 0).map(row => ({ ...row, status: getCreditInstalmentStatus(state, agreement, row.instalment, asOfDate) })))
+export function getNextCreditPayment(state, asOfDate = new Date().toISOString().slice(0, 10), transactionIndex = createCreditTransactionIndex(state)) {
+  return (state.creditAgreements || []).filter(item => !item.archivedAt && getCreditAgreementStatus(state, item, transactionIndex) === 'active')
+    .flatMap(agreement => scheduledRows(state, agreement, transactionIndex).filter(row => row.remaining > 0).map(row => ({ ...row, status: getCreditInstalmentStatus(state, agreement, row.instalment, asOfDate, transactionIndex) })))
     .sort((left, right) => left.instalment.dueDate.localeCompare(right.instalment.dueDate) || left.instalment.sequence - right.instalment.sequence)[0] || null;
 }
 
-export function getOverdueCreditPayments(state, asOfDate = new Date().toISOString().slice(0, 10)) {
-  return (state.creditAgreements || []).filter(item => getCreditAgreementStatus(state, item) === 'active')
-    .flatMap(agreement => scheduledRows(state, agreement).filter(row => row.remaining > 0 && row.instalment.dueDate < asOfDate).map(row => ({ ...row, status: getCreditInstalmentStatus(state, agreement, row.instalment, asOfDate) })))
+export function getOverdueCreditPayments(state, asOfDate = new Date().toISOString().slice(0, 10), transactionIndex = createCreditTransactionIndex(state)) {
+  return (state.creditAgreements || []).filter(item => !item.archivedAt && getCreditAgreementStatus(state, item, transactionIndex) === 'active')
+    .flatMap(agreement => scheduledRows(state, agreement, transactionIndex).filter(row => row.remaining > 0 && row.instalment.dueDate < asOfDate).map(row => ({ ...row, status: getCreditInstalmentStatus(state, agreement, row.instalment, asOfDate, transactionIndex) })))
     .sort((left, right) => left.instalment.dueDate.localeCompare(right.instalment.dueDate));
 }
 
-export function getCreditDueSoon(state, asOfDate = new Date().toISOString().slice(0, 10)) {
-  return (state.creditAgreements || []).filter(item => getCreditAgreementStatus(state, item) === 'active')
-    .flatMap(agreement => scheduledRows(state, agreement).filter(row => row.remaining > 0 && row.instalment.dueDate >= asOfDate && row.instalment.dueDate <= addDays(asOfDate, 7)).map(row => ({ ...row, status: getCreditInstalmentStatus(state, agreement, row.instalment, asOfDate) })))
+export function getCreditDueSoon(state, asOfDate = new Date().toISOString().slice(0, 10), transactionIndex = createCreditTransactionIndex(state)) {
+  return (state.creditAgreements || []).filter(item => !item.archivedAt && getCreditAgreementStatus(state, item, transactionIndex) === 'active')
+    .flatMap(agreement => scheduledRows(state, agreement, transactionIndex).filter(row => row.remaining > 0 && row.instalment.dueDate >= asOfDate && row.instalment.dueDate <= addDays(asOfDate, 7)).map(row => ({ ...row, status: getCreditInstalmentStatus(state, agreement, row.instalment, asOfDate, transactionIndex) })))
     .sort((left, right) => left.instalment.dueDate.localeCompare(right.instalment.dueDate));
 }
 
-export function getMonthlyCreditCommitment(state, asOfDate = new Date().toISOString().slice(0, 10)) {
-  return (state.creditAgreements || []).filter(item => getCreditAgreementStatus(state, item) === 'active').reduce((sum, agreement) => {
-    const rows = scheduledRows(state, agreement).filter(row => row.remaining > 0).sort((a, b) => a.instalment.dueDate.localeCompare(b.instalment.dueDate));
-    if (agreement.scheduleMode === 'custom') return sum + rows.filter(row => row.instalment.dueDate >= asOfDate && row.instalment.dueDate <= addDays(asOfDate, 30)).reduce((total, row) => total + row.remaining, 0);
-    const first = rows[0];
-    if (!first) return sum;
-    const numerator = agreement.frequency === 'weekly' ? 52 : agreement.frequency === 'fortnightly' ? 26 : agreement.frequency === 'custom' ? Math.round(36500 / agreement.customDays) : 12;
-    return sum + Math.round(first.remaining * numerator / 12);
-  }, 0);
+export function getCreditAgreementMonthlyCommitment(state, agreement, asOfDate = new Date().toISOString().slice(0, 10), transactionIndex = createCreditTransactionIndex(state)) {
+  if (!validDate(asOfDate)) throw new Error('Choose a valid date for the Credit summary.');
+  if (!agreement || agreement.archivedAt || getCreditAgreementStatus(state, agreement, transactionIndex) !== 'active') return 0;
+  const throughDate = addDays(asOfDate, 30);
+  return scheduledRows(state, agreement, transactionIndex)
+    .filter(row => row.remaining > 0 && row.instalment.dueDate >= asOfDate && row.instalment.dueDate <= throughDate)
+    .reduce((sum, row) => sum + row.remaining, 0);
 }
 
-export function getCreditOverview(state, asOfDate = new Date().toISOString().slice(0, 10)) {
-  const active = (state.creditAgreements || []).filter(item => getCreditAgreementStatus(state, item) === 'active');
+export function getMonthlyCreditCommitment(state, asOfDate = new Date().toISOString().slice(0, 10), transactionIndex = createCreditTransactionIndex(state)) {
+  return (state.creditAgreements || []).reduce((sum, agreement) => sum + getCreditAgreementMonthlyCommitment(state, agreement, asOfDate, transactionIndex), 0);
+}
+
+export function planCreditReminderReconciliation(state, reminders, asOfDate = new Date().toISOString().slice(0, 10)) {
+  if (!validDate(asOfDate)) throw new Error('Choose a valid date for Credit reminders.');
+  const transactionIndex = createCreditTransactionIndex(state);
+  const targets = new Map();
+  for (const agreement of state.creditAgreements || []) {
+    const preference = agreement.creditReminderPreferences;
+    if (!preference?.enabled || agreement.archivedAt || getCreditAgreementStatus(state, agreement, transactionIndex) !== 'active') continue;
+    const events = [
+      ...(preference.daysBefore > 0 ? [{ event: 'before_due', days: preference.daysBefore }] : []),
+      ...(preference.onDueDate ? [{ event: 'due_date', days: 0 }] : []),
+    ];
+    for (const { instalment, remaining } of scheduledRows(state, agreement, transactionIndex)) {
+      if (remaining <= 0 || instalment.dueDate < asOfDate) continue;
+      for (const event of events) {
+        const eventDate = addDays(instalment.dueDate, -event.days);
+        if (eventDate < asOfDate) continue;
+        const key = `${agreement.id}:${instalment.id}:${event.event}`;
+        const dueAt = new Date(`${eventDate}T09:00:00`).getTime();
+        if (Number.isFinite(dueAt)) targets.set(key, {
+          key, agreementId: agreement.id, instalmentId: instalment.id, event: event.event,
+          dueAt, title: `Credit payment ${event.event === 'due_date' ? 'due' : 'coming up'}: ${agreement.title} (${instalment.dueDate})`,
+        });
+      }
+    }
+  }
+
+  const active = (reminders || []).filter(item => ['waiting', 'ringing'].includes(item.status)
+    && item.creditAgreementId && item.creditInstalmentId && ['before_due', 'due_date'].includes(item.creditReminderEvent));
+  const keep = new Set(), cancelIds = [];
+  for (const item of active) {
+    const key = `${item.creditAgreementId}:${item.creditInstalmentId}:${item.creditReminderEvent}`;
+    const target = targets.get(key);
+    if (!target || target.dueAt !== item.dueAt || keep.has(key)) cancelIds.push(item.id);
+    else keep.add(key);
+  }
+  const add = [...targets.entries()].filter(([key]) => !keep.has(key)).map(([, target]) => target);
+  return { add, cancelIds };
+}
+
+export function getCreditOverview(state, asOfDate = new Date().toISOString().slice(0, 10), transactionIndex = createCreditTransactionIndex(state)) {
+  const agreements = state.creditAgreements || [];
+  const active = [];
+  let settledPlans = 0, cancelledPlans = 0, archivedPlans = 0;
+  for (const agreement of agreements) {
+    const status = getCreditAgreementStatus(state, agreement, transactionIndex);
+    if (status === 'active') active.push(agreement);
+    if (status === 'paid_off' || status === 'settled_early') settledPlans += 1;
+    if (status === 'cancelled') cancelledPlans += 1;
+    if (agreement.archivedAt) archivedPlans += 1;
+  }
   const visibleActive = active.filter(item => !item.archivedAt);
-  const nextPayment = getNextCreditPayment(state, asOfDate);
-  const dueSoon = getCreditDueSoon(state, asOfDate), overdue = getOverdueCreditPayments(state, asOfDate);
+  const nextPayment = getNextCreditPayment(state, asOfDate, transactionIndex);
+  const dueSoon = getCreditDueSoon(state, asOfDate, transactionIndex), overdue = getOverdueCreditPayments(state, asOfDate, transactionIndex);
   return {
-    outstanding: active.reduce((sum, item) => sum + getCreditAgreementBalances(state, item).totalRemaining, 0),
-    principalOutstanding: active.reduce((sum, item) => sum + getCreditAgreementBalances(state, item).principalRemaining, 0),
-    financeCostRemaining: active.reduce((sum, item) => sum + getCreditAgreementBalances(state, item).financeCostRemaining, 0),
-    monthlyCommitment: getMonthlyCreditCommitment(state),
+    outstanding: active.reduce((sum, item) => sum + getCreditAgreementBalances(state, item, transactionIndex).totalRemaining, 0),
+    principalOutstanding: active.reduce((sum, item) => sum + getCreditAgreementBalances(state, item, transactionIndex).principalRemaining, 0),
+    financeCostRemaining: active.reduce((sum, item) => sum + getCreditAgreementBalances(state, item, transactionIndex).financeCostRemaining, 0),
+    monthlyCommitment: getMonthlyCreditCommitment(state, asOfDate, transactionIndex),
     activePlans: visibleActive.length,
-    completedPlans: (state.creditAgreements || []).filter(item => ['paid_off', 'settled_early'].includes(getCreditAgreementStatus(state, item))).length,
+    completedPlans: settledPlans,
+    settledPlans,
+    cancelledPlans,
+    archivedPlans,
     nextPayment,
     dueSoon,
     dueSoonAmount: dueSoon.reduce((sum, item) => sum + item.remaining, 0),
@@ -295,6 +368,25 @@ export function createCreditAgreement(state, agreement, { transactionId = '', da
   return result;
 }
 
+function applyExtraPrincipalToSchedule(state, agreement, amount, date, transactionId, excludedInstalmentId = '') {
+  const futurePrincipalRows = (agreement.schedule || []).filter(item => !item.supersededAt && item.id !== excludedInstalmentId
+    && item.dueDate > date && getCreditInstalmentAmounts(state, agreement, item).paid === 0)
+    .sort((left, right) => right.dueDate.localeCompare(left.dueDate) || right.sequence - left.sequence);
+  const eligiblePrincipal = futurePrincipalRows.reduce((sum, item) => sum + item.principalAmount, 0);
+  if (amount > eligiblePrincipal) throw new Error('This extra payment is larger than the principal in future instalments. Use Settle early for a payoff quote.');
+  let principalToReschedule = amount;
+  for (const instalment of futurePrincipalRows) {
+    const reduction = Math.min(principalToReschedule, instalment.principalAmount);
+    instalment.principalAmount -= reduction;
+    instalment.amount -= reduction;
+    principalToReschedule -= reduction;
+    instalment.extraPaymentIds ||= [];
+    instalment.extraPaymentIds.push(transactionId);
+    if (!instalment.amount) instalment.supersededAt = date;
+    if (!principalToReschedule) break;
+  }
+}
+
 export function recordCreditPayment(state, { agreementId, amount, date, paidFromFundId = '', note = '', instalmentId = '', paymentId, transactionId }) {
   state.creditAgreements ||= [];
   if (!paymentId || !transactionId || !Number.isSafeInteger(amount) || amount <= 0 || !validDate(date)) throw new Error('Enter a valid payment amount and date.');
@@ -307,35 +399,28 @@ export function recordCreditPayment(state, { agreementId, amount, date, paidFrom
   const agreement = state.creditAgreements.find(item => item.id === agreementId);
   if (!agreement || getCreditAgreementStatus(state, agreement) !== 'active') throw new Error('This credit agreement is no longer active.');
   const balances = getCreditAgreementBalances(state, agreement);
-  let principalAmount = 0, financeCostAmount = 0, scheduledInstalmentId = '';
+  let principalAmount = 0, financeCostAmount = 0, scheduledInstalmentId = '', scheduledPortionAmount = 0, scheduledPrincipalAmount = 0, extraPrincipalAmount = 0;
   if (instalmentId) {
     const instalment = (agreement.schedule || []).find(item => item.id === instalmentId && !item.supersededAt);
     if (!instalment) throw new Error('Choose an active scheduled instalment.');
     const due = getCreditInstalmentAmounts(state, agreement, instalment);
-    if (amount > due.remaining) throw new Error('The payment cannot exceed the remaining amount for this instalment. Use Extra payment for additional principal.');
-    financeCostAmount = amount === due.remaining ? due.financeCostRemaining : Math.min(due.financeCostRemaining, Math.floor(amount * due.financeCostRemaining / due.remaining));
-    principalAmount = amount - financeCostAmount;
-    if (principalAmount > balances.principalRemaining || financeCostAmount > balances.financeCostRemaining) throw new Error('This payment exceeds the remaining agreement balance.');
+    scheduledPortionAmount = Math.min(amount, due.remaining);
+    financeCostAmount = scheduledPortionAmount === due.remaining ? due.financeCostRemaining : Math.min(due.financeCostRemaining, Math.floor(scheduledPortionAmount * due.financeCostRemaining / due.remaining));
+    scheduledPrincipalAmount = scheduledPortionAmount - financeCostAmount;
+    extraPrincipalAmount = amount - scheduledPortionAmount;
+    if (scheduledPrincipalAmount > balances.principalRemaining || financeCostAmount > balances.financeCostRemaining) throw new Error('This payment exceeds the remaining agreement balance.');
+    if (extraPrincipalAmount > balances.principalRemaining - scheduledPrincipalAmount) throw new Error('This payment exceeds the remaining principal. Use Settle early for the remaining balance.');
+    if (extraPrincipalAmount > 0) applyExtraPrincipalToSchedule(state, agreement, extraPrincipalAmount, date, transactionId, instalment.id);
+    principalAmount = scheduledPrincipalAmount + extraPrincipalAmount;
     scheduledInstalmentId = instalment.id;
   } else {
     if (amount > balances.principalRemaining) throw new Error('An extra payment can only reduce the remaining principal. Use Settle early to clear the agreement.');
-    let principalToReschedule = amount;
-    const futurePrincipalRows = (agreement.schedule || []).filter(item => !item.supersededAt && item.dueDate > date && getCreditInstalmentAmounts(state, agreement, item).paid === 0).sort((left, right) => right.dueDate.localeCompare(left.dueDate) || right.sequence - left.sequence);
-    const eligiblePrincipal = futurePrincipalRows.reduce((sum, item) => sum + item.principalAmount, 0);
-    if (amount > eligiblePrincipal) throw new Error('This extra payment is larger than the principal in future instalments. Use Settle early for a payoff quote.');
-    for (const instalment of futurePrincipalRows) {
-      const reduction = Math.min(principalToReschedule, instalment.principalAmount);
-      instalment.principalAmount -= reduction;
-      instalment.amount -= reduction;
-      principalToReschedule -= reduction;
-      instalment.extraPaymentIds ||= [];
-      instalment.extraPaymentIds.push(transactionId);
-      if (!instalment.amount) instalment.supersededAt = date;
-      if (!principalToReschedule) break;
-    }
+    applyExtraPrincipalToSchedule(state, agreement, amount, date, transactionId);
     principalAmount = amount;
+    extraPrincipalAmount = amount;
   }
-  const transaction = { id: transactionId, sequence: Math.max(0, ...(state.transactions || []).map((item, index) => item.sequence ?? index + 1)) + 1, title: `${agreement.title} credit payment`, type: 'creditPayment', amount, date, paidFromFundId, note: String(note || '').trim(), creditAgreementId: agreement.id, creditPaymentId: paymentId, creditPaymentKind: scheduledInstalmentId ? (amount < getCreditInstalmentAmounts(state, agreement, (agreement.schedule || []).find(item => item.id === instalmentId)).remaining ? 'partial' : 'scheduled') : 'extra', scheduledInstalmentId, creditPrincipalAmount: principalAmount, creditFinanceCostAmount: financeCostAmount };
+  const paymentKind = !scheduledInstalmentId ? 'extra' : extraPrincipalAmount ? 'scheduled_extra' : scheduledPortionAmount < getCreditInstalmentAmounts(state, agreement, (agreement.schedule || []).find(item => item.id === instalmentId)).remaining ? 'partial' : 'scheduled';
+  const transaction = { id: transactionId, sequence: Math.max(0, ...(state.transactions || []).map((item, index) => item.sequence ?? index + 1)) + 1, title: `${agreement.title} credit payment`, type: 'creditPayment', amount, date, paidFromFundId, note: String(note || '').trim(), creditAgreementId: agreement.id, creditPaymentId: paymentId, creditPaymentKind: paymentKind, scheduledInstalmentId, ...(scheduledInstalmentId ? { scheduledPortionAmount, scheduledPrincipalAmount } : {}), ...(extraPrincipalAmount ? { extraPrincipalAmount } : {}), creditPrincipalAmount: principalAmount, creditFinanceCostAmount: financeCostAmount };
   state.transactions.push(transaction);
   return transaction;
 }
@@ -388,7 +473,7 @@ export function reverseCreditPayment(state, transactionId, date = new Date().toI
     }
     delete agreement.settledEarlyAt;
     delete agreement.settlement;
-  } else if (transaction.creditPaymentKind === 'extra') {
+  } else if (['extra', 'scheduled_extra'].includes(transaction.creditPaymentKind)) {
     const preserved = (agreement.schedule || []).filter(item => !item.supersededAt && (item.dueDate <= date || getCreditInstalmentAmounts(state, agreement, item).paid > 0));
     const preservedDue = preserved.map(item => ({ ...getCreditInstalmentAmounts(state, agreement, item) }));
     const preservedPrincipal = preservedDue.reduce((sum, item) => sum + item.principalRemaining, 0);
@@ -426,21 +511,31 @@ export function updateCreditPayment(state, transactionId, changes) {
   const amount = changes.amount ?? transaction.amount;
   const date = changes.date ?? transaction.date;
   if (!Number.isSafeInteger(amount) || amount <= 0 || !validDate(date)) throw new Error('Enter a valid payment amount and date.');
-  if (amount !== transaction.amount && transaction.creditPaymentKind !== 'scheduled' && !transaction.scheduledInstalmentId) throw new Error('To change an extra payment or settlement amount, reverse it and record the corrected payment.');
+  if (amount !== transaction.amount && ['extra', 'scheduled_extra', 'settlement'].includes(transaction.creditPaymentKind)) throw new Error('To change an extra payment or settlement amount, mark it unpaid and record the corrected payment.');
   if (transaction.scheduledInstalmentId && amount !== transaction.amount) {
     const instalment = (agreement.schedule || []).find(item => item.id === transaction.scheduledInstalmentId && !item.supersededAt);
     if (!instalment) throw new Error('This payment is linked to a superseded instalment; reverse and re-record it instead.');
     const others = activeTransactions(state).filter(item => item.id !== transaction.id && item.creditAgreementId === agreement.id && item.scheduledInstalmentId === instalment.id);
-    const due = instalment.amount - others.reduce((sum, item) => sum + item.amount, 0);
-    if (amount > due) throw new Error('The corrected payment cannot exceed the remaining instalment amount.');
+    const due = instalment.amount - others.reduce((sum, item) => sum + (item.scheduledPortionAmount ?? item.amount), 0);
+    const scheduledAmount = Math.min(amount, due);
     const feeAvailable = Math.max(0, instalment.financeCostAmount - others.reduce((sum, item) => sum + (item.creditFinanceCostAmount || 0), 0));
-    const principalAvailable = Math.max(0, instalment.principalAmount - others.reduce((sum, item) => sum + (item.creditPrincipalAmount || 0), 0));
-    const fee = amount === due ? feeAvailable : Math.min(feeAvailable, Math.floor(amount * feeAvailable / due));
-    const principal = amount - fee;
-    if (principal > principalAvailable) throw new Error('The corrected amount does not reconcile with this instalment’s principal and finance cost.');
+    const principalAvailable = Math.max(0, instalment.principalAmount - others.reduce((sum, item) => sum + (item.scheduledPrincipalAmount ?? item.creditPrincipalAmount ?? 0), 0));
+    const fee = scheduledAmount === due ? feeAvailable : due > 0 ? Math.min(feeAvailable, Math.floor(scheduledAmount * feeAvailable / due)) : 0;
+    const scheduledPrincipal = scheduledAmount - fee;
+    const extraPrincipal = amount - scheduledAmount;
+    if (scheduledPrincipal > principalAvailable) throw new Error('The corrected amount does not reconcile with this instalment’s principal and finance cost.');
+    if (extraPrincipal > 0) {
+      const balances = getCreditAgreementBalances(state, agreement);
+      if (extraPrincipal > balances.principalRemaining - scheduledPrincipal) throw new Error('The corrected amount exceeds the remaining principal.');
+      applyExtraPrincipalToSchedule(state, agreement, extraPrincipal, date, transaction.id, instalment.id);
+    }
+    const principal = scheduledPrincipal + extraPrincipal;
     transaction.creditPrincipalAmount = principal;
     transaction.creditFinanceCostAmount = fee;
-    transaction.creditPaymentKind = amount < due ? 'partial' : 'scheduled';
+    transaction.scheduledPortionAmount = scheduledAmount;
+    transaction.scheduledPrincipalAmount = scheduledPrincipal;
+    if (extraPrincipal) { transaction.extraPrincipalAmount = extraPrincipal; transaction.creditPaymentKind = 'scheduled_extra'; }
+    else { delete transaction.extraPrincipalAmount; transaction.creditPaymentKind = scheduledAmount < due ? 'partial' : 'scheduled'; }
   }
   const before = { amount: transaction.amount, date: transaction.date, paidFromFundId: transaction.paidFromFundId || '', note: transaction.note || '' };
   transaction.amount = amount;
@@ -485,6 +580,8 @@ export function updateCreditAgreement(state, agreementId, changes, asOfDate = ne
   const nextCategoryId = String(changes.categoryId ?? agreement.categoryId ?? '');
   const nextUpfrontCounts = changes.upfrontCountsAsFirstInstalment ?? agreement.upfrontCountsAsFirstInstalment ?? false;
   const nextScheduleMode = changes.scheduleMode === 'custom' || changes.scheduleMode === 'auto' ? changes.scheduleMode : agreement.scheduleMode || 'auto';
+  const nextReminderPreferences = changes.creditReminderPreferences ?? agreement.creditReminderPreferences ?? { enabled: false, daysBefore: 1, onDueDate: true };
+  if (!nextReminderPreferences || typeof nextReminderPreferences.enabled !== 'boolean' || !Number.isInteger(nextReminderPreferences.daysBefore) || nextReminderPreferences.daysBefore < 0 || nextReminderPreferences.daysBefore > 30 || typeof nextReminderPreferences.onDueDate !== 'boolean') throw new Error('Choose valid Credit reminder preferences.');
   const existingDeposit = (state.transactions || []).find(item => item.creditAgreementId === agreementId && item.creditPaymentKind === 'deposit' && !item.reversedAt);
   if ((purchaseTermsChanged || depositDetailsChanged) && existingDeposit && (existingDeposit.source === 'bank' || existingDeposit.sourceType === 'bank_import')) throw new Error('Bank-imported deposits cannot be edited here. Correct or unlink the bank record while keeping its provenance.');
   if (purchaseTermsChanged && nextDeposit > 0 && !existingDeposit && !changes.depositTransactionId) throw new Error('A transaction ID is required to add the corrected deposit to Finance.');
@@ -545,6 +642,7 @@ export function updateCreditAgreement(state, agreementId, changes, asOfDate = ne
     agreement.reference = String(changes.reference ?? agreement.reference).trim();
     agreement.productUrl = nextProductUrl;
     agreement.notes = String(changes.notes ?? agreement.notes).trim();
+    agreement.creditReminderPreferences = { ...nextReminderPreferences };
     for (const transaction of (state.transactions || []).filter(item => item.creditAgreementId === agreementId && item.creditPaymentKind === 'deposit' && !item.reversedAt)) transaction.title = `Deposit for ${nextTitle}`;
     agreement.updatedAt = new Date().toISOString();
     return agreement;
@@ -586,6 +684,7 @@ export function updateCreditAgreement(state, agreementId, changes, asOfDate = ne
   agreement.reference = String(changes.reference ?? agreement.reference).trim();
   agreement.productUrl = nextProductUrl;
   agreement.notes = String(changes.notes ?? agreement.notes).trim();
+  agreement.creditReminderPreferences = { ...nextReminderPreferences };
   for (const transaction of (state.transactions || []).filter(item => item.creditAgreementId === agreementId && item.creditPaymentKind === 'deposit' && !item.reversedAt)) transaction.title = `Deposit for ${nextTitle}`;
   agreement.frequency = frequency;
   agreement.customDays = customDays;

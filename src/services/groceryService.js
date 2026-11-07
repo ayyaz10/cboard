@@ -37,6 +37,7 @@ export async function loadGroceries() {
     if (migrationPending) loaded.version = await saveGroceries(loaded.state, loaded.version, loaded.userId);
     loaded.state = linkRecipeInventory(loaded.state, resolvedRecipes, days, foodCatalog);
     loaded.migratedNegativeItemCount = migratedNegativeItemCount;
+    loaded.diaryDays = days;
     return loaded;
   });
 }

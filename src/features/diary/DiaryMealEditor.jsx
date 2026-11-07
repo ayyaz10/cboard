@@ -78,6 +78,7 @@ export function DiaryMealEditor({
   onDraftChange,
   foodLibrary = [],
   startWithFoodLookup = false,
+  initialFocusFoodId = null,
 }) {
   const [draft, setDraft] = useState(() => structuredClone(initial));
   const [notesOpen, setNotesOpen] = useState(() => Boolean(initial.notes));
@@ -87,7 +88,7 @@ export function DiaryMealEditor({
   const [individual, setIndividual] = useState(false);
   const [lookup, setLookup] = useState(null);
   const pickerDialog = useRef(null);
-  const [openFood, setOpenFood] = useState(null);
+  const [openFood, setOpenFood] = useState(initialFocusFoodId);
   const [manualId, setManualId] = useState(null);
   const [nutritionOpen, setNutritionOpen] = useState({});
   const [draggingFoodId, setDraggingFoodId] = useState(null);
@@ -104,6 +105,9 @@ export function DiaryMealEditor({
   useEffect(() => {
     if (startWithFoodLookup) setLookup('new');
   }, [startWithFoodLookup]);
+  useEffect(() => {
+    if (initialFocusFoodId) setOpenFood(initialFocusFoodId);
+  }, [initialFocusFoodId]);
   useEffect(() => {
     onDraftChange(draft);
   }, [draft, onDraftChange]);

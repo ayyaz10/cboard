@@ -79,6 +79,16 @@ test('one-app backup keeps a selective scope and round-trips the source data', a
   assert.equal(parsed.modules[0].data.workspace.state.transactions[0].id, 'stable-tx-1');
 });
 
+test('Notes backups retain the lifecycle, pin, tags, and timestamp fields', async () => {
+  const note = {
+    id: 'a2e3d8d3-2eaa-4ad0-81b8-f26b801418f3', title: 'Archived', content_html: '<p>Keep me</p>',
+    content_text: 'Keep me', lifecycle_state: 'archived', state_before_trash: 'active',
+    pinned_at: '2026-10-05T09:00:00Z', tags: ['work'], created_at: '2026-10-01T10:00:00Z', updated_at: '2026-10-05T09:00:00Z',
+  };
+  const parsed = await parseBackupFile(await asFile(await backupFor(['goals', 'notes'], { notes: { notes: [note] } })));
+  assert.deepEqual(parsed.modules.find(module => module.moduleId === 'notes').data.notes[0], note);
+});
+
 test('Finance schema v1 backup restores with an empty credit agreement list', async () => {
   const finance = { workspace: { state: { transactions: [{ id: 'legacy', type: 'income', amount: 100 }], debts: [] }, updated_at: '2026-10-05T09:00:00Z' } };
   const backup = await backupFor(['finance'], { finance });
@@ -148,6 +158,27 @@ test('Habit Improvement backups preserve backlog promotion linkage and remap its
   assert.equal(getBackupModule('drivingImprovement').recordCount({ workspace: { data: restored } }), 2);
 });
 
+test('Habit Improvement archive backups round-trip lifecycle, hierarchy and content without regenerating IDs', async () => {
+  const archivedAt = '2026-11-05T12:00:00.000Z';
+  const habit = { id: 'habit-sleep', userId: 'old-account', name: 'Sleep Improvement', slug: 'sleep-improvement', description: 'Evening routine', lifecycleState: 'BACKLOG', backloggedAt: '2026-11-01T00:00:00.000Z', archivedAt, createdAt: '2026-10-20T00:00:00.000Z', updatedAt: archivedAt };
+  const root = { id: 'node-evening', userId: 'old-account', habitId: habit.id, parentId: null, title: 'Evening routine', description: 'Slow down', whyItHappens: '<p>Late screens</p>', whatIDoDifferently: '<ul><li>Read</li></ul>', richNotes: '<p>Keep the phone away.</p>', status: 'IMPROVING', priority: 'HIGH', focusNow: true, sortOrder: 2, archivedAt, createdAt: '2026-10-21T00:00:00.000Z', updatedAt: archivedAt };
+  const child = { id: 'node-phone', userId: 'old-account', habitId: habit.id, parentId: root.id, title: 'Put phone away', description: '', whyItHappens: '', whatIDoDifferently: '', richNotes: '<p>Charge outside bedroom.</p>', status: 'STABLE', priority: 'LOW', focusNow: false, sortOrder: 0, archivedAt, createdAt: '2026-10-22T00:00:00.000Z', updatedAt: archivedAt };
+  const idea = { id: 'idea-sleep', userId: 'old-account', title: habit.name, note: habit.description, type: null, priority: null, state: 'ARCHIVED', promotedHabitId: habit.id, promotedAt: '2026-10-20T00:00:00.000Z', backloggedAt: habit.backloggedAt, archivedAt, createdAt: '2026-10-20T00:00:00.000Z', updatedAt: archivedAt };
+  const client = new FinanceMemoryClient();
+  client.rows = [{ user_id: 'old-account', data: { version: 1, habitVersion: 6, habits: [habit], nodes: [root, child], categories: [], mistakes: [], reminders: [], guidanceNotes: [], backlogItems: [idea] }, revision: 6, updated_at: archivedAt }];
+  const exported = await exportBackupData(['drivingImprovement'], { client, userId: 'old-account' });
+  const parsed = await parseBackupFile(await asFile(await backupFor(['drivingImprovement'], { drivingImprovement: exported.drivingImprovement.data })));
+  client.rows = [];
+  await importBackupModule('drivingImprovement', parsed.modules[0].data, { client, userId: 'new-account' });
+  const restored = client.rows[0].data;
+  assert.deepEqual(restored.habits.map(({ userId, ...record }) => record), [(({ userId, ...record }) => record)(habit)]);
+  assert.deepEqual(restored.nodes.map(({ userId, ...record }) => record), [(({ userId, ...record }) => record)(root), (({ userId, ...record }) => record)(child)]);
+  assert.equal(restored.backlogItems[0].id, idea.id);
+  assert.equal(restored.backlogItems[0].state, 'ARCHIVED');
+  assert.equal(restored.backlogItems[0].promotedHabitId, habit.id);
+  assert.equal(restored.backlogItems[0].userId, 'new-account');
+});
+
 test('multi-app backup preserves linked identifiers between selected modules', async () => {
   const goalId = 'goal-1';
   const note = { id: 'note-1', linked_goal_id: goalId, content_text: 'Progress note' };
@@ -159,7 +190,7 @@ test('multi-app backup preserves linked identifiers between selected modules', a
 });
 
 test('Finance export, replacement restore, ownership remapping, and round-trip preserve IDs but omit secrets', async () => {
-  const state = { version: 1, settings: { currency: 'GBP', refresh_token: 'never-export-this' }, categories: [], donationCategories: [{ id: 'donation-category-1', name: 'Education', archived: false }], donationTargets: [{ id: 'donation-target-1', categoryId: 'donation-category-1', targetAmount: 50000, status: 'active' }], donationAccruals: [{ id: 'due-1', categoryId: 'donation-category-1', amount: 5000, accruedAmount: 5000, paidAmount: 0, effectiveDate: '2026-10-01', status: 'outstanding' }], donationPayments: [{ id: 'payment-1', categoryId: 'donation-category-1', amount: 1000, financeTransactionId: 'tx-stable-1', date: '2026-10-05', reversedAt: '2026-10-06', reversalId: 'reversal-1', sourceAccruals: [{ accrualId: 'due-1', amount: 1000 }] }], donationReversals: [{ id: 'reversal-1', paymentId: 'payment-1', financeTransactionId: 'tx-stable-1', categoryId: 'donation-category-1', amount: 1000, date: '2026-10-06', sourceType: 'manual_undo', sourceAccruals: [{ accrualId: 'due-1', amount: 1000 }] }], transactions: [{ id: 'tx-stable-1', type: 'expense', amount: 2250, date: '2026-10-05', reversedAt: '2026-10-06', donationReversalId: 'reversal-1', donationPaymentId: 'payment-1', financeGroup: 'donation', donationCategoryId: 'donation-category-1', linkedDonationTargetId: 'donation-target-1', merchantId: 'merchant-custom-1' }], merchantProfiles: [{ id: 'merchant-custom-1', displayName: 'Spice of India', aliases: ['Spice India'], normalizedAliases: ['spice of india', 'spice india'], logoType: 'custom', logoData: 'data:image/webp;base64,AA==' }], budgets: {}, openingBalances: {}, budgetPresets: [], goals: [], goalContributions: [], investments: [], debts: [], debtPayments: [{ id: 'repay-1', debtId: 'debt-stable-1', amount: 300 }], recurring: [{ id: 'repeat-1', frequency: 'weekly' }], transactionPresets: [], allocationRules: [] };
+  const state = { version: 1, settings: { currency: 'GBP', refresh_token: 'never-export-this' }, categories: [], donationCategories: [{ id: 'donation-category-1', name: 'Education', archived: false }], donationTargets: [{ id: 'donation-target-1', categoryId: 'donation-category-1', targetAmount: 50000, status: 'active' }], donationAccruals: [{ id: 'due-1', categoryId: 'donation-category-1', amount: 5000, accruedAmount: 5000, paidAmount: 0, effectiveDate: '2026-10-01', status: 'outstanding' }], donationPayments: [{ id: 'payment-1', categoryId: 'donation-category-1', amount: 1000, financeTransactionId: 'tx-stable-1', date: '2026-10-05', reversedAt: '2026-10-06', reversalId: 'reversal-1', sourceAccruals: [{ accrualId: 'due-1', amount: 1000 }] }], donationReversals: [{ id: 'reversal-1', paymentId: 'payment-1', financeTransactionId: 'tx-stable-1', categoryId: 'donation-category-1', amount: 1000, date: '2026-10-06', sourceType: 'manual_undo', sourceAccruals: [{ accrualId: 'due-1', amount: 1000 }] }], transactions: [{ id: 'tx-stable-1', type: 'expense', amount: 2250, date: '2026-10-05', reversedAt: '2026-10-06', donationReversalId: 'reversal-1', donationPaymentId: 'payment-1', financeGroup: 'donation', donationCategoryId: 'donation-category-1', linkedDonationTargetId: 'donation-target-1', merchantId: 'merchant-custom-1' }, { id: 'credit-tx-1', type: 'creditPayment', amount: 35000, date: '2026-10-25', creditAgreementId: 'credit-stable-1', creditPaymentKind: 'payment', creditPaymentId: 'credit-payment-1', scheduledInstalmentId: 'credit-row-1', creditPrincipalAmount: 33000, creditFinanceCostAmount: 2000 }], merchantProfiles: [{ id: 'merchant-custom-1', displayName: 'Spice of India', aliases: ['Spice India'], normalizedAliases: ['spice of india', 'spice india'], logoType: 'custom', logoData: 'data:image/webp;base64,AA==' }], budgets: {}, openingBalances: {}, budgetPresets: [], goals: [], goalContributions: [], investments: [], debts: [], creditAgreements: [{ id: 'credit-stable-1', title: 'Phone', status: 'active', cashPrice: 120000, deposit: 20000, financedAmount: 100000, financeCharge: 5000, totalRepayable: 105000, term: 3, schedule: [{ id: 'credit-row-1', sequence: 1, dueDate: '2026-11-25', amount: 35000, principalAmount: 33000, financeCostAmount: 2000 }], history: [{ type: 'payment_corrected', date: '2026-10-26' }], creditReminderPreferences: { enabled: true, daysBefore: 3, onDueDate: true } }], debtPayments: [{ id: 'repay-1', debtId: 'debt-stable-1', amount: 300 }], recurring: [{ id: 'repeat-1', frequency: 'weekly' }], transactionPresets: [], allocationRules: [] };
   const expected = structuredClone(state); delete expected.settings.refresh_token;
   const client = new FinanceMemoryClient();
   client.rows = [{ user_id: 'source-account', state, updated_at: '2026-10-05T09:00:00Z' }];

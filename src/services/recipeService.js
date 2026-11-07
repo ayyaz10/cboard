@@ -219,6 +219,39 @@ export async function getRecipes(expectedUserId) {
   });
 }
 
+export async function getArchivedRecipes(expectedUserId) {
+  const { client, userId } = await getUserScopedClient();
+  if (expectedUserId && userId !== expectedUserId) throw new Error('Your account changed. Reload recipes.');
+  const rows = [];
+  for (let from = 0; ; from += 100) {
+    const result = await client.from('user_tool_preferences').select('key,value,updated_at')
+      .eq('user_id', userId).like('key', `${PREFIX}%`).order('key').range(from, from + 99);
+    assertSupabaseResult(result);
+    rows.push(...result.data);
+    if (result.data.length < 100) break;
+  }
+  return rows.filter(row => row.value.archivedAt).map(row => ({ ...validateRecipe(row.value.recipe), image: isRecipeImage(row.value.image) ? row.value.image : null, updatedAt: row.updated_at, archivedAt: row.value.archivedAt }));
+}
+
+export async function setRecipeArchived(recipe, archived, expectedUserId) {
+  const { client, userId } = await getUserScopedClient();
+  if (expectedUserId && expectedUserId !== userId) throw new Error('Your account changed. Reload Recipes before saving.');
+  if (!recipe?.slug || !recipe.updatedAt) throw new Error('Reload this recipe before changing its archive status.');
+  const key = `${PREFIX}${recipe.slug}`;
+  const found = await client.from('user_tool_preferences').select('value,updated_at').eq('user_id', userId).eq('key', key).single();
+  assertSupabaseResult(found);
+  if (found.data.updated_at !== recipe.updatedAt) throw new Error('This recipe changed in another tab. Reload before changing its archive status.');
+  const value = { ...found.data.value };
+  if (archived) value.archivedAt = new Date().toISOString();
+  else delete value.archivedAt;
+  const updatedAt = new Date().toISOString();
+  const result = await client.from('user_tool_preferences').update({ value, updated_at: updatedAt })
+    .eq('user_id', userId).eq('key', key).eq('updated_at', found.data.updated_at).select('updated_at').maybeSingle();
+  assertSupabaseResult(result);
+  if (!result.data) throw new Error('This recipe changed while saving. Reload and try again.');
+  return { ...recipe, updatedAt: result.data.updated_at, ...(archived ? { archivedAt: value.archivedAt } : { archivedAt: undefined }) };
+}
+
 export async function saveRecipe(recipe, image, { edit = false, expectedUserId } = {}) {
   const clean = validateRecipe(recipe);
   if (image && !isRecipeImage(image))

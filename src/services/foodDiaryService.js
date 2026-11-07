@@ -8,12 +8,50 @@ import { notify } from '../lib/notifications.js';
 
 const PREFIX = "food-diary:v1:";
 const DIARY_WRITE_TIMEOUT_MS = 30_000;
+const DIARY_CACHE_TTL_MS = 45_000;
 const loadDiaryOnce = createSingleFlightByKey();
+const diaryCache = new Map();
+let diaryCacheUserId = null;
+let diaryAuthSubscription = null;
+
+function clearDiaryCache() {
+  diaryCache.clear();
+  diaryCacheUserId = null;
+}
+
+function cacheDiary(userId, days) {
+  if (diaryCacheUserId && diaryCacheUserId !== userId) diaryCache.clear();
+  diaryCacheUserId = userId;
+  diaryCache.set(userId, { days: structuredClone(days), expiresAt: Date.now() + DIARY_CACHE_TTL_MS });
+}
+
+function watchDiaryAuth(client) {
+  if (diaryAuthSubscription) return;
+  const result = client.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_OUT' || session?.user?.id && diaryCacheUserId && session.user.id !== diaryCacheUserId) clearDiaryCache();
+  });
+  diaryAuthSubscription = result.data.subscription;
+}
+
+export function getCachedFoodDiary(expectedUserId) {
+  if (!expectedUserId) return null;
+  if (diaryCacheUserId && diaryCacheUserId !== expectedUserId) clearDiaryCache();
+  diaryCacheUserId = expectedUserId;
+  const cached = diaryCache.get(expectedUserId);
+  if (!cached || cached.expiresAt <= Date.now()) {
+    diaryCache.delete(expectedUserId);
+    return null;
+  }
+  return structuredClone(cached.days);
+}
 export async function getFoodDiary(expectedUserId) {
   const { client, userId } = await getUserScopedClient();
   if (userId !== expectedUserId)
     throw new Error("Your account changed. Reload the diary.");
-  return loadDiaryOnce(userId, async () => {
+  watchDiaryAuth(client);
+  const cached = getCachedFoodDiary(userId);
+  if (cached) return cached;
+  const days = await loadDiaryOnce(userId, async () => {
     const rows = [];
     for (let from = 0; ; from += 100) {
       const result = await client
@@ -36,6 +74,8 @@ export async function getFoodDiary(expectedUserId) {
       return { ...day, updatedAt: row.updated_at };
     });
   });
+  cacheDiary(userId, days);
+  return structuredClone(days);
 }
 export async function getFoodDiaryDays(dates, expectedUserId) {
   const uniqueDates = [...new Set(dates)].filter(validDate);
@@ -96,7 +136,12 @@ async function commitDay(day, expectedUserId, deleting = false) {
   assertSupabaseResult(result);
   const previousAlerts = new Set((groceries.state.stockAlerts || []).map(alert => alert.id));
   for (const alert of inventory.state.stockAlerts || []) if (!previousAlerts.has(alert.id)) notify.warning(alert.title);
-  return deleting ? clean.date : { ...clean, updatedAt: result.data, inventoryWarnings: inventory.warnings };
+  const updated = deleting ? null : { ...clean, updatedAt: result.data, inventoryWarnings: inventory.warnings };
+  const cached = getCachedFoodDiary(userId);
+  if (cached) {
+    cacheDiary(userId, deleting ? cached.filter(entry => entry.date !== clean.date) : [...cached.filter(entry => entry.date !== clean.date), updated]);
+  }
+  return deleting ? clean.date : updated;
 }
 export const saveFoodDiary = (day, expectedUserId) => commitDay(day, expectedUserId);
 export function deleteFoodDiaryDay(day, expectedUserId) {

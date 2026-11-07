@@ -55,3 +55,15 @@ test('transaction search includes notes, references, categories, receipt items, 
   }
   assert.equal(filterTransactions(rows,{month:null,query:'  ALDI  ',...options})[0].id,'receipt');
 });
+
+test('custom date range includes boundary dates, excludes outside rows and supports uncategorized filtering', () => {
+  const rows=[
+    {id:'before',date:'2026-10-31',type:'expense',amount:100},
+    {id:'start',date:'2026-11-01',type:'expense',amount:200},
+    {id:'inside',date:'2026-11-15',type:'expense',amount:300,categoryId:'food'},
+    {id:'end',date:'2026-11-30',type:'income',amount:400},
+    {id:'after',date:'2026-12-01',type:'expense',amount:500},
+  ];
+  assert.deepEqual(filterTransactions(rows,{from:'2026-11-01',to:'2026-11-30'}).map(row=>row.id),['end','inside','start']);
+  assert.deepEqual(filterTransactions(rows,{from:'2026-11-01',to:'2026-11-30',type:'expense',category:'uncategorized'}).map(row=>row.id),['start']);
+});

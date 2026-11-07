@@ -1,5 +1,7 @@
 import { id } from './financeData.js';
 import { nextTransactionSequence } from './transactionOrder.js';
+import { convertMinorUnits } from '../../services/currencyService.js';
+import { debtPlanStatus } from './financeDebtPlans.js';
 
 const cents = value => Math.max(0, Math.round(Number(value) || 0));
 
@@ -73,6 +75,51 @@ export function debtPaymentSummary(state, debtId, month = null) {
     paidAllTime: payments.reduce((sum, item) => sum + cents(item.amount), 0),
     paymentCount: payments.length,
   };
+}
+
+export function getDebtStatus(state, debtId) {
+  const debt = (state.debts || []).find(item => item.id === debtId);
+  if (!debt) return 'missing';
+  if (debt.archivedAt) return 'archived';
+  return debtPlanStatus({ ...debt, remaining: debtRemainingAmount(state, debtId) }, state.allocationRules || []);
+}
+
+export function filterDebts(state, { status = 'active', query = '' } = {}) {
+  const normalizedQuery = String(query).trim().toLocaleLowerCase();
+  return (state.debts || []).filter(debt => {
+    const debtStatus = getDebtStatus(state, debt.id);
+    const matchesStatus = status === 'all'
+      || status === 'archived' && debtStatus === 'archived'
+      || status === 'paid' && debtStatus === 'completed'
+      || status === 'paused' && debtStatus === 'paused'
+      || status === 'active' && !['archived', 'completed', 'paused', 'missing'].includes(debtStatus);
+    return matchesStatus && (!normalizedQuery || `${debt.name || ''} ${debt.notes || ''}`.toLocaleLowerCase().includes(normalizedQuery));
+  }).sort((a, b) => Number(Boolean(a.archivedAt)) - Number(Boolean(b.archivedAt))
+    || debtRemainingAmount(state, b.id) - debtRemainingAmount(state, a.id)
+    || String(a.name || '').localeCompare(String(b.name || '')));
+}
+
+export function canDeleteDebt(state, debtId) {
+  const debt = (state.debts || []).find(item => item.id === debtId);
+  if (!debt) return false;
+  return !(state.debtPayments || []).some(item => item.debtId === debtId)
+    && !(state.debtAccruals || []).some(item => item.debtId === debtId)
+    && !(state.transactions || []).some(item => item.type === 'debt' && (item.targetId === debtId || item.debtId === debtId));
+}
+
+export function deleteDebt(state, debtId) {
+  if (!canDeleteDebt(state, debtId)) return false;
+  state.debts = (state.debts || []).filter(item => item.id !== debtId);
+  state.allocationRules = (state.allocationRules || []).filter(item => !(item.targetType === 'debt' && item.targetId === debtId));
+  return true;
+}
+
+export function setDebtArchived(state, debtId, archived, date = new Date().toISOString()) {
+  const debt = (state.debts || []).find(item => item.id === debtId);
+  if (!debt || Boolean(debt.archivedAt) === Boolean(archived)) return false;
+  if (archived) debt.archivedAt = date;
+  else delete debt.archivedAt;
+  return true;
 }
 
 export function debtAccrualSettlementStatus(accrual) {
@@ -207,6 +254,66 @@ export function recordDebtPayment(state, { debtId, amount, sourceAmount = amount
 export function recordDebtPaymentState(state, paymentData) {
   recordDebtPayment(state, paymentData);
   return state;
+}
+
+export function canEditDebtPayment(state, paymentId) {
+  const payment = (state.debtPayments || []).find(item => item.id === paymentId && !item.reversedAt);
+  const transaction = payment && (state.transactions || []).find(item => item.id === payment.transactionId);
+  return Boolean(payment && transaction && transaction.type === 'debt'
+    && transaction.source !== 'bank' && transaction.sourceType !== 'bank_import'
+    && !transaction.reversedAt);
+}
+
+export function correctDebtPayment(state, paymentId, { amount, date, note = '', correctedAt = new Date().toISOString() } = {}) {
+  if (!canEditDebtPayment(state, paymentId)) throw new Error('This payment cannot be edited.');
+  const payment = state.debtPayments.find(item => item.id === paymentId && !item.reversedAt);
+  const transaction = state.transactions.find(item => item.id === payment.transactionId);
+  const debt = (state.debts || []).find(item => item.id === payment.debtId);
+  const value = cents(amount);
+  if (!debt || !value || !date) throw new Error('Enter a valid payment amount and date.');
+  const maxAmount = debtRemainingAmount(state, debt.id) + cents(payment.amount);
+  if (value > maxAmount) throw new Error('Payment cannot exceed the remaining debt.');
+
+  const rate = Number(payment.exchangeRate || 1);
+  if (!Number.isFinite(rate) || rate <= 0) throw new Error('The saved exchange rate is invalid.');
+  const maxSourceAmount = debtRemainingSourceAmount(state, debt.id) + cents(payment.sourceAmount ?? payment.amount);
+  const sourceAmount = convertMinorUnits(value, 1 / rate);
+  if (sourceAmount > maxSourceAmount) throw new Error('Payment cannot exceed the remaining amount in the debt currency.');
+  if (!sourceAmount) throw new Error('The corrected amount is too small in the debt currency.');
+  const before = { amount: cents(payment.amount), sourceAmount: cents(payment.sourceAmount ?? payment.amount), date: payment.date, note: transaction.note || '' };
+  const after = { amount: value, sourceAmount, date, note: String(note).trim() };
+  if (before.amount === after.amount && before.sourceAmount === after.sourceAmount && before.date === after.date && before.note === after.note) return false;
+
+  payment.corrections ||= [];
+  payment.corrections.push({ correctedAt, before, after });
+  Object.assign(payment, { amount: value, sourceAmount, date, paidFromFundId: payment.paidFromFundId || transaction.paidFromFundId || '' });
+  Object.assign(transaction, { amount: value, date, paymentDate: date, note: after.note, updatedAt: correctedAt });
+
+  // Reconcile allocation from the authoritative active payment set, preserving
+  // oldest-first settlement and each payment's own allocation evidence.
+  const accruals = (state.debtAccruals || []).filter(item => item.debtId === debt.id && item.status !== 'reversed');
+  for (const accrual of accruals) {
+    accrual.paidAmount = 0;
+    accrual.status = cents(accrual.accruedAmount ?? accrual.amount) ? 'outstanding' : 'reversed';
+  }
+  const payments = (state.debtPayments || []).filter(item => item.debtId === debt.id && !item.reversedAt)
+    .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.transactionId || '').localeCompare(String(b.transactionId || '')));
+  for (const activePayment of payments) {
+    let unallocated = cents(activePayment.amount);
+    activePayment.sourceAccruals = [];
+    for (const accrual of accruals) {
+      if (!unallocated) break;
+      const available = Math.max(0, cents(accrual.accruedAmount ?? accrual.amount) - cents(accrual.paidAmount));
+      const allocated = Math.min(available, unallocated);
+      if (!allocated) continue;
+      accrual.paidAmount += allocated;
+      accrual.status = accrual.paidAmount >= cents(accrual.accruedAmount ?? accrual.amount) ? 'fully_paid' : 'partially_paid';
+      activePayment.sourceAccruals.push({ accrualId: accrual.id, amount: allocated });
+      unallocated -= allocated;
+    }
+  }
+  reconcileDebtBalance(state, debt.id);
+  return true;
 }
 
 export function canMarkDebtPaymentUnpaid(state, transaction) {

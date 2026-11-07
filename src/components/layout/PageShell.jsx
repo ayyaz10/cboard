@@ -47,7 +47,7 @@ export function PageShell({ children }) {
           </div>
         </header>
         <AppNavigationScope value={true}>{children}</AppNavigationScope>
-        <ScrollControls />
+        {route !== '/food-diary' && <ScrollControls />}
       </div>
     </main>
   );

@@ -6,28 +6,30 @@ import { NotFoundPage } from '../components/pages/NotFoundPage';
 import { ToolLayout } from '../components/layout/ToolLayout';
 import { useAuth } from '../contexts/AuthContext';
 import { migrateLocalStorageData } from '../services/dataMigrationService';
-import { navigateTo, useRoute } from './useRoute';
+import { getCurrentPathWithSearch, navigateTo, useRoute } from './useRoute';
 import { observeWorkspaceSetup } from './workspaceSetup';
-import { CalculatorBoard } from '../features/calculators/CalculatorBoard';
+import { RouteErrorBoundary } from './RouteErrorBoundary.jsx';
+const CalculatorBoard = lazy(() => import('../features/calculators/CalculatorBoard').then(module => ({ default: module.CalculatorBoard })));
 import {
   calculators,
   findCalculatorByPath,
 } from '../features/calculators/registry';
-import { ProgressTracker } from '../features/progressTracker/ProgressTracker';
-import { FocusTimerPage } from '../features/focusTimer/FocusTimerPage';
-import { NotebookPage } from '../features/notebook/NotebookPage';
-import { Recipes } from '../features/recipes/Recipes';
-import { Groceries } from '../features/groceries/Groceries';
-import { WeightProgress } from '../features/weightProgress/WeightProgress.jsx';
-import { FinancePage } from '../features/finance/FinancePage.jsx';
-import { ProfilePage } from '../components/pages/ProfilePage.jsx';
+const ProgressTracker = lazy(() => import('../features/progressTracker/ProgressTracker').then(module => ({ default: module.ProgressTracker })));
+const FocusTimerPage = lazy(() => import('../features/focusTimer/FocusTimerPage').then(module => ({ default: module.FocusTimerPage })));
+const NotebookPage = lazy(() => import('../features/notebook/NotebookPage').then(module => ({ default: module.NotebookPage })));
+const Recipes = lazy(() => import('../features/recipes/Recipes').then(module => ({ default: module.Recipes })));
+const Groceries = lazy(() => import('../features/groceries/Groceries').then(module => ({ default: module.Groceries })));
+const WeightProgress = lazy(() => import('../features/weightProgress/WeightProgress.jsx').then(module => ({ default: module.WeightProgress })));
+const FinancePage = lazy(() => import('../features/finance/FinancePage.jsx').then(module => ({ default: module.FinancePage })));
+const ProfilePage = lazy(() => import('../components/pages/ProfilePage.jsx').then(module => ({ default: module.ProfilePage })));
 const ThemePreview = lazy(() => import('../components/pages/ThemePreview.jsx').then(module => ({ default: module.ThemePreview })));
 const Training = lazy(() => import('../features/training/Training.jsx').then(module => ({ default: module.Training })));
 const HabitImprovementHome = lazy(() => import('../features/drivingImprovement/HabitImprovementHome.jsx').then(module => ({ default: module.HabitImprovementHome })));
 const HabitImprovementDetail = lazy(() => import('../features/drivingImprovement/DrivingImprovement.jsx').then(module => ({ default: module.HabitImprovementDetail })));
 
 export default function App() {
-  return <AppContent />;
+  const route = useRoute();
+  return <RouteErrorBoundary key={route}><AppContent /></RouteErrorBoundary>;
 }
 
 function AppContent() {
@@ -113,7 +115,7 @@ function AppContent() {
   }
 
   if (!isAuthenticated) {
-    return <AuthPage key={route} route={route} returnTo={route} />;
+    return <AuthPage key={route} route={route} returnTo={getCurrentPathWithSearch()} />;
   }
 
   if (isMigrating) {
@@ -157,41 +159,45 @@ function AppContent() {
   }
 
   if (route === '/calculators') {
-    return <CalculatorBoard calculators={calculators} />;
+    return <Suspense fallback={<RouteLoading label="Loading Calculator Tools..." />}><CalculatorBoard calculators={calculators} /></Suspense>;
   }
 
   if (route === '/progress-tracker') {
-    return <ProgressTracker />;
+    return <Suspense fallback={<RouteLoading label="Loading Progress Tracker..." />}><ProgressTracker /></Suspense>;
   }
 
-  if (route === '/notes') {
-    return <NotebookPage />;
+  if (route === '/notes' || route.startsWith('/notes/')) {
+    const noteId = route.startsWith('/notes/') ? safeDecodePathSegment(route.slice('/notes/'.length)) : '';
+    if (noteId === null || noteId.includes('/')) return <NotFoundPage />;
+    return <Suspense fallback={<RouteLoading label="Loading Notes..." />}><NotebookPage noteId={noteId} /></Suspense>;
   }
 
-  if (route === '/groceries') return <Groceries key={user.id} />;
+  if (route === '/groceries') return <Suspense fallback={<RouteLoading label="Loading Groceries..." />}><Groceries key={user.id} /></Suspense>;
 
-  if (route === '/weight-progress') return <WeightProgress key={user.id} />;
+  if (route === '/weight-progress') return <Suspense fallback={<RouteLoading label="Loading Weight Progress..." />}><WeightProgress key={user.id} /></Suspense>;
 
-  if (route === '/finance') return <FinancePage key={user.id} />;
-  if (route === '/account') return <ProfilePage key={user.id} />;
+  if (route === '/finance' || route.startsWith('/finance/debt/')) return <Suspense fallback={<RouteLoading label="Loading Finance..." />}><FinancePage key={user.id} userId={user.id} /></Suspense>;
+  if (route === '/account') return <Suspense fallback={<RouteLoading label="Loading Profile..." />}><ProfilePage key={user.id} /></Suspense>;
   if (route === '/training') return <Suspense fallback={<main className="panel m-6 p-6" role="status">Loading Training…</main>}><Training key={user.id} /></Suspense>;
   if (route === '/driving-improvement') return <main className="panel m-6 p-6" role="status">Opening Driving Improvement...</main>;
   if (route === '/habit-improvement' || route === '/habit-improvement/backlog') return <Suspense fallback={<main className="panel m-6 p-6" role="status">Loading Habit Improvement...</main>}><HabitImprovementHome key={user.id} userId={user.id} view={route.endsWith('/backlog') ? 'backlog' : 'active'} /></Suspense>;
   if (route.startsWith('/habit-improvement/')) {
-    const [habitSlug, nodeId = ''] = route.slice('/habit-improvement/'.length).split('/').map(part => decodeURIComponent(part));
+    const decoded = route.slice('/habit-improvement/'.length).split('/').map(safeDecodePathSegment);
+    if (decoded.some(part => part === null) || decoded.length > 2) return <NotFoundPage />;
+    const [habitSlug, nodeId = ''] = decoded;
     return <Suspense fallback={<main className="panel m-6 p-6" role="status">Loading improvement area...</main>}><HabitImprovementDetail key={`${user.id}:${habitSlug}`} userId={user.id} habitSlug={habitSlug} nodeId={nodeId} /></Suspense>;
   }
 
   if (route === '/food-diary') {
-    return <Recipes key={user.id} route="/recipes/diary/day" navigationPath="/food-diary" />;
+    return <Suspense fallback={<RouteLoading label="Loading Food Diary..." />}><Recipes key={user.id} route="/recipes/diary/day" navigationPath="/food-diary" /></Suspense>;
   }
 
   if (route === '/recipes' || route.startsWith('/recipes/')) {
-    return <Recipes key={user.id} route={route} />;
+    return <Suspense fallback={<RouteLoading label="Loading Recipes..." />}><Recipes key={user.id} route={route} /></Suspense>;
   }
 
   if (route === '/focus-timer') {
-    return <FocusTimerPage />;
+    return <Suspense fallback={<RouteLoading label="Loading Focus Timer..." />}><FocusTimerPage /></Suspense>;
   }
 
   const activeCalculator = findCalculatorByPath(route);
@@ -203,11 +209,21 @@ function AppContent() {
   const ActiveCalculatorComponent = activeCalculator.component;
 
   return (
+    <Suspense fallback={<RouteLoading label="Loading calculator..." />}>
     <ToolLayout
       activeCalculator={activeCalculator}
       calculators={calculators}
     >
       <ActiveCalculatorComponent />
     </ToolLayout>
+    </Suspense>
   );
+}
+
+function safeDecodePathSegment(value) {
+  try { return decodeURIComponent(value); } catch { return null; }
+}
+
+function RouteLoading({ label }) {
+  return <main className="panel m-6 p-6" role="status">{label}</main>;
 }

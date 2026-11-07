@@ -2,6 +2,8 @@ import { ingredientRecipeCalculation, recipeProductCalculation } from './ingredi
 
 export const MEAL_SLOTS = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
 export const MACROS = ['calories', 'protein', 'carbs', 'fat', 'fiber'];
+export const DATED_PLAN_KEY = 'recipes:dated-plans:v1';
+const validPlanDate = date => typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(Date.parse(`${date}T00:00:00`)) && new Date(`${date}T00:00:00`).toISOString().slice(0, 10) === date;
 export const emptyMealPlan = () =>
   MEAL_SLOTS.map((meal, index) => ({
     id: `meal-${index}`,
@@ -9,6 +11,60 @@ export const emptyMealPlan = () =>
     slug: '',
     portions: 1,
   }));
+
+export function addRecipeToMealRoutine(current, slug, meal, portions) {
+  const routine = current == null ? { version: 1, name: 'My current meal routine', notes: '', entries: emptyMealPlan() } : readMealRoutine(current);
+  if (!MEAL_SLOTS.includes(meal) || typeof slug !== 'string' || !slug || !Number.isFinite(portions) || portions <= 0 || portions > 100)
+    throw new Error('Choose a meal and serving amount to add this recipe to your planner.');
+  if (routine.entries.length >= 24) throw new Error('Your planner already has the maximum of 24 meals.');
+  const matching = routine.entries.find(entry => entry.slug === slug && entry.meal === meal);
+  const empty = routine.entries.find(entry => !entry.slug && entry.meal === meal);
+  const entries = matching
+    ? routine.entries.map(entry => entry.id === matching.id ? { ...entry, portions } : entry)
+    : empty
+      ? routine.entries.map(entry => entry.id === empty.id ? { ...entry, slug, portions } : entry)
+      : [...routine.entries, { id: `quick-${slug}-${Date.now().toString(36)}`, meal, slug, portions }];
+  return readMealRoutine({ ...routine, entries });
+}
+
+export function readDatedMealPlans(value) {
+  if (value == null) return { version: 1, dates: {} };
+  if (!value || value.version !== 1 || !value.dates || typeof value.dates !== 'object' || Array.isArray(value.dates))
+    throw new Error('Saved date plans are invalid.');
+  const dates = Object.entries(value.dates);
+  if (dates.length > 366) throw new Error('Keep no more than 366 dated meal plans at a time.');
+  const clean = {};
+  for (const [date, entries] of dates) {
+    if (!validPlanDate(date)) throw new Error('A saved meal plan has an invalid date.');
+    clean[date] = validateMealPlan(entries);
+  }
+  return { version: 1, dates: clean };
+}
+
+export function addRecipeToDatedMealPlan(current, date, slug, meal, portions) {
+  if (!validPlanDate(date))
+    throw new Error('Choose a valid date for the Planner.');
+  if (!MEAL_SLOTS.includes(meal) || typeof slug !== 'string' || !slug || !Number.isFinite(portions) || portions <= 0 || portions > 100)
+    throw new Error('Choose a meal and serving amount to add this recipe to your planner.');
+  const plan = readDatedMealPlans(current);
+  const entries = [...(plan.dates[date] || emptyMealPlan())];
+  const existing = entries.find(entry => entry.slug === slug && entry.meal === meal);
+  if (existing) existing.portions = portions;
+  else {
+    if (entries.length >= 24) throw new Error('This date already has the maximum of 24 meals.');
+    const empty = entries.find(entry => !entry.slug && entry.meal === meal);
+    if (empty) { empty.slug = slug; empty.portions = portions; }
+    else entries.push({ id: `scheduled-${slug}-${meal.toLowerCase()}-${date}`, meal, slug, portions });
+  }
+  return readDatedMealPlans({ ...plan, dates: { ...plan.dates, [date]: validateMealPlan(entries) } });
+}
+
+export function setDatedMealPlan(current, date, entries) {
+  if (!validPlanDate(date)) throw new Error('Choose a valid date for the Planner.');
+  const plan = readDatedMealPlans(current);
+  const validated = validateMealPlan(entries);
+  return readDatedMealPlans({ ...plan, dates: { ...plan.dates, [date]: validated } });
+}
 
 export function readMealRoutine(value) {
   if (Array.isArray(value))

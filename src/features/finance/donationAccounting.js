@@ -36,6 +36,76 @@ export function accrueDonation(state, { categoryId = '', amount, currency = stat
   return true;
 }
 
+export function canEditDonationAccrual(accrual) {
+  return Boolean(accrual && accrual.sourceType === 'manual' && accrual.status !== 'reversed');
+}
+
+export function canDeleteDonationAccrual(accrual) {
+  return Boolean(canEditDonationAccrual(accrual) && Number(accrual.paidAmount || 0) === 0);
+}
+
+export function canArchiveDonationCategory(state, categoryId) {
+  return (state.donationCategories || []).some(category => category.id === categoryId);
+}
+
+/** Archive preserves the category and its history, pausing its automatic Due rules. Restore never silently resumes them. */
+export function archiveDonationCategory(state, categoryId, archived = true) {
+  if (!canArchiveDonationCategory(state, categoryId)) throw new Error('The Donation category could not be found.');
+  const category = state.donationCategories.find(item => item.id === categoryId);
+  category.archived = Boolean(archived);
+  if (archived) {
+    for (const rule of state.allocationRules || []) {
+      if (rule.targetType === 'donation' && (rule.donationCategoryId || rule.categoryId) === categoryId && rule.active) {
+        rule.active = false;
+        rule.pausedByCategory = true;
+      }
+    }
+  }
+  return category;
+}
+
+export function editDonationAccrual(state, accrualId, changes) {
+  const accrual = (state.donationAccruals || []).find(item => item.id === accrualId);
+  if (!canEditDonationAccrual(accrual)) throw new Error('Only an active manual Donation Due can be edited.');
+  const amount = Number(changes.amount);
+  if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error('Donation due must be a positive amount.');
+  if (amount < Number(accrual.paidAmount || 0)) throw new Error('Due cannot be reduced below the amount already paid.');
+  if (!changes.categoryId) throw new Error('Choose a Donation category.');
+  if (Number(accrual.paidAmount || 0) > 0 && changes.categoryId !== accrual.categoryId) throw new Error('Category cannot change after part of this Due has been paid.');
+  if (Number(accrual.paidAmount || 0) > 0 && changes.effectiveDate !== accrual.effectiveDate) throw new Error('Date cannot change after part of this Due has been paid.');
+  accrual.amount = amount;
+  accrual.accruedAmount = amount;
+  accrual.categoryId = changes.categoryId;
+  accrual.effectiveDate = changes.effectiveDate;
+  accrual.note = String(changes.note || '');
+  accrual.status = Number(accrual.paidAmount || 0) === amount ? 'fully_paid' : Number(accrual.paidAmount || 0) ? 'partially_paid' : 'outstanding';
+  return accrual;
+}
+
+export function deleteDonationAccrual(state, accrualId) {
+  const accrual = (state.donationAccruals || []).find(item => item.id === accrualId);
+  if (!canDeleteDonationAccrual(accrual)) throw new Error('This Due has payment history and cannot be deleted.');
+  state.donationAccruals = state.donationAccruals.filter(item => item.id !== accrualId);
+  return true;
+}
+
+function allocateDonationPayment(state, categoryId, amount) {
+  const accruals = (state.donationAccruals || []).filter(item => item.categoryId === categoryId && item.status !== 'reversed' && Number(item.accruedAmount ?? item.amount ?? 0) > Number(item.paidAmount || 0))
+    .sort((a, b) => String(a.effectiveDate).localeCompare(String(b.effectiveDate)) || String(a.createdAt).localeCompare(String(b.createdAt)) || String(a.id).localeCompare(String(b.id)));
+  let remaining = amount;
+  const allocations = [];
+  for (const accrual of accruals) {
+    if (!remaining) break;
+    const outstanding = Number(accrual.accruedAmount ?? accrual.amount) - Number(accrual.paidAmount || 0);
+    const allocated = Math.min(remaining, outstanding);
+    accrual.paidAmount = Number(accrual.paidAmount || 0) + allocated;
+    accrual.status = accrual.paidAmount >= Number(accrual.accruedAmount ?? accrual.amount) ? 'fully_paid' : 'partially_paid';
+    allocations.push({ accrualId: accrual.id, amount: allocated });
+    remaining -= allocated;
+  }
+  return allocations;
+}
+
 export function reconcileDonationIncome(state, income, operation = 'replace') {
   const deleting = operation === 'delete' || operation === true;
   const linked = (state.donationAccruals || []).filter(item => item.linkedIncomeTransactionId === income.id && item.automationRuleId);
@@ -83,23 +153,46 @@ export function payDonationDue(state, { categoryId, amount, date, paidFromFundId
   if (!category) throw new Error('Add an active Donation category in Finance categories first.');
   state.donationAccruals ||= [];
   state.donationPayments ||= [];
-  const accruals = state.donationAccruals.filter(item => item.categoryId === categoryId && item.status !== 'reversed' && Number(item.accruedAmount ?? item.amount ?? 0) > Number(item.paidAmount || 0))
-    .sort((a, b) => String(a.effectiveDate).localeCompare(String(b.effectiveDate)) || String(a.createdAt).localeCompare(String(b.createdAt)) || String(a.id).localeCompare(String(b.id)));
-  let remaining = amount;
-  const allocations = [];
-  for (const accrual of accruals) {
-    if (!remaining) break;
-    const outstanding = Number(accrual.accruedAmount ?? accrual.amount) - Number(accrual.paidAmount || 0);
-    const allocated = Math.min(remaining, outstanding);
-    accrual.paidAmount = Number(accrual.paidAmount || 0) + allocated;
-    accrual.status = accrual.paidAmount >= Number(accrual.accruedAmount ?? accrual.amount) ? 'fully_paid' : 'partially_paid';
-    allocations.push({ accrualId: accrual.id, amount: allocated });
-    remaining -= allocated;
-  }
+  const allocations = allocateDonationPayment(state, categoryId, amount);
   const paymentId = id();
   const transaction = { id: id(), sequence: nextTransactionSequence(state), title: title || `Donation: ${(state.donationCategories || []).find(item => item.id === categoryId)?.name || 'Donation'}`, amount, type: 'expense', categoryId: category.id, financeGroup: 'donation', donationCategoryId: categoryId, date, paymentDate: date, paymentMethod: paidFromFundId, paidFromFundId, note, sourceType: 'donation_payment', donationPaymentId: paymentId, createdAt: new Date().toISOString() };
   state.transactions.push(transaction);
   state.donationPayments.push({ id: paymentId, categoryId, amount, financeTransactionId: transaction.id, date, sourceAccruals: allocations, paidFromFundId, note, createdAt: transaction.createdAt });
+  return transaction;
+}
+
+/** Correct a linked CBoard payment in place, preserving its single Finance transaction identity. */
+export function correctDonationPayment(state, financeTransactionId, { amount, date, paidFromFundId = '', note = '' }) {
+  const transaction = (state.transactions || []).find(item => item.id === financeTransactionId);
+  const payment = donationPaymentForTransaction(state, transaction);
+  if (!transaction || !payment || !canCorrectDonationPayment(state, transaction)) throw new Error('This Donation payment cannot be corrected here.');
+  const nextAmount = Number(amount);
+  const dueBeforeRestore = donationDue(state, payment.categoryId);
+  const available = dueBeforeRestore + Number(payment.amount || transaction.amount || 0);
+  if (!Number.isSafeInteger(nextAmount) || nextAmount <= 0) throw new Error('Enter a payment amount greater than zero.');
+  if (nextAmount > available) throw new Error('Payment cannot be greater than the amount due.');
+  for (const allocation of payment.sourceAccruals || []) {
+    const accrual = (state.donationAccruals || []).find(item => item.id === allocation.accrualId);
+    if (!accrual || Number(allocation.amount) > Number(accrual.paidAmount || 0)) throw new Error('The linked Donation due allocation is inconsistent; payment was not changed.');
+  }
+  for (const allocation of payment.sourceAccruals || []) {
+    const accrual = state.donationAccruals.find(item => item.id === allocation.accrualId);
+    accrual.paidAmount = Number(accrual.paidAmount || 0) - Number(allocation.amount || 0);
+    accrual.status = accrual.paidAmount === 0 ? 'outstanding' : accrual.paidAmount >= Number(accrual.accruedAmount ?? accrual.amount) ? 'fully_paid' : 'partially_paid';
+  }
+  const allocations = allocateDonationPayment(state, payment.categoryId, nextAmount);
+  payment.amount = nextAmount;
+  payment.date = date;
+  payment.paidFromFundId = paidFromFundId;
+  payment.note = String(note || '');
+  payment.sourceAccruals = allocations;
+  transaction.amount = nextAmount;
+  transaction.date = date;
+  transaction.paymentDate = date;
+  transaction.paidFromFundId = paidFromFundId;
+  transaction.paymentMethod = paidFromFundId;
+  transaction.note = String(note || '');
+  transaction.updatedAt = new Date().toISOString();
   return transaction;
 }
 
@@ -119,6 +212,13 @@ export function removeDonationPayment(state, financeTransactionId) {
 export function donationPaymentForTransaction(state, transaction) {
   if (!transaction) return null;
   return (state.donationPayments || []).find(item => item.id === transaction.donationPaymentId || item.financeTransactionId === transaction.id) || null;
+}
+
+export function canCorrectDonationPayment(state, transaction) {
+  const payment = donationPaymentForTransaction(state, transaction);
+  return Boolean(transaction && payment && !transaction.reversedAt && !payment.reversedAt
+    && transaction.source !== 'bank' && transaction.sourceType !== 'bank_import'
+    && !transaction.source && !transaction.receipt && transaction.sourceType !== 'receipt');
 }
 
 export function canUndoDonationPayment(state, transaction) {

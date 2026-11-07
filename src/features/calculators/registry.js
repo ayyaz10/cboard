@@ -1,12 +1,26 @@
-import { CalorieCalculator } from './calorie/CalorieCalculator';
-import { CryptoFuturesCalculator } from './cryptoFutures/CryptoFuturesCalculator';
-import { MassCalculator } from './mass/MassCalculator';
-import { PercentageCalculator } from './percentage/PercentageCalculator';
-import { PositionSizeCalculator } from './positionSize/PositionSizeCalculator';
-import { ProteinIntakeCalculator } from './proteinIntake/ProteinIntakeCalculator';
-import { SavingsPlannerCalculator } from './savingsPlanner/SavingsPlannerCalculator';
+import { lazy } from 'react';
+
+const CalorieCalculator = lazy(() => import('./calorie/CalorieCalculator').then(module => ({ default: module.CalorieCalculator })));
+const CryptoFuturesCalculator = lazy(() => import('./cryptoFutures/CryptoFuturesCalculator').then(module => ({ default: module.CryptoFuturesCalculator })));
+const MassCalculator = lazy(() => import('./mass/MassCalculator').then(module => ({ default: module.MassCalculator })));
+const LoanPaymentCalculator = lazy(() => import('./loanPayment/LoanPaymentCalculator').then(module => ({ default: module.LoanPaymentCalculator })));
+const PercentageCalculator = lazy(() => import('./percentage/PercentageCalculator').then(module => ({ default: module.PercentageCalculator })));
+const PositionSizeCalculator = lazy(() => import('./positionSize/PositionSizeCalculator').then(module => ({ default: module.PositionSizeCalculator })));
+const ProteinIntakeCalculator = lazy(() => import('./proteinIntake/ProteinIntakeCalculator').then(module => ({ default: module.ProteinIntakeCalculator })));
+const SavingsPlannerCalculator = lazy(() => import('./savingsPlanner/SavingsPlannerCalculator').then(module => ({ default: module.SavingsPlannerCalculator })));
 
 export const calculators = [
+  {
+    id: 'loan-payment',
+    path: '/calculators/loan-payment',
+    name: 'Loan Payment Calculator',
+    boardLabel: 'Loan estimate',
+    boardColor: '#9fe3ff',
+    boardDescription: 'Estimate monthly payments, total interest, and repayment schedule.',
+    description: 'Estimate monthly payments, total interest, and total repayment using flat interest or reducing-balance calculations.',
+    showReferenceCards: false,
+    component: LoanPaymentCalculator,
+  },
   {
     id: 'savings-planner',
     path: '/calculators/savings-planner',

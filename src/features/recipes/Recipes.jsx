@@ -2,7 +2,7 @@ import { FoodLibrary } from './FoodLibrary';
 import { DailyNutritionTargets, useNutritionGoals } from '../nutrition/DailyNutritionTargets';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { navigateTo, getAppHref } from '../../app/useRoute';
+import { navigateTo, getAppHref, getCurrentPathWithSearch } from '../../app/useRoute';
 import { PageShell } from '../../components/layout/PageShell';
 import { AppNavigation } from '../../components/layout/AppNavigation';
 import { PrimaryButton } from '../../components/ui/PrimaryButton';
@@ -10,12 +10,14 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog.jsx';
 import { useConfirmDialog } from '../../hooks/useConfirmDialog.js';
 import {
   getRecipes,
+  getArchivedRecipes,
   saveRecipe,
   saveRecipeBatch,
   deleteRecipe,
   deleteRecipes,
   getRecipeFavourites,
   setRecipeFavourite,
+  setRecipeArchived,
 } from '../../services/recipeService';
 import {
   RecipeCard,
@@ -37,6 +39,9 @@ import { mergeFoodRecords } from '../../services/foodMergeService.js';
 import { formatIngredient } from './recipeData';
 import { recipeNutritionDisplay } from './ingredientNutrition.js';
 import { DailyMealPlanner } from './DailyMealPlanner';
+import { getPreference, setPreference } from '../../services/preferenceService.js';
+import { addRecipeToDatedMealPlan, DATED_PLAN_KEY } from './mealPlanData.js';
+import { recipeDeletionEligibility } from './recipeLifecycle.js';
 import { FoodDiary } from '../diary/FoodDiary';
 import {
   RecipeCardViewProvider,
@@ -77,6 +82,8 @@ function RecipesContent({ route, navigationPath }) {
   const cardGrid = useRecipeCardGrid();
   const nutritionGoals = useNutritionGoals();
   const [recipes, setRecipes] = useState([]);
+  const [archivedRecipes, setArchivedRecipes] = useState([]);
+  const [archivedLoading, setArchivedLoading] = useState(false);
   const [foodCatalog, setFoodCatalog] = useState([]);
   const [mealPlanRefs, setMealPlanRefs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -91,6 +98,7 @@ function RecipesContent({ route, navigationPath }) {
   const [favouriteNotice, setFavouriteNotice] = useState('');
   const favouriteLocks = useRef(new Set());
   const [draft, setDraft] = useState(null);
+  const [importDirty, setImportDirty] = useState(false);
   const [addingFood, setAddingFood] = useState(false);
   const [removing, setRemoving] = useState(null);
   const [selectedRecipeSlugs, setSelectedRecipeSlugs] = useState(new Set());
@@ -103,8 +111,9 @@ function RecipesContent({ route, navigationPath }) {
   const { confirm: confirmAction, dialog: actionConfirmDialog } = useConfirmDialog();
   const dialogBackdropPointerDown = useRef(false);
   const deleteLock = useRef(false);
+  const skipImportHistoryGuard = useRef(false);
   async function refresh() {
-    setLoading(true);
+    setLoading(recipes.length === 0);
     setError('');
     try {
       const [loadedRecipes, loadedFavourites, storedFoodCatalog, loadedMealPlanRefs] = await Promise.all([getRecipes(user.id), getRecipeFavourites(), getFoodCatalog(user.id), getMealPlanFoodReferences()]);
@@ -182,6 +191,69 @@ function RecipesContent({ route, navigationPath }) {
       setFavouritePending(values => update(values, false));
     }
   }
+  async function archiveRecipe(item) {
+    if (!await confirmAction({ title: `Archive “${item.title}”?`, message: 'This hides the recipe from your library and keeps its history and planner references. You can restore it from Archived recipes.', confirmLabel: 'Archive recipe' })) return;
+    try {
+      const archived = await setRecipeArchived(item, true, user.id);
+      setRecipes(current => current.map(entry => entry.slug === item.slug ? archived : entry));
+      setArchivedRecipes(current => [...current.filter(entry => entry.slug !== item.slug), archived]);
+      notify.success(`${item.title} archived. You can restore it from Archived recipes.`);
+      if (route === `/recipes/${item.slug}`) navigateTo('/recipes');
+    } catch (error) { notify.error(error.message || 'Could not archive this recipe.'); }
+  }
+  async function archiveSelected() {
+    const selected = recipes.filter(item => selectedRecipeSlugs.has(item.slug));
+    if (!selected.length || !await confirmAction({ title: `Archive ${selected.length} recipes?`, message: 'Their Diary and Planner references stay intact. You can restore them later from Archived recipes.', confirmLabel: `Archive ${selected.length}` })) return;
+    setBusy(true);
+    try {
+      const updated = [];
+      for (const item of selected) updated.push(await setRecipeArchived(item, true, user.id));
+      const bySlug = new Map(updated.map(item => [item.slug, item]));
+      setRecipes(current => current.map(item => bySlug.get(item.slug) || item));
+      setArchivedRecipes(current => [...current.filter(item => !bySlug.has(item.slug)), ...updated]);
+      setSelectedRecipeSlugs(new Set());
+      notify.success(`${selected.length} recipes archived.`);
+    } catch (error) { notify.error(error.message || 'Some recipes could not be archived. Reload Manage Recipes and try again.'); await refresh(); }
+    finally { setBusy(false); }
+  }
+  async function restoreRecipe(item) {
+    try {
+      const restored = await setRecipeArchived(item, false, user.id);
+      setArchivedRecipes(current => current.filter(recipe => recipe.slug !== item.slug));
+      setRecipes(current => [...current.filter(recipe => recipe.slug !== item.slug), restored]);
+      notify.success(`${item.title} restored to your recipes.`);
+    } catch (error) { notify.error(error.message || 'Could not restore this recipe.'); }
+  }
+  async function permanentlyDeleteArchived(item) {
+    try {
+      const [mealPlans, groceries] = await Promise.all([getMealPlanFoodReferences(), loadGroceries()]);
+      const eligibility = recipeDeletionEligibility(item, { diaryDays: groceries.diaryDays, mealPlans, groceryItems: groceries.state.items });
+      if (!eligibility.eligible) {
+        notify.warning(`Keep this recipe archived because ${eligibility.reasons.join('; ').toLowerCase()}.`);
+        return;
+      }
+      if (!await confirmAction({ title: `Delete ${item.title} permanently?`, message: 'This permanently removes the archived recipe and its favourite setting. It cannot be restored.', confirmLabel: 'Delete permanently' })) return;
+      await deleteRecipe(item.slug);
+      setArchivedRecipes(current => current.filter(recipe => recipe.slug !== item.slug));
+      setRecipes(current => current.filter(recipe => recipe.slug !== item.slug));
+      setFavourites(current => { const next = new Set(current); next.delete(item.slug); return next; });
+      notify.success(`${item.title} permanently deleted.`);
+    } catch (error) { notify.error(error.message || 'Could not safely delete this recipe.'); }
+  }
+  async function addToPlanner(item, { date, meal, portions }) {
+    try {
+      const existing = await getPreference(DATED_PLAN_KEY);
+      await setPreference(DATED_PLAN_KEY, addRecipeToDatedMealPlan(existing, date, item.slug, meal, portions));
+      notify.success(`${item.title} added to your Planner for ${date}.`);
+      navigateTo(`/recipes/planner/day?date=${encodeURIComponent(date)}`);
+      return true;
+    } catch (error) { notify.error(error.message || 'Could not update your planner.'); return false; }
+  }
+  function addToDiary(item, { date, meal, portions }) {
+    const params = new URLSearchParams({ recipe: item.slug, meal, servings: String(portions), date, requestId: crypto.randomUUID() });
+    navigateTo(`/food-diary?${params}`);
+    return true;
+  }
   const parts = route.replace(/\/$/, '').split('/').filter(Boolean);
   const foods = parts.length === 3 && parts[1] === 'library' && parts[2] === 'items';
   const manage = parts.length === 2 && parts[1] === 'manage';
@@ -198,13 +270,63 @@ function RecipesContent({ route, navigationPath }) {
   const planning =
     parts.length === 3 && parts[1] === 'planner' && parts[2] === 'day';
   const diary = parts.length === 3 && parts[1] === 'diary' && parts[2] === 'day';
+  const archived = parts.length === 2 && parts[1] === 'archived';
+  useEffect(() => {
+    if (!archived) return;
+    setArchivedLoading(true);
+    getArchivedRecipes(user.id).then(setArchivedRecipes).catch(loadError => setError(loadError.message || 'Could not load archived recipes.')).finally(() => setArchivedLoading(false));
+  }, [archived, user.id]);
   const shortcutOrder = ['home', 'foods', 'add', 'planner', 'diary', 'manage'];
+  useEffect(() => {
+    if (!importing || !importDirty) return undefined;
+    const warn = event => { event.preventDefault(); event.returnValue = ''; };
+    const confirmDiscard = async () => await confirmAction({ title: 'Discard unsaved recipe changes?', message: 'Your recipe edits have not been saved yet.', confirmLabel: 'Discard changes' });
+    const guardLink = event => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const link = event.target.closest?.('a[href]');
+      if (!link || link.hasAttribute('download')) return;
+      const destination = new URL(link.href, window.location.href);
+      if (destination.href === window.location.href) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      void confirmDiscard().then(confirmed => {
+        if (!confirmed) return;
+        setImportDirty(false);
+        let path = destination.pathname;
+        const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+        if (base && base !== '.' && path.startsWith(base)) path = path.slice(base.length) || '/';
+        skipImportHistoryGuard.current = true;
+        navigateTo(`${path}${destination.search}${destination.hash}`);
+      });
+    };
+    const guardWorkspace = event => {
+      if (event.detail?.confirmed) return;
+      event.preventDefault();
+      void confirmDiscard().then(confirmed => {
+        if (confirmed) { setImportDirty(false); skipImportHistoryGuard.current = true; window.dispatchEvent(new CustomEvent('workspace:navigate', { cancelable: true, detail: { path: event.detail?.path, confirmed: true } })); }
+      });
+    };
+    const guardHistory = () => {
+      if (skipImportHistoryGuard.current) { skipImportHistoryGuard.current = false; return; }
+      void confirmDiscard().then(confirmed => {
+        if (confirmed) setImportDirty(false);
+        else { skipImportHistoryGuard.current = true; navigateTo('/recipes/import', { replace: true }); }
+      });
+    };
+    document.addEventListener('click', guardLink, true);
+    window.addEventListener('beforeunload', warn);
+    window.addEventListener('workspace:navigate', guardWorkspace);
+    window.addEventListener('popstate', guardHistory);
+    return () => { document.removeEventListener('click', guardLink, true); window.removeEventListener('beforeunload', warn); window.removeEventListener('workspace:navigate', guardWorkspace); window.removeEventListener('popstate', guardHistory); };
+  }, [importing, importDirty, confirmAction]);
   useEffect(() => {
     setSelectionMode(manage);
     if (!manage) setSelectedRecipeSlugs(new Set());
   }, [manage]);
   function startImport(initial = null, editing = false) {
+    setImportDirty(false);
     setDraft({ initial, editing, key: crypto.randomUUID() });
+    skipImportHistoryGuard.current = true;
     navigateTo('/recipes/import');
   }
   async function save(data, image, edit) {
@@ -222,9 +344,11 @@ function RecipesContent({ route, navigationPath }) {
       saved,
     ]);
     setDraft(null);
+    setImportDirty(false);
     try { await saveRecipeFoodsToCatalog([saved]); }
     catch (error) { notify.error(error.message || 'Recipe saved, but its foods could not be added to All Food Items.'); }
     notify.success(edit ? 'Recipe updated' : 'Recipe saved');
+    skipImportHistoryGuard.current = true;
     navigateTo(`/recipes/${saved.slug}`);
   }
   async function remove() {
@@ -340,9 +464,11 @@ function RecipesContent({ route, navigationPath }) {
     try { await saveRecipeFoodsToCatalog(saved); }
     catch (error) { notify.warning(error.message || 'Recipes were imported, but their foods could not be added to All Food Items.'); }
     setDraft(null);
+    setImportDirty(false);
     setSearch('');
     setCategory('All');
     setFavouritesOnly(false);
+    skipImportHistoryGuard.current = true;
     navigateTo('/recipes');
     window.scrollTo(0, 0);
     notify.success(`${saved.length} recipe${saved.length === 1 ? '' : 's'} imported`);
@@ -385,40 +511,30 @@ function RecipesContent({ route, navigationPath }) {
       notify.info(`Kept “${alias}” separate. CBoard will remember this choice for these foods.`);
     } catch (error) { notify.error(error.message || 'Could not remember this separate-food choice.'); }
   }
-  const categories = [
-    ...new Set([
-      'Breakfast',
-      'Lunch',
-      'Dinner',
-      'Snack',
-      ...recipes.map((item) => item.mealType),
-    ]),
-  ];
   const query = search.trim().toLowerCase();
-  const matchingRecipes = recipes.filter(
-    (item) =>
-      (category === 'All' || item.mealType === category) &&
-      (!favouritesOnly || favourites.has(item.slug)) &&
-      [
+  const activeRecipes = useMemo(() => recipes.filter(item => !item.archivedAt), [recipes]);
+  const categories = useMemo(() => [...new Set([
+    'Breakfast', 'Lunch', 'Dinner', 'Snack', ...activeRecipes.map(item => item.mealType),
+  ])], [activeRecipes]);
+  const searchIndex = useMemo(() => new Map(activeRecipes.map(item => [item.slug, [
         item.title,
         ...item.ingredients.map((ingredient) => ingredient.name),
         ...item.tags,
         item.description,
         item.cuisine,
-      ]
-        .join(' ')
-        .toLowerCase()
-        .includes(query),
-  );
-  const sortNutrition = sortBy === 'calories' || sortBy === 'protein'
+      ].filter(Boolean).join(' ').toLowerCase()])), [activeRecipes]);
+  const matchingRecipes = useMemo(() => activeRecipes.filter(item =>
+    (category === 'All' || item.mealType === category) &&
+    (!favouritesOnly || favourites.has(item.slug)) && searchIndex.get(item.slug).includes(query)),
+  [activeRecipes, category, favouritesOnly, favourites, query, searchIndex]);
+  const sortNutrition = useMemo(() => sortBy === 'calories' || sortBy === 'protein'
     ? new Map(matchingRecipes.map(item => [item.slug, recipeNutritionDisplay(item).nutrition]))
-    : null;
-  const filtered = matchingRecipes.sort((a, b) => {
+    : null, [sortBy, matchingRecipes]);
+  const filtered = useMemo(() => [...matchingRecipes].sort((a, b) => {
     if (sortBy === 'name') return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
     if (sortBy === 'calories' || sortBy === 'protein') {
-      const key = sortBy;
-      const av = sortNutrition.get(a.slug)?.[key];
-      const bv = sortNutrition.get(b.slug)?.[key];
+      const av = sortNutrition.get(a.slug)?.[sortBy];
+      const bv = sortNutrition.get(b.slug)?.[sortBy];
       if (av == null && bv == null) return a.title.localeCompare(b.title);
       if (av == null) return 1;
       if (bv == null) return -1;
@@ -426,12 +542,12 @@ function RecipesContent({ route, navigationPath }) {
     }
     return (Date.parse(b.updatedAt || '') || 0) - (Date.parse(a.updatedAt || '') || 0)
       || a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
-  });
+  }), [matchingRecipes, sortBy, sortNutrition]);
   function setRecipeSelected(slug, checked) {
     setError('');
     setSelectedRecipeSlugs(current => {
       const next = new Set(current);
-      if (checked && !next.has(slug) && next.size >= 50) { setError('You can bulk delete up to 50 recipes at a time.'); return current; }
+      if (checked && !next.has(slug) && next.size >= 50) { setError('You can bulk archive up to 50 recipes at a time.'); return current; }
       if (checked) next.add(slug); else next.delete(slug);
       return next;
     });
@@ -452,19 +568,19 @@ function RecipesContent({ route, navigationPath }) {
       return !current;
     });
   }
-  const bulkDeleteItems = recipes.filter(item => selectedRecipeSlugs.has(item.slug));
+  const bulkDeleteItems = activeRecipes.filter(item => selectedRecipeSlugs.has(item.slug));
   const deletingInDialog = confirmBulkDelete ? bulkDeleteItems : removing ? [removing] : [];
   return (
     <PageShell>
-      <section className="recipe-page-shell panel space-y-7 border-[var(--border-default)] p-5 text-[var(--color-text)] sm:p-8 lg:p-10">
-        <AppNavigation activePath={navigationPath} />
-        {home || manage ? (
+      <section className={`recipe-page-shell text-[var(--color-text)] ${diary ? 'recipe-diary-shell' : 'panel space-y-7 border-[var(--border-default)] p-5 sm:p-8 lg:p-10'}`}>
+        {!diary && <AppNavigation activePath={navigationPath} />}
+        {!diary && (home || manage ? (
           <details className="recipe-targets-disclosure">
             <summary>Daily nutrition targets</summary>
             <DailyNutritionTargets controller={nutritionGoals} />
           </details>
-        ) : <DailyNutritionTargets controller={nutritionGoals} />}
-        <nav className="recipe-shortcuts mobile-section-nav flex flex-wrap gap-2" aria-label="Recipe shortcuts">
+        ) : <DailyNutritionTargets controller={nutritionGoals} />)}
+        {!diary && <nav className="recipe-shortcuts mobile-section-nav flex flex-wrap gap-2" aria-label="Recipe shortcuts">
           <button type="button" className={secondaryButton} disabled={loading} onClick={() => setAddingFood(true)}>Add item</button>
           {shortcutOrder.map((item) => {
             if (item === 'foods') return <RecipeLink key={item} to="/recipes/library/items">All food items</RecipeLink>;
@@ -474,7 +590,8 @@ function RecipesContent({ route, navigationPath }) {
             if (item === 'diary') return !diary ? <RecipeLink key={item} to="/food-diary">Food diary</RecipeLink> : null;
             return !manage ? <RecipeLink key={item} to="/recipes/manage">Manage recipes</RecipeLink> : null;
           })}
-        </nav>
+          {!archived && <RecipeLink to="/recipes/archived">Archived recipes</RecipeLink>}
+        </nav>}
         {addingFood && <FoodItemEditor initial={typeof addingFood==='object'?addingFood:null} duplicate={addingFood?.duplicateDraft === true} catalog={foodCatalog} onClose={() => setAddingFood(false)} onSave={async item => {
           if (item.reuseExisting) { notify.info('Existing food reused'); return; }
           const reuse = !item.id && findFoodMatches(item, foodCatalog).some(match => match.confidence === 'certain' || match.confidence === 'high');
@@ -488,9 +605,7 @@ function RecipesContent({ route, navigationPath }) {
         {favouriteError && <p role="alert" className="rounded-xl border-2 border-[var(--border-default)] bg-[var(--color-danger-soft)] p-3 text-sm font-semibold">{favouriteError}</p>}
         <p role="status" className="sr-only">{favouriteNotice}</p>
         {loading ? (
-          <p role="status" className="py-12 text-center font-bold">
-            Loading recipes…
-          </p>
+          <section role="status" aria-label="Loading recipes" className="recipe-loading-grid"><span className="sr-only">Loading recipes…</span>{Array.from({ length: 8 }, (_, index) => <article key={index} className="recipe-loading-card"><i /><b /><b /><span /><span /></article>)}</section>
         ) : (
           <>
             {error && (
@@ -506,13 +621,19 @@ function RecipesContent({ route, navigationPath }) {
                 key={draft?.key ?? 'new'}
                 initial={draft?.initial}
                 editing={draft?.editing}
+                onDirtyChange={setImportDirty}
                 ingredientLibrary={ingredientLibrary}
                 onAddItem={() => setAddingFood(true)}
                 onSave={save}
                 onSaveBatch={saveBatch}
                 onCancel={() => {
-                  setDraft(null);
-                  navigateTo('/recipes');
+                  void (async () => {
+                    if (importDirty && !await confirmAction({ title: 'Discard unsaved recipe changes?', message: 'Your recipe edits have not been saved yet.', confirmLabel: 'Discard changes' })) return;
+                    setImportDirty(false);
+                    setDraft(null);
+                    skipImportHistoryGuard.current = true;
+                    navigateTo('/recipes');
+                  })();
                 }}
                 getSlugs={async () =>
                   (await getRecipes(user.id)).map((item) => item.slug)
@@ -532,12 +653,15 @@ function RecipesContent({ route, navigationPath }) {
                   ]);
                   notify.success(imageWarning ? `Recipe saved without an AI image: ${imageWarning}` : 'Recipe and AI image saved.');
                   setDraft(null);
+                  setImportDirty(false);
+                  skipImportHistoryGuard.current = true;
                   navigateTo(`/recipes/${result.slug}`);
                 }}
               />
             ) : null}
             {!error && foods && <FoodLibrary library={ingredientLibrary} recipes={recipes} foodCatalog={foodCatalog} mealPlans={mealPlanRefs} onAdd={() => setAddingFood(true)} onEdit={id=>setAddingFood(foodCatalog.find(item=>item.id===id)||true)} onDuplicate={id => { const food = foodCatalog.find(item => item.id === id); if (food) setAddingFood({ ...structuredClone(food), id: undefined, name: `${food.name} (copy)`, duplicateDraft: true }); }} onDeleteFoods={deleteFoods} onDeleteRecipeIngredients={deleteRecipeOnlyIngredients} onMergeFoods={mergeFoods} />}
             {!error && planning && <DailyMealPlanner recipes={recipes} nutritionGoals={nutritionGoals} />}
+            {!error && archived && <section className="space-y-5"><header><span className="pill">Recipe archive</span><h1 className="mt-3 text-4xl font-bold">Archived recipes</h1><p className="mt-2 text-[var(--color-text-secondary)]">Restore a recipe to make it available in your library again. Existing Diary history remains saved. Permanent deletion is available only when no Diary, Planner or Grocery references remain.</p></header>{archivedLoading ? <p role="status">Loading archived recipes…</p> : archivedRecipes.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{archivedRecipes.map(item => <article className="recipe-card panel space-y-3 p-4" key={item.slug}><h2 className="text-lg font-bold">{item.title}</h2><p className="text-sm">Archived {new Date(item.archivedAt).toLocaleDateString()}</p><div className="flex flex-wrap gap-2"><button type="button" className={secondaryButton} disabled={busy} onClick={() => restoreRecipe(item)}>Restore recipe</button><button type="button" className={`${secondaryButton} danger-action`} disabled={busy} onClick={() => permanentlyDeleteArchived(item)}>Delete permanently</button></div></article>)}</div> : <p>No archived recipes.</p>}</section>}
             {!error && diary && <FoodDiary recipes={recipes} nutritionGoals={nutritionGoals} foodCatalog={foodCatalog} onFoodCatalogChange={saveMainFoodItems} onDiaryRecipeUpdated={updated => setRecipes(current => [updated, ...current.filter(item => item.slug !== updated.slug)])} />}
             {!error && (home || manage) && (
               <>
@@ -553,7 +677,7 @@ function RecipesContent({ route, navigationPath }) {
                   </div>
                   {manage && <RecipeLink to="/recipes">Done managing · All recipes</RecipeLink>}
                 </header>
-                {recipes.length > 0 ? (
+                {activeRecipes.length > 0 ? (
                   <>
                     <div className="space-y-5">
                       <label className="block space-y-2 font-bold">
@@ -568,7 +692,7 @@ function RecipesContent({ route, navigationPath }) {
                       </label>
                       <div className="recipe-library-controls flex flex-wrap items-center gap-3" aria-label="Recipe filters and view">
                         <button type="button" className={`${secondaryButton.replace('bg-[var(--surface-elevated)]', '')} min-h-11 ${!favouritesOnly ? 'bg-[var(--color-accent)]' : 'bg-[var(--surface-elevated)]'}`} aria-pressed={!favouritesOnly} onClick={() => setFavouritesOnly(false)}>All recipes</button>
-                        <button type="button" className={`${secondaryButton.replace('bg-[var(--surface-elevated)]', '')} min-h-11 ${favouritesOnly ? 'bg-[var(--color-accent)]' : 'bg-[var(--surface-elevated)]'}`} aria-pressed={favouritesOnly} onClick={() => setFavouritesOnly(true)}><span aria-hidden="true" className="mr-2">♥</span>Favourites ({recipes.filter(item => favourites.has(item.slug)).length})</button>
+                        <button type="button" className={`${secondaryButton.replace('bg-[var(--surface-elevated)]', '')} min-h-11 ${favouritesOnly ? 'bg-[var(--color-accent)]' : 'bg-[var(--surface-elevated)]'}`} aria-pressed={favouritesOnly} onClick={() => setFavouritesOnly(true)}><span aria-hidden="true" className="mr-2">♥</span>Favourites ({activeRecipes.filter(item => favourites.has(item.slug)).length})</button>
                         <details className="recipe-filter-disclosure">
                           <summary className={secondaryButton} aria-label={category === 'All' ? 'Filter recipes' : `Filter recipes, ${category} selected`}>Filter{category !== 'All' ? ` · ${category}` : ''}</summary>
                           <label className="recipe-meal-filter inline-flex min-h-11 items-center gap-2 rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 text-sm font-bold">
@@ -605,7 +729,7 @@ function RecipesContent({ route, navigationPath }) {
                       </div>
                       {selectionMode && <div className="flex gap-2">
                         <button type="button" className={secondaryButton} onClick={toggleSelectionMode}>Done</button>
-                        <button type="button" className={`${secondaryButton} danger-action`} disabled={!bulkDeleteItems.length || busy} onClick={() => setConfirmBulkDelete(true)}>Delete {bulkDeleteItems.length ? `(${bulkDeleteItems.length})` : 'selected'}</button>
+                        <button type="button" className={secondaryButton} disabled={!bulkDeleteItems.length || busy} onClick={archiveSelected}>Archive {bulkDeleteItems.length ? `(${bulkDeleteItems.length})` : 'selected'}</button>
                       </div>}
                     </section>}
                     <RecipeMasonryGrid className={`${cardGrid} recipe-library-grid`}>
@@ -619,7 +743,7 @@ function RecipesContent({ route, navigationPath }) {
                             favourite={favourites.has(item.slug)}
                             favouritePending={favouritePending.has(item.slug)}
                             onToggleFavourite={toggleFavourite}
-                            onDelete={!manage ? setRemoving : undefined}
+                            onArchive={!manage ? archiveRecipe : undefined}
                             onEdit={!manage ? recipe => startImport(recipe, true) : undefined}
                             onDuplicate={!manage ? recipe => startImport({ ...recipe, title: `${recipe.title} (copy)` }) : undefined}
                             bulkSelection={manage && selectionMode}
@@ -693,10 +817,10 @@ function RecipesContent({ route, navigationPath }) {
                   <RecipeLink to="/recipes">Back to recipes</RecipeLink>
                     <div className="flex flex-wrap gap-2">
                       <button type="button" className={secondaryButton} onClick={() => startImport(recipe, true)}>Edit Recipe</button>
-                      <button type="button" className={`${secondaryButton} danger-action`} aria-label={`Delete ${recipe.title}`} onClick={() => setRemoving(recipe)}>Delete recipe</button>
+                      <button type="button" className={secondaryButton} onClick={() => archiveRecipe(recipe)}>Archive recipe</button>
                     </div>
                 </div>
-                <RecipePage key={recipe.slug} recipe={recipe} foodCatalog={foodCatalog} favourite={favourites.has(recipe.slug)} favouritePending={favouritePending.has(recipe.slug)} onToggleFavourite={toggleFavourite} onRecipeUpdated={recipeUpdated} onMatchExistingFoods={matchExistingFoods} onUseFood={linkRecipeFood} onKeepSeparate={keepRecipeFoodSeparate} />
+                <RecipePage key={recipe.slug} recipe={recipe} foodCatalog={foodCatalog} favourite={favourites.has(recipe.slug)} favouritePending={favouritePending.has(recipe.slug)} onToggleFavourite={toggleFavourite} onRecipeUpdated={recipeUpdated} onMatchExistingFoods={matchExistingFoods} onUseFood={linkRecipeFood} onKeepSeparate={keepRecipeFoodSeparate} onEdit={item => startImport(item, true)} onDuplicate={item => startImport({ ...item, title: `${item.title} (copy)` })} onArchive={archiveRecipe} onAddToDiary={options => addToDiary(recipe, options)} onAddToPlanner={options => addToPlanner(recipe, options)} />
               </div>
             )}
             {!error &&
@@ -706,6 +830,7 @@ function RecipesContent({ route, navigationPath }) {
               !importing &&
               !planning &&
               !diary &&
+              !archived &&
               !(recipe && parts.length === 2) &&
               !group && (
                 <>

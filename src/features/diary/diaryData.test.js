@@ -5,6 +5,7 @@ import {
   foodItem,
   newMeal,
   recipeItems,
+  recipeDiaryMeal,
   validateDay,
   itemNutrition,
   diaryTotals,
@@ -161,6 +162,16 @@ test("recipe snapshots are independent and product ingredients scale per serving
     0.5,
   );
   assert.equal(itemNutrition(legacy[0]).calories, 250);
+});
+test('recipe quick-add request ids make retried Diary additions idempotent and preserve serving portions', () => {
+  const recipe = { slug: 'oats', title: 'Oats', servings: 2, nutrition: { calories: 200 }, ingredients: [], sauces: [] };
+  const request = { meal: 'Breakfast', portions: 1.5, requestId: '123e4567-e89b-12d3-a456-426614174000' };
+  const first = recipeDiaryMeal(recipe, request);
+  const retry = recipeDiaryMeal(recipe, request);
+  assert.equal(first.id, retry.id);
+  assert.equal(first.meal, 'Breakfast');
+  assert.equal(first.items[0].quantity, 1.5);
+  assert.throws(() => recipeDiaryMeal(recipe, { ...request, portions: 101 }), /valid meal/);
 });
 test("partial recipe products reach the daily log as a known subtotal with missing ingredients", () => {
   const recipe = {

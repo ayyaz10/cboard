@@ -4,6 +4,7 @@ const format = (n) =>
   new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(n);
 export function NutritionTotals({ meals, goals, compact = false, dense = false }) {
   const totals = diaryTotals(meals);
+  const emptyLog = meals.every(meal => !(meal.items || []).length);
   const primaryNutrients = NUTRIENTS.slice(0, 5);
   const missingDetails = meals.flatMap((meal) =>
     meal.items.flatMap((item) => {
@@ -22,7 +23,7 @@ export function NutritionTotals({ meals, goals, compact = false, dense = false }
       <div key={key} className={`diary-nutrient diary-nutrient-${key}`}>
         <span>{displayLabel}</span>
         <strong>
-          {total.known ? format(total.value) : "—"} <small>{unit}</small>
+          {total.known ? format(total.value) : dense && emptyLog ? "0" : "—"} <small>{unit}</small>
         </strong>
         {!compact && total.missing > 0 && (
           <small>
@@ -39,7 +40,7 @@ export function NutritionTotals({ meals, goals, compact = false, dense = false }
             />
             <small>
               Target {format(target)} {unit}
-              {!total.missing && total.known > 0
+              {!total.missing && (total.known > 0 || dense && emptyLog)
                 ? ` · ${format(Math.abs(target - total.value))} ${unit} ${total.value > target ? "over" : "remaining"}`
                 : ""}
             </small>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppNavigation } from '../../components/layout/AppNavigation';
 import { PageShell } from '../../components/layout/PageShell';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
@@ -117,6 +117,8 @@ export function ProgressTracker() {
   const [goalQuotes, setGoalQuotes] = useState([]);
   const [notes, setNotes] = useState([]);
   const [selectedGoalId, setSelectedGoalId] = useState('');
+  const selectedGoalIdRef = useRef(selectedGoalId);
+  selectedGoalIdRef.current = selectedGoalId;
   const [editingEntry, setEditingEntry] = useState(null);
   const [editingGoal, setEditingGoal] = useState(null);
   const [isLogPanelOpen, setIsLogPanelOpen] = useState(false);
@@ -134,19 +136,18 @@ export function ProgressTracker() {
     setError('');
 
     try {
-      const [savedGoals, savedEntries, savedGoalJournalEntries, savedGoalQuotes, savedNotes] = await Promise.all([
+      const [savedGoals, savedEntries, savedGoalJournalEntries, savedGoalQuotes] = await Promise.all([
         getGoals(),
         getEntries(),
         getGoalJournalEntries(),
         getGoalQuotes(),
-        getNotes(),
       ]);
 
       setGoals(applyLocalGoalOrder(savedGoals));
       setEntries(savedEntries);
       setGoalJournalEntries(savedGoalJournalEntries);
       setGoalQuotes(savedGoalQuotes);
-      setNotes(savedNotes);
+      setNotes([]);
     } catch (loadError) {
       setError(
         getTrackerErrorMessage(
@@ -200,7 +201,8 @@ export function ProgressTracker() {
         ));
     });
     const notesChannel = subscribeToNotes(user.id, () => {
-      getNotes()
+      if (!selectedGoalIdRef.current) return;
+      getNotes({ linkedGoalId: selectedGoalIdRef.current })
         .then(setNotes)
         .catch((noteError) => setError(
           getTrackerErrorMessage(
@@ -217,6 +219,18 @@ export function ProgressTracker() {
       notesChannel.unsubscribe();
     };
   }, [user?.id]);
+
+  useEffect(() => {
+    if (activeGoalDetailView !== 'notes' || !selectedGoalId) {
+      setNotes([]);
+      return undefined;
+    }
+    let active = true;
+    getNotes({ linkedGoalId: selectedGoalId })
+      .then((savedNotes) => { if (active) setNotes(savedNotes); })
+      .catch((noteError) => { if (active) setError(getTrackerErrorMessage(noteError, 'Could not load notes for this tracker.')); });
+    return () => { active = false; };
+  }, [activeGoalDetailView, selectedGoalId]);
 
   useEffect(() => {
     if (goals.length === 0) {
@@ -651,9 +665,9 @@ export function ProgressTracker() {
 
   async function handleDeleteNote(note) {
     const confirmed = await confirm({
-      title: 'Delete note?',
-      message: `This removes "${note.title || 'this note'}" from your notebook.`,
-      confirmLabel: 'Delete',
+      title: 'Move this note to Trash?',
+      message: `"${note.title || 'Untitled note'}" can be restored from Trash later.`,
+      confirmLabel: 'Move to Trash',
     });
 
     if (!confirmed) {

@@ -424,6 +424,12 @@ export function recipeItems(recipe, portions = 1, ingredients = false, { wholeRe
     inventoryUsage: individual ? usage(parts[index], index, item.quantity * recipe.servings / portions) : parts.flatMap((part, index) => usage(part, index, recipe.servings)),
   }));
 }
+
+export function recipeDiaryMeal(recipe, { meal, portions, requestId }) {
+  if (!MEALS.includes(meal) || !Number.isFinite(portions) || portions <= 0 || portions > 100 || !/^[a-f\d-]{36}$/i.test(requestId || ''))
+    throw new Error('Choose a valid meal, serving amount and add request.');
+  return { ...newMeal(meal), id: `recipe-${requestId}`, items: recipeItems(recipe, portions) };
+}
 export function streaks(days, today = localDate()) {
   const dates = [
     ...new Set(

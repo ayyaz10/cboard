@@ -12,6 +12,7 @@ C Board is a clean, responsive control board built with React/Vite. It collects 
   - Percentage Calculator
   - Calorie Calculator
   - Mass Unit Converter
+  - Loan Payment Calculator
 - `Progress Tracker`
   - Create custom goals
   - Add/remove goal metrics dynamically
@@ -106,6 +107,7 @@ src/
 - `/calculators/percentage` Percentage Calculator
 - `/calculators/calorie` Calorie Calculator
 - `/calculators/mass` Mass Unit Converter
+- `/calculators/loan-payment` Loan Payment Calculator
 - `/progress-tracker` Progress Tracker
 
 ## How to add more calculators later

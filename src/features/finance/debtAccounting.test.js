@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { accrueDebtPayment, canMarkDebtPaymentUnpaid, debtAccrualSettlementStatus, debtPayoffReady, debtPaymentDue, debtPaymentSummary, debtRemainingAmount, editDebtAccumulation, markDebtPaymentUnpaid, markOrphanDebtPaymentUnpaid, migrateLegacyDebtAllocations, reconcileDebtBalance, recordDebtPayment, recordDebtPaymentState, removeDebtAccumulation } from './debtAccounting.js';
+import { accrueDebtPayment, canDeleteDebt, canEditDebtPayment, canMarkDebtPaymentUnpaid, correctDebtPayment, debtAccrualSettlementStatus, debtPayoffReady, debtPaymentDue, debtPaymentSummary, debtRemainingAmount, editDebtAccumulation, filterDebts, getDebtStatus, markDebtPaymentUnpaid, markOrphanDebtPaymentUnpaid, migrateLegacyDebtAllocations, reconcileDebtBalance, recordDebtPayment, recordDebtPaymentState, removeDebtAccumulation, setDebtArchived } from './debtAccounting.js';
 import { applyIncomeAllocations, reconcileIncomeAllocations } from './financeAllocations.js';
 import { deriveFinancePosition, inspectFinanceIntegrity } from './financeLedger.js';
 import { debtSummary, financeSummary } from './financeMath.js';
@@ -222,4 +222,76 @@ test('editing income reconciles only its unpaid debt due', () => {
   assert.equal(debtPaymentDue(state, 'wasik'), 5_000);
   assert.equal(state.transactions.length, 1);
   assert.equal(state.debts[0].remaining, 50_000);
+});
+
+test('an actual payment can exceed accumulated amount or be recorded without accumulation', () => {
+  const state = makeState();
+  state.debts[0].original = 20_000;
+  state.debts[0].remaining = 20_000;
+  accrueDebtPayment(state, { debtId: 'wasik', amount: 2_000, effectiveDate: '2026-10-01', sourceType: 'manual' });
+
+  const payment = recordDebtPayment(state, { debtId: 'wasik', amount: 5_000, date: '2026-10-05' });
+
+  assert.equal(debtRemainingAmount(state, 'wasik'), 15_000);
+  assert.equal(debtPaymentDue(state, 'wasik'), 0);
+  assert.equal(state.debtAccruals[0].paidAmount, 2_000);
+  assert.equal(state.debtPayments.filter(item => !item.reversedAt).length, 1);
+  assert.equal(state.transactions.filter(item => item.type === 'debt' && !item.reversedAt).length, 1);
+  assert.equal(state.transactions[0].id, payment.id);
+
+  const directPayment = recordDebtPayment(state, { debtId: 'wasik', amount: 3_000, date: '2026-10-06' });
+  assert.equal(debtRemainingAmount(state, 'wasik'), 12_000);
+  assert.equal(state.debtPayments.filter(item => !item.reversedAt).length, 2);
+  assert.equal(state.transactions.filter(item => item.type === 'debt' && !item.reversedAt).length, 2);
+  assert.equal(directPayment.amount, 3_000);
+});
+
+test('correcting a payment updates its linked transaction and oldest-first accumulation ledger', () => {
+  const state = makeState();
+  state.transactions.push({ id: 'income', type: 'income', amount: 50_000, date: '2026-10-01' });
+  const startingFinanceBalance = deriveFinancePosition(state).totalOwned;
+  accrueDebtPayment(state, { debtId: 'wasik', amount: 4_000, effectiveDate: '2026-10-01', sourceType: 'manual' });
+  const transaction = recordDebtPayment(state, { debtId: 'wasik', amount: 4_000, date: '2026-10-05', note: 'Original note' });
+  const payment = state.debtPayments[0];
+  assert.equal(canEditDebtPayment(state, payment.id), true);
+
+  assert.equal(correctDebtPayment(state, payment.id, { amount: 3_500, date: '2026-10-06', note: 'Corrected note', correctedAt: '2026-10-07T00:00:00.000Z' }), true);
+
+  assert.equal(state.debtPayments.length, 1);
+  assert.equal(payment.amount, 3_500);
+  assert.equal(transaction.amount, 3_500);
+  assert.equal(transaction.date, '2026-10-06');
+  assert.equal(transaction.note, 'Corrected note');
+  assert.equal(payment.corrections[0].before.amount, 4_000);
+  assert.equal(payment.corrections[0].after.amount, 3_500);
+  assert.equal(state.debtAccruals[0].paidAmount, 3_500);
+  assert.equal(debtPaymentDue(state, 'wasik'), 500);
+  assert.equal(debtRemainingAmount(state, 'wasik'), 46_500);
+  assert.equal(deriveFinancePosition(state).totalOwned, startingFinanceBalance - 3_500);
+});
+
+test('archiving and restoring preserve debt history and status filters', () => {
+  const state = makeState();
+  const transaction = recordDebtPayment(state, { debtId: 'wasik', amount: 50_000, date: '2026-10-05' });
+  assert.equal(getDebtStatus(state, 'wasik'), 'completed');
+  assert.equal(filterDebts(state, { status: 'paid' }).length, 1);
+  assert.equal(canDeleteDebt(state, 'wasik'), false);
+
+  assert.equal(setDebtArchived(state, 'wasik', true, '2026-10-08T00:00:00.000Z'), true);
+  assert.equal(getDebtStatus(state, 'wasik'), 'archived');
+  assert.equal(filterDebts(state, { status: 'archived' })[0].id, 'wasik');
+  assert.equal(transaction.reversedAt, undefined);
+  assert.equal(debtRemainingAmount(state, 'wasik'), 0);
+  assert.equal(setDebtArchived(state, 'wasik', false), true);
+  assert.equal(getDebtStatus(state, 'wasik'), 'completed');
+});
+
+test('bank imported payments cannot be corrected and debt deletion is limited to debts without history', () => {
+  const state = makeState();
+  const transaction = { id: 'imported', type: 'debt', targetId: 'wasik', amount: 1_000, source: 'bank', sourceType: 'bank_import' };
+  state.transactions.push(transaction);
+  state.debtPayments.push({ id: 'imported-payment', debtId: 'wasik', amount: 1_000, transactionId: transaction.id });
+  assert.equal(canEditDebtPayment(state, 'imported-payment'), false);
+  assert.throws(() => correctDebtPayment(state, 'imported-payment', { amount: 900, date: '2026-10-05' }), /cannot be edited/);
+  assert.equal(canDeleteDebt(state, 'wasik'), false);
 });

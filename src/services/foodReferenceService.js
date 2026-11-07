@@ -1,11 +1,13 @@
 import { getPreference } from './preferenceService.js';
 import { readMealRoutine } from '../features/recipes/mealPlanData.js';
 import { readRoutinePresets } from '../features/recipes/routinePresets.js';
+import { DATED_PLAN_KEY, readDatedMealPlans } from '../features/recipes/mealPlanData.js';
 
 export async function getMealPlanFoodReferences() {
-  const [daily, storedPresets] = await Promise.all([
+  const [daily, storedPresets, storedDates] = await Promise.all([
     getPreference('recipes:daily-plan:v1'),
     getPreference('recipes:routine-presets:v1', []),
+    getPreference(DATED_PLAN_KEY),
   ]);
   const references = [];
   if (daily) {
@@ -13,5 +15,6 @@ export async function getMealPlanFoodReferences() {
     references.push({ id: 'current-plan', name: plan.name, source: 'Current meal plan', entries: plan.entries });
   }
   readRoutinePresets(storedPresets).forEach(plan => references.push({ id: plan.id, name: plan.name, source: 'Saved routine', entries: plan.entries }));
+  Object.entries(readDatedMealPlans(storedDates).dates).forEach(([date, entries]) => references.push({ id: `date-${date}`, name: `Meal plan · ${date}`, source: 'Dated meal plan', entries }));
   return references;
 }

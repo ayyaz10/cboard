@@ -711,7 +711,7 @@ html[data-theme="matrix"] {
   }
 
   .note-editor:empty::before {
-    color: rgba(0, 0, 0, 0.35);
+    color: var(--color-text-muted);
     content: attr(data-placeholder);
     font-weight: 700;
   }
@@ -746,11 +746,16 @@ html[data-theme="matrix"] {
   }
 
   .note-editor blockquote {
-    @apply my-4 border-l-4 border-black bg-[#fff0b8] px-4 py-3 font-bold;
+    @apply my-4 border-l-4 px-4 py-3 font-bold;
+    border-color: var(--border-interactive);
+    background: var(--color-warning-soft);
   }
 
   .note-editor pre {
-    @apply my-4 overflow-x-auto rounded-[1rem] border-2 border-black bg-black px-4 py-3 font-mono text-sm text-white;
+    @apply my-4 overflow-x-auto rounded-[1rem] border px-4 py-3 font-mono text-sm;
+    border-color: var(--border-default);
+    background: var(--surface-primary);
+    color: var(--color-text);
   }
 
   .note-editor a {
@@ -760,7 +765,9 @@ html[data-theme="matrix"] {
   .note-editor .note-media-block,
   .note-editor img,
   .note-editor video {
-    @apply my-4 max-w-full rounded-[1rem] border-2 border-black bg-[#fffdf8];
+    @apply my-4 max-w-full rounded-[1rem] border;
+    border-color: var(--border-default);
+    background: var(--surface-primary);
   }
 
   .note-editor video {

@@ -45,6 +45,10 @@ export function getAppHref(path) {
   return withBasePath(path);
 }
 
+export function getCurrentPathWithSearch() {
+  return `${getCurrentRoute()}${window.location.search}`;
+}
+
 export function useRoute() {
   const [route, setRoute] = useState(getCurrentRoute);
 

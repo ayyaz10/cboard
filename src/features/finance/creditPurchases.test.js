@@ -4,8 +4,8 @@ import { initialFinanceState, normalizeFinanceState } from './financeData.js';
 import { deriveFinancePosition, inspectFinanceIntegrity } from './financeLedger.js';
 import { financeSummary } from './financeMath.js';
 import {
-  archiveCreditAgreement, canDeleteCreditPurchase, cancelCreditAgreement, createCreditAgreement, deleteUnusedCreditAgreement, generateCreditSchedule, getCreditAgreementBalances, getCreditAgreementStatus, getCreditPurchaseDeleteBlockReason,
-  getCreditAgreementRepaymentSummary, getCreditDueSoon, getCreditInstalmentAmounts, getCreditOverview, getMonthlyCreditCommitment, getOverdueCreditPayments, recordCreditPayment,
+  archiveCreditAgreement, canDeleteCreditPurchase, cancelCreditAgreement, createCreditAgreement, createCreditTransactionIndex, deleteUnusedCreditAgreement, generateCreditSchedule, getCreditAgreementBalances, getCreditAgreementStatus, getCreditPurchaseDeleteBlockReason,
+  getCreditAgreementMonthlyCommitment, getCreditAgreementRepaymentSummary, getCreditDueSoon, getCreditInstalmentAmounts, getCreditOverview, getMonthlyCreditCommitment, getOverdueCreditPayments, planCreditReminderReconciliation, recordCreditPayment,
   calculateRemainingBalance, calculateRemainingInstallmentCount, generateCustomCreditSchedule, mutateCreditState, restoreCreditAgreement, reverseCreditPayment, settleCreditAgreement, updateCreditAgreement, updateCreditInstalment, updateCreditPayment, validateCustomSchedule,
 } from './creditPurchases.js';
 
@@ -32,14 +32,25 @@ test('credit mutation adapter returns the updated Finance state when operation r
   assert.ok(Array.isArray(returned.transactions));
 });
 
+test('indexed Credit selectors preserve balances and instalment amounts while reusing transaction grouping', () => {
+  const { state, agreement } = makeAgreement({ deposit: 0, financedAmount: 120_000 });
+  const instalment = agreement.schedule[0];
+  recordCreditPayment(state, { agreementId: agreement.id, instalmentId: instalment.id, amount: 10_000, date: '2026-02-15', paymentId: 'indexed-payment', transactionId: 'indexed-payment' });
+  const index = createCreditTransactionIndex(state);
+  assert.deepEqual(getCreditAgreementBalances(state, agreement, index), getCreditAgreementBalances(state, agreement));
+  assert.deepEqual(getCreditInstalmentAmounts(state, agreement, instalment, index), getCreditInstalmentAmounts(state, agreement, instalment));
+  state.transactions.find(item => item.id === 'indexed-payment').reversedAt = new Date().toISOString();
+  assert.equal(getCreditAgreementBalances(state, agreement).totalRemaining, 120_000);
+});
+
 test('monthly schedule splits cents exactly and clamps end-of-month dates', () => {
   const schedule = generateCreditSchedule({ agreementId: 'x', principalAmount: 100, financeCharge: 2, term: 3, firstPaymentDate: '2026-01-31' });
-  assert.deepEqual(schedule.map(item => item.amount), [34, 34, 34]);
-  assert.deepEqual(schedule.map(item => item.principalAmount), [34, 33, 33]);
+  assert.deepEqual(schedule.map(item => item.amount), [33, 33, 36]);
+  assert.deepEqual(schedule.map(item => item.principalAmount), [33, 33, 34]);
   assert.deepEqual(schedule.map(item => item.dueDate), ['2026-01-31', '2026-02-28', '2026-03-31']);
   assert.equal(schedule.reduce((sum, item) => sum + item.financeCostAmount, 0), 2);
   const remainderSchedule = generateCreditSchedule({ agreementId: 'remainder', principalAmount: 100, term: 3, firstPaymentDate: '2026-02-15' });
-  assert.deepEqual(remainderSchedule.map(item => item.amount), [34, 33, 33]);
+  assert.deepEqual(remainderSchedule.map(item => item.amount), [33, 33, 34]);
   assert.equal(remainderSchedule.reduce((sum, item) => sum + item.amount, 0), 100);
 });
 
@@ -204,6 +215,24 @@ test('custom upfront plan links its paid first row and leaves future custom amou
   assert.equal(getMonthlyCreditCommitment(state, '2026-11-01'), 3_000);
 });
 
+test('custom schedule can add and delete future rows only when the exact remaining balance reconciles', () => {
+  const { state, agreement } = makeAgreement({ deposit: 0, cashPrice: 10_000, financedAmount: 10_000, term: 2, firstPaymentDate: '2026-02-15' });
+  const expanded = [
+    { id: agreement.schedule[0].id, dueDate: '2026-02-15', amount: 3_000 },
+    { id: agreement.schedule[1].id, dueDate: '2026-03-15', amount: 3_000 },
+    { id: 'new-row', dueDate: '2026-04-15', amount: 4_000 },
+  ];
+  updateCreditAgreement(state, agreement.id, { scheduleMode: 'custom', customSchedule: expanded, term: 3, firstPaymentDate: '2026-02-15' }, '2026-01-20');
+  assert.equal(agreement.schedule.filter(row => !row.supersededAt).length, 3);
+  assert.equal(agreement.schedule.reduce((sum, row) => sum + (!row.supersededAt ? row.amount : 0), 0), getCreditAgreementBalances(state, agreement).totalRemaining);
+  const reduced = expanded.slice(0, 2).map(row => ({ ...row, amount: row.amount + (row.id === expanded[0].id ? 2_000 : 2_000) }));
+  updateCreditAgreement(state, agreement.id, { scheduleMode: 'custom', customSchedule: reduced, term: 2, firstPaymentDate: '2026-02-15' }, '2026-01-20');
+  assert.equal(agreement.schedule.filter(row => !row.supersededAt).length, 2);
+  assert.equal(agreement.schedule.filter(row => !row.supersededAt).reduce((sum, row) => sum + row.amount, 0), 10_000);
+  assert.throws(() => updateCreditAgreement(state, agreement.id, { scheduleMode: 'custom', customSchedule: [{ ...reduced[0], amount: 9_999 }], term: 1, firstPaymentDate: '2026-02-15' }, '2026-01-20'), /must total/);
+  assert.equal(agreement.schedule.filter(row => !row.supersededAt).reduce((sum, row) => sum + row.amount, 0), getCreditAgreementBalances(state, agreement).totalRemaining);
+});
+
 test('product links are normalized, optional, and restricted to safe web URLs', () => {
   const { agreement } = makeAgreement({ productUrl: ' https://shop.example/products/phone ' });
   assert.equal(agreement.productUrl, 'https://shop.example/products/phone');
@@ -253,6 +282,39 @@ test('a partial payment leaves the unpaid balance due and records only cash paid
   assert.equal(deriveFinancePosition(state).totalOwned, before - 6_000);
 });
 
+test('one payment can satisfy the selected instalment and apply excess to future principal once', () => {
+  const { state, agreement } = makeAgreement({ deposit: 0, cashPrice: 30_000, financedAmount: 30_000, term: 3 });
+  const due = agreement.schedule[0];
+  const before = deriveFinancePosition(state).totalOwned;
+  const payment = recordCreditPayment(state, { agreementId: agreement.id, amount: 12_000, date: due.dueDate, instalmentId: due.id, paymentId: 'combined', transactionId: 'combined-tx' });
+  assert.equal(payment.amount, 12_000);
+  assert.equal(payment.creditPaymentKind, 'scheduled_extra');
+  assert.equal(payment.scheduledPortionAmount, 10_000);
+  assert.equal(payment.extraPrincipalAmount, 2_000);
+  assert.equal(getCreditInstalmentAmounts(state, agreement, due).paid, 10_000);
+  assert.equal(getCreditInstalmentAmounts(state, agreement, due).remaining, 0);
+  assert.equal(getCreditAgreementBalances(state, agreement).totalRemaining, 18_000);
+  assert.equal(deriveFinancePosition(state).totalOwned, before - 12_000);
+  assert.equal(state.transactions.filter(item => item.creditPaymentId === 'combined').length, 1);
+  assert.equal(agreement.schedule.filter(item => !item.supersededAt).reduce((sum, item) => sum + getCreditInstalmentAmounts(state, agreement, item).remaining, 0), 18_000);
+  reverseCreditPayment(state, payment.id, '2026-02-16');
+  assert.equal(getCreditAgreementBalances(state, agreement).totalRemaining, 30_000);
+  assert.equal(agreement.schedule.filter(item => !item.supersededAt).reduce((sum, item) => sum + getCreditInstalmentAmounts(state, agreement, item).remaining, 0), 30_000);
+  assert.equal(financeSummary(state, '2026-02').creditPayments, 0);
+});
+
+test('correcting a scheduled payment upward preserves its Finance ID and records the excess once', () => {
+  const { state, agreement } = makeAgreement({ deposit: 0, cashPrice: 30_000, financedAmount: 30_000, term: 3 });
+  const due = agreement.schedule[0];
+  const payment = recordCreditPayment(state, { agreementId: agreement.id, amount: 10_000, date: due.dueDate, instalmentId: due.id, paymentId: 'correct-up', transactionId: 'correct-up-tx' });
+  updateCreditPayment(state, payment.id, { amount: 12_000, date: due.dueDate });
+  assert.equal(payment.id, 'correct-up-tx');
+  assert.equal(payment.creditPaymentKind, 'scheduled_extra');
+  assert.equal(payment.extraPrincipalAmount, 2_000);
+  assert.equal(getCreditAgreementBalances(state, agreement).totalRemaining, 18_000);
+  assert.equal(state.transactions.filter(item => item.creditPaymentId === 'correct-up').length, 1);
+});
+
 test('extra principal reduces liability and reschedules future principal without reducing fees', () => {
   const { state, agreement } = makeAgreement({ financeCharge: 900, interestMode: 'fixed_fee' });
   const futureFees = agreement.schedule.map(item => item.financeCostAmount);
@@ -261,6 +323,51 @@ test('extra principal reduces liability and reschedules future principal without
   assert.equal(extra.creditFinanceCostAmount, 0);
   assert.equal(getCreditAgreementBalances(state, agreement).principalRemaining, 90_000);
   assert.deepEqual(agreement.schedule.map(item => item.financeCostAmount), futureFees);
+});
+
+test('Auto Split puts all integer minor-unit remainder in the final instalment without negative fee rows', () => {
+  const schedule = generateCreditSchedule({ agreementId: 'awkward', principalAmount: 101, financeCharge: 1, term: 3, firstPaymentDate: '2026-02-15' });
+  assert.deepEqual(schedule.map(item => item.principalAmount), [33, 33, 35]);
+  assert.deepEqual(schedule.map(item => item.financeCostAmount), [0, 0, 1]);
+  assert.deepEqual(schedule.map(item => item.amount), [33, 33, 36]);
+  assert.ok(schedule.every(item => item.principalAmount >= 0 && item.financeCostAmount >= 0));
+  assert.equal(schedule.reduce((sum, item) => sum + item.amount, 0), 102);
+});
+
+test('monthly commitment sums actual upcoming rows and excludes paid, reversed, cancelled, and archived plans', () => {
+  const { state, agreement } = makeAgreement({ deposit: 0, cashPrice: 30_000, financedAmount: 30_000, term: 3, firstPaymentDate: '2026-02-15' });
+  assert.equal(getMonthlyCreditCommitment(state, '2026-02-15'), 20_000);
+  const first = agreement.schedule[0];
+  const payment = recordCreditPayment(state, { agreementId: agreement.id, amount: 10_000, date: first.dueDate, instalmentId: first.id, paymentId: 'monthly-paid', transactionId: 'monthly-paid-tx' });
+  assert.equal(getMonthlyCreditCommitment(state, '2026-02-15'), 10_000);
+  reverseCreditPayment(state, payment.id, '2026-02-16');
+  assert.equal(getMonthlyCreditCommitment(state, '2026-02-15'), 20_000);
+  archiveCreditAgreement(state, agreement.id, '2026-02-16');
+  assert.equal(getMonthlyCreditCommitment(state, '2026-02-15'), 0);
+  assert.equal(getCreditAgreementMonthlyCommitment(state, agreement, '2026-02-15'), 0);
+  assert.equal(getCreditOverview(state, '2026-02-15').outstanding, 30_000);
+  assert.equal(getCreditOverview(state, '2026-02-15').nextPayment, null);
+
+  const cancelled = makeAgreement({ id: 'cancelled-plan', title: 'Cancelled plan', deposit: 0, cashPrice: 15_000, financedAmount: 15_000, term: 3, firstPaymentDate: '2026-02-15' });
+  cancelCreditAgreement(cancelled.state, cancelled.agreement.id, '2026-01-20');
+  assert.equal(getMonthlyCreditCommitment(cancelled.state, '2026-02-15'), 0);
+});
+
+test('credit reminder reconciliation is idempotent and drops paid or archived instalments', () => {
+  const { state, agreement } = makeAgreement({ deposit: 0, cashPrice: 30_000, financedAmount: 30_000, term: 3, firstPaymentDate: '2026-02-15' });
+  updateCreditAgreement(state, agreement.id, { creditReminderPreferences: { enabled: true, daysBefore: 3, onDueDate: true } }, '2026-01-20');
+  const firstPlan = planCreditReminderReconciliation(state, [], '2026-02-01');
+  assert.equal(firstPlan.add.length, 6);
+  assert.equal(firstPlan.cancelIds.length, 0);
+  const active = firstPlan.add.map(item => ({ ...item, id: `reminder-${item.key}`, status: 'waiting', creditAgreementId: item.agreementId, creditInstalmentId: item.instalmentId, creditReminderEvent: item.event }));
+  assert.deepEqual(planCreditReminderReconciliation(state, active, '2026-02-01'), { add: [], cancelIds: [] });
+  const first = agreement.schedule[0];
+  recordCreditPayment(state, { agreementId: agreement.id, amount: first.amount, date: first.dueDate, instalmentId: first.id, paymentId: 'reminded-paid', transactionId: 'reminded-paid-tx' });
+  const afterPayment = planCreditReminderReconciliation(state, active, '2026-02-01');
+  assert.equal(afterPayment.add.length, 0);
+  assert.equal(afterPayment.cancelIds.length, 2);
+  archiveCreditAgreement(state, agreement.id, '2026-02-02');
+  assert.deepEqual(planCreditReminderReconciliation(state, active, '2026-02-02'), { add: [], cancelIds: active.map(item => item.id) });
 });
 
 test('due and overdue schedule items are informational and do not affect the ledger', () => {
@@ -281,6 +388,16 @@ test('early settlement records one actual payment and supersedes unpaid instalme
   assert.equal(getCreditAgreementStatus(state, agreement), 'settled_early');
   assert.ok(agreement.schedule.every(item => item.supersededAt));
   assert.equal(settleCreditAgreement(state, { agreementId: agreement.id, settlementAmount: 97_000, settlementFee: 500, date: '2026-02-01', paymentId: 'settle', transactionId: 'duplicate' }).id, 'settle-tx');
+});
+
+test('early settlement uses one transaction, clears outstanding liability, and retains its history', () => {
+  const { state, agreement } = makeAgreement({ deposit: 0, cashPrice: 10_000, financedAmount: 10_000, term: 3 });
+  const payment = settleCreditAgreement(state, { agreementId: agreement.id, settlementAmount: 10_000, date: '2026-02-01', paymentId: 'full-settle', transactionId: 'full-settle-tx' });
+  assert.equal(getCreditAgreementBalances(state, agreement).totalRemaining, 0);
+  assert.equal(getCreditAgreementStatus(state, agreement), 'settled_early');
+  assert.equal(payment.amount, 10_000);
+  assert.equal(state.transactions.filter(item => item.creditPaymentKind === 'settlement').length, 1);
+  assert.ok(agreement.schedule.every(item => item.supersededAt));
 });
 
 test('editing terms preserves paid and past rows while replacing only future rows', () => {
@@ -362,12 +479,30 @@ test('archive and restore update the visible plan count while preserving live li
   const archived = getCreditOverview(state, '2026-01-20');
   assert.equal(archived.activePlans, 0);
   assert.equal(archived.outstanding, before.outstanding);
-  assert.equal(archived.monthlyCommitment, before.monthlyCommitment);
-  assert.equal(archived.nextPayment?.agreement.id, agreement.id);
+  assert.equal(archived.monthlyCommitment, 0);
+  assert.equal(archived.nextPayment, null);
   restoreCreditAgreement(state, agreement.id);
   const restored = getCreditOverview(state, '2026-01-20');
   assert.equal(restored.activePlans, 1);
   assert.equal(restored.outstanding, before.outstanding);
+});
+
+test('Credit overview separates active, settled, cancelled, and archived agreement counts', () => {
+  const state = initialFinanceState();
+  const active = createCreditAgreement(state, agreementInput({ id: 'active', title: 'Active', deposit: 0, financedAmount: 120_000 }));
+  const settled = createCreditAgreement(state, agreementInput({ id: 'settled', title: 'Settled', deposit: 0, financedAmount: 120_000 }));
+  const cancelled = createCreditAgreement(state, agreementInput({ id: 'cancelled', title: 'Cancelled', deposit: 0, financedAmount: 120_000 }));
+  const archived = createCreditAgreement(state, agreementInput({ id: 'archived', title: 'Archived', deposit: 0, financedAmount: 120_000 }));
+  settleCreditAgreement(state, { agreementId: settled.id, settlementAmount: 120_000, settlementFee: 0, date: '2026-01-20', paymentId: 'count-settlement', transactionId: 'count-settlement-tx' });
+  cancelCreditAgreement(state, cancelled.id, '2026-01-20');
+  archiveCreditAgreement(state, archived.id, '2026-01-20');
+  const summary = getCreditOverview(state, '2026-01-20');
+  assert.equal(summary.activePlans, 1);
+  assert.equal(summary.settledPlans, 1);
+  assert.equal(summary.cancelledPlans, 1);
+  assert.equal(summary.archivedPlans, 1);
+  assert.equal(summary.outstanding, 240_000);
+  assert.equal(summary.nextPayment.agreement.id, active.id);
 });
 
 test('agreements with a real deposit cannot be hard deleted', () => {

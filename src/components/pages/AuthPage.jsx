@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { getAppHref, navigateTo } from '../../app/useRoute';
+import { safeReturnPath } from '../../app/returnTo';
 import { useAuth } from '../../contexts/AuthContext';
 import { isValidUsername, normalizeUsername } from '../../services/profileService';
 import { BrandBadge } from '../layout/BrandBadge';
 import { ThemeToggle } from '../layout/ThemeToggle';
-
-const safeReturnPath = (path) => path?.startsWith('/') && !path.startsWith('//') && !['/login','/forgot-password','/reset-password'].includes(path) ? path : '/board';
 
 export function AuthPage({ route = '/login', returnTo = '/board' }) {
   const { authError, isConfigured, isAuthenticated, isPasswordRecovery, signIn, signUp, requestPasswordReset, updatePassword } = useAuth();
@@ -46,10 +45,10 @@ export function AuthPage({ route = '/login', returnTo = '/board' }) {
         if (result?.needsEmailConfirmation) {
           setMode('login'); setIdentifier(emailValue); setPassword(''); setConfirmPassword('');
           setSuccessMessage('Account created. Check your email to confirm it, then sign in.');
-        } else navigateTo(safeReturnPath(returnTo), { replace: true });
+        } else navigateTo(safeReturnPath(returnTo, { basePath: import.meta.env.BASE_URL, origin: window.location.origin }), { replace: true });
       } else if (mode === 'login') {
         await signIn(identifier.trim(), password);
-        navigateTo(safeReturnPath(returnTo), { replace: true });
+        navigateTo(safeReturnPath(returnTo, { basePath: import.meta.env.BASE_URL, origin: window.location.origin }), { replace: true });
       } else if (mode === 'forgot') {
         await requestPasswordReset(emailValue);
         setSuccessMessage('If an account exists for this email, a reset link has been sent. Check your inbox and spam folder.');

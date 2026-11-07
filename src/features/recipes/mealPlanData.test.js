@@ -1,6 +1,6 @@
-import test from 'node:test';
+﻿import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readMealRoutine } from './mealPlanData.js';
+import { addRecipeToDatedMealPlan, addRecipeToMealRoutine, readDatedMealPlans, readMealRoutine, setDatedMealPlan } from './mealPlanData.js';
 
 test('meal routines preserve names, notes and legacy saved daily plans', () => {
   const entries = emptyMealPlan();
@@ -117,4 +117,41 @@ test('saved plans validate portions, identities and limits', () => {
     );
   assert.throws(() => validateMealPlan([plan[0], plan[0]]), /Meal #2/);
   assert.throws(() => validateMealPlan(Array(25).fill(plan[0])), /24 meals/);
+});
+
+test('quick planner add fills the selected empty slot and preserves existing routine metadata', () => {
+  const routine = { version: 1, name: 'Weekday', notes: 'Keep this note', entries: [
+    { id: 'breakfast', meal: 'Breakfast', slug: '', portions: 1 },
+    { id: 'lunch', meal: 'Lunch', slug: 'soup', portions: 1.5 },
+  ] };
+  const next = addRecipeToMealRoutine(routine, 'oats', 'Breakfast', 1);
+  assert.equal(next.name, 'Weekday');
+  assert.equal(next.notes, 'Keep this note');
+  assert.deepEqual(next.entries[0], { id: 'breakfast', meal: 'Breakfast', slug: 'oats', portions: 1 });
+  assert.deepEqual(next.entries[1], routine.entries[1]);
+});
+
+test('quick planner add appends when the chosen slot already has a recipe and validates bounds', () => {
+  const routine = { version: 1, name: 'Weekday', notes: '', entries: [{ id: 'b', meal: 'Breakfast', slug: 'toast', portions: 1 }] };
+  const next = addRecipeToMealRoutine(routine, 'oats', 'Breakfast', 2);
+  assert.equal(next.entries.length, 2);
+  assert.equal(next.entries[1].slug, 'oats');
+  assert.throws(() => addRecipeToMealRoutine(routine, 'oats', 'Dessert', 1), /Choose a meal/);
+  assert.throws(() => addRecipeToMealRoutine(routine, 'oats', 'Breakfast', 101), /Choose a meal/);
+});
+
+test('dated planner add is idempotent for the same recipe and preserves other dates', () => {
+  const first = addRecipeToDatedMealPlan(null, '2026-11-06', 'oats', 'Breakfast', 1);
+  const again = addRecipeToDatedMealPlan(first, '2026-11-06', 'oats', 'Breakfast', 1.5);
+  const tomorrow = addRecipeToDatedMealPlan(again, '2026-11-07', 'soup', 'Lunch', 2);
+  assert.equal(tomorrow.dates['2026-11-06'].filter(entry => entry.slug === 'oats').length, 1);
+  assert.equal(tomorrow.dates['2026-11-06'].find(entry => entry.slug === 'oats').portions, 1.5);
+  assert.equal(tomorrow.dates['2026-11-07'].find(entry => entry.slug === 'soup').portions, 2);
+  assert.throws(() => addRecipeToDatedMealPlan(tomorrow, '2026-02-31', 'oats', 'Breakfast', 1), /valid date/);
+});
+
+test('dated planner edit validates meal identity and count limits', () => {
+  const plan = setDatedMealPlan(null, '2026-11-06', [{ id: 'breakfast', meal: 'Breakfast', slug: 'oats', portions: 1 }]);
+  assert.deepEqual(readDatedMealPlans(plan), plan);
+  assert.throws(() => setDatedMealPlan(plan, '2026-11-06', Array.from({ length: 25 }, (_, index) => ({ id: `x${index}`, meal: 'Lunch', slug: '', portions: 1 }))), /24 meals/);
 });

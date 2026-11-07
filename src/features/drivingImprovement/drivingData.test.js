@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   createInitialHabitData, getHabitSummary, getItemsForHabit, makeHabitArea, makeImprovementNode, makeBacklogItem, promoteBacklogItem, moveHabitToBacklog, getActiveHabits, getBacklogItems, getQuickReviewItemsForHabit, archiveBacklogItem, deleteBacklogItem,
   migrateHabitData, removeHabitArea, getDescendantNodes, getNodePath, getNodeProgress,
-  getQuickReviewItems, archiveNodeBranch, deleteNodeBranch, setNodeParent, validateHabitData, HABIT_STATUSES, archiveBacklogEntry, deleteBacklogEntry, archiveHabitArea,
+  getQuickReviewItems, archiveNodeBranch, restoreNodeBranch, isNodeBranchArchived, deleteNodeBranch, setNodeParent, validateHabitData, HABIT_STATUSES, archiveBacklogEntry, deleteBacklogEntry, archiveHabitArea, restoreArchivedBacklogEntry, searchImprovementNodes,
 } from './drivingData.js';
 
 const at = '2026-10-31T00:00:00.000Z';
@@ -81,6 +81,12 @@ test('archiving a previously active Backlog entry preserves but hides Habit reco
   assert.equal(archived.habits[0].archivedAt, at);
   assert.deepEqual(archived.nodes, data.nodes);
   assert.equal(archived.backlogItems[0].state, 'ARCHIVED');
+  const restored = restoreArchivedBacklogEntry(archived, item.id, '2026-11-02T12:00:00.000Z');
+  assert.equal(restored.habits[0].id, habit.id);
+  assert.equal(restored.habits[0].lifecycleState, 'BACKLOG');
+  assert.equal(restored.backlogItems[0].state, 'BACKLOG');
+  assert.equal(restored.backlogItems[0].promotedHabitId, habit.id);
+  assert.deepEqual(restored.nodes, data.nodes);
   const deleted = deleteBacklogEntry(data, item.id);
   assert.deepEqual(deleted.habits, []);
   assert.deepEqual(deleted.nodes, []);
@@ -98,6 +104,56 @@ test('archiving an active Habit preserves its full tree while removing it from a
   assert.deepEqual(getQuickReviewItemsForHabit(archived, habit.id), []);
 });
 
+test('archived Habits restore to their previous lifecycle with the same identity and recursive data', () => {
+  const data = createInitialHabitData(), habit = makeHabitArea({ name: 'Sleep Improvement', description: 'A full tree' }, [], 'user-a', at);
+  const root = makeImprovementNode({ habitId: habit.id, parentId: null, title: 'Evening routine', status: 'IMPROVING', priority: 'HIGH', focusNow: true, richNotes: '<p>Wind down.</p>' }, 'user-a', at);
+  const child = makeImprovementNode({ habitId: habit.id, parentId: root.id, title: 'Put phone away', status: 'STABLE' }, 'user-a', at);
+  data.habits.push(habit); data.nodes = [root, child];
+  const archived = archiveHabitArea(data, habit.id, '2026-11-01T12:00:00.000Z');
+  const restored = restoreArchivedBacklogEntry(archived, archived.backlogItems[0].id, '2026-11-02T12:00:00.000Z');
+  assert.equal(restored.habits[0].id, habit.id);
+  assert.equal(restored.habits[0].archivedAt, null);
+  assert.deepEqual(restored.nodes, data.nodes);
+  assert.equal(restored.backlogItems[0].state, 'PROMOTED');
+  assert.equal(restored.backlogItems[0].promotedHabitId, habit.id);
+  assert.deepEqual(getActiveHabits(restored).map(item => item.id), [habit.id]);
+  validateHabitData(restored);
+});
+
+test('archived Backlog ideas restore without becoming active or changing ID', () => {
+  const idea = makeBacklogItem({ title: 'Improve cooking', note: 'Practice knife skills' }, 'user-a', at);
+  const data = { ...createInitialHabitData(), backlogItems: [{ ...idea, state: 'ARCHIVED', archivedAt: at }] };
+  const restored = restoreArchivedBacklogEntry(data, idea.id, '2026-11-02T12:00:00.000Z');
+  assert.equal(restored.backlogItems[0].id, idea.id);
+  assert.equal(restored.backlogItems[0].state, 'BACKLOG');
+  assert.equal(restored.backlogItems[0].archivedAt, null);
+  assert.equal(restored.habits.length, 0);
+});
+
+test('restoring an archived parent keeps independently archived descendants archived', () => {
+  const habit = makeHabitArea({ name: 'Driving Improvement' }, [], 'user-a', at);
+  const root = makeImprovementNode({ habitId: habit.id, parentId: null, title: 'Roundabouts' }, 'user-a', at);
+  const child = makeImprovementNode({ habitId: habit.id, parentId: root.id, title: 'Lane selection' }, 'user-a', at);
+  const grandchild = makeImprovementNode({ habitId: habit.id, parentId: child.id, title: 'Choose early' }, 'user-a', at);
+  const independentlyArchived = archiveNodeBranch([root, child, grandchild], child.id, '2026-10-01T12:00:00.000Z');
+  const withParentArchived = archiveNodeBranch(independentlyArchived, root.id, '2026-11-01T12:00:00.000Z');
+  assert.equal(withParentArchived.find(node => node.id === child.id).archivedAt, '2026-10-01T12:00:00.000Z');
+  const restored = restoreNodeBranch(withParentArchived, child.id);
+  assert.equal(isNodeBranchArchived(restored, root.id), false);
+  assert.equal(isNodeBranchArchived(restored, child.id), true);
+  assert.equal(restored.find(node => node.id === child.id).archivedAt, '2026-10-01T12:00:00.000Z');
+});
+
+test('search matches rich Notes and ancestor path within the lifecycle collection supplied by the caller', () => {
+  const habit = makeHabitArea({ name: 'Driving Improvement' }, [], 'user-a', at);
+  const root = makeImprovementNode({ habitId: habit.id, parentId: null, title: 'Roundabouts' }, 'user-a', at);
+  const child = makeImprovementNode({ habitId: habit.id, parentId: root.id, title: 'Lane choice', richNotes: '<p>Check mirrors and road markings.</p>' }, 'user-a', at);
+  const backlogOnly = makeImprovementNode({ habitId: habit.id, parentId: null, title: 'Old junction note', richNotes: '<p>Roundabouts</p>' }, 'user-a', at);
+  assert.deepEqual(searchImprovementNodes([root, child], 'road markings').map(node => node.id), [child.id]);
+  assert.deepEqual(searchImprovementNodes([root, child], 'roundabouts').map(node => node.id), [root.id, child.id]);
+  assert.deepEqual(searchImprovementNodes([backlogOnly], 'roundabouts').map(node => node.id), [backlogOnly.id]);
+});
+
 test('legacy category and item records migrate idempotently to recursive nodes preserving content and IDs', () => {
   const names = ['Mirrors', 'Roundabouts'];
   const legacy = {
@@ -109,6 +165,7 @@ test('legacy category and item records migrate idempotently to recursive nodes p
   const driving = first.data.habits[0], root = first.data.nodes.find(node => node.id === 'category-2'), child = first.data.nodes.find(node => node.id === 'item-1');
   assert.equal(first.changed, true); assert.equal(second.changed, false);
   assert.deepEqual(first.data.categories, []); assert.deepEqual(first.data.mistakes, []);
+  assert.equal(legacy.categories.length, 2); assert.equal(legacy.mistakes.length, 1);
   assert.equal(driving.name, 'Driving Improvement');
   assert.equal(driving.lifecycleState, 'ACTIVE');
   assert.equal(root.parentId, null); assert.equal(root.habitId, driving.id);
