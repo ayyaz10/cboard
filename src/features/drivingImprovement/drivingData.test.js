@@ -10,7 +10,7 @@ const at = '2026-10-31T00:00:00.000Z';
 
 test('new workspace has a recursive node collection and no seeded improvements', () => {
   assert.deepEqual(createInitialHabitData(), {
-    version: 1, habitVersion: 6, habits: [], nodes: [], categories: [], mistakes: [], reminders: [], guidanceNotes: [], backlogItems: [],
+    version: 1, habitVersion: 7, habits: [], nodes: [], categories: [], mistakes: [], reminders: [], guidanceNotes: [], backlogItems: [],
   });
 });
 
@@ -25,7 +25,8 @@ test('moving a Habit to Backlog and resuming it preserves identity, recursive pr
   assert.deepEqual(getActiveHabits(paused), []);
   assert.equal(getBacklogItems(paused).length, 1);
   assert.equal(paused.habits[0].id, habit.id);
-  assert.deepEqual(paused.nodes, beforeNodes);
+  assert.equal(paused.nodes[0].pausedAt, '2026-11-03T12:00:00.000Z');
+  assert.equal(paused.nodes[1].pausedAt, null);
   assert.deepEqual(getQuickReviewItemsForHabit(paused, habit.id), []);
   const item = getBacklogItems(paused)[0];
   const resumed = promoteBacklogItem(paused, item.id, habit.name, 'user-a', '2026-11-04T12:00:00.000Z');
@@ -35,7 +36,8 @@ test('moving a Habit to Backlog and resuming it preserves identity, recursive pr
   assert.equal(resumed.habit.id, habit.id);
   assert.equal(resumedAgain.changed, false);
   assert.equal(resumedAgain.data.habits.length, 1);
-  assert.deepEqual(resumed.data.nodes, beforeNodes);
+  assert.deepEqual(resumed.data.nodes[0].pausedIntervals, [{ start: '2026-11-03', end: '2026-11-04' }]);
+  assert.deepEqual(resumed.data.nodes[1], beforeNodes[1]);
   assert.equal(getActiveHabits(resumed.data)[0].id, habit.id);
   assert.equal(getBacklogItems(resumed.data).length, 0);
   assert.deepEqual(getQuickReviewItemsForHabit(resumed.data, habit.id).map(node => node.id), [root.id]);
@@ -248,4 +250,26 @@ test('deleting a habit removes only its recursive nodes and associated legacy da
   const after = removeHabitArea(data, first.id);
   assert.deepEqual(after.habits.map(habit => habit.id), [second.id]);
   assert.deepEqual(after.nodes, []);
+});
+
+test('a 500-node improvement tree remains valid with execution data on focused leaves', () => {
+  const data = createInitialHabitData(), habit = makeHabitArea({ name: 'Large tree' }, [], 'user-a', at);
+  const nodes = [];
+  for (let index = 0; index < 500; index++) {
+    const parentId = index === 0 ? null : nodes[Math.floor((index - 1) / 2)].id;
+    nodes.push(makeImprovementNode({ habitId: habit.id, parentId, title: `Improvement ${index}`, focusNow: index % 100 === 0, actionContract: index % 100 === 0 ? { action: 'Read 10 pages', minimum: 'Read 1 page', trigger: 'After breakfast', schedule: { type: 'WEEKDAYS', days: [1, 3, 5] }, createdAt: at } : null }, 'user-a', at));
+  }
+  data.habits.push(habit); data.nodes = nodes;
+  assert.equal(validateHabitData(data).nodes.length, 500);
+  assert.equal(getDescendantNodes(nodes, nodes[0].id).length, 499);
+  assert.equal(nodes.filter(node => node.focusNow && node.actionContract).length, 5);
+});
+
+test('Focus Timer preferences validate optional full and minimum durations', () => {
+  const data = createInitialHabitData();
+  const habit = makeHabitArea({ name: 'Deep Work' }, [], 'user-a', at);
+  const node = makeImprovementNode({ habitId: habit.id, parentId: null, title: 'Work on CBoard', actionContract: { action: 'Work on CBoard', minimum: 'Work for 5 minutes', trigger: 'After breakfast', schedule: { type: 'DAILY' }, useFocusTimer: true, focusMinutes: 25, minimumFocusMinutes: 5 } }, 'user-a', at);
+  data.habits.push(habit); data.nodes.push(node);
+  assert.equal(validateHabitData(data).nodes[0].actionContract.minimumFocusMinutes, 5);
+  assert.throws(() => validateHabitData({ ...data, nodes: [{ ...node, actionContract: { ...node.actionContract, focusMinutes: 0 } }] }), /Focus duration/);
 });

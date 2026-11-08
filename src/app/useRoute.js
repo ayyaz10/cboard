@@ -66,3 +66,7 @@ export function useRoute() {
 
   return route;
 }
+
+export function getRouteBoundaryKey(route) {
+  return route.startsWith('/habit-improvement/') ? route.split('/').slice(0, 3).join('/') : route;
+}

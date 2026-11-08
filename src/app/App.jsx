@@ -6,7 +6,7 @@ import { NotFoundPage } from '../components/pages/NotFoundPage';
 import { ToolLayout } from '../components/layout/ToolLayout';
 import { useAuth } from '../contexts/AuthContext';
 import { migrateLocalStorageData } from '../services/dataMigrationService';
-import { getCurrentPathWithSearch, navigateTo, useRoute } from './useRoute';
+import { getCurrentPathWithSearch, getRouteBoundaryKey, navigateTo, useRoute } from './useRoute';
 import { observeWorkspaceSetup } from './workspaceSetup';
 import { RouteErrorBoundary } from './RouteErrorBoundary.jsx';
 const CalculatorBoard = lazy(() => import('../features/calculators/CalculatorBoard').then(module => ({ default: module.CalculatorBoard })));
@@ -29,7 +29,8 @@ const HabitImprovementDetail = lazy(() => import('../features/drivingImprovement
 
 export default function App() {
   const route = useRoute();
-  return <RouteErrorBoundary key={route}><AppContent /></RouteErrorBoundary>;
+  const boundaryKey = getRouteBoundaryKey(route);
+  return <RouteErrorBoundary key={boundaryKey}><AppContent /></RouteErrorBoundary>;
 }
 
 function AppContent() {
@@ -48,13 +49,16 @@ function AppContent() {
       for (let index = sessionStorage.length - 1; index >= 0; index -= 1) {
         const key = sessionStorage.key(index);
         const belongsToCurrentUser = user?.id && (key?.startsWith(`habit-ui:${user.id}:`) || key?.startsWith(`habit-tree:${user.id}:`));
-        if ((key?.startsWith('habit-ui:') || key?.startsWith('habit-tree:')) && (user?.id ? !belongsToCurrentUser : !isLoading)) sessionStorage.removeItem(key);
+        const isHabitFocusState = key === 'cboard:habit-focus-launch' || key === 'cboard:habit-focus-return';
+        let focusStateBelongsToCurrentUser = false;
+        if (isHabitFocusState && user?.id) { try { focusStateBelongsToCurrentUser = JSON.parse(sessionStorage.getItem(key) || 'null')?.userId === user.id; } catch {} }
+        if (((key?.startsWith('habit-ui:') || key?.startsWith('habit-tree:')) && (user?.id ? !belongsToCurrentUser : !isLoading)) || (isHabitFocusState && (accountChanged || (user?.id ? !focusStateBelongsToCurrentUser : !isLoading)))) sessionStorage.removeItem(key);
       }
     } catch {}
   }, [user?.id, isLoading]);
 
   useEffect(() => {
-    if (route === '/driving-improvement') navigateTo('/habit-improvement/driving-improvement', { replace: true });
+    if (route === '/driving-improvement') navigateTo('/habit-improvement', { replace: true });
   }, [route]);
 
   useEffect(() => {

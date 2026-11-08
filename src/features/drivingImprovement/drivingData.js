@@ -16,12 +16,16 @@ const normalizedNode = (node, habitId) => ({
   status: node.status === 'CONFIDENT' ? 'STABLE' : (validStatus(node.status) ? node.status : 'NEEDS_WORK'),
   priority: IMPROVEMENT_PRIORITIES.includes(node.priority) ? node.priority : 'MEDIUM',
   focusNow: node.focusNow === true, sortOrder: Number.isFinite(node.sortOrder) ? node.sortOrder : 0,
+  actionContract: node.actionContract && typeof node.actionContract === 'object' ? structuredClone(node.actionContract) : null,
+  executionHistory: Array.isArray(node.executionHistory) ? structuredClone(node.executionHistory) : [],
+  activeSession: node.activeSession && typeof node.activeSession === 'object' ? structuredClone(node.activeSession) : null,
+  pausedAt: node.pausedAt || null, pausedIntervals: Array.isArray(node.pausedIntervals) ? structuredClone(node.pausedIntervals) : [],
   archivedAt: node.archivedAt || null, createdAt: node.createdAt || new Date(0).toISOString(),
   updatedAt: node.updatedAt || node.createdAt || new Date(0).toISOString(),
 });
 
 export function createInitialHabitData() {
-  return { version: 1, habitVersion: 6, habits: [], nodes: [], categories: [], mistakes: [], reminders: [], guidanceNotes: [], backlogItems: [] };
+  return { version: 1, habitVersion: 7, habits: [], nodes: [], categories: [], mistakes: [], reminders: [], guidanceNotes: [], backlogItems: [] };
 }
 
 export function slugifyHabitName(name) {
@@ -54,7 +58,7 @@ export function promoteBacklogItem(data, itemId, habitName, userId, now = new Da
     const existing = data.habits.find(habit => habit.id === item.promotedHabitId);
     if (!existing || existing.archivedAt || existing.lifecycleState !== 'BACKLOG') throw new Error('The linked Habit Improvement area could not be resumed.');
     const habit = { ...existing, name, description: item.note, lifecycleState: 'ACTIVE', activatedAt: existing.activatedAt || now, backloggedAt: null, updatedAt: now };
-    const next = { ...data, habits: data.habits.map(saved => saved.id === habit.id ? habit : saved), backlogItems: data.backlogItems.map(entry => entry.id === item.id ? { ...entry, state: 'PROMOTED', promotedAt: entry.promotedAt || now, backloggedAt: null, archivedAt: null, updatedAt: now } : entry) };
+    const next = { ...data, nodes: data.nodes.map(node => node.habitId === habit.id && node.pausedAt ? { ...node, pausedIntervals: [...(node.pausedIntervals || []), { start: node.pausedAt.slice(0, 10), end: now.slice(0, 10) }].slice(-100), pausedAt: null, updatedAt: now } : node), habits: data.habits.map(saved => saved.id === habit.id ? habit : saved), backlogItems: data.backlogItems.map(entry => entry.id === item.id ? { ...entry, state: 'PROMOTED', promotedAt: entry.promotedAt || now, backloggedAt: null, archivedAt: null, updatedAt: now } : entry) };
     return { data: validateHabitData(next), habit, changed: true, resumed: true };
   }
   const habit = data.habits.find(entry => !entry.archivedAt && entry.lifecycleState !== 'BACKLOG' && !data.backlogItems.some(link => link.promotedHabitId === entry.id) && entry.name.toLocaleLowerCase() === name.toLocaleLowerCase()) || makeHabitArea({ name, description: item.note }, data.habits, userId, now);
@@ -71,7 +75,7 @@ export function moveHabitToBacklog(data, habitId, now = new Date().toISOString()
   const backlogItem = linked
     ? { ...linked, title: habit.name, note: habit.description || linked.note || '', state: 'BACKLOG', promotedAt: linked.promotedAt || habit.activatedAt || habit.createdAt, backloggedAt: now, archivedAt: null, updatedAt: now }
     : { ...makeBacklogItem({ title: habit.name, note: habit.description }, habit.userId, now), promotedHabitId: habit.id, promotedAt: habit.activatedAt || habit.createdAt, backloggedAt: now };
-  const next = { ...data, habits: data.habits.map(entry => entry.id === habitId ? { ...entry, lifecycleState: 'BACKLOG', backloggedAt: now, updatedAt: now } : entry), backlogItems: linked ? data.backlogItems.map(item => item.id === linked.id ? backlogItem : item) : [...data.backlogItems, backlogItem] };
+  const next = { ...data, nodes: data.nodes.map(node => node.habitId === habitId && node.focusNow && !node.pausedAt ? { ...node, pausedAt: now, updatedAt: now } : node), habits: data.habits.map(entry => entry.id === habitId ? { ...entry, lifecycleState: 'BACKLOG', backloggedAt: now, updatedAt: now } : entry), backlogItems: linked ? data.backlogItems.map(item => item.id === linked.id ? backlogItem : item) : [...data.backlogItems, backlogItem] };
   return validateHabitData(next);
 }
 
@@ -141,7 +145,7 @@ export function migrateHabitData(data, userId) {
   const next = structuredClone(data);
   next.categories ||= []; next.mistakes ||= []; next.habits ||= []; next.reminders ||= []; next.guidanceNotes ||= [];
   next.backlogItems ||= [];
-  let changed = next.habitVersion !== 6 || !Array.isArray(next.nodes) || !Array.isArray(data.backlogItems);
+  let changed = next.habitVersion !== 7 || !Array.isArray(next.nodes) || !Array.isArray(data.backlogItems);
   next.habits = next.habits.map(habit => {
     if (habit.lifecycleState) return habit;
     changed = true;
@@ -176,7 +180,7 @@ export function migrateHabitData(data, userId) {
     next.nodes = next.nodes.map(node => normalizedNode(node, node.habitId || next.categories.find(category => category.id === node.id)?.habitId || next.habits[0]?.id));
   }
   if (next.categories.length || next.mistakes.length) { next.categories = []; next.mistakes = []; changed = true; }
-  if (changed) next.habitVersion = 6;
+  if (changed) next.habitVersion = 7;
   return { data: validateHabitData(next), changed };
 }
 
@@ -216,6 +220,11 @@ export function validateHabitData(data) {
   for (const node of nodes) {
     if (!node || typeof node.id !== 'string' || byId.has(node.id) || !habitIds.has(node.habitId) || (node.parentId !== null && typeof node.parentId !== 'string') || typeof node.title !== 'string' || !node.title.trim() || node.title.length > 160 || !validStatus(node.status) || !IMPROVEMENT_PRIORITIES.includes(node.priority) || typeof node.focusNow !== 'boolean' || !Number.isFinite(node.sortOrder) || (node.archivedAt != null && typeof node.archivedAt !== 'string')) throw new Error('Improvement node data is invalid.');
     for (const key of ['description', 'whyItHappens', 'whatIDoDifferently', 'richNotes']) if (typeof node[key] !== 'string' || node[key].length > (key === 'description' ? 2000 : 20000)) throw new Error('Improvement node content is invalid.');
+    if (node.pausedAt != null && typeof node.pausedAt !== 'string') throw new Error('Habit pause data is invalid.');
+    if (node.pausedIntervals !== undefined && (!Array.isArray(node.pausedIntervals) || node.pausedIntervals.length > 100 || node.pausedIntervals.some(range => !/^\d{4}-\d{2}-\d{2}$/.test(range.start) || !/^\d{4}-\d{2}-\d{2}$/.test(range.end) || range.end < range.start))) throw new Error('Habit pause history is invalid.');
+    if (node.actionContract != null) validateActionContract(node.actionContract);
+    if (node.executionHistory !== undefined && (!Array.isArray(node.executionHistory) || node.executionHistory.length > 2000 || node.executionHistory.some(record => !validExecutionRecord(record)))) throw new Error('Habit execution history is invalid.');
+    if (node.activeSession != null && (typeof node.activeSession.startedAt !== 'string' || typeof node.activeSession.date !== 'string')) throw new Error('Habit active session is invalid.');
     byId.set(node.id, node);
   }
   for (const node of nodes) if (node.parentId !== null) {
@@ -228,6 +237,25 @@ export function validateHabitData(data) {
   if (data.guidanceNotes !== undefined && (!Array.isArray(data.guidanceNotes) || data.guidanceNotes.some(note => typeof note !== 'string' || note.length > 2000))) throw new Error('Archived guidance data is invalid.');
   if (JSON.stringify(data).length > 500000) throw new Error('Habit Improvement data exceeds the supported size.');
   return data;
+}
+
+const OUTCOMES = ['DONE', 'MINIMUM_DONE', 'MISSED', 'SKIPPED'];
+const FAILURE_REASONS = ['Forgot', 'No time', 'Too difficult', 'Wrong timing', 'Environment', 'Low energy', 'Interrupted', 'Other'];
+function validateActionContract(contract) {
+  if (!contract || typeof contract !== 'object' || typeof contract.action !== 'string' || !contract.action.trim() || contract.action.length > 240 || /^(improve|read more|exercise regularly|work harder|focus better|stop procrastinating)$/i.test(contract.action.trim()) || typeof contract.minimum !== 'string' || !contract.minimum.trim() || contract.minimum.length > 240 || contract.minimum.trim().toLocaleLowerCase() === contract.action.trim().toLocaleLowerCase() || typeof contract.trigger !== 'string' || !contract.trigger.trim() || contract.trigger.length > 160) throw new Error('Habit action contract is invalid.');
+  const schedule = contract.schedule || { type: 'DAILY' };
+  if (!['DAILY', 'WEEKDAYS', 'WEEKLY'].includes(schedule.type) || (schedule.type === 'WEEKDAYS' && (!Array.isArray(schedule.days) || !schedule.days.length || schedule.days.some(day => !Number.isInteger(day) || day < 0 || day > 6))) || (schedule.type === 'WEEKLY' && (!Number.isInteger(schedule.target) || schedule.target < 1 || schedule.target > 7))) throw new Error('Habit schedule is invalid.');
+  if (contract.mode !== undefined && !['ADD', 'REPLACEMENT'].includes(contract.mode)) throw new Error('Habit action mode is invalid.');
+  if (contract.mode === 'REPLACEMENT' && (!contract.currentResponse?.trim() || !contract.replacement?.trim())) throw new Error('Replacement habits need both a current and replacement response.');
+  if (contract.triggerType !== undefined && !['AFTER_BEHAVIOR', 'TIME', 'CONTEXT', 'CUSTOM'].includes(contract.triggerType)) throw new Error('Habit trigger type is invalid.');
+  if (contract.triggerTime !== undefined && contract.triggerTime !== '' && (typeof contract.triggerTime !== 'string' || !/^\d{2}:\d{2}$/.test(contract.triggerTime))) throw new Error('Habit trigger time is invalid.');
+  if (contract.useFocusTimer !== undefined && typeof contract.useFocusTimer !== 'boolean') throw new Error('Focus Timer preference is invalid.');
+  for (const key of ['focusMinutes', 'minimumFocusMinutes']) if (contract[key] !== undefined && (!Number.isInteger(contract[key]) || contract[key] < 1 || contract[key] > 240)) throw new Error('Focus duration must be between 1 and 240 minutes.');
+  for (const key of ['location', 'obstacle', 'environment', 'currentResponse', 'replacement', 'mode']) if (contract[key] !== undefined && (typeof contract[key] !== 'string' || contract[key].length > 240)) throw new Error('Habit action contract is invalid.');
+  return true;
+}
+function validExecutionRecord(record) {
+  return Boolean(record && typeof record.id === 'string' && typeof record.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(record.date) && OUTCOMES.includes(record.outcome) && (record.reason == null || FAILURE_REASONS.includes(record.reason) || (typeof record.reason === 'string' && record.reason.length <= 120)) && (record.contract == null || typeof record.contract === 'object') && (record.focusSessionId == null || typeof record.focusSessionId === 'string'));
 }
 
 export function makeImprovementNode(input, userId, now = new Date().toISOString()) {

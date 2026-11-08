@@ -146,7 +146,7 @@ test('older Habit Improvement backup schema upgrades its flat records to recursi
   backup.integrity.digest = await digest(backup.data);
   const parsed = await parseBackupFile(await asFile(backup));
   const module = parsed.modules[0];
-  assert.equal(module.schemaVersion, 5);
+  assert.equal(module.schemaVersion, 6);
   assert.equal(module.displayName, 'Habit Improvement');
   assert.equal(module.data.workspace.data.categories.length, 0);
   assert.equal(module.data.workspace.data.nodes[0].title, 'Roundabouts');
@@ -170,8 +170,8 @@ test('Habit Improvement backups preserve backlog promotion linkage and remap its
 test('Habit Improvement archive backups round-trip lifecycle, hierarchy and content without regenerating IDs', async () => {
   const archivedAt = '2026-11-05T12:00:00.000Z';
   const habit = { id: 'habit-sleep', userId: 'old-account', name: 'Sleep Improvement', slug: 'sleep-improvement', description: 'Evening routine', lifecycleState: 'BACKLOG', backloggedAt: '2026-11-01T00:00:00.000Z', archivedAt, createdAt: '2026-10-20T00:00:00.000Z', updatedAt: archivedAt };
-  const root = { id: 'node-evening', userId: 'old-account', habitId: habit.id, parentId: null, title: 'Evening routine', description: 'Slow down', whyItHappens: '<p>Late screens</p>', whatIDoDifferently: '<ul><li>Read</li></ul>', richNotes: '<p>Keep the phone away.</p>', status: 'IMPROVING', priority: 'HIGH', focusNow: true, sortOrder: 2, archivedAt, createdAt: '2026-10-21T00:00:00.000Z', updatedAt: archivedAt };
-  const child = { id: 'node-phone', userId: 'old-account', habitId: habit.id, parentId: root.id, title: 'Put phone away', description: '', whyItHappens: '', whatIDoDifferently: '', richNotes: '<p>Charge outside bedroom.</p>', status: 'STABLE', priority: 'LOW', focusNow: false, sortOrder: 0, archivedAt, createdAt: '2026-10-22T00:00:00.000Z', updatedAt: archivedAt };
+  const root = { id: 'node-evening', userId: 'old-account', habitId: habit.id, parentId: null, title: 'Evening routine', description: 'Slow down', whyItHappens: '<p>Late screens</p>', whatIDoDifferently: '<ul><li>Read</li></ul>', richNotes: '<p>Keep the phone away.</p>', status: 'IMPROVING', priority: 'HIGH', focusNow: true, sortOrder: 2, actionContract: { action: 'Read for 10 minutes', minimum: 'Read one page', trigger: 'After breakfast', triggerType: 'AFTER_BEHAVIOR', triggerTime: '', schedule: { type: 'WEEKDAYS', days: [1, 3, 5] }, location: 'Desk', obstacle: 'Phone', environment: 'Leave phone outside', mode: 'ADD', currentResponse: '', replacement: '', createdAt: '2026-10-21T00:00:00.000Z', version: 1 }, executionHistory: [{ id: 'record-1', date: '2026-11-02', outcome: 'MINIMUM_DONE', reason: null, recordedAt: '2026-11-02T08:00:00.000Z', startedAt: '2026-11-02T07:55:00.000Z', contract: { action: 'Read for 10 minutes', minimum: 'Read one page', trigger: 'After breakfast', schedule: { type: 'WEEKDAYS', days: [1, 3, 5] } } }], activeSession: null, pausedAt: null, pausedIntervals: [], archivedAt, createdAt: '2026-10-21T00:00:00.000Z', updatedAt: archivedAt };
+  const child = { id: 'node-phone', userId: 'old-account', habitId: habit.id, parentId: root.id, title: 'Put phone away', description: '', whyItHappens: '', whatIDoDifferently: '', richNotes: '<p>Charge outside bedroom.</p>', status: 'STABLE', priority: 'LOW', focusNow: false, sortOrder: 0, actionContract: null, executionHistory: [], activeSession: null, pausedAt: null, pausedIntervals: [], archivedAt, createdAt: '2026-10-22T00:00:00.000Z', updatedAt: archivedAt };
   const idea = { id: 'idea-sleep', userId: 'old-account', title: habit.name, note: habit.description, type: null, priority: null, state: 'ARCHIVED', promotedHabitId: habit.id, promotedAt: '2026-10-20T00:00:00.000Z', backloggedAt: habit.backloggedAt, archivedAt, createdAt: '2026-10-20T00:00:00.000Z', updatedAt: archivedAt };
   const client = new FinanceMemoryClient();
   client.rows = [{ user_id: 'old-account', data: { version: 1, habitVersion: 6, habits: [habit], nodes: [root, child], categories: [], mistakes: [], reminders: [], guidanceNotes: [], backlogItems: [idea] }, revision: 6, updated_at: archivedAt }];
@@ -182,6 +182,9 @@ test('Habit Improvement archive backups round-trip lifecycle, hierarchy and cont
   const restored = client.rows[0].data;
   assert.deepEqual(restored.habits.map(({ userId, ...record }) => record), [(({ userId, ...record }) => record)(habit)]);
   assert.deepEqual(restored.nodes.map(({ userId, ...record }) => record), [(({ userId, ...record }) => record)(root), (({ userId, ...record }) => record)(child)]);
+  assert.equal(restored.nodes[0].actionContract.schedule.type, 'WEEKDAYS');
+  assert.equal(restored.nodes[0].executionHistory[0].outcome, 'MINIMUM_DONE');
+  assert.equal(restored.nodes[0].executionHistory[0].contract.action, 'Read for 10 minutes');
   assert.equal(restored.backlogItems[0].id, idea.id);
   assert.equal(restored.backlogItems[0].state, 'ARCHIVED');
   assert.equal(restored.backlogItems[0].promotedHabitId, habit.id);

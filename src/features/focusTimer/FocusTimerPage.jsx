@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { navigateTo } from '../../app/useRoute.js';
+import { useAuth } from '../../contexts/AuthContext.jsx';
 import { AppNavigation } from '../../components/layout/AppNavigation';
 import { PageShell } from '../../components/layout/PageShell';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
@@ -68,7 +70,7 @@ function notifyUser(title, body) {
   }
 }
 
-function FocusCompleteModal({ isOpen, session, onStartBreak, onSkipBreak, onFinishSession, onClose }) {
+function FocusCompleteModal({ isOpen, session, onStartBreak, onSkipBreak, onFinishSession, onClose, habitContext = null }) {
   if (!isOpen || !session) {
     return null;
   }
@@ -95,6 +97,7 @@ function FocusCompleteModal({ isOpen, session, onStartBreak, onSkipBreak, onFini
         <p className="mt-3 text-sm font-semibold leading-6 text-[var(--color-text-secondary)]">
           {session.title} is ready to close out or move into a break.
         </p>
+        {habitContext && <p className="mt-3 text-sm font-semibold text-[var(--color-text-secondary)]">Habit: {habitContext.habitTitle} · {habitContext.focusMinutes} min session</p>}
         <div className="mt-6 grid gap-3 sm:grid-cols-3">
           <button
             type="button"
@@ -254,7 +257,11 @@ function activeSessionSort(session) {
 
 export function FocusTimerPage() {
   const { confirm, dialog } = useConfirmDialog();
+  const { user } = useAuth();
   const [sessions, setSessions] = useState([]);
+  const [habitLaunch, setHabitLaunch] = useState(null);
+  const [habitLaunchConflict, setHabitLaunchConflict] = useState(false);
+  const launchHandled = useRef(false);
   const [activeSession, setActiveSession] = useState(null);
   const [breakTasksBySessionId, setBreakTasksBySessionId] = useState({});
   const [remainingSeconds, setRemainingSeconds] = useState(0);
@@ -293,12 +300,56 @@ export function FocusTimerPage() {
       ]);
       const taskMap = await getBreakTasksForSessions(savedSessions.map((session) => session.id));
 
-      setSessions(savedSessions);
-      setActiveSession(savedActiveSession);
-      setBreakTasksBySessionId(taskMap);
-      if (savedActiveSession?.status === focusSessionStatuses.focusComplete) {
-        setShowFocusCompleteModal(true);
+      let launch = null;
+      try { launch = JSON.parse(sessionStorage.getItem('cboard:habit-focus-launch') || 'null'); } catch {}
+      let nextSessions = savedSessions;
+      let nextActiveSession = savedActiveSession;
+      if (launch?.requestId && launch.userId === user?.id) {
+        const marker = `[habit-run:${launch.requestId}]`;
+        let linked = savedSessions.find(session => session.intention?.includes(marker));
+        if (linked) {
+          launch = { ...launch, focusSessionId: linked.id };
+          try { sessionStorage.setItem('cboard:habit-focus-launch', JSON.stringify(launch)); } catch {}
+          if (savedActiveSession && savedActiveSession.id !== linked.id) {
+            nextActiveSession = savedActiveSession;
+            setHabitLaunchConflict(true);
+          } else if (savedActiveSession?.id === linked.id) nextActiveSession = linked;
+          else if (linked.status === focusSessionStatuses.completed || linked.status === focusSessionStatuses.cancelled) {
+            setHabitLaunch(launch);
+            try { sessionStorage.setItem('cboard:habit-focus-return', JSON.stringify({ ...launch, status: linked.status === focusSessionStatuses.completed ? 'COMPLETED' : 'CANCELLED' })); } catch {}
+            setSessions(savedSessions);
+            setActiveSession(null);
+            setBreakTasksBySessionId(taskMap);
+            setIsLoading(false);
+            navigateTo(launch.returnTo || '/habit-improvement');
+            return;
+          }
+        } else if (savedActiveSession) {
+          setHabitLaunch(launch);
+          setHabitLaunchConflict(true);
+        } else if (!launchHandled.current) {
+          launchHandled.current = true;
+          linked = await createFocusSession({
+            title: launch.habitTitle,
+            focusMinutes: launch.focusMinutes,
+            breakMinutes: 0,
+            taskDetails: launch.action,
+            intention: `${marker} ${launch.minimumMode ? 'Minimum action' : 'Standard action'}: ${launch.action}`,
+            breakTasks: [],
+          });
+          launch = { ...launch, focusSessionId: linked.id };
+          try { sessionStorage.setItem('cboard:habit-focus-launch', JSON.stringify(launch)); } catch {}
+          nextSessions = [linked, ...savedSessions];
+          nextActiveSession = linked;
+        }
+        setHabitLaunch(launch);
+      } else if (launch) {
+        try { sessionStorage.removeItem('cboard:habit-focus-launch'); } catch {}
       }
+      setSessions(nextSessions);
+      setActiveSession(nextActiveSession);
+      setBreakTasksBySessionId(taskMap);
+      if (nextActiveSession?.status === focusSessionStatuses.focusComplete) setShowFocusCompleteModal(true);
     } catch (loadError) {
       setError('Could not load focus sessions. Apply the Supabase focus schema and refresh.');
     } finally {
@@ -392,6 +443,32 @@ export function FocusTimerPage() {
     }
   }
 
+  function returnToHabit(status) {
+    if (!habitLaunch) return false;
+    const result = { ...habitLaunch, status, focusSessionId: activeSession?.id || habitLaunch.focusSessionId || null, endedAt: new Date().toISOString() };
+    try { sessionStorage.setItem('cboard:habit-focus-return', JSON.stringify(result)); } catch {}
+    navigateTo(habitLaunch.returnTo || '/habit-improvement');
+    return true;
+  }
+
+  async function replaceWithHabitSession() {
+    if (!activeSession || !habitLaunch) return;
+    const next = await cancelFocusSession(activeSession.id);
+    mergeSession(next);
+    setActiveSession(null);
+    setHabitLaunchConflict(false);
+    launchHandled.current = false;
+    setIsLoading(true);
+    await loadFocusData();
+  }
+
+  function keepCurrentTimer() {
+    try { sessionStorage.removeItem('cboard:habit-focus-launch'); } catch {}
+    setHabitLaunch(null);
+    setHabitLaunchConflict(false);
+    navigateTo('/habit-improvement');
+  }
+
   async function handlePause() {
     if (!activeSession) {
       return;
@@ -446,6 +523,7 @@ export function FocusTimerPage() {
     setActiveSession(null);
     mergeSession(nextSession);
     setShowFocusCompleteModal(false);
+    if (habitLaunch) returnToHabit('CANCELLED');
   }
 
   async function handleCompleteFocus(fromTimer = false) {
@@ -525,6 +603,7 @@ export function FocusTimerPage() {
     setActiveSession(null);
     mergeSession(nextSession);
     setShowFocusCompleteModal(false);
+    if (habitLaunch) { returnToHabit('COMPLETED'); return; }
     setReflectionSession(nextSession);
   }
 
@@ -632,6 +711,8 @@ export function FocusTimerPage() {
         </p>
 
         <RemindersPanel />
+        {habitLaunch && <div className="ui-card mt-5 p-4" aria-live="polite"><p className="ui-eyebrow">Habit session</p><strong>{habitLaunch.habitTitle}</strong><p className="mt-1 text-sm text-[var(--color-text-secondary)]">{habitLaunch.action} · {habitLaunch.focusMinutes} minutes{habitLaunch.minimumMode ? ' · minimum version' : ''}</p></div>}
+        {habitLaunchConflict && <section className="ui-card mt-5 grid gap-3 p-4" role="alert"><h2 className="font-bold">A focus session is already running.</h2><p className="text-sm text-[var(--color-text-secondary)]">Choose whether to keep it or end it before starting {habitLaunch?.habitTitle}.</p><div className="flex flex-wrap gap-2"><button type="button" className="ui-button" onClick={keepCurrentTimer}>Return to current session</button><button type="button" className="ui-button ui-button--danger" onClick={replaceWithHabitSession}>End current and start this habit</button><button type="button" className="ui-button" onClick={keepCurrentTimer}>Cancel</button></div></section>}
 
         {error ? (
           <p className="ui-badge ui-badge--danger mt-5 block rounded-[var(--radius-md)] px-4 py-3 text-sm">
@@ -690,6 +771,7 @@ export function FocusTimerPage() {
         onSkipBreak={handleSkipBreak}
         onFinishSession={handleFinishSession}
         onClose={() => setShowFocusCompleteModal(false)}
+        habitContext={habitLaunch}
       />
       <ReflectionModal
         isOpen={Boolean(reflectionSession)}
