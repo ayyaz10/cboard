@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { linkRecipeInventory, reconcileInventory } from './inventory.js';
 import { foodItem, recipeItems, validateDay } from '../diary/diaryData.js';
 import { validateRecipe } from '../recipes/recipeData.js';
-import { removeGroceryItems, addItems, purchase, normalizeGroceryState } from './groceryData.js';
+import { removeGroceryItems, addItems, purchase, normalizeGroceryState, ingredientKey } from './groceryData.js';
 const stock = () => ({ items: [{ id: 'chicken', name: 'Chicken', quantity: 1000, unit: 'g' }], settings: {}, shopping: [] });
 const recipe = (slug = 'chicken-rice') => validateRecipe({ slug, title: slug, mealType: 'Lunch', servings: 2, ingredients: [{ name: 'Chicken', amount: 300, unit: 'g', nutrition: { calories: 330, protein: 60, salt: 1, sugars: 2 } }], steps: ['Cook'], nutritionFromIngredients: true });
 const day = items => ({ date: '2026-09-29', meals: [{ id: 'meal', meal: 'Lunch', title: 'Lunch', items }], skipped: [], complete: false });
@@ -292,4 +292,22 @@ test('shared product barcodes link differently named ingredients to the same sto
   const state=linkRecipeInventory(empty,[a,b]);
   assert.equal(state.items.length,1);
   assert.equal(new Set(Object.values(state.ingredientLinks)).size,1);
+});
+
+
+test('explicitly unlinked recipe ingredients stay unlinked across grocery reloads and can be relinked', () => {
+  const r = recipe();
+  const key = ingredientKey(r, r.ingredients[0], 0);
+  const linked = linkRecipeInventory(stock(), [r]);
+  assert.equal(linked.ingredientLinks[key], 'chicken');
+  delete linked.ingredientLinks[key];
+  linked.unlinkedIngredients = [key];
+  const reloaded = linkRecipeInventory(normalizeGroceryState(JSON.parse(JSON.stringify(linked))), [r]);
+  assert.equal(reloaded.ingredientLinks[key], undefined);
+  assert.deepEqual(reloaded.unlinkedRecipeIngredients, [{ key, recipeTitle: r.title, ingredientName: 'Chicken', unit: 'g' }]);
+  assert.deepEqual(reloaded.items[0].recipeRefs, []);
+  reloaded.unlinkedIngredients = [];
+  const relinked = linkRecipeInventory(normalizeGroceryState(JSON.parse(JSON.stringify(reloaded))), [r]);
+  assert.equal(relinked.ingredientLinks[key], 'chicken');
+  assert.deepEqual(relinked.unlinkedRecipeIngredients, []);
 });

@@ -8,6 +8,7 @@ import { AppNavigation } from "../../components/layout/AppNavigation";
 import { readGroceryImage, resizeGroceryImage } from "./groceryImage";
 import { groceryImage } from "../../services/groceryService";
 import { useGroceries } from "./useGroceries";
+import { filterGroceryItems, isGroceryCategoryExpanded, summarizeCategoryStock } from "./groceryView.js";
 import {
   validateNutrition,
   nutrients,
@@ -180,7 +181,12 @@ export function Groceries() {
     [query, setQuery] = useState(""),
     [category, setCategory] = useState("All"),
     [status, setStatus] = useState("All"),
-    [recipeUsage, setRecipeUsage] = useState("all");
+    [recipeUsage, setRecipeUsage] = useState("all"),
+    [shoppingFilter, setShoppingFilter] = useState("all"),
+    [sort, setSort] = useState("category"),
+    [filtersOpen, setFiltersOpen] = useState(false),
+    [expandedCategories, setExpandedCategories] = useState({}),
+    [showAllAlerts, setShowAllAlerts] = useState(false);
   const groceryTabs = [["stock", "My Groceries"], ["shop", "Shopping List"], ["unused", "Unused recipe ingredients"], ["links", "Ingredient links"], ["wishlist", "Wishlist"]];
   const [selected, setSelected] = useState([]),
     [modal, setModal] = useState(null),
@@ -341,13 +347,9 @@ export function Groceries() {
   const estimate = shoppingEstimate(data?.shopping || []);
   const stockItems = data ? data.items.filter(item => !item.recipeOnly && !item.removed && !item.trackingDisabled) : [];
   const list = data ? (tab === "stock" ? stockItems : data.shopping) : [];
-  const filtered = list.filter(
-    (i) =>
-      i.name.toLowerCase().includes(query.toLowerCase()) &&
-      (category === "All" || i.category === category) &&
-      (tab !== "stock" || recipeUsage === "all" || (recipeUsage === "used" ? Boolean(i.recipeRefs?.length) : !i.recipeRefs?.length)) &&
-      (tab !== "stock" || status === "All" || (status === "Needs attention" ? ["Low stock", "Out of stock"].includes(stockStatus(i)) : stockStatus(i) === status)),
-  );
+  const filtered = filterGroceryItems(list, { query, category, status, recipeUsage, shoppingFilter, shopping: data?.shopping || [], sort, tab, categoryNames });
+  const activeFilters = Boolean(query.trim()) || category !== "All" || status !== "All" || recipeUsage !== "all" || shoppingFilter !== "all";
+  const visibleCategoryNames = sort === 'category' ? categoryNames : [...new Set(filtered.map(item => item.category))].sort((a, b) => filtered.findIndex(item => item.category === a) - filtered.findIndex(item => item.category === b));
   function beginBuy(items) {
     setBuy(items.map((i) => ({ ...i, currentQuantity: "" })));
     setModal("buy");
@@ -393,9 +395,8 @@ export function Groceries() {
         <AppNavigation activePath="/groceries" />
         <header className="g-between g-header">
           <div>
-            <span className="g-eyebrow">YOUR EVERYDAY KITCHEN</span>
-            <h1>Groceries, sorted.</h1>
-            <p>What you have. What’s running low. What’s next.</p>
+            <h1>Groceries</h1>
+            <p>Stock, shopping and recipe ingredients.</p>
           </div>
           <button
             className="g-primary"
@@ -428,7 +429,7 @@ export function Groceries() {
                     onClick={() => {
                       setTab(label === "Shopping list" ? "shop" : "stock");
                       setStatus(label === "Shopping list" ? "All" : label);
-                      setQuery(""); setCategory("All"); setRecipeUsage("all");
+                      setQuery(""); setCategory("All"); setRecipeUsage("all"); setShoppingFilter('all');
                       setSelected([]);
                     }}
                   >
@@ -443,13 +444,19 @@ export function Groceries() {
                 ),
               )}
             </div>
-            <p className="g-attention-summary"><strong>Needs attention:</strong> {stockItems.filter(i => stockStatus(i) === 'Out of stock').length} out of stock · {stockItems.filter(i => stockStatus(i) === 'Low stock').length} low stock</p>
-            {data.stockAlerts?.length > 0 && <section className="g-stock-alerts" aria-label="Grocery stock alerts">
-              <div className="g-between"><h2>Stock alerts</h2><button type="button" onClick={() => change(s => { s.stockAlerts = s.stockAlerts.map(alert => ({ ...alert, read: true })); return s; }, 'Alerts marked as read', false)}>Mark all read</button></div>
-              {data.stockAlerts.slice(0, 5).map(alert => <div key={alert.id} className={`g-stock-alert ${alert.type === 'out' ? 'is-out' : 'is-low'}${alert.read ? ' is-read' : ''}`}>
+            <details className="g-attention-summary">
+              <summary><strong>Needs attention</strong> - {stockItems.filter(i => ['Out of stock', 'Low stock'].includes(stockStatus(i))).length} items</summary>
+              <div>{stockItems.filter(i => ['Out of stock', 'Low stock'].includes(stockStatus(i))).slice(0, 3).map(item => <div className="g-attention-item" key={item.id}><span>{item.name}</span><span>{stockStatus(item)}</span></div>)}
+                {stockItems.some(i => ['Out of stock', 'Low stock'].includes(stockStatus(i))) && <button type="button" onClick={() => { setTab('stock'); setStatus('Needs attention'); setQuery(''); setCategory('All'); setRecipeUsage('all'); }}>View all attention items</button>}
+                {!stockItems.some(i => ['Out of stock', 'Low stock'].includes(stockStatus(i))) && <p>All tracked items are stocked.</p>}
+              </div>
+            </details>
+            {data.stockAlerts?.length > 0 && <section className="g-stock-alerts" aria-label="Recent stock alerts">
+              <div className="g-between"><h2>Recent stock alerts</h2><div><button type="button" onClick={() => setShowAllAlerts(value => !value)}>{showAllAlerts ? 'Show less' : 'View all'}</button> <button type="button" onClick={() => change(s => { s.stockAlerts = s.stockAlerts.map(alert => ({ ...alert, read: true })); return s; }, 'Alerts marked as read', false)}>Mark read</button></div></div>
+              {(showAllAlerts ? data.stockAlerts : data.stockAlerts.slice(0, 2)).map(alert => <div key={alert.id} className={`g-stock-alert ${alert.type === 'out' ? 'is-out' : 'is-low'}${alert.read ? ' is-read' : ''}`}>
                 <span>{alert.title}{alert.items?.length > 1 && <small className="g-alert-items">{alert.items.map(item => `${item.name} · ${item.quantity} ${item.unit}`).join('  /  ')}</small>}</span><button type="button" onClick={() => {
                   const firstId = alert.itemIds?.[0]; const item = data.items.find(candidate => candidate.id === firstId);
-                  setTab('stock'); setCategory('All'); setRecipeUsage('all'); setStatus(alert.type === 'out' ? 'Out of stock' : 'Low stock');
+                  setTab('stock'); setCategory('All'); setRecipeUsage('all'); setShoppingFilter('all'); setStatus(alert.type === 'out' ? 'Out of stock' : 'Low stock');
                   if (item) { setQuery(item.name); requestAnimationFrame(() => document.getElementById(`grocery-${item.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })); }
                   change(s => { s.stockAlerts = s.stockAlerts.map(saved => saved.id === alert.id ? { ...saved, read: true } : saved); return s; }, 'Alert opened', false);
                 }}>View item</button>
@@ -478,56 +485,20 @@ export function Groceries() {
             <InventoryExtras data={data} change={change} busy={busy} section={tab} />
             {tab !== 'stock' && tab !== 'shop' && <div className="g-between"><p role="status">{busy ? 'Saving...' : notice}</p>{undo && <button disabled={busy} onClick={undo}>Undo</button>}</div>}
             {(tab === 'stock' || tab === 'shop') && <>
-            <div className="g-tools">
-              <input
-                ref={search}
-                aria-label="Search groceries"
-                placeholder="Search your groceries…  /"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-              <select
-                aria-label="Category filter"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-              >
-                <option>All</option>
-                {categoryNames.map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
-              {tab === "stock" && (
-                <label className="g-recipe-usage-filter">Recipe usage
-                  <select
-                    aria-label="Recipe usage filter"
-                    value={recipeUsage}
-                    onChange={(e) => { setRecipeUsage(e.target.value); setSelected([]); }}
-                  >
-                    <option value="all">All items</option>
-                    <option value="used">Used in recipes</option>
-                    <option value="unused">Not used in recipes</option>
-                  </select>
-                </label>
-              )}
-              {tab === "stock" && (
-                <select
-                  aria-label="Stock filter"
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                >
-                  {[
-                    "All",
-                    "Needs attention",
-                    "In stock",
-                    "Low stock",
-                    "Out of stock",
-                    "Unknown",
-                  ].map((s) => (
-                    <option key={s}>{s}</option>
-                  ))}
-                </select>
-              )}
+            <div className="g-search-toolbar">
+              <input ref={search} aria-label="Search groceries" placeholder="Search groceries...  /" value={query} onChange={event => setQuery(event.target.value)} />
+              <button type="button" className="g-filter-trigger" aria-expanded={filtersOpen} onClick={() => setFiltersOpen(value => !value)}>Filters{activeFilters ? ` (${[query.trim(), category !== 'All', status !== 'All', recipeUsage !== 'all', shoppingFilter !== 'all'].filter(Boolean).length})` : ''}</button>
+              <label className="g-sort-control">Sort<select aria-label="Sort groceries" value={sort} onChange={event => setSort(event.target.value)}><option value="category">Category</option><option value="name">Name</option><option value="stock">Stock status</option><option value="lowest">Lowest stock</option></select></label>
             </div>
+            {filtersOpen && <div className="g-filter-panel" aria-label="Grocery filters">
+              <label>Category<select aria-label="Category filter" value={category} onChange={event => setCategory(event.target.value)}><option>All</option>{categoryNames.map(value => <option key={value}>{value}</option>)}</select></label>
+              {tab === 'stock' && <>
+                <label>Shopping<select aria-label="Shopping list filter" value={shoppingFilter} onChange={event => setShoppingFilter(event.target.value)}><option value="all">All groceries</option><option value="on">On shopping list</option><option value="off">Not on shopping list</option></select></label>
+                <label>Stock<select aria-label="Stock filter" value={status} onChange={event => setStatus(event.target.value)}>{['All','Needs attention','In stock','Low stock','Out of stock','Unknown'].map(value => <option key={value}>{value}</option>)}</select></label>
+                <label>Recipe usage<select aria-label="Recipe usage filter" value={recipeUsage} onChange={event => { setRecipeUsage(event.target.value); setSelected([]); }}><option value="all">All items</option><option value="used">Used in recipes</option><option value="unused">Not used in recipes</option></select></label>
+              </>}
+              {activeFilters && <button type="button" onClick={() => { setQuery(''); setCategory('All'); setStatus('All'); setRecipeUsage('all'); setShoppingFilter('all'); }}>Clear filters</button>}
+            </div>}
             {tab === 'stock' && <p className="g-hint" role="status">Showing {filtered.length} of {list.length} groceries. Recipe usage is based on links to saved recipe ingredients and sauces.</p>}
             <div className="g-between">
               <label className="g-check">
@@ -673,13 +644,16 @@ export function Groceries() {
               <legend className="sr-only">
                 {tab === "stock" ? "Grocery inventory" : "Shopping items"}
               </legend>
-              {categoryNames.map((c) => {
+              {visibleCategoryNames.map((c) => {
                 const rows = filtered.filter((i) => i.category === c);
                 return rows.length ? (
                   <section key={c} className="g-group">
-                    <h2>
-                      {categoryIcon(c)} {c} <small>{rows.length}</small>
-                    </h2>
+                    <button type="button" className="g-category-toggle" aria-expanded={isGroceryCategoryExpanded(expandedCategories, c, activeFilters)} aria-controls={`g-category-${encodeURIComponent(c)}`} onClick={() => setExpandedCategories(current => ({ ...current, [c]: !isGroceryCategoryExpanded(current, c, activeFilters) }))}>
+                      <span className="g-category-title">{categoryIcon(c)} {c}</span>
+                      <small>{rows.length} {rows.length === 1 ? 'item' : 'items'}{tab === 'stock' && (() => { const summary = summarizeCategoryStock(rows); return summary.out || summary.low ? ` - ${summary.out} out / ${summary.low} low` : ''; })()}</small>
+                      <span className="g-category-chevron" aria-hidden="true">{isGroceryCategoryExpanded(expandedCategories, c, activeFilters) ? '-' : '+'}</span>
+                    </button>
+                    {isGroceryCategoryExpanded(expandedCategories, c, activeFilters) && <div className="g-category-items" id={`g-category-${encodeURIComponent(c)}`}>
                     {rows.map((item) => (
                       <div key={item.id} id={`grocery-${item.id}`} className={`g-row ${tab === 'stock' ? `is-${stockStatus(item).toLowerCase().replaceAll(' ', '-')}` : ''}`}>
                         <input
@@ -714,15 +688,6 @@ export function Groceries() {
                               ? ` · ${item.location}`
                               : ""}
                           </small>
-                          {tab === "stock" && <div className="g-item-tracking">
-                            <label className="g-check">
-                              <input type="checkbox" checked={!item.stockTrackingPaused}
-                                aria-label={`Automatic stock tracking for ${item.name}`}
-                                onChange={event => patch(item.id, { stockTrackingPaused: !event.target.checked })} />
-                              Auto stock: {item.stockTrackingPaused ? 'Off' : 'On'}
-                            </label>
-                            {data.settings.stockTrackingPaused && !item.stockTrackingPaused && <small>Paused by the global setting</small>}
-                          </div>}
                           {tab === "stock" &&
                             data.settings.expiryReminders &&
                             item.expiry && (
@@ -737,10 +702,7 @@ export function Groceries() {
                                 Best before {item.expiry}
                               </small>
                             )}
-                          <small>
-                            {item.estimatedPrice == null ? "Estimated price not set" :
-                              `${money(item.estimatedPrice)} per ${item.priceQuantity} ${item.unit}${tab === "shop" && estimatedCost(item) != null ? ` ? Est. ${money(estimatedCost(item))}` : ""}`}
-                          </small>
+                          {item.estimatedPrice != null && <small>{money(item.estimatedPrice)} per {item.priceQuantity} {item.unit}{tab === "shop" && estimatedCost(item) != null ? ` - Est. ${money(estimatedCost(item))}` : ""}</small>}
                           {imageJobs[item.id] && (
                             <small>{imageJobs[item.id]}</small>
                           )}
@@ -796,34 +758,26 @@ export function Groceries() {
                           )}
                         </div>
                         <div className="g-row-actions">
-                          {tab === "stock" ? (
-                            <>
-                              <button
-                                aria-label={`Add ${item.name} to shopping list`}
-                                onClick={() => toShop([item])}
-                              >
-                                ＋ List
-                              </button>
-                              <button
-                                aria-label={`Edit ${item.name}`}
-                                onClick={() => {
-                                  setEdit({
-                                    ...item,
-                                    image: groceryImageFor(data, item.name),
-                                  });
-                                  setModal("edit");
-                                }}
-                              >
-                                Edit
-                              </button>
-                              <button className="danger-action" aria-label={`Delete ${item.name} from Groceries`} onClick={() => { setDeleteTarget({ ...item, fromShopping: false }); setModal('delete'); }}>Delete</button>
-                            </>
-                          ) : (
-                            <><button onClick={() => beginBuy([item])}>✓ Bought</button><button className="danger-action" aria-label={`Delete ${item.name} from Shopping List`} onClick={() => { setDeleteTarget({ ...item, fromShopping: true }); setModal('delete'); }}>Delete</button></>
-                          )}
+                          {tab === 'shop' && <button type="button" onClick={() => beginBuy([item])}>Bought</button>}
+                          <details className="g-overflow">
+                            <summary aria-label={`More actions for ${item.name}`} title="More actions">{"\u2022\u2022\u2022"}</summary>
+                            <div>
+                              {tab === 'stock' ? <>
+                                <button type="button" onClick={() => toShop([item])}>Add to shopping list</button>
+                                <button type="button" onClick={() => { setEdit({ ...item, image: groceryImageFor(data, item.name) }); setModal('edit'); }}>Edit item</button>
+                                <label><input type="checkbox" checked={!item.stockTrackingPaused} aria-label={`Automatic stock tracking for ${item.name}`} onChange={event => patch(item.id, { stockTrackingPaused: !event.target.checked })} /> Auto-stock {item.stockTrackingPaused ? 'off' : 'on'}</label>
+                                {data.settings.stockTrackingPaused && !item.stockTrackingPaused && <small>Paused by the global setting</small>}
+                                <button type="button" className="danger-action" onClick={() => { setDeleteTarget({ ...item, fromShopping: false }); setModal('delete'); }}>Delete item</button>
+                              </> : <>
+                                <button type="button" onClick={() => { setEdit({ ...item, image: groceryImageFor(data, item.name) }); setModal('editShop'); }}>Edit quantity</button>
+                                <button type="button" className="danger-action" onClick={() => { setDeleteTarget({ ...item, fromShopping: true }); setModal('delete'); }}>Remove from list</button>
+                              </>}
+                            </div>
+                          </details>
                         </div>
                       </div>
                     ))}
+                    </div>}
                   </section>
                 ) : null;
               })}
@@ -832,16 +786,10 @@ export function Groceries() {
               <div className="g-empty">
                 <span>🛒</span>
                 <h2>
-                  {query || category !== "All" || status !== "All"
-                    ? "No matching items"
-                    : tab === "shop"
-                      ? "Your shopping list is clear"
-                      : "Make room for something good"}
+                  {tab === 'shop' && !query && category === 'All' ? "Your shopping list is clear" : status === 'Low stock' ? 'No low-stock groceries' : status === 'Out of stock' ? 'No out-of-stock groceries' : activeFilters ? 'No matching items' : 'No groceries yet'}
                 </h2>
                 <p>
-                  {tab === "shop"
-                    ? "Add what you need, or bring over your low-stock items."
-                    : "Add your first grocery or adjust your filters."}
+                  {tab === 'shop' && !query && category === 'All' ? "Add items to your list or bring over low-stock groceries." : status === 'Low stock' ? "Nothing needs a low-stock restock right now." : status === 'Out of stock' ? "Your tracked items are not out of stock." : activeFilters ? "Try another search or clear the active filters." : "Add your first grocery to start tracking stock."}
                 </p>
                 <button onClick={openAdd}>＋ Add an item</button>
               </div>

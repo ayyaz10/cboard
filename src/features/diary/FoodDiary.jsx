@@ -117,8 +117,11 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
   const [routine, setRoutine] = useState(null);
   const [selected, setSelected] = useState([]);
   const [pastOpen, setPastOpen] = useState(false);
-  const [confirmPastCopy, setConfirmPastCopy] = useState(false);
-  const [pastSelected, setPastSelected] = useState([]);
+  const [pastSelected, setPastSelected] = useState(null);
+  const [copyingMeal, setCopyingMeal] = useState(false);
+  const [expandedMeals, setExpandedMeals] = useState({});
+  const [postCopyEdit, setPostCopyEdit] = useState(null);
+  const mealSectionRefs = useRef({});
   const [pastSearch, setPastSearch] = useState("");
   const [month, setMonth] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -447,7 +450,7 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
       if (foodsToReview.length) notify.warning(`Meal saved. ${foodsToReview.length} food${foodsToReview.length === 1 ? '' : 's'} in this meal may match existing foods; review them in All Food Items when convenient.`);
       if (saved.inventoryWarnings?.length) notify.warning([...new Set(saved.inventoryWarnings)].join(' '));
       logMealSave('complete', { dayId: saved.date });
-      return true;
+      return saved;
     } catch (err) {
       logMealSave('error', { stage, dayId: next.date, error: err?.message || 'unknown' });
       if (id === generation.current) {
@@ -481,14 +484,14 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
   function selectDate(next, scroll = false) {
     if (validDate(next) && next <= today) {
       setDate(next);
+      setExpandedMeals({});
       const url = new URL(window.location.href);
       url.searchParams.set('date', next);
       window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
       setError("");
       setRemoveDay(null);
       setPastOpen(false);
-      setPastSelected([]);
-      setConfirmPastCopy(false);
+      setPastSelected(null);
       if (scroll)
         window.requestAnimationFrame(() =>
           (scroll === "meals" ? mealsRef.current : diaryTopRef.current)?.scrollIntoView({
@@ -519,9 +522,26 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
       setBusy(false);
     }
   }
-  function saveMeal(meal) {
+  async function saveMeal(meal) {
+    if (postCopyEdit?.mealId === meal.id) {
+      if (JSON.stringify(meal) === JSON.stringify(postCopyEdit.baseline)) {
+        setPostCopyEdit(null); setFocusFoodId(null); setDraft(null); setError('');
+        return;
+      }
+      const next = { ...day, meals: day.meals.map(entry => entry.id === meal.id ? meal : entry) };
+      if (await persist(next, 'Copied meal updated.')) {
+        setPostCopyEdit(null); setFocusFoodId(null); setDraft(null); setError('');
+      }
+      return;
+    }
     setRecipeError('');
     setPendingRecipe({ meal: structuredClone(meal), initial: structuredClone(day.meals.find(entry => entry.id === meal.id)), diarySaved: false, savedRecipe: null });
+  }
+  async function closePostCopyEditor() {
+    if (!postCopyEdit) { setDraft(null); return; }
+    const changed = JSON.stringify(draft) !== JSON.stringify(postCopyEdit.baseline);
+    if (changed && !await confirmDiscard({ title: 'Discard edits?', message: 'The copied meal is already saved. Discard only these unsaved edits?', confirmLabel: 'Discard edits' })) return;
+    setPostCopyEdit(null); setFocusFoodId(null); setDraft(null); setError('');
   }
   async function confirmMeal(recipe, selections, share, newRecipe) {
     if (lock.current || !pendingRecipe) return;
@@ -634,20 +654,31 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
       setError(err.message);
     }
   }
-  async function importPastMeals() {
-    const selectedMeals = allPastMeals
-      .filter(({ entryDate, meal }) => pastSelected.includes(`${entryDate}:${meal.id}`))
-      .map(({ meal }) => meal);
-    if (!selectedMeals.length) {
-      setError("Choose at least one past meal to copy.");
-      return;
+  async function importPastMeals(destination) {
+    if (!pastSelected || !MEALS.includes(destination) || copyingMeal || lock.current) return;
+    const sourceRecord = allPastMeals.find(({ entryDate, meal }) => (entryDate + ':' + meal.id) === pastSelected.key);
+    if (!sourceRecord) { setError("That source meal is no longer available. Choose another meal."); return; }
+    setCopyingMeal(true);
+    const source = sourceRecord.meal;
+    const copiedMeal = { ...source, meal: destination };
+    const next = appendCopiedMeals(day, [copiedMeal]);
+    const pendingCopy = next.meals[next.meals.length - 1];
+    const savedDay = await persist(next, source.title + ' copied to ' + destination + '.');
+    if (savedDay) {
+      const copied = savedDay.meals.find(meal => meal.id === pendingCopy.id);
+      if (!copied) { setError('Meal copied, but the saved entry could not be opened for editing. Refresh the diary to continue.'); setCopyingMeal(false); return; }
+      setPastOpen(false); setPastSelected(null); setPastSearch('');
+      setExpandedMeals(current => ({ ...current, [destination]: true }));
+      setPostCopyEdit({ mealId: copied.id, baseline: structuredClone(copied) });
+      setFocusFoodId(copied.items[0]?.id || null);
+      setDraft(copied);
+      window.requestAnimationFrame(() => {
+        const section = mealSectionRefs.current[destination];
+        section?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'nearest' });
+        section?.querySelector('.diary-meal-disclosure')?.focus({ preventScroll: true });
+      });
     }
-    if (await persist(appendCopiedMeals(day, selectedMeals), `${selectedMeals.length} past meal${selectedMeals.length===1?'':'s'} copied to ${date}.`)) {
-      setPastOpen(false);
-      setPastSelected([]);
-      setConfirmPastCopy(false);
-      setPastSearch("");
-    }
+    setCopyingMeal(false);
   }
   async function deleteMealOrFood(meal, food) {
     const target = food
@@ -775,7 +806,7 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
         </div>
       )}
       {copyOpen && <section className="diary-copy-menu" id="diary-copy-menu" aria-label="Copy meals">
-          <button type="button" onClick={() => { setCopyOpen(false); setPastOpen(true); setConfirmPastCopy(false); setPastSelected([]); setError(""); }}>Copy from history</button>
+          <button type="button" onClick={() => { setCopyOpen(false); setPastOpen(true); setPastSelected(null); setPastSearch(''); setError(""); }}>Copy from history</button>
         <button type="button" disabled={busy} onClick={() => { setCopyOpen(false); void openRoutine(); }}>Copy from Planner</button>
         <button type="button" onClick={() => setCopyOpen(false)}>Cancel</button>
       </section>}
@@ -810,21 +841,25 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
       )}
       {busy && <p className="diary-save-status" role="status">Updating your diary…</p>}
       {pastOpen && (
-        <section className="diary-panel" aria-label="Copy past meals">
-          <div className="diary-section-heading"><div><h2>Copy from meal history</h2><p>Choose any old meal to add a fresh copy to {date}.</p></div><span className="pill">{pastSelected.length} selected</span></div>
-          <label className="mt-4">Search meal names or foods inside them<input type="search" value={pastSearch} onChange={(event) => setPastSearch(event.target.value)} placeholder="Tea, chicken, breakfast, no sugar…" /></label>
-          <div className="diary-copy-list mt-4">
-            {pastMeals.slice(0,100).map(({ entryDate, meal }) => {
-              const key=`${entryDate}:${meal.id}`, totals=diaryTotals([meal]);
-              return <label className="diary-copy-option" key={key}>
-                <input type="checkbox" disabled={busy} checked={pastSelected.includes(key)} onChange={(event)=>{setConfirmPastCopy(false);setPastSelected(event.target.checked?[...pastSelected,key]:pastSelected.filter((value)=>value!==key));}}/>
-                <span><strong>{meal.title}</strong><small>{entryDate} · {meal.meal} · {totals.calories.known?`${format(totals.calories.value)} kcal`:'calories unknown'} · {totals.protein.known?`${format(totals.protein.value)} g protein`:'protein unknown'}</small><span className="diary-copy-foods">{meal.items.map((item)=>`${format(item.quantity)} ${item.unit} ${item.name}`).join(' · ')}</span></span>
-              </label>;
-            })}
-            {!pastMeals.length&&<p>No matching meals are available from another day yet.</p>}
-          </div>
-          {confirmPastCopy && <p className="diary-copy-confirmation" role="status">{pastSelected.reduce((count, key) => count + (allPastMeals.find(({ entryDate, meal }) => `${entryDate}:${meal.id}` === key)?.meal.items.length || 0), 0)} foods across {pastSelected.length} meal{pastSelected.length === 1 ? '' : 's'} will be added to {date}. The original entries stay unchanged.</p>}
-          <div className="diary-actions"><button className="diary-primary" disabled={busy||!pastSelected.length} onClick={() => confirmPastCopy ? void importPastMeals() : setConfirmPastCopy(true)}>{confirmPastCopy ? `Copy ${pastSelected.length} selected meal${pastSelected.length === 1 ? '' : 's'}` : `Review copy · ${pastSelected.length} selected`}</button><button disabled={busy} onClick={()=>{setPastOpen(false);setPastSelected([]);setConfirmPastCopy(false);setPastSearch("")}}>Cancel</button></div>
+        <section className="diary-panel diary-copy-sheet" aria-label="Copy a meal">
+          <div className="diary-section-heading"><div><h2>{pastSelected ? 'Copy ' + pastSelected.meal.title : 'Choose a source meal'}</h2><p>{pastSelected ? 'From ' + pastSelected.entryDate + ' | To ' + date : 'Choose one meal from history to copy to ' + date + '.'}</p></div></div>
+          {!pastSelected && <>
+            <label className="mt-4">Search meal names or foods<input type="search" value={pastSearch} onChange={event => setPastSearch(event.target.value)} placeholder="Search foods or meal names" /></label>
+            <div className="diary-copy-list mt-4">
+              {pastMeals.slice(0, 100).map(({ entryDate, meal }) => {
+                const key = entryDate + ':' + meal.id, totals = diaryTotals([meal]);
+                return <button type="button" className="diary-copy-option" key={key} disabled={busy || copyingMeal} aria-pressed={pastSelected?.key === key} onClick={() => setPastSelected({ key, entryDate, meal })}>
+                  <span><strong>{meal.title}</strong><small>{entryDate} | {meal.meal} | {totals.calories.known ? format(totals.calories.value) + ' kcal' : 'calories unknown'} | {meal.items.length} {meal.items.length === 1 ? 'food' : 'foods'}</small></span>
+                </button>;
+              })}
+              {!pastMeals.length && <p>No meals from another day match this search.</p>}
+            </div>
+          </>}
+          {pastSelected && <div className="diary-copy-destinations" aria-label="Choose destination meal">
+            {MEALS.map(slot => <button key={slot} type="button" disabled={busy || copyingMeal} onClick={() => void importPastMeals(slot)}>{copyingMeal ? 'Copying...' : slot === 'Snack' ? 'Snacks' : slot}</button>)}
+          </div>}
+          {error && <p role="alert">{error}</p>}
+          <div className="diary-actions"><button type="button" disabled={busy || copyingMeal} onClick={() => pastSelected ? setPastSelected(null) : (setPastOpen(false), setPastSearch(''))}>{pastSelected ? 'Back' : 'Close'}</button></div>
         </section>
       )}
       {routine && (
@@ -872,6 +907,7 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
       {draft && (
         <div ref={editorRef}>
           <DiaryMealEditor
+            postCopyMode={Boolean(postCopyEdit)}
             foodLibrary={foodLibrary}
             key={draft.id}
             initial={draft}
@@ -881,7 +917,7 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
             onDraftChange={setDraft}
             startWithFoodLookup={draft.items.length === 0}
             initialFocusFoodId={focusFoodId}
-            onCancel={() => {
+            onCancel={postCopyEdit ? closePostCopyEditor : () => {
               setFocusFoodId(null);
               setDraft(null);
               setError("");
@@ -894,6 +930,9 @@ export function FoodDiary({ recipes, nutritionGoals, foodCatalog = [], onFoodCat
           const entries = day.meals.filter(meal => meal.meal === slot);
           return <DiaryMealSection
             key={slot}
+            sectionRef={element => { mealSectionRefs.current[slot] = element; }}
+            expanded={Boolean(expandedMeals[slot])}
+            onToggle={() => setExpandedMeals(current => ({ ...current, [slot]: !current[slot] }))}
             slot={slot}
             entries={entries}
             totals={diaryTotals(entries)}

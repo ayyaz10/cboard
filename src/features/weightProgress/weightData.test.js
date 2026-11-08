@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { weightInKg, displayWeight, validateEntry, weightSummary, localDate } from './weightData.js';
+import { weightInKg, displayWeight, validateEntry, weightSummary, localDate, weightEntriesInRange, shiftLocalDate, formatWeightDate } from './weightData.js';
 test('kg and lb records remain comparable with precise canonical storage', () => {
   assert.equal(weightInKg('100', 'kg'), 100);
   assert.equal(displayWeight(100, 'lb'), 220.46);
@@ -21,4 +21,22 @@ test('summary follows entry dates rather than insertion order, without mutating 
   assert.equal(entries[0].date,'2026-09-16');
   assert.equal(weightSummary([]),null);
   assert.equal(weightSummary([entries[0]]).change,0);
+});
+
+
+test('chart ranges include only actual dated measurements and handle calendar boundaries', () => {
+  const entries = [
+    { date: '2026-03-01', weight_kg: 82 },
+    { date: '2026-03-08', weight_kg: 81.5 },
+    { date: '2026-03-09', weight_kg: 81.4 },
+    { date: '2026-04-01', weight_kg: 80.8 },
+  ];
+  assert.deepEqual(weightEntriesInRange(entries, '7d', '2026-03-09').map(entry => entry.date), ['2026-03-08', '2026-03-09']);
+  assert.deepEqual(weightEntriesInRange(entries, '30d', '2026-03-09').map(entry => entry.date), ['2026-03-01', '2026-03-08', '2026-03-09']);
+  assert.deepEqual(weightEntriesInRange(entries, '90d', '2026-03-09').map(entry => entry.date), ['2026-03-01', '2026-03-08', '2026-03-09']);
+  assert.equal(weightEntriesInRange(entries, '7d', '2026-03-09').length, 2);
+  assert.equal(weightEntriesInRange([{ date: '2026-03-09', weight_kg: 81.4 }], '7d', '2026-03-09').length, 1);
+  assert.deepEqual(weightEntriesInRange(entries, 'all').map(entry => entry.date), ['2026-03-01', '2026-03-08', '2026-03-09', '2026-04-01']);
+  assert.equal(shiftLocalDate('2026-03-30', -1), '2026-03-29');
+  assert.doesNotThrow(() => formatWeightDate('2026-11-08'));
 });

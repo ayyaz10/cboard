@@ -85,6 +85,8 @@ export function normalizeGroceryState(value) {
   state.items = Array.isArray(state.items) ? state.items : fallback.items;
   state.wishlist = Array.isArray(state.wishlist) ? state.wishlist : [];
   state.shopping = Array.isArray(state.shopping) ? state.shopping : [];
+  state.ingredientLinks = state.ingredientLinks && typeof state.ingredientLinks === 'object' ? state.ingredientLinks : {};
+  state.unlinkedIngredients = Array.isArray(state.unlinkedIngredients) ? state.unlinkedIngredients.filter(key => typeof key === 'string') : [];
   state.receiptPurchaseLedger = state.receiptPurchaseLedger && typeof state.receiptPurchaseLedger === 'object' ? state.receiptPurchaseLedger : {};
   state.settings = { ...fallback.settings, ...(state.settings || {}) };
   state.migrations = state.migrations && typeof state.migrations === 'object' ? state.migrations : {};
@@ -153,6 +155,8 @@ export function newItem(name, quantity = null, unit = "pieces", category) {
   };
 }
 export const initialState = () => ({
+  ingredientLinks: {},
+  unlinkedIngredients: [],
   items: Object.entries(categories).flatMap(([category, names]) =>
     names.map((name) =>
       newItem(

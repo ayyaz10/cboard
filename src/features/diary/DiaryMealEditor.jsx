@@ -79,6 +79,7 @@ export function DiaryMealEditor({
   foodLibrary = [],
   startWithFoodLookup = false,
   initialFocusFoodId = null,
+  postCopyMode = false,
 }) {
   const [draft, setDraft] = useState(() => structuredClone(initial));
   const [notesOpen, setNotesOpen] = useState(() => Boolean(initial.notes));
@@ -457,9 +458,9 @@ export function DiaryMealEditor({
             }
   return (
     <section className="diary-editor" aria-label="Meal entry editor">
-      <h2>{initial.items.length ? "Edit meal entry" : "Log a meal"}</h2>
+      <h2>{postCopyMode ? "Edit copied meal" : initial.items.length ? "Edit meal entry" : "Log a meal"}</h2>
       <p>
-        Add foods and adjust portions. Changes apply to this day; updating a saved recipe is optional after saving.
+        {postCopyMode ? "Adjust the copied foods and portions. This changes these diary entries only; the source meal and saved recipe stay unchanged." : "Add foods and adjust portions. Changes apply to this day; updating a saved recipe is optional after saving."}
       </p>
       <form
         onSubmit={(event) => {
@@ -660,9 +661,9 @@ export function DiaryMealEditor({
               type="submit"
               disabled={!draft.items.length}
             >
-              {busy ? "Saving…" : "Save meal"}
+              {busy ? "Saving…" : postCopyMode ? "Done" : "Save meal"}
             </button>
-            <button type="button" onClick={onCancel}>Cancel</button>
+            <button type="button" onClick={onCancel}>{postCopyMode ? "Discard edits" : "Cancel"}</button>
           </div>
           {error && <p role="alert">{error}</p>}
         </fieldset>

@@ -4,6 +4,8 @@ const baseUnit = unit => ['g', 'kg'].includes(canonicalUnit(unit)) ? 'g' : ['ml'
 
 function resolve(state, usage, active = false, foodCatalog = []) {
   state.ingredientLinks ||= {};
+  state.unlinkedIngredients ||= [];
+  if (state.unlinkedIngredients.includes(usage.key)) return null;
   const linkedId = usage.itemId || state.ingredientLinks[usage.key];
   let item = linkedId && state.items.find(item => item.id === linkedId);
   const food = usage.foodId && foodCatalog.find(food => food.id === usage.foodId);
@@ -41,17 +43,24 @@ export function linkRecipeInventory(state, recipes, days = [], foodCatalog = [])
       item.trackingDisabled = matches[0].groceryTrackingEnabled === false;
     }
   }
+  next.ingredientLinks ||= {};
+  next.unlinkedIngredients ||= [];
   for (const item of next.items) item.recipeRefs = [];
+  next.unlinkedRecipeIngredients = [];
   const active = new Set(days.flatMap(day => day.meals.flatMap(meal => meal.items.map(item => item.recipeOrigin?.slug).filter(Boolean))));
   // Legacy recipe titles are used only to establish visibility, never to deduct stock.
   for (const recipe of recipes) {
     if (days.some(day => day.meals.some(meal => meal.items.some(item => item.source?.provider === 'Recipe' && item.name === recipe.title || item.source?.provider === 'Recipe ingredient' && item.source?.name === recipe.title)))) active.add(recipe.slug);
     [...recipe.ingredients, ...(recipe.sauces || [])].forEach((part, index) => {
       const unit = baseUnit(recipe.productNutrition?.items[index]?.unit || part.nutritionLabel?.unit || part.unit);
-
+      const key = ingredientKey(recipe, part, index);
+      if (next.unlinkedIngredients.includes(key)) {
+        next.unlinkedRecipeIngredients.push({ key, recipeTitle: recipe.title, ingredientName: part.name, unit });
+        return;
+      }
       const food = part.foodId && foodCatalog.find(food => food.id === part.foodId);
       const matchingFood = food || foodCatalog.find(candidate => [candidate.name, ...(candidate.aliases || [])].some(name => nameKey(name) === nameKey(part.name)));
-      const item = resolve(next, { ...(matchingFood ? { foodId: matchingFood.id, groceryTrackingEnabled: matchingFood.groceryTrackingEnabled } : {}), key: ingredientKey(recipe, part, index), name: part.name, unit, code: recipe.productNutrition?.items[index]?.nutrition?.source?.code || part.nutritionLabel?.source?.code }, active.has(recipe.slug), foodCatalog);
+      const item = resolve(next, { ...(matchingFood ? { foodId: matchingFood.id, groceryTrackingEnabled: matchingFood.groceryTrackingEnabled } : {}), key, name: part.name, unit, code: recipe.productNutrition?.items[index]?.nutrition?.source?.code || part.nutritionLabel?.source?.code }, active.has(recipe.slug), foodCatalog);
       if (!item) return;
       item.recipeRefs ||= [];
       if (!item.recipeRefs.some(ref => ref.slug === recipe.slug)) item.recipeRefs.push({ slug: recipe.slug, title: recipe.title });

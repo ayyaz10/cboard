@@ -7,7 +7,17 @@ export function RecipeReferences({ item }) {
 export function InventoryExtras({ data, change, busy, section }) {
   const [draft, setDraft] = useState({ name: '', quantity: 1, unit: 'pieces' });
   const [error, setError] = useState('');
+  const [linkQuery, setLinkQuery] = useState('');
   const unused = data.items.filter(item => item.recipeOnly && !item.removed);
+  const ingredientLinks = [
+    ...Object.entries(data.ingredientLinks || {}).filter(([key]) => key.includes('/')).map(([key, itemId]) => {
+      const item = data.items.find(row => row.id === itemId);
+      const slug = key.split('/')[0];
+      const recipe = data.items.flatMap(row => row.recipeRefs || []).find(ref => ref.slug === slug);
+      return { key, itemId, item, recipe, ingredientName: item?.name || '', unit: item?.unit, unlinked: false };
+    }).filter(link => link.item && !link.item.removed && link.recipe),
+    ...(data.unlinkedRecipeIngredients || []).map(link => ({ key: link.key, itemId: '', item: null, recipe: { title: link.recipeTitle }, ingredientName: link.ingredientName, unit: link.unit, unlinked: true })),
+  ].filter(link => `${link.key} ${link.ingredientName} ${link.recipe.title}`.toLowerCase().includes(linkQuery.trim().toLowerCase()));
   async function save(event) {
     event.preventDefault();
     if (!draft.name.trim()) return;
@@ -21,23 +31,30 @@ export function InventoryExtras({ data, change, busy, section }) {
     if (ok) setDraft({ name: '', quantity: 1, unit: 'pieces' });
   }
   return <section className="g-inventory-extras">
-    <label className="g-check"><input type="checkbox" disabled={busy} checked={!data.settings.stockTrackingPaused} onChange={event => change(state => { state.settings.stockTrackingPaused = !event.target.checked; return state; }, 'Stock tracking updated', false)} />Automatic stock tracking: {data.settings.stockTrackingPaused ? 'PAUSED' : 'ON'}</label>
-    <p className="g-hint">Only new diary activity adjusts stock. Use Auto stock on each grocery to turn tracking off for that item. The global pause overrides every item. Paused activity is never deducted later. Manual stock changes still work.</p>
+    <details className="g-tracking-preferences">
+      <summary>Stock tracking preferences</summary>
+      <label className="g-check"><input type="checkbox" disabled={busy} checked={!data.settings.stockTrackingPaused} onChange={event => change(state => { state.settings.stockTrackingPaused = !event.target.checked; return state; }, 'Stock tracking updated', false)} />Automatic stock tracking: {data.settings.stockTrackingPaused ? 'PAUSED' : 'ON'}</label>
+      <p className="g-hint">Only new diary activity adjusts stock. Use Auto-stock on an item to turn tracking off for it. The global pause overrides every item. Paused activity is never deducted later. Manual stock changes still work.</p>
+    </details>
     <section hidden={section !== 'unused'}><h2>Ingredients from unused recipes ({unused.length})</h2>
       {!unused.length && <p>No additional ingredients from unused recipes.</p>}
       {unused.map(item => <div key={item.id} className="g-between"><div><strong>{item.name}</strong><p>{item.quantity ?? 0} {item.unit}</p><RecipeReferences item={item}/></div><button disabled={busy} onClick={() => change(state => { state.items.find(row => row.id === item.id).recipeOnly = false; return state; })}>Move to inventory</button></div>)}
     </section>
     <section hidden={section !== 'links'}><h2>Recipe ingredient links</h2><p>Choose the stock record used by future recipe logs. Existing logged entries keep their original stock record.</p>
-      {Object.entries(data.ingredientLinks || {}).filter(([key]) => key.includes('/')).map(([key, itemId]) => {
-        const item = data.items.find(item => item.id === itemId);
-        const slug = key.split('/')[0];
-        const recipe = data.items.flatMap(item => item.recipeRefs || []).find(recipe => recipe.slug === slug);
-        if (!item || item.removed || !recipe) return null;
-        return <label key={key} className="g-tools">{recipe.title}: {item.name}<select disabled={busy} value={itemId} onChange={event => change(state => { state.ingredientLinks[key] = event.target.value; return state; }, 'Ingredient link saved', false)}>{data.items.filter(candidate => !candidate.removed && convert(1, item.unit, candidate.unit) != null).map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.name} ({candidate.unit})</option>)}</select></label>;
-      })}
+      <label className="g-link-search">Search links<input type="search" aria-label="Search ingredient links" placeholder="Recipe or grocery name" value={linkQuery} onChange={event => setLinkQuery(event.target.value)} /></label>
+      {!ingredientLinks.length && <p>{linkQuery ? 'No matching ingredient links.' : 'No ingredient links need attention.'}</p>}
+      {ingredientLinks.map(({ key, itemId, item, recipe, ingredientName, unit, unlinked }) => <div key={key} className="g-link-row">
+        <span><strong>{recipe.title}</strong><small>{ingredientName}</small></span>
+        <select aria-label={`Grocery linked to ${recipe.title}`} disabled={busy} value={itemId} onChange={event => change(state => { state.ingredientLinks[key] = event.target.value; state.unlinkedIngredients = (state.unlinkedIngredients || []).filter(link => link !== key); state.unlinkedRecipeIngredients = (state.unlinkedRecipeIngredients || []).filter(link => link.key !== key); const target = state.items.find(row => row.id === event.target.value); if (target) { target.recipeRefs ||= []; if (!target.recipeRefs.some(ref => ref.slug === key.split('/')[0])) target.recipeRefs.push({ slug: key.split('/')[0], title: recipe.title }); } return state; }, 'Ingredient link saved', false)}>
+          {!itemId && <option value="">Choose a grocery</option>}
+          {data.items.filter(candidate => !candidate.removed && convert(1, unit || item?.unit, candidate.unit) != null).map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.name} ({candidate.unit})</option>)}
+        </select>
+        {unlinked ? <span className="g-unlinked-status">Not linked</span> : <button type="button" disabled={busy} onClick={() => change(state => { delete state.ingredientLinks[key]; state.unlinkedIngredients ||= []; if (!state.unlinkedIngredients.includes(key)) state.unlinkedIngredients.push(key); state.unlinkedRecipeIngredients ||= []; state.unlinkedRecipeIngredients.push({ key, recipeTitle: recipe.title, ingredientName, unit: item.unit }); if (!Object.entries(state.ingredientLinks).some(([linkedKey, linkedId]) => linkedKey.startsWith(`${key.split('/')[0]}/`) && linkedId === item.id)) { const target = state.items.find(row => row.id === item.id); if (target) target.recipeRefs = (target.recipeRefs || []).filter(ref => ref.slug !== key.split('/')[0]); } return state; }, 'Ingredient unlinked', false)}>Unlink</button>}
+      </div>)}
     </section>
     <section hidden={section !== 'wishlist'}><h2>Wishlist / Future items ({data.wishlist?.length || 0})</h2>
       <p>Ideas for later purchases. These are separate from current stock.</p>
+      {!(data.wishlist || []).length && <p>Your wishlist is empty. Add a future purchase below; it stays separate from the Shopping List.</p>}
       {(data.wishlist || []).map(item => <div className="g-between" key={item.id}><span>{item.name} · {item.quantity} {item.unit}</span><div className="g-tools">
         <button disabled={busy} onClick={() => setDraft(item)}>Edit</button>
         <button className="danger-action" disabled={busy} onClick={() => change(state => { state.wishlist = state.wishlist.filter(row => row.id !== item.id); return state; })}>Remove</button>

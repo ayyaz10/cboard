@@ -33,18 +33,22 @@ function DiaryFoodRow({ item, meal, recipes, disabled, onEdit, onDelete }) {
   </details>;
 }
 
-export function DiaryMealSection({ slot, entries, totals, skipped, disabled, recipes, onAdd, onEdit, onDelete, onMove, onSkip }) {
+export function DiaryMealSection({ sectionRef, slot, entries, totals, skipped, disabled, recipes, expanded = false, onToggle, onAdd, onEdit, onDelete, onMove, onSkip }) {
   const itemCount = entries.reduce((count, meal) => count + meal.items.length, 0);
-  const calories = itemCount ? totals.calories.known ? `${format(totals.calories.value)} kcal` : 'Calories unknown' : 'No food logged';
-  return <section className="diary-meal-section" aria-label={`${slot} entries`}>
+  const calories = itemCount ? totals.calories.known ? `${format(totals.calories.value)} kcal` : 'Calories unknown' : null;
+  const contentId = `diary-meal-content-${slot.toLowerCase()}`;
+  return <section ref={sectionRef} className="diary-meal-section" aria-label={`${slot === 'Snack' ? 'Snacks' : slot} entries`}>
     <header className="diary-meal-section-header">
       <div className="diary-meal-heading-copy">
-        <h2>{slot}</h2>
-        <span>{calories} · {itemCount} {itemCount === 1 ? 'item' : 'items'}</span>
+        <h2>{slot === 'Snack' ? 'Snacks' : slot}</h2>
+        <span>{itemCount ? `${calories} · ${itemCount} ${itemCount === 1 ? 'item' : 'items'}` : skipped ? 'Marked skipped' : 'No food logged'}</span>
       </div>
-      <button type="button" disabled={disabled} onClick={onAdd}>+ Add</button>
+      <div className="diary-meal-section-actions">
+        <button type="button" disabled={disabled} onClick={onAdd}>+ Add</button>
+        {itemCount > 0 && <button type="button" className="diary-meal-disclosure" aria-expanded={expanded} aria-controls={contentId} aria-label={`${expanded ? 'Collapse' : 'Expand'} ${slot === 'Snack' ? 'Snacks' : slot}`} onClick={onToggle}><ChevronDown size={19} aria-hidden="true" /></button>}
+      </div>
     </header>
-    {entries.length ? <div className="diary-meal-entry-list">
+    {itemCount > 0 && <div id={contentId} className="diary-meal-content" hidden={!expanded}>{expanded && <div className="diary-meal-entry-list">
       {entries.map(meal => <article className="diary-meal-entry" key={meal.id}>
         <header className="diary-meal-entry-header">
           <h3>{meal.title}</h3>
@@ -63,12 +67,7 @@ export function DiaryMealSection({ slot, entries, totals, skipped, disabled, rec
           {meal.items.map(item => <DiaryFoodRow key={item.id} item={item} meal={meal} recipes={recipes} disabled={disabled} onEdit={onEdit} onDelete={(entry, food) => onDelete(entry, food)} />)}
         </div>
       </article>)}
-    </div> : <div className="diary-meal-empty"><p>{skipped ? 'Marked skipped' : slot === 'Snack' ? 'No snacks logged' : daySkippedLabel(slot)}</p>
-      {slot !== 'Snack' && <button type="button" disabled={disabled} onClick={onSkip}>{skipped ? 'Undo skipped' : 'Mark skipped'}</button>}
-    </div>}
+    </div>}</div>}
+    {!itemCount && <div className="diary-meal-empty">{slot !== 'Snack' && <button type="button" disabled={disabled} onClick={onSkip}>{skipped ? 'Undo skipped' : 'Mark skipped'}</button>}</div>}
   </section>;
-}
-
-function daySkippedLabel(slot) {
-  return `No ${slot.toLowerCase()} logged`;
 }

@@ -54,7 +54,7 @@ export function DailyNutritionTargets({ controller }) {
   const { goals, loading, error, load, save } = controller;
   const contentId = useId();
   const [collapsed, setCollapsed] = useState(() => {
-    try { return window.localStorage.getItem(COLLAPSED_KEY) === 'true'; }
+    try { return window.localStorage.getItem(COLLAPSED_KEY) !== 'false'; }
     catch { return false; }
   });
   function toggleCollapsed() {

@@ -1697,3 +1697,33 @@ html[data-theme="midnight"] .food-diary .diary-recipe-confirm .diary-actions { b
   .diary-meal-entry-header .diary-actions > button { padding-inline: .42rem; }
   .diary-move-meal { font-size: .68rem; }
 }
+/* Compact meal disclosure and direct-copy selector */
+.diary-meal-section-actions { display: flex; align-items: center; gap: .35rem; flex: 0 0 auto; }
+.diary-meal-section-actions > button { min-height: 2.75rem; }
+.diary-meal-section-header .diary-meal-disclosure { display: grid; place-items: center; width: 2.75rem; padding: 0; }
+.diary-meal-disclosure svg { transition: transform .18s ease; }
+.diary-meal-disclosure[aria-expanded="true"] svg { transform: rotate(180deg); }
+.diary-meal-disclosure:focus-visible,
+.diary-meal-section-actions > button:focus-visible,
+.diary-copy-option:focus-visible,
+.diary-copy-destinations > button:focus-visible { outline: 3px solid var(--border-focus); outline-offset: 2px; }
+.diary-meal-content[hidden] { display: none; }
+.diary-meal-empty { min-height: .35rem; }
+.diary-copy-sheet { max-width: 42rem; margin-inline: auto; }
+.diary-copy-list { display: grid; gap: .35rem; max-height: min(45vh, 24rem); overflow: auto; }
+.food-diary .diary-copy-option { display: block; width: 100%; padding: .7rem .8rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text); text-align: left; }
+.food-diary .diary-copy-option:hover,
+.food-diary .diary-copy-option[aria-pressed="true"] { background: var(--color-surface-interactive); }
+.diary-copy-option > span,.diary-copy-option small { display: block; min-width: 0; }
+.diary-copy-option small { margin-top: .2rem; color: var(--color-text-secondary); font-size: var(--font-size-small); }
+.diary-copy-destinations { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: .5rem; margin-block: 1rem; }
+.diary-copy-destinations > button { min-height: 3rem; padding: .6rem; }
+@media (max-width: 699px) {
+  .diary-meal-section-header { gap: .4rem; }
+  .diary-meal-section-header .diary-meal-heading-copy { min-width: 0; }
+  .diary-meal-section-header h2 { font-size: 1rem; }
+  .diary-meal-section-header .diary-meal-heading-copy > span { font-size: .77rem; font-variant-numeric: tabular-nums; }
+  .diary-meal-section-actions { gap: .2rem; }
+  .diary-meal-section-actions > button { min-height: 2.75rem; padding-inline: .55rem; }
+}
+@media (prefers-reduced-motion: reduce) { .diary-meal-disclosure svg { transition: none; } }
