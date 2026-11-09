@@ -50,6 +50,9 @@ export const NUTRIENT_REGISTRY = definitions.map(([id, label, canonicalUnit, gro
   defaultSummary: ['calories', 'protein', 'carbs', 'fat', 'fiber'].includes(id),
   precision: canonicalUnit === 'kcal' || canonicalUnit === 'kJ' ? 0 : 1,
 }));
+// Shared by nutrition entry, OCR, external JSON prompts, and import validation.
+// These aliases add schema vocabulary without duplicating field data.
+export const nutritionFieldDefinitions = NUTRIENT_REGISTRY.map(field => ({ ...field, key: field.id, unit: field.canonicalUnit, required: false, optional: true }));
 export const NUTRIENTS = NUTRIENT_REGISTRY.map(({ id, label, canonicalUnit }) => [id, label, canonicalUnit]);
 export const nutrientKeys = NUTRIENT_REGISTRY.map(({ id }) => id);
 export const nutrientById = Object.fromEntries(NUTRIENT_REGISTRY.map((entry) => [entry.id, entry]));

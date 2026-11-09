@@ -1,0 +1,1 @@
+import{j as s}from"./index-DYm95gFf.js";function n({children:e,className:a="",inputClassName:i="",onChange:l,id:t,...p}){return s.jsxs("label",{className:`ui-file-upload ${a}`.trim(),children:[s.jsx("span",{children:e}),s.jsx("input",{id:t,className:i,type:"file",onChange:l,...p})]})}export{n as F};

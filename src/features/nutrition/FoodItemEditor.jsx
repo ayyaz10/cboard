@@ -90,7 +90,7 @@ export function FoodItemEditor({ catalog, onSave, onClose, initial = null, dupli
           <p className="g-hint">Used when logging this food as pieces. Nutrition is scaled from the basis above. For different sizes, save separate foods such as “Medium egg” and “Large egg” with their own piece weight.</p>
         </>}
         <p>Enter the label values for this amount. For values per 100 g, enter 100 and g.</p>
-        <NutritionLabelScan disabled={busy} current={{...draft.nutrition,quantity:draft.quantity,unit:draft.unit,source:draft.source}} onApply={label=>setDraft({...draft,quantity:label.quantity,unit:label.unit,...(label.unit===draft.unit?{}:{perPiece:null}),nutrition:cleanNutrients(label),source:label.source})}/>
+        <NutritionLabelScan disabled={busy} foodName={draft.name} amount={draft.quantity} unit={draft.unit} draftId={initial?.id||'new-food-item'} onFoodNameChange={name=>setDraft(current=>({...current,name}))} current={{...draft.nutrition,nutrientSources:draft.nutrientSources,quantity:draft.quantity,unit:draft.unit,source:draft.source}} onApply={label=>setDraft({...draft,...(label.foodName?{name:label.foodName}:{}),quantity:label.quantity,unit:label.unit,...(label.unit===draft.unit?{}:{perPiece:null}),nutrition:cleanNutrients(label),nutrientSources:label.nutrientSources||{},source:label.source})}/>
         <p className="g-hint">Values are for {draft.quantity || 100} {draft.unit || 'g'}.</p>
         {nutrientFields(NUTRIENTS.slice(0, 5))}
         <details><summary>More nutrients</summary>{nutrientFields(NUTRIENTS.slice(5))}</details>

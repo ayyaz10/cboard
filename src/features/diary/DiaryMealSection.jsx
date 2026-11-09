@@ -33,11 +33,11 @@ function DiaryFoodRow({ item, meal, recipes, disabled, onEdit, onDelete }) {
   </details>;
 }
 
-export function DiaryMealSection({ sectionRef, slot, entries, totals, skipped, disabled, recipes, expanded = false, onToggle, onAdd, onEdit, onDelete, onMove, onSkip }) {
+export function DiaryMealSection({ sectionRef, slot, entries, totals, skipped, disabled, recipes, expanded = false, copyingMeal = false, onToggle, onAdd, onEdit, onDelete, onMove, onSkip, onCopyFromHistory }) {
   const itemCount = entries.reduce((count, meal) => count + meal.items.length, 0);
   const calories = itemCount ? totals.calories.known ? `${format(totals.calories.value)} kcal` : 'Calories unknown' : null;
   const contentId = `diary-meal-content-${slot.toLowerCase()}`;
-  return <section ref={sectionRef} className="diary-meal-section" aria-label={`${slot === 'Snack' ? 'Snacks' : slot} entries`}>
+  return <section ref={sectionRef} className="diary-meal-section" data-meal-slot={slot} aria-label={`${slot === 'Snack' ? 'Snacks' : slot} entries`}>
     <header className="diary-meal-section-header">
       <div className="diary-meal-heading-copy">
         <h2>{slot === 'Snack' ? 'Snacks' : slot}</h2>
@@ -45,6 +45,7 @@ export function DiaryMealSection({ sectionRef, slot, entries, totals, skipped, d
       </div>
       <div className="diary-meal-section-actions">
         <button type="button" disabled={disabled} onClick={onAdd}>+ Add</button>
+        <button type="button" disabled={disabled || copyingMeal} aria-label={`Copy a previous meal to ${slot}`} onClick={() => onCopyFromHistory(slot)}>{copyingMeal ? 'Copying...' : 'Copy meal'}</button>
         {itemCount > 0 && <button type="button" className="diary-meal-disclosure" aria-expanded={expanded} aria-controls={contentId} aria-label={`${expanded ? 'Collapse' : 'Expand'} ${slot === 'Snack' ? 'Snacks' : slot}`} onClick={onToggle}><ChevronDown size={19} aria-hidden="true" /></button>}
       </div>
     </header>

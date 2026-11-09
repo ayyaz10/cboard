@@ -7,6 +7,7 @@ import { NutritionLookup } from "../groceries/NutritionLookup";
 import { NUTRIENTS } from "../nutrition/nutrients";
 import { MEALS, foodItem, itemNutrition, recipeItems, validateItem } from "./diaryData";
 import { applyStoredDiaryFood, findDiaryFoodMatches } from './diaryFoodLibrary';
+import { getDiaryShortcutAction } from './diaryKeyboardShortcuts.js';
 
 const number = (value) => (value === "" ? "" : Number(value));
 const format = (value) =>
@@ -89,6 +90,7 @@ export function DiaryMealEditor({
   const [individual, setIndividual] = useState(false);
   const [lookup, setLookup] = useState(null);
   const pickerDialog = useRef(null);
+  const editorRoot = useRef(null);
   const [openFood, setOpenFood] = useState(initialFocusFoodId);
   const [manualId, setManualId] = useState(null);
   const [nutritionOpen, setNutritionOpen] = useState({});
@@ -112,6 +114,18 @@ export function DiaryMealEditor({
   useEffect(() => {
     onDraftChange(draft);
   }, [draft, onDraftChange]);
+  useEffect(() => {
+    const onShortcut = event => {
+      if (!editorRoot.current?.contains(event.target)) return;
+      const inDialog = Boolean(event.target?.closest?.('dialog[open], [role="dialog"]'));
+      const action = getDiaryShortcutAction(event, { editorOpen: true, inDialog });
+      if (action === 'add-food-lookup') { event.preventDefault(); toggleNewFoodLookup(); }
+      else if (action === 'add-manual-food') { event.preventDefault(); addManualFood('', true); }
+      else if (action === 'save-meal') { event.preventDefault(); editorRoot.current.querySelector('form')?.requestSubmit(); }
+    };
+    window.addEventListener('keydown', onShortcut);
+    return () => window.removeEventListener('keydown', onShortcut);
+  }, [draft, manualId, lookup, busy]);
   function changeItem(id, values) {
     setDraft((current) => ({
       ...current,
@@ -166,8 +180,9 @@ export function DiaryMealEditor({
     setOpenFood(selectedId);
     setLookup(null);
   }
-  function addManualFood(name = '') {
-    if (draft.items.length >= 100 || manualId) return;
+  function addManualFood(name = '', finalizePrevious = false) {
+    if (draft.items.length >= 100) return;
+    if (manualId && (!finalizePrevious || !finalizeManualFood(manualId))) return;
     const item = { ...foodItem({ quantity: 100, unit: "g" }), name };
     setManualId(item.id);
     setDraft(current => ({ ...current, items: [...current.items, item] }));
@@ -356,8 +371,8 @@ export function DiaryMealEditor({
                     {format(totals.calories)} kcal · {format(totals.protein)} g
                     protein
                   </p>
-                  <NutritionLabelScan disabled={busy} current={{...item.nutrition,quantity:item.basis,unit:item.nutritionUnit,source:item.source}} onApply={label=>changeItem(item.id, {
-                    basis:label.quantity,nutritionUnit:label.unit,nutrition:cleanNutrients(label),source:label.source,
+                  <NutritionLabelScan disabled={busy} foodName={item.name} amount={item.basis} unit={item.nutritionUnit} draftId={item.id} onFoodNameChange={name=>changeItem(item.id,{name})} current={{...item.nutrition,nutrientSources:item.nutrientSources,quantity:item.basis,unit:item.nutritionUnit,source:item.source}} onApply={label=>changeItem(item.id, {
+                    name:label.foodName||item.name,basis:label.quantity,nutritionUnit:label.unit,nutrition:cleanNutrients(label),nutrientSources:label.nutrientSources||{},source:label.source,
                     // Preserve amount eaten; require a new quantity if the units cannot be related.
                     ...(item.unit!==label.unit && !(item.unit==='pieces' && ['g','ml'].includes(label.unit)) ? {unit:label.unit,quantity:''} : {}),
                     ...(item.nutritionUnit!==label.unit ? {perPiece:null} : {}),
@@ -457,11 +472,12 @@ export function DiaryMealEditor({
               );
             }
   return (
-    <section className="diary-editor" aria-label="Meal entry editor">
+    <section ref={editorRoot} className="diary-editor" aria-label="Meal entry editor">
       <h2>{postCopyMode ? "Edit copied meal" : initial.items.length ? "Edit meal entry" : "Log a meal"}</h2>
       <p>
         {postCopyMode ? "Adjust the copied foods and portions. This changes these diary entries only; the source meal and saved recipe stay unchanged." : "Add foods and adjust portions. Changes apply to this day; updating a saved recipe is optional after saving."}
       </p>
+      <details className="diary-shortcuts"><summary>Keyboard shortcuts</summary><ul><li><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> Add food from lookup</li><li><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>N</kbd> Add next item manually</li><li><kbd>Ctrl</kbd>+<kbd>Enter</kbd> / <kbd>?</kbd>+<kbd>Enter</kbd> Save meal</li></ul></details>
       <form
         onSubmit={(event) => {
           event.preventDefault();

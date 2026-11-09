@@ -10,8 +10,8 @@ export function cleanLabelBasis(value) {
 export function currentAtBasis(current, basis) {
   if(!current || !(current.quantity>0) || current.unit!==basis.unit || !(basis.quantity>0)) return null;
   if(['pieces','servings'].includes(basis.unit)) {
-    const countKind=kind=>['portion','serving'].includes(kind)?'serving':['item','pieces',undefined].includes(kind)?'item':kind;
-    if(countKind(current.source?.labelBasis?.kind)!==countKind(basis.kind))return null;
+    const countKind=(kind,unit)=>['portion','serving'].includes(kind)?'serving':['item','pieces'].includes(kind)||kind==null?(unit==='servings'?'serving':'item'):kind;
+    if(countKind(current.source?.labelBasis?.kind,current.unit)!==countKind(basis.kind,basis.unit))return null;
   }
   return Object.fromEntries(nutrientKeys.map(key=>[key,current[key]==null?null:current[key]*basis.quantity/current.quantity]));
 }

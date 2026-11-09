@@ -109,3 +109,17 @@ test('copy then edit quantity reconciles only the quantity delta once', () => {
   assert.equal(edited.meals[0].id, copied.id);
   assert.equal(edited.meals[0].items[0].id, copied.items[0].id);
 });
+
+
+test('a copied meal can be pasted into different meal slots as independent entries', () => {
+  const source = { ...newMeal('Breakfast'), title: 'Usual breakfast', items: [chicken(80)] };
+  const day = { ...emptyDay('2026-11-08'), meals: [] };
+  const clipboard = structuredClone(source);
+  const lunch = appendCopiedMeals(day, [{ ...clipboard, meal: 'Lunch' }]);
+  const dinner = appendCopiedMeals(lunch, [{ ...clipboard, meal: 'Dinner' }]);
+  assert.deepEqual(dinner.meals.map(meal => meal.meal), ['Lunch', 'Dinner']);
+  assert.notEqual(dinner.meals[0].id, dinner.meals[1].id);
+  assert.notEqual(dinner.meals[0].items[0].id, dinner.meals[1].items[0].id);
+  assert.equal(dinner.meals[0].items[0].quantity, source.items[0].quantity);
+  assert.equal(dinner.meals[1].items[0].foodId, source.items[0].foodId);
+});
