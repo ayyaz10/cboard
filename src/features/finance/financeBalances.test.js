@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { balanceViewValue, buildFinanceTimeline, calculateFinanceBalances, transactionCashEffect } from './financeBalances.js';
+import { createCreditAgreement } from './creditPurchases.js';
+import { initialFinanceState } from './financeData.js';
 
 const tx = (id, type, amount, date, extra = {}) => ({ id, type, amount, date, ...extra });
 const state = (transactions = [], values = {}) => ({ transactions, goals: [], goalContributions: [], investments: [], debts: [], debtPayments: [], ...values });
@@ -126,4 +128,10 @@ test('cancelled and planned records do not change cash or reserve values', () =>
   ]));
   assert.equal(balances.actualCash, 100_000);
   assert.equal(balances.reservedTotal, 0);
+});
+
+
+test('active Credit Purchase plans appear in liability totals without changing owned cash',()=>{
+ const value=initialFinanceState();value.settings.configured=true;value.creditAgreements=[];createCreditAgreement(value,{id:'bnpl-plan',title:'Laptop',cashPrice:50000,deposit:0,financeMode:'zero',financeCharge:0,term:5,scheduleMode:'auto',frequency:'monthly',customDays:30,firstPaymentDate:'2027-01-01',purchaseDate:'2026-11-01'});
+ const balances=calculateFinanceBalances(value);assert.equal(balances.actualCash,0);assert.equal(balances.creditPurchaseLiability,50000);assert.equal(balances.liabilities,50000);
 });

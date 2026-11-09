@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { backupModuleRegistry, exportBackupData, getBackupModule, importBackupModule } from './backupRegistry.js';
-import { BACKUP_FORMAT, BACKUP_VERSION, expandDependencies, parseBackupFile } from './backupService.js';
+import { BACKUP_FORMAT, BACKUP_VERSION, countModuleRecords, expandDependencies, parseBackupFile } from './backupService.js';
 
 const canonical = value => Array.isArray(value) ? value.map(canonical) : value && typeof value === 'object'
   ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value;
@@ -317,4 +317,10 @@ test('Notes backup restores block-formatted content through export and import', 
   assert.equal(target.rows[0].user_id, 'target-user');
   const roundTrip = await exportBackupData(['notes'], { client: target, userId: 'target-user' });
   assert.deepEqual(roundTrip.notes.data.notes, [note]);
+});
+
+
+test('Finance backup counts people, liabilities, repayments, split funding transactions, receivables and reimbursements',()=>{
+ const state={transactions:[{id:'purchase',type:'expense',amount:50000,fundingSources:[{kind:'person',personId:'p1',amount:10000}]},{id:'repay',type:'personalRepayment',amount:5000,personalEntryId:'l1'},{id:'reimburse',type:'reimbursement',amount:2000,personalEntryId:'r1'}],financePeople:[{id:'p1'}],personalLiabilities:[{id:'l1',personId:'p1',history:[{transactionId:'repay'}]}],personalReceivables:[{id:'r1',personId:'p1',history:[{transactionId:'reimburse'}]}],accounts:[],creditCards:[],creditAgreements:[]};
+ assert.equal(countModuleRecords('finance',{workspace:{state}}),6);
 });

@@ -42,7 +42,13 @@ export function budgetTarget(item, income) {
 
 export function financeSummary(state, selectedMonth) {
   const allTime = selectedMonth === null;
-  const transactions = (allTime ? state.transactions : state.transactions.filter((item) => inMonth(item.date, selectedMonth))).filter(item => !item.reversedAt && !['allocated', 'planned', 'cancelled'].includes(item.allocationStatus) && (!item.source || item.providerStatus === 'BOOK'));
+  const agreements = (state.creditAgreements || []).filter(item => item && typeof item.id === 'string' && Number.isSafeInteger(item.cashPrice) && item.cashPrice > 0 && /^\d{4}-\d{2}-\d{2}$/.test(item.purchaseDate || '') && (allTime || inMonth(item.purchaseDate, selectedMonth)));
+  const agreementIds = new Set((state.creditAgreements || []).map(item => item?.id).filter(Boolean));
+  const ledgerTransactions = (allTime ? state.transactions : state.transactions.filter((item) => inMonth(item.date, selectedMonth))).filter(item => !item.reversedAt && !['allocated', 'planned', 'cancelled'].includes(item.allocationStatus) && (!item.source || item.providerStatus === 'BOOK'));
+  const transactions = ledgerTransactions.filter(item => !(item.type === 'expense' && item.creditPaymentKind === 'deposit' && agreementIds.has(item.creditAgreementId) && /^\d{4}-\d{2}-\d{2}$/.test((state.creditAgreements || []).find(agreement => agreement.id === item.creditAgreementId)?.purchaseDate || '')));
+  const creditPurchaseExpenses = agreements.filter(agreement => !(state.transactions || []).some(item => item.creditAgreementId === agreement.id && item.type === 'expense' && item.creditPaymentKind === 'purchase'))
+    .map(agreement => ({ id: `credit-purchase:${agreement.id}`, title: agreement.title || 'Credit purchase', type: 'expense', amount: agreement.cashPrice, categoryId: agreement.categoryId || '', date: agreement.purchaseDate, creditAgreementId: agreement.id, creditPaymentKind: 'purchase', sourceType: 'credit_agreement' }));
+  transactions.push(...creditPurchaseExpenses);
   const sum = (type) => transactions.filter((item) => item.type === type).reduce((total, item) => total + item.amount, 0);
   const donationCategoryIds = new Set((state.categories || []).filter(category => category.type === 'donation').map(category => category.id));
   const income = sum('income');
@@ -54,7 +60,7 @@ export function financeSummary(state, selectedMonth) {
   const creditPurchaseRefunds = transactions.filter(item => item.type === 'creditPurchaseRefund' && (item.refundStatus || 'received') === 'received').reduce((total, item) => total + item.amount, 0);
   const refundCashIn = transactions.filter(item => item.type === 'creditPurchaseRefund' && item.refundDestination === 'user' && (item.refundStatus || 'received') === 'received').reduce((total, item) => total + item.amount, 0);
   const refundFor = predicate => refundTransactions.filter(refund => refund.originalTransactionId && predicate(state.transactions.find(item => item.id === refund.originalTransactionId))).reduce((total,item)=>total+item.amount,0);
-  const expensesBeforeReimbursements = Math.max(0, grossExpenses - refundFor(original => original?.type === 'expense' && !isDonationExpense(original)));
+  const expensesBeforeReimbursements = Math.max(0, grossExpenses - refundFor(original => original?.type === 'expense' && !isDonationExpense(original)) - creditPurchaseRefunds);
   const reimbursementTransactions = transactions.filter(item => item.type === 'reimbursement');
   const reimbursements = reimbursementTransactions.reduce((total, item) => total + item.amount, 0);
   const expenses = Math.max(0, expensesBeforeReimbursements - reimbursements);
@@ -71,7 +77,7 @@ export function financeSummary(state, selectedMonth) {
   const transferIn = transfers.filter(item => item.transferKind === 'external-in').reduce((total, item) => total + item.amount, 0);
   const transferOut = transfers.filter(item => item.transferKind === 'external-out' || item.transferKind === 'card-payment' && item.accountingKind !== 'card-liability-only').reduce((total, item) => total + item.amount, 0);
   const outflow = expenses + donations + investments + debtPayments + creditPayments + saved + budgetAllocated + goalContributions + transferOut;
-  const remaining = income + transferIn + refundCashIn - outflow;
+  const remaining = income + transferIn - outflow;
   const savings = saved;
   const budgetMonths = allTime ? Object.keys(state.budgets) : [selectedMonth];
   const budgetPlanned = budgetMonths.reduce((total, month) => {

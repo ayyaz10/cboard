@@ -1,4 +1,5 @@
 import { nextTransactionSequence } from './transactionOrder.js';
+import { addFinancePerson, createPersonLiabilityState } from './flexiblePayments.js';
 import { matchingTransactions } from './transactionSuggestions.js';
 import { normalizeMerchantName } from './merchantDirectory.js';
 import { isValidFinanceDate } from './transactionOrder.js';
@@ -135,6 +136,53 @@ export function detectPossibleRefund(record, transactions) {
   return matchingTransactions(transactions, record.description).find(item => canRefundTransaction(transactions, item) && remainingRefundable(transactions, item) >= record.amount) || null;
 }
 
+
+
+export function linkImportedBorrowedMoneyState(state, { record, personId = '', personName = '', accountId = '' }) {
+  if (record?.direction !== 'income' || !Number.isSafeInteger(record.amount) || record.amount <= 0 || !record.date || !record.description) throw new Error('Choose a valid incoming transaction to record as borrowed money.');
+  const person = personId ? (state.financePeople || []).find(item => item.id === personId && !item.archived) : addFinancePerson(state, personName);
+  if (!person) throw new Error('Choose or enter the person who lent you the money.');
+  const transaction = buildImportedTransaction(record, state, { accountId });
+  transaction.type = 'borrowedCash'; transaction.title = record.description; transaction.personId = person.id;
+  const liability = createPersonLiabilityState(state, { personId: person.id, amount: record.amount, date: record.date, notes: record.description, kind: 'borrowed-cash' });
+  transaction.personalEntryId = liability.id;
+  state.transactions.push(transaction);
+  return transaction;
+}
+
+export function suggestPersonalSettlement(record, state) {
+  const isOutgoing = record?.direction === 'expense';
+  const collection = isOutgoing ? state.personalLiabilities || [] : state.personalReceivables || [];
+  const people = state.financePeople || [];
+  const description = String(record?.description || '').trim().toLocaleLowerCase();
+  if (!description || !Number.isSafeInteger(record?.amount) || record.amount <= 0) return null;
+  const matches = collection.filter(entry => entry.remainingAmount >= record.amount).flatMap(entry => {
+    const person = people.find(item => item.id === entry.personId && !item.archived);
+    return person && description.includes(String(person.name || '').trim().toLocaleLowerCase())
+      ? [{ entry, person }] : [];
+  });
+  return matches.length === 1 ? { kind: isOutgoing ? 'repayment' : 'reimbursement', entryId: matches[0].entry.id, personId: matches[0].person.id, personName: matches[0].person.name } : null;
+}
+
+export function linkImportedPersonalSettlementState(state, { record, entryId, accountId = '', categoryId = '' }) {
+  const kind = record?.direction === 'expense' ? 'repayment' : record?.direction === 'income' ? 'reimbursement' : '';
+  const collection = kind === 'repayment' ? 'personalLiabilities' : 'personalReceivables';
+  const entry = (state[collection] || []).find(item => item.id === entryId);
+  if (!entry || !Number.isSafeInteger(record?.amount) || record.amount <= 0 || record.amount > entry.remainingAmount || !record.date || !record.description) throw new Error('This imported row no longer matches the outstanding personal balance.');
+  const person = (state.financePeople || []).find(item => item.id === entry.personId);
+  if (!person) throw new Error('The linked person is missing.');
+  const transaction = buildImportedTransaction(record, state, { accountId, categoryId });
+  transaction.type = kind === 'repayment' ? 'personalRepayment' : 'reimbursement';
+  transaction.title = record.description;
+  transaction.personId = person.id;
+  transaction.personalEntryId = entry.id;
+  transaction.paymentMethod = '';
+  entry.remainingAmount -= record.amount;
+  entry.history ||= [];
+  entry.history.push({ id: crypto.randomUUID(), kind, amount: record.amount, date: record.date, accountId, transactionId: transaction.id, note: record.description.slice(0, 300) });
+  state.transactions.push(transaction);
+  return transaction;
+}
 
 export function parseStatementText(text, { sourceType = 'statement', dateOrder = 'dmy' } = {}) {
   const records = [], source = String(text || '');

@@ -3,8 +3,11 @@ import assert from 'node:assert/strict';
 import { initialFinanceState, normalizeFinanceState } from './financeData.js';
 import { financeSummary } from './financeMath.js';
 import { deriveFinancePosition } from './financeLedger.js';
+import { transactionCashEffect } from './financeBalances.js';
 import { creditCardLiability } from './creditCards.js';
 import { expenseCategoryReport } from './financeReports.js';
+import { createRefundState, editRefundState, reverseRefundState } from './refunds.js';
+import { canDeleteTransaction, canEditTransaction } from './transactionPresentation.js';
 import { addFinancePerson, createPersonLiabilityState, createReceivableState, flexibleBalanceSummary, recordBorrowedCashState, repayPersonState, receiveReimbursementState, validateFunding } from './flexiblePayments.js';
 
 const base = () => { const state=initialFinanceState(); state.categories=[{id:'food',name:'Food',type:'expense'}]; state.transactions=[{id:'opening',type:'income',amount:100000,date:'2026-11-01'},{id:'purchase',type:'expense',amount:12000,categoryId:'food',title:'Dinner',date:'2026-11-02',fundingSources:[{kind:'person',amount:12000,personId:'ahmed'}]}]; state.financePeople=[{id:'ahmed',name:'Ahmed',archived:false}]; return state; };
@@ -56,4 +59,45 @@ test('people and payment relationships survive workspace backup-shaped normaliza
 test('split purchase is one expense with owned, card, and person balances recorded once',()=>{
  const state=initialFinanceState();state.categories=[{id:'food',name:'Food',type:'expense'}];state.transactions=[{id:'salary',type:'income',amount:100000,date:'2026-11-01'},{id:'dinner',type:'expense',title:'Dinner',amount:50000,date:'2026-11-02',categoryId:'food',paymentSourceType:'split',fundingSources:[{kind:'owned',amount:10000},{kind:'creditCard',sourceId:'card-1',amount:30000},{kind:'person',sourceId:'ahmed',personId:'ahmed',amount:10000}]}];state.creditCards=[{id:'card-1',name:'Card',openingLiability:0}];state.financePeople=[{id:'ahmed',name:'Ahmed',archived:false}];createPersonLiabilityState(state,{personId:'ahmed',amount:10000,transactionId:'dinner',date:'2026-11-02'});
  assert.equal(financeSummary(state,'2026-11').expenses,50000);assert.equal(deriveFinancePosition(state).totalOwned,60000);assert.equal(deriveFinancePosition(state).totalOwned+creditCardLiability(state,'card-1'),90000);assert.equal(creditCardLiability(state,'card-1'),30000);assert.equal(flexibleBalanceSummary(state).liabilities,10000);
+});
+
+
+test('refund to the person who paid reduces their liability; refund to user cash leaves that liability intact',()=>{
+ const state=base(); createPersonLiabilityState(state,{personId:'ahmed',amount:12000,transactionId:'purchase',date:'2026-11-02'});
+ const before=deriveFinancePosition(state).totalOwned;
+ const toAhmed=createRefundState(state,{originalTransactionId:'purchase',amount:3000,date:'2026-11-12',destination:'person:ahmed'});
+ assert.equal(state.personalLiabilities[0].remainingAmount,9000);assert.equal(deriveFinancePosition(state).totalOwned,before);assert.equal(financeSummary(state,'2026-11').expenses,9000);
+ reverseRefundState(state,toAhmed.id,'2026-11-13');assert.equal(state.personalLiabilities[0].remainingAmount,12000);
+ const toUser=createRefundState(state,{originalTransactionId:'purchase',amount:3000,date:'2026-11-14',destination:'user'});
+ assert.equal(state.personalLiabilities[0].remainingAmount,12000);assert.equal(deriveFinancePosition(state).totalOwned,before+3000);assert.equal(financeSummary(state,'2026-11').income,100000);
+});
+
+test('pending person refund changes liability only when received and reverses cleanly',()=>{
+ const state=base();createPersonLiabilityState(state,{personId:'ahmed',amount:12000,transactionId:'purchase',date:'2026-11-02'});
+ const refund=createRefundState(state,{originalTransactionId:'purchase',amount:2500,date:'2026-11-12',destination:'person:ahmed',status:'pending'});
+ assert.equal(state.personalLiabilities[0].remainingAmount,12000);editRefundState(state,{refundId:refund.id,amount:2500,date:'2026-11-13',status:'received'});assert.equal(state.personalLiabilities[0].remainingAmount,9500);
+ reverseRefundState(state,refund.id,'2026-11-14');assert.equal(state.personalLiabilities[0].remainingAmount,12000);
+});
+
+test('refund to a person cannot exceed their linked remaining liability',()=>{
+ const state=base();createPersonLiabilityState(state,{personId:'ahmed',amount:12000,transactionId:'purchase',date:'2026-11-02'});repayPersonState(state,state.personalLiabilities[0].id,{amount:8000,date:'2026-11-10'});
+ assert.throws(()=>createRefundState(state,{originalTransactionId:'purchase',amount:5000,date:'2026-11-12',destination:'person:ahmed'}),/cannot exceed/);
+});
+
+test('transactions with linked personal history cannot be edited or deleted',()=>{
+ const state=base();state.personalLiabilities=[{id:'liability',transactionId:'purchase',personId:'ahmed',originalAmount:12000,remainingAmount:7000,history:[]}];
+ assert.equal(canEditTransaction(state.transactions[1],state),false);assert.equal(canDeleteTransaction(state.transactions[1],state),false);
+});
+
+test('creditors and BNPL sources keep stable IDs and validate exact purchase totals',()=>{
+ assert.deepEqual(validateFunding(1000,[{kind:'creditor',sourceId:'person-klarna',amount:1000}])[0].sourceId,'person-klarna');
+ assert.throws(()=>validateFunding(1000,[{kind:'bnpl',amount:1000}]),/Choose an account/);
+ assert.throws(()=>validateFunding(1000,[{kind:'unknown',amount:1000}]),/valid payment amount/);
+});
+
+
+test('split refund to a funded credit card lowers that card liability without creating owned cash',()=>{
+ const state=initialFinanceState();state.creditCards=[{id:'card-1',name:'Card',openingLiability:0}];state.transactions=[{id:'split',type:'expense',title:'Laptop',amount:50000,date:'2026-11-02',categoryId:'food',paymentSourceType:'split',fundingSources:[{kind:'creditCard',sourceId:'card-1',amount:30000},{kind:'owned',amount:20000}]}];
+ const before=deriveFinancePosition(state).totalOwned;const refund=createRefundState(state,{originalTransactionId:'split',amount:5000,date:'2026-11-12',destination:'card:card-1'});
+ assert.equal(refund.refundToCard,true);assert.equal(transactionCashEffect(refund),0);assert.equal(deriveFinancePosition(state).totalOwned,before+5000);assert.equal(creditCardLiability(state,'card-1'),25000);assert.equal(financeSummary(state,'2026-11').expenses,45000);
 });

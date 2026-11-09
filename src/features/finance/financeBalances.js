@@ -1,5 +1,6 @@
 import { deriveFinancePosition } from './financeLedger.js';
 import { flexibleBalanceSummary } from './flexiblePayments.js';
+import { getCreditAgreementBalances } from './creditPurchases.js';
 
 export const balanceComponents = [
   { id: 'savings', label: 'Savings' },
@@ -162,7 +163,8 @@ export function calculateFinanceBalances(state, { month = null, openingBalance =
   for (const [key, value] of Object.entries(position.reserves)) reserved[key] = (reserved[key] || 0) + value;
   const timeline = buildFinanceTimeline(state, month, openingBalance);
   const flexible = flexibleBalanceSummary(state);
-  const liabilities = position.debtOutstanding + position.cardLiability + flexible.liabilities;
+  const creditPurchaseLiability = (state.creditAgreements || []).reduce((sum, agreement) => sum + Math.max(0, getCreditAgreementBalances(state, agreement).totalRemaining || 0), 0);
+  const liabilities = position.debtOutstanding + position.cardLiability + flexible.liabilities + creditPurchaseLiability;
   return {
     actualCash: position.totalOwned,
     reserved,
@@ -171,6 +173,7 @@ export function calculateFinanceBalances(state, { month = null, openingBalance =
     overallOwned: position.totalOwned,
     investments: 0,
     liabilities,
+    creditPurchaseLiability,
     receivables: flexible.receivables,
     netPosition: position.totalOwned + flexible.receivables - liabilities,
     timeline,

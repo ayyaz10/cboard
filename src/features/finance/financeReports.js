@@ -113,12 +113,19 @@ export function expenseCategoryReport(state, { mode = 'month', month = monthKey(
     total += transaction.amount;
   }
   for (const refund of refunds) {
-    const original = accepted.find(item => item.id === refund.originalTransactionId);
+    const original = (state.transactions || []).find(item => item.id === refund.originalTransactionId);
     if (!original || original.type !== 'expense' || original.financeGroup || original.donationPaymentId || original.creditAgreementId) continue;
     const row = rowFor(original);
     row.amount -= refund.amount;
     row.transactions.push(refund);
     total -= refund.amount;
+  }
+  for (const refund of accepted.filter(item => item.type === 'creditPurchaseRefund' && (item.refundStatus || 'received') === 'received' && withinPeriod(item.date))) {
+    const agreement = (state.creditAgreements || []).find(item => item.id === refund.creditAgreementId);
+    if (!agreement) continue;
+    const original = accepted.find(item => item.creditAgreementId === agreement.id && item.creditPaymentKind === 'purchase');
+    if (!original) continue;
+    const row = rowFor(original); row.amount -= refund.amount; row.transactions.push(refund); total -= refund.amount;
   }
   for (const reimbursement of accepted.filter(item => item.type === 'reimbursement' && withinPeriod(item.date))) {
     const receivable = (state.personalReceivables || []).find(item => item.id === reimbursement.personalEntryId);

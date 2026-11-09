@@ -7,7 +7,7 @@ import { getTransactionAmountPresentation, getTransactionDisplayType, getTransac
 import { MerchantLogo } from './MerchantLogo.jsx';
 import { receivedRefundTotal } from './refunds.js';
 
-const typeLabels={income:'Income',expense:'Expense',refund:'Refund',creditPurchaseRefund:'Credit purchase refund',donation:'Donation payment',transfer:'Transfer',debt:'Debt repayment',creditPayment:'Credit purchase payment',investment:'Investment',savings:'Savings',budget:'Budget allocation',goal:'Fund contribution'};
+const typeLabels={income:'Income',expense:'Expense',refund:'Refund',creditPurchaseRefund:'Credit purchase refund',donation:'Donation payment',transfer:'Transfer',debt:'Debt repayment',creditPayment:'Credit purchase payment',investment:'Investment',savings:'Savings',budget:'Budget allocation',goal:'Fund contribution',personalRepayment:'Personal repayment',reimbursement:'Reimbursement',borrowedCash:'Borrowed money'};
 const typeOptions=['expense','income','refund','transfer','debt','donation','creditPayment','investment','savings','budget','goal'];
 const currencyLabel=(amount,currency)=>formatMoney(amount,currency);
 const transactionSubLabel=(transaction,data)=>{if(transaction.type==='expense'){const refunded=receivedRefundTotal(data.transactions,transaction.id);if(refunded>0)return `${formatMoney(refunded,data.settings.currency)} refunded · ${formatMoney(Math.max(0,transaction.amount-refunded),data.settings.currency)} net`}return getTransactionDisplayType(transaction,data)};
