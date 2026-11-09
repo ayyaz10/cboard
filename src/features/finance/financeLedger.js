@@ -1,4 +1,5 @@
 import { orderedTransactions } from './transactionOrder.js';
+import { creditCardLiability } from './creditCards.js';
 
 const FUND_TYPES = new Set(['savings', 'goal', 'investment']);
 const RESERVED_TYPES = new Set(['donation', 'debt', 'budget']);
@@ -26,9 +27,29 @@ function movement(transaction, funds, reserves, owned, cash, stateGoals, stateIn
   const status = transaction.allocationStatus || '';
   const type = transaction.type;
   if (type === 'income') return { owned: owned + amount, cash: cash + amount };
+  if (type === 'creditPurchaseRefund') {
+    if ((transaction.refundStatus || 'received') !== 'received' || transaction.refundDestination !== 'user') return { owned, cash };
+    return { owned: owned + amount, cash: cash + amount };
+  }
+  if (type === 'refund') {
+    const original = stateTransactions.find(item => item.id === transaction.originalTransactionId);
+    if ((transaction.refundStatus || 'received') !== 'received' || !original || original.type !== 'expense' || original.financeGroup || original.donationPaymentId || (original.creditAgreementId && original.creditPaymentKind !== 'deposit')) return { owned, cash };
+    if (original.creditCardId) return { owned, cash };
+    const destination = transaction.refundDestination || original.paidFromFundId || '';
+    if (destination && Object.hasOwn(funds, destination)) funds[destination] += amount;
+    else cash += amount;
+    return { owned: owned + amount, cash };
+  }
   if (type === 'transfer') {
+    if (transaction.transferKind === 'card-payment' && transaction.accountingKind === 'card-liability-only') return { owned, cash };
     if (transaction.transferKind === 'external-in') return { owned: owned + amount, cash: cash + amount };
     if (transaction.transferKind === 'external-out') return { owned: owned - amount, cash: cash - amount };
+    if (transaction.transferKind === 'card-payment') {
+      const from = transaction.fromFundId || '';
+      if (from && Object.hasOwn(funds, from)) funds[from] -= amount;
+      else cash -= amount;
+      return { owned, cash };
+    }
     const from = transaction.fromFundId || '';
     const to = transaction.toFundId || '';
     if (from === to) return { owned, cash };
@@ -39,6 +60,7 @@ function movement(transaction, funds, reserves, owned, cash, stateGoals, stateIn
     return { owned, cash };
   }
   if (type === 'expense') {
+    if (transaction.creditCardId) return { owned, cash };
     const reservation = transaction.linkedReservationId && stateTransactions.find(item => item.id === transaction.linkedReservationId && item.type === 'donation' && item.allocationStatus === 'allocated');
     if (reservation) {
       reserves.donation = Math.max(0, (reserves.donation || 0) - amount);
@@ -111,6 +133,10 @@ export function deriveFinancePosition(state, { asOfDate = '9999-12-31', openingB
     const amount = money(transaction.amount), status = transaction.allocationStatus || '';
     if (!transaction._reservePhase) {
       if (transaction.type === 'income') income += amount;
+      if (transaction.type === 'refund' && (transaction.refundStatus || 'received') === 'received' && transaction.originalTransactionId) {
+        const original = transactions.find(item => item.id === transaction.originalTransactionId);
+        if (original?.type === 'expense' && !original.financeGroup && !original.donationPaymentId && (!original.creditAgreementId || original.creditPaymentKind === 'deposit') && !donationCategoryIds.has(original.categoryId)) expenses -= amount;
+      }
       if (transaction.type === 'expense' && transaction.financeGroup !== 'donation' && !donationCategoryIds.has(transaction.categoryId)) expenses += amount;
       if ((transaction.type === 'donation' && status !== 'allocated') || (transaction.type === 'expense' && (transaction.financeGroup === 'donation' || donationCategoryIds.has(transaction.categoryId)))) donationsPaid += amount;
       if (transaction.type === 'debt' && status !== 'allocated') debtPaid += amount;
@@ -128,8 +154,13 @@ export function deriveFinancePosition(state, { asOfDate = '9999-12-31', openingB
     return linked ? money(item.currentValue) - money(item.contributed) : money(item.currentValue);
   }));
   owned += assetGain;
+  const cardLiability = (state.creditCards || []).reduce((total, card) => total + Math.max(0, creditCardLiability(state, card, asOfDate)), 0);
+  owned -= cardLiability;
   const protectedFunds = sum(Object.values(funds));
   for (const point of points) {
+    const pointLiability = (state.creditCards || []).reduce((total, card) => total + Math.max(0, creditCardLiability(state, card, point.date || asOfDate)), 0);
+    point.totalOwned -= pointLiability;
+    point.spendable -= pointLiability;
     const pointAssets = (state.investments || []).filter(item => (!item.date || item.date <= point.date) && item.date <= asOfDate);
     for (const item of pointAssets) {
       point.funds[`asset:${item.id}`] = money(item.currentValue);
@@ -151,7 +182,7 @@ export function deriveFinancePosition(state, { asOfDate = '9999-12-31', openingB
   const debtOutstanding = sum((state.debts || []).map(debt => Math.max(0, money(debt.original) - (paidByDebt.get(debt.id) || 0))));
   return {
     spendable, protected: protectedFunds + reservedPayments, protectedFunds, reservedPayments,
-    funds, reserves, totalOwned: owned, debtOutstanding,
+    funds, reserves, totalOwned: owned, debtOutstanding, cardLiability,
     activity: { income, expenses, donationsPaid, debtPaid, movedToFunds }, points,
   };
 }
@@ -298,6 +329,26 @@ export function inspectFinanceIntegrity(state) {
   }
   for (const [key, count] of generated) if (count > 1) issues.push({ type: 'duplicate-generated-allocation', key, count });
   for (const transaction of transactions) if (transaction.allocationStatus === 'allocated' && ['goal', 'investment', 'debt'].includes(transaction.type) && !transaction.targetId) issues.push({ type: 'allocation-without-destination', transactionId: transaction.id, typeName: transaction.type });
+  const refundsByOriginal = new Map();
+  for (const refund of transactions.filter(item => item.type === 'refund')) {
+    const original = transactions.find(item => item.id === refund.originalTransactionId);
+    if (!original || original.type !== 'expense' || original.financeGroup || original.donationPaymentId || (original.creditAgreementId && original.creditPaymentKind !== 'deposit')) issues.push({ type: 'orphan-refund', transactionId: refund.id, originalTransactionId: refund.originalTransactionId || '' });
+    if (!refund.reversedAt && !['pending', 'received'].includes(refund.refundStatus || 'received')) issues.push({ type: 'invalid-refund-status', transactionId: refund.id });
+    if (original?.type === 'expense' && !original.financeGroup && !original.donationPaymentId && (!original.creditAgreementId || original.creditPaymentKind === 'deposit') && (refund.refundStatus || 'received') === 'received' && !refund.reversedAt) refundsByOriginal.set(original.id, (refundsByOriginal.get(original.id) || 0) + money(refund.amount));
+  }
+  for (const [originalId, amount] of refundsByOriginal) { const original = transactions.find(item => item.id === originalId); if (amount > money(original?.amount)) issues.push({ type: 'refunds-exceed-original', transactionId: originalId, refunded: amount, original: money(original?.amount) }); }
+
+  const agreementsById = new Map((state.creditAgreements || []).map(agreement => [agreement.id, agreement]));
+  const purchaseRefundTotals = new Map();
+  for (const refund of transactions.filter(item => item.type === 'creditPurchaseRefund')) {
+    const agreement = agreementsById.get(refund.creditAgreementId);
+    if (!agreement) issues.push({ type: 'orphan-credit-purchase-refund', transactionId: refund.id, agreementId: refund.creditAgreementId || '' });
+    if (!refund.reversedAt && !['pending', 'received'].includes(refund.refundStatus || 'received')) issues.push({ type: 'invalid-credit-purchase-refund-status', transactionId: refund.id });
+    if (!['provider', 'user'].includes(refund.refundDestination)) issues.push({ type: 'invalid-credit-purchase-refund-destination', transactionId: refund.id });
+    if (agreement && !refund.reversedAt && ['pending', 'received'].includes(refund.refundStatus || 'received')) purchaseRefundTotals.set(agreement.id, (purchaseRefundTotals.get(agreement.id) || 0) + money(refund.amount));
+  }
+  for (const [agreementId, amount] of purchaseRefundTotals) { const agreement = agreementsById.get(agreementId); if (amount > money(agreement?.cashPrice)) issues.push({ type: 'credit-purchase-refunds-exceed-price', agreementId, refunded: amount, purchasePrice: money(agreement?.cashPrice) }); }
+
   const position = deriveFinancePosition(state);
   for (const [fund, amount] of Object.entries(position.funds)) if (amount < 0) issues.push({ type: 'negative-fund-balance', fund, amount });
   return issues;

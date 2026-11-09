@@ -64,7 +64,7 @@ export async function loadFinance() {
     const prior = state.transactions.find(candidate => candidate.type === item.type && candidate.categoryId && candidate.title?.trim().toLowerCase() === item.title.trim().toLowerCase());
     const category = saved?.categoryId || prior?.categoryId || '';
     // Bank values and identity are provider-owned; user classification remains editable.
-    return { ...item, title: saved?.title || item.title, note: saved?.note || '', categoryId: category, tags: saved?.tags || [], userNote: saved?.note || '', sequence: saved?.sequence || 0, bankIncomeAllocationsApplied: Boolean(saved?.bankIncomeAllocationsApplied) };
+    return { ...item, ...(saved?.type === 'refund' ? { type: 'refund', originalTransactionId: saved.originalTransactionId, refundStatus: saved.refundStatus, refundKind: saved.refundKind, refundDestination: saved.refundDestination, refundToCard: saved.refundToCard, accountId: saved.accountId, linkedAt: saved.linkedAt } : {}), title: saved?.title || item.title, note: saved?.note || '', categoryId: category, tags: saved?.tags || [], userNote: saved?.note || '', sequence: saved?.sequence || 0, bankIncomeAllocationsApplied: Boolean(saved?.bankIncomeAllocationsApplied) };
   });
   state.transactions = [...state.transactions.filter(item => !String(item.id).startsWith('bank-')), ...bankTransactions];
   let version = result.data?.updated_at || null;

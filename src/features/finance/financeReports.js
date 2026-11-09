@@ -95,30 +95,36 @@ export function expenseCategoryReport(state, { mode = 'month', month = monthKey(
     if (mode === 'year') return value.slice(0, 4) === year;
     return true;
   };
-  const transactions = accepted
-    .filter(item => (item.type === 'expense' || item.type === 'donation') && withinPeriod(item.date))
-    .sort((left, right) => String(right.date).localeCompare(String(left.date)) || String(right.createdAt || '').localeCompare(String(left.createdAt || '')));
+  const transactions = accepted.filter(item => (item.type === 'expense' || item.type === 'donation') && withinPeriod(item.date));
+  const refunds = accepted.filter(item => item.type === 'refund' && (item.refundStatus || 'received') === 'received' && withinPeriod(item.date));
   const categories = new Map();
   let total = 0;
-  for (const transaction of transactions) {
-    total += transaction.amount;
+  const rowFor = transaction => {
     const category = categoriesById.get(transaction.categoryId);
     const id = category?.id || 'uncategorized';
-    const row = categories.get(id) || {
-      id,
-      name: category?.name || 'Uncategorised',
-      archived: Boolean(category?.archived),
-      amount: 0,
-      transactions: [],
-    };
+    const row = categories.get(id) || { id, name: category?.name || 'Uncategorised', archived: Boolean(category?.archived), amount: 0, transactions: [] };
+    categories.set(id, row);
+    return row;
+  };
+  for (const transaction of transactions) {
+    const row = rowFor(transaction);
     row.amount += transaction.amount;
     row.transactions.push(transaction);
-    categories.set(id, row);
+    total += transaction.amount;
   }
-  const breakdown = [...categories.values()]
+  for (const refund of refunds) {
+    const original = accepted.find(item => item.id === refund.originalTransactionId);
+    if (!original || original.type !== 'expense' || original.financeGroup || original.donationPaymentId || original.creditAgreementId) continue;
+    const row = rowFor(original);
+    row.amount -= refund.amount;
+    row.transactions.push(refund);
+    total -= refund.amount;
+  }
+  total = Math.max(0, total);
+  const breakdown = [...categories.values()].filter(row => row.amount > 0)
     .map(row => ({ ...row, percentage: total ? (row.amount / total) * 100 : 0 }))
     .sort((left, right) => right.amount - left.amount || left.name.localeCompare(right.name));
-  return { mode, month, year, total, categories: breakdown, transactions };
+  return { mode, month, year, total, categories: breakdown, transactions: [...transactions, ...refunds] };
 }
 
 export function markGoalCompletion(goal, date) {

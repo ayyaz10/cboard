@@ -40,7 +40,8 @@
     "react-dom": "^19.0.0",
     "recharts": "^3.8.1",
     "sonner": "^2.0.8",
-    "tesseract.js": "^7.0.0"
+    "tesseract.js": "^7.0.0",
+    "pdfjs-dist": "^5.4.394"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.4",

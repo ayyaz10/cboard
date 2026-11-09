@@ -1,7 +1,9 @@
-const labels = { income: 'Income', expense: 'Expense', donation: 'Donation payment', investment: 'Investment', debt: 'Debt payment', creditPayment: 'Credit payment', savings: 'Savings', budget: 'Budget allocation', goal: 'Goal contribution', transfer: 'Transfer' };
+const labels = { cardCredit: 'Card credit', income: 'Income', expense: 'Expense', refund: 'Refund', creditPurchaseRefund: 'Credit purchase refund', donation: 'Donation payment', investment: 'Investment', debt: 'Debt payment', creditPayment: 'Credit payment', savings: 'Savings', budget: 'Budget allocation', goal: 'Goal contribution', transfer: 'Transfer' };
 const outflowTypes = new Set(['expense', 'donation', 'debt', 'creditPayment']);
 
 export function getTransactionDisplayType(transaction, data) {
+  if (transaction.type === 'refund') return 'Refund';
+  if (transaction.type === 'creditPurchaseRefund') return transaction.refundDestination === 'provider' ? 'Credit purchase refund to provider' : 'Credit purchase refund to you';
   const donation = transaction.type === 'donation'
     || transaction.financeGroup === 'donation'
     || Boolean(transaction.donationCategoryId)
@@ -14,12 +16,14 @@ export function getTransactionMoneyEffect(transaction, data) {
   if (transaction.source && transaction.providerStatus !== 'BOOK') return 0;
   if (transaction.type === 'income') return transaction.amount;
   if (outflowTypes.has(transaction.type)) return -transaction.amount;
+  if (transaction.type === 'creditPurchaseRefund' && (transaction.refundStatus || 'received') === 'received' && transaction.refundDestination === 'user') return transaction.amount;
+  if (transaction.type === 'refund' && (transaction.refundStatus || 'received') === 'received' && data.transactions?.some(item => item.id === transaction.originalTransactionId && item.type === 'expense' && !item.financeGroup && (!item.creditAgreementId || item.creditPaymentKind === 'deposit'))) return transaction.amount;
   if (transaction.type === 'expense' && (transaction.financeGroup === 'donation' || (data.categories || []).some(category => category.id === transaction.categoryId && category.type === 'donation'))) return -transaction.amount;
   return 0;
 }
 
 export function getTransactionAmountPresentation(transaction) {
-  if (transaction.type === 'income') return { prefix: '+', tone: 'positive' };
+  if (transaction.type === 'income' || transaction.type === 'cardCredit' || (transaction.type === 'refund' && (transaction.refundStatus || 'received') === 'received') || (transaction.type === 'creditPurchaseRefund' && transaction.refundDestination === 'user' && (transaction.refundStatus || 'received') === 'received')) return { prefix: '+', tone: 'positive' };
   if (transaction.type === 'transfer') return { prefix: '', tone: 'neutral' };
   return ['expense', 'donation', 'debt', 'creditPayment'].includes(transaction.type)
     ? { prefix: '-', tone: 'negative' }
@@ -51,29 +55,30 @@ export function canOpenLinkedRecord(linked) {
 
 const isBankTransaction = transaction => transaction.source === 'bank' || transaction.sourceType === 'bank_import';
 export function canEditTransaction(transaction, data) {
-  if (!transaction || transaction.reversedAt || transaction.donationPaymentId || transaction.creditPaymentId) return false;
-  if (transaction.type === 'debt' || transaction.type === 'creditPayment' || ['goal', 'investment', 'savings', 'budget'].includes(transaction.type)) return false;
+  if (!transaction || transaction.reversedAt || transaction.donationPaymentId || transaction.creditPaymentId || transaction.type === 'refund' || transaction.originalTransactionId || transaction.linkedTransferId || transaction.cardPaymentLinkId) return false;
+  if (transaction.creditAgreementId || transaction.type === 'debt' || transaction.type === 'creditPayment' || ['goal', 'investment', 'savings', 'budget'].includes(transaction.type)) return false;
   if (isBankTransaction(transaction)) return false;
   return ['expense', 'income', 'transfer', 'donation'].includes(transaction.type);
 }
 export function canDeleteTransaction(transaction, data) {
-  if (!transaction || transaction.reversedAt || isBankTransaction(transaction)) return false;
+  if (!transaction || transaction.reversedAt || isBankTransaction(transaction) || transaction.type === 'refund' || transaction.originalTransactionId || transaction.linkedTransferId || transaction.cardPaymentLinkId || (data.transactions || []).some(item => item.type === 'refund' && item.originalTransactionId === transaction.id)) return false;
   if (transaction.donationPaymentId || transaction.creditPaymentId || transaction.type === 'debt' || transaction.type === 'creditPayment' || ['goal', 'investment', 'savings', 'budget'].includes(transaction.type)) return false;
   if (getTransactionDisplayType(transaction, data) === 'Donation payment') return false;
-  return ['expense', 'income', 'transfer'].includes(transaction.type);
+  return ['expense', 'income', 'transfer', 'cardCredit'].includes(transaction.type);
 }
 export function canDuplicateTransaction(transaction, data) {
   return canEditTransaction(transaction, data) && !isBankTransaction(transaction) && ['expense', 'income'].includes(transaction.type);
 }
 export function canReclassifyTransaction(transaction, data) {
-  if (!transaction || transaction.reversedAt || transaction.type !== 'expense' || transaction.donationPaymentId || transaction.creditPaymentId) return false;
+  if (!transaction || transaction.reversedAt || transaction.type !== 'expense' || transaction.donationPaymentId || transaction.creditPaymentId || transaction.linkedTransferId || transaction.cardPaymentLinkId) return false;
   return isBankTransaction(transaction) || !getTransactionLinkedContext(transaction, data);
 }
 
 export function summarizeTransactions(transactions, data) {
   return transactions.reduce((summary, transaction) => {
     const effect = getTransactionMoneyEffect(transaction, data);
-    if (effect > 0) summary.income += effect;
+    if (effect > 0 && transaction.type === 'refund') summary.spent = Math.max(0, summary.spent - effect);
+    else if (effect > 0) summary.income += effect;
     if (effect < 0) summary.spent -= effect;
     summary.net += effect;
     return summary;

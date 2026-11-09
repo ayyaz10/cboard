@@ -1,4 +1,4 @@
-export const transactionTypes = ['income', 'expense', 'donation', 'investment', 'debt', 'creditPayment', 'savings', 'budget', 'goal', 'transfer'];
+export const transactionTypes = ['income', 'expense', 'refund', 'donation', 'investment', 'debt', 'creditPayment', 'savings', 'budget', 'goal', 'transfer', 'cardCredit', 'creditPurchaseRefund'];
 
 export function parseMoney(value, { allowZero = false } = {}) {
   if (typeof value === 'number' && Number.isSafeInteger(value)) return value;
@@ -46,8 +46,16 @@ export function financeSummary(state, selectedMonth) {
   const sum = (type) => transactions.filter((item) => item.type === type).reduce((total, item) => total + item.amount, 0);
   const donationCategoryIds = new Set((state.categories || []).filter(category => category.type === 'donation').map(category => category.id));
   const income = sum('income');
-  const expenses = transactions.filter(item => item.type === 'expense' && item.financeGroup !== 'donation' && !donationCategoryIds.has(item.categoryId)).reduce((total,item)=>total+item.amount,0);
-  const donations = transactions.filter(item => item.type === 'donation' || (item.type === 'expense' && (item.financeGroup === 'donation' || donationCategoryIds.has(item.categoryId)))).reduce((total,item)=>total+item.amount,0);
+  const isDonationExpense = item => item.type === 'donation' || (item.type === 'expense' && (item.financeGroup === 'donation' || donationCategoryIds.has(item.categoryId)));
+  const grossExpenses = transactions.filter(item => item.type === 'expense' && !isDonationExpense(item)).reduce((total,item)=>total+item.amount,0);
+  const grossDonations = transactions.filter(isDonationExpense).reduce((total,item)=>total+item.amount,0);
+  const refundTransactions = transactions.filter(item => item.type === 'refund' && (item.refundStatus || 'received') === 'received' && item.originalTransactionId);
+  const refunds = refundTransactions.reduce((total,item)=>total+item.amount,0);
+  const creditPurchaseRefunds = transactions.filter(item => item.type === 'creditPurchaseRefund' && (item.refundStatus || 'received') === 'received').reduce((total, item) => total + item.amount, 0);
+  const refundCashIn = transactions.filter(item => item.type === 'creditPurchaseRefund' && item.refundDestination === 'user' && (item.refundStatus || 'received') === 'received').reduce((total, item) => total + item.amount, 0);
+  const refundFor = predicate => refundTransactions.filter(refund => refund.originalTransactionId && predicate(state.transactions.find(item => item.id === refund.originalTransactionId))).reduce((total,item)=>total+item.amount,0);
+  const expenses = Math.max(0, grossExpenses - refundFor(original => original?.type === 'expense' && !isDonationExpense(original)));
+  const donations = Math.max(0, grossDonations - refundFor(original => isDonationExpense(original || {})));
   const investments = sum('investment');
   const debtPayments = sum('debt');
   const creditPayments = sum('creditPayment');
@@ -58,9 +66,9 @@ export function financeSummary(state, selectedMonth) {
   const goalContributions = sum('goal');
   const transfers = transactions.filter(item => item.type === 'transfer');
   const transferIn = transfers.filter(item => item.transferKind === 'external-in').reduce((total, item) => total + item.amount, 0);
-  const transferOut = transfers.filter(item => item.transferKind === 'external-out').reduce((total, item) => total + item.amount, 0);
+  const transferOut = transfers.filter(item => item.transferKind === 'external-out' || item.transferKind === 'card-payment' && item.accountingKind !== 'card-liability-only').reduce((total, item) => total + item.amount, 0);
   const outflow = expenses + donations + investments + debtPayments + creditPayments + saved + budgetAllocated + goalContributions + transferOut;
-  const remaining = income + transferIn - outflow;
+  const remaining = income + transferIn + refundCashIn - outflow;
   const savings = saved;
   const budgetMonths = allTime ? Object.keys(state.budgets) : [selectedMonth];
   const budgetPlanned = budgetMonths.reduce((total, month) => {
@@ -68,7 +76,7 @@ export function financeSummary(state, selectedMonth) {
     return total + (state.budgets[month] || []).reduce((sum, item) => sum + budgetTarget(item, monthIncome || state.settings.monthlyIncome), 0);
   }, 0);
   return {
-    income, expenses, donations, investments, debtPayments, creditPayments, creditPrincipalPaid, creditFinanceCosts, remaining, savings, budgetAllocated, goalContributions, transferIn, transferOut,
+    income, expenses, grossExpenses, refunds, creditPurchaseRefunds, refundCashIn, donations, investments, debtPayments, creditPayments, creditPrincipalPaid, creditFinanceCosts, remaining, savings, budgetAllocated, goalContributions, transferIn, transferOut,
     savingsRate: income ? Math.round(saved * 10000 / income) : 0,
     budgetPlanned,
     budgetUsed: budgetPlanned ? Math.round(expenses * 10000 / budgetPlanned) : 0,

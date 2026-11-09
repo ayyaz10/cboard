@@ -26,7 +26,7 @@ export function initialFinanceState() {
   return {
     version: 1,
     settings: { configured: false, currency: defaultCurrency(), monthlyIncome: 0, budgetStartDay: 1, defaultForeignCurrency: 'PKR', leftoverDestination: 'rollover', leftoverGoalId: '' },
-    categories: structuredClone(defaultCategories), donationCategories: structuredClone(defaultDonationCategories), donationTargets: [], donationAccruals: [], donationPayments: [], donationReversals: [], transactions: [], merchantProfiles: [], budgets: {}, openingBalances: {}, budgetPresets: [],
+    categories: structuredClone(defaultCategories), donationCategories: structuredClone(defaultDonationCategories), donationTargets: [], donationAccruals: [], donationPayments: [], donationReversals: [], transactions: [], merchantProfiles: [], accounts: [], importAccountMappings: {}, budgets: {}, openingBalances: {}, budgetPresets: [], creditCards: [],
     goals: [], goalContributions: [], investments: [], debts: [], debtPayments: [], debtAccruals: [], creditAgreements: [], recurring: [], transactionPresets: [], allocationRules: [],
   };
 }
@@ -35,12 +35,19 @@ export function normalizeFinanceState(value) {
   const fallback = initialFinanceState();
   if (!value || typeof value !== 'object') return fallback;
   const state = { ...fallback, ...structuredClone(value), settings: { ...fallback.settings, ...(value.settings || {}) } };
-  for (const key of ['categories', 'donationCategories', 'donationTargets', 'donationAccruals', 'donationPayments', 'donationReversals', 'transactions', 'budgetPresets', 'goals', 'goalContributions', 'investments', 'debts', 'debtPayments', 'debtAccruals', 'creditAgreements', 'recurring', 'transactionPresets', 'allocationRules']) {
+  for (const key of ['categories', 'donationCategories', 'donationTargets', 'donationAccruals', 'donationPayments', 'donationReversals', 'transactions', 'budgetPresets', 'goals', 'goalContributions', 'investments', 'debts', 'debtPayments', 'debtAccruals', 'creditAgreements', 'recurring', 'transactionPresets', 'allocationRules', 'creditCards', 'accounts']) {
     if (!Array.isArray(state[key])) state[key] = [];
   }
   migrateDebtPlanStatuses(state.debts, state.allocationRules);
+  for (const agreement of state.creditAgreements) {
+    if (!agreement.financeMode) agreement.financeMode = Number(agreement.financeCharge || 0) > 0 ? 'fixed' : 'zero';
+    if (agreement.financeMode !== 'apr') agreement.apr = null;
+  }
   if (!Array.isArray(state.merchantProfiles)) state.merchantProfiles = [];
   state.merchantProfiles = state.merchantProfiles.filter(item => item && typeof item.id === 'string' && typeof item.displayName === 'string' && Array.isArray(item.aliases) && item.aliases.every(alias => typeof alias === 'string') && (!item.logoData || (typeof item.logoData === 'string' && item.logoData.startsWith('data:image/webp;base64,') && item.logoData.length <= 500000)));
+  if (!state.importAccountMappings || typeof state.importAccountMappings !== 'object' || Array.isArray(state.importAccountMappings)) state.importAccountMappings = {};
+  const accountIds = new Set([...state.accounts, ...state.creditCards].map(item => item?.id).filter(id => typeof id === 'string'));
+  state.importAccountMappings = Object.fromEntries(Object.entries(state.importAccountMappings).filter(([key, value]) => key.length <= 80 && typeof value === 'string' && accountIds.has(value)).slice(-50));
   if (!state.budgets || typeof state.budgets !== 'object' || Array.isArray(state.budgets)) state.budgets = {};
   if (!state.openingBalances || typeof state.openingBalances !== 'object' || Array.isArray(state.openingBalances)) state.openingBalances = {};
   state.transactions = state.transactions.filter((item) => item && transactionTypes.includes(item.type) && Number.isSafeInteger(item.amount) && item.amount > 0);

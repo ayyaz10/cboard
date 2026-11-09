@@ -45,3 +45,12 @@ test('linked history blocks generic edit and delete while manual expenses remain
   assert.equal(canEditTransaction(manual,data),true);
   assert.equal(canReclassifyTransaction(manual,data),true);
 });
+
+test('linked account transfer and card payment pairs cannot be edited or deleted apart', () => {
+  for (const transaction of [{ id: 'out', type: 'transfer', linkedTransferId: 'pair' }, { id: 'payment', type: 'transfer', cardPaymentLinkId: 'bank' }]) {
+    const data = { transactions: [transaction] };
+    assert.equal(canEditTransaction(transaction, data), false);
+    assert.equal(canDeleteTransaction(transaction, data), false);
+    assert.equal(canReclassifyTransaction(transaction, data), false);
+  }
+});
