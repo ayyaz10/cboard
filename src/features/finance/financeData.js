@@ -28,6 +28,7 @@ export function initialFinanceState() {
     settings: { configured: false, currency: defaultCurrency(), monthlyIncome: 0, budgetStartDay: 1, defaultForeignCurrency: 'PKR', leftoverDestination: 'rollover', leftoverGoalId: '' },
     categories: structuredClone(defaultCategories), donationCategories: structuredClone(defaultDonationCategories), donationTargets: [], donationAccruals: [], donationPayments: [], donationReversals: [], transactions: [], merchantProfiles: [], accounts: [], importAccountMappings: {}, budgets: {}, openingBalances: {}, budgetPresets: [], creditCards: [],
     goals: [], goalContributions: [], investments: [], debts: [], debtPayments: [], debtAccruals: [], creditAgreements: [], recurring: [], transactionPresets: [], allocationRules: [],
+    financePeople: [], personalLiabilities: [], personalReceivables: [],
   };
 }
 
@@ -35,7 +36,7 @@ export function normalizeFinanceState(value) {
   const fallback = initialFinanceState();
   if (!value || typeof value !== 'object') return fallback;
   const state = { ...fallback, ...structuredClone(value), settings: { ...fallback.settings, ...(value.settings || {}) } };
-  for (const key of ['categories', 'donationCategories', 'donationTargets', 'donationAccruals', 'donationPayments', 'donationReversals', 'transactions', 'budgetPresets', 'goals', 'goalContributions', 'investments', 'debts', 'debtPayments', 'debtAccruals', 'creditAgreements', 'recurring', 'transactionPresets', 'allocationRules', 'creditCards', 'accounts']) {
+  for (const key of ['categories', 'donationCategories', 'donationTargets', 'donationAccruals', 'donationPayments', 'donationReversals', 'transactions', 'budgetPresets', 'goals', 'goalContributions', 'investments', 'debts', 'debtPayments', 'debtAccruals', 'creditAgreements', 'recurring', 'transactionPresets', 'allocationRules', 'creditCards', 'accounts', 'financePeople', 'personalLiabilities', 'personalReceivables']) {
     if (!Array.isArray(state[key])) state[key] = [];
   }
   migrateDebtPlanStatuses(state.debts, state.allocationRules);

@@ -27,10 +27,11 @@ export function creditCardLiability(state, cardOrId, asOfDate = '9999-12-31') {
   const byId = new Map(transactions.map(item => [item.id, item]));
   for (const item of transactions) {
     if (item.type === 'expense' && item.creditCardId === card.id) liability += item.amount;
+    if (item.type === 'expense' && Array.isArray(item.fundingSources)) liability += item.fundingSources.filter(source => source.kind === 'creditCard' && source.sourceId === card.id).reduce((sum, source) => sum + Number(source.amount || 0), 0);
     if (item.type === 'cardCredit' && item.creditCardId === card.id) liability -= item.amount;
     if (item.type === 'refund' && (item.refundStatus || 'received') === 'received') {
       const original = byId.get(item.originalTransactionId);
-      if (original?.creditCardId === card.id) liability -= item.amount;
+      if (original?.creditCardId === card.id || item.refundDestination === `card:${card.id}`) liability -= item.amount;
     }
     if (item.type === 'transfer' && item.transferKind === 'card-payment' && item.creditCardId === card.id) liability -= item.amount;
   }

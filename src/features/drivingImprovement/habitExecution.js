@@ -85,10 +85,10 @@ export function recordExecution(node, outcome, { date = localDateKey(), reason =
   const record = { id: existing?.id || uuid(), date, outcome, reason: reason || null, recordedAt: now, startedAt: node.activeSession?.date === date ? node.activeSession.startedAt : null, focusSessionId, contract: structuredClone(node.actionContract) };
   return { ...node, executionHistory: [...(node.executionHistory || []).filter(entry => entry.date !== date), record].sort((a, b) => a.date.localeCompare(b.date)), activeSession: null, updatedAt: now };
 }
-export function startExecution(node, { date = localDateKey(), now = new Date().toISOString() } = {}) {
+export function startExecution(node, { date = localDateKey(), now = new Date().toISOString(), focusRequestId = null } = {}) {
   if (!node.actionContract) throw new Error('Set an Action Contract before starting this habit.');
   if (node.activeSession?.date === date) return node;
-  return { ...node, activeSession: { date, startedAt: now }, updatedAt: now };
+  return { ...node, activeSession: { date, startedAt: now, ...(focusRequestId ? { focusRequestId } : {}) }, updatedAt: now };
 }
 export function getOpportunity(node, today = localDateKey()) {
   if (!node.focusNow || !node.actionContract) return { due: false, recovery: false };
@@ -102,3 +102,7 @@ export function getOpportunity(node, today = localDateKey()) {
   return { due: true, completed: false, recovery: missedYesterday };
 }
 export function getContractSnapshot(contract, now = new Date().toISOString()) { return { ...structuredClone(contract), createdAt: now }; }
+
+export function updateActionContract(node, contract, now = new Date().toISOString()) {
+  return { ...node, focusNow: true, actionContract: structuredClone(contract), updatedAt: now };
+}

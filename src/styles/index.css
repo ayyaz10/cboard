@@ -792,6 +792,7 @@ html[data-theme="matrix"] {
 
 .global-scroll-controls { position: sticky; bottom: max(5.5rem, env(safe-area-inset-bottom)); align-self: flex-end; display: flex; gap: .4rem; z-index: 15; padding-top: 1rem; }
 .global-scroll-controls button { min-height: 44px; padding: .55rem .8rem; border: 2px solid currentColor; border-radius: 999px; background: var(--color-surface, #fffdf8); color: #171717; box-shadow: 2px 2px 0 #171717; }
+@media (max-width: 47.99rem) { .global-scroll-controls { display: none; } }
 @layer components {
   .auth-label { @apply grid gap-2 text-sm font-bold; }
   .auth-show-password { @apply absolute right-2 top-1/2 -translate-y-1/2 rounded-full border-2 border-black bg-white px-3 py-1.5 text-xs font-bold shadow-[2px_2px_0_#000]; }

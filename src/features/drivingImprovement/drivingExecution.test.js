@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getExecutionStats, getOpportunity, isScheduledDate, localDateKey, recordExecution, startExecution } from './habitExecution.js';
+import { getExecutionStats, getOpportunity, isScheduledDate, localDateKey, recordExecution, startExecution, updateActionContract } from './habitExecution.js';
 
 const contract = (schedule = { type: 'DAILY' }) => ({ action: 'Read 10 pages', minimum: 'Read 2 pages', trigger: 'After breakfast', schedule, createdAt: '2026-10-26T00:00:00.000Z' });
 const node = (schedule, history = []) => ({ id: 'n1', focusNow: true, actionContract: contract(schedule), executionHistory: history, activeSession: null });
@@ -60,4 +60,13 @@ test('focus session references persist on the habit outcome without changing str
   assert.equal(getExecutionStats(outcome, '2026-11-08').currentStreak, 1);
   const unresolved = { ...started, executionHistory: [] };
   assert.equal(getExecutionStats(unresolved, '2026-11-08').currentStreak, 0);
+});
+
+test('editing an Action Contract preserves an unresolved execution session', () => {
+  const habit = node({ type: 'DAILY' });
+  const started = startExecution(habit, { date: '2026-11-08', now: '2026-11-08T08:00:00Z' });
+  const updated = updateActionContract(started, { ...contract(), action: 'Read 12 pages' }, '2026-11-08T08:10:00Z');
+  assert.deepEqual(updated.activeSession, started.activeSession);
+  assert.equal(updated.actionContract.action, 'Read 12 pages');
+  assert.equal(updated.focusNow, true);
 });

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Toaster } from 'sonner';
 import { notify } from '../../lib/notifications.js';
 
@@ -29,7 +29,28 @@ function forwardInlineAlert(element, sent) {
 }
 
 export function AppNotifications() {
+  const toasterRef = useRef(null);
   useEffect(() => {
+    const toaster = toasterRef.current;
+    if (!toaster || typeof toaster.showPopover !== 'function') return;
+    toaster.setAttribute('popover', 'manual');
+    try { toaster.showPopover(); } catch { /* The browser may already have promoted this surface. */ }
+    const raiseAboveOpenDialogs = () => {
+      try { if (toaster.matches(':popover-open')) toaster.hidePopover(); toaster.showPopover(); } catch { /* Keep the normal high z-index fallback. */ }
+    };
+    const promotedToasts = new WeakSet();
+    const topLayerObserver = new MutationObserver(records => {
+      let newToast = false;
+      for (const record of records) {
+        for (const node of record.addedNodes) {
+          const candidates = node.matches?.('[data-sonner-toast]') ? [node] : Array.from(node.querySelectorAll?.('[data-sonner-toast]') || []);
+          for (const toast of candidates) { if (!promotedToasts.has(toast)) { promotedToasts.add(toast); newToast = true; } }
+        }
+      }
+      if (newToast) raiseAboveOpenDialogs();
+      toaster.querySelectorAll('[data-sonner-toaster]').forEach(list => topLayerObserver.observe(list, { childList: true }));
+    });
+    topLayerObserver.observe(toaster, { childList: true });
     const sent = new WeakMap();
     const process = node => {
       const element = node instanceof Element ? node : node.parentElement;
@@ -46,10 +67,10 @@ export function AppNotifications() {
       }
     });
     observer.observe(document.body, { subtree: true, childList: true, characterData: true });
-    return () => observer.disconnect();
+    return () => { observer.disconnect(); topLayerObserver.disconnect(); try { toaster.hidePopover(); } catch { /* Already closed. */ } };
   }, []);
 
-  return <Toaster position="top-right" theme="system" closeButton duration={4200} visibleToasts={8} expand
+  return <Toaster ref={toasterRef} position="top-right" theme="system" closeButton duration={4200} visibleToasts={8} expand
     toastOptions={{ className: 'cboard-toast', classNames: { title: 'cboard-toast-title', description: 'cboard-toast-description', actionButton: 'cboard-toast-action', cancelButton: 'cboard-toast-cancel', closeButton: 'cboard-toast-close' } }}
     />;
 }

@@ -26,14 +26,15 @@ function movement(transaction, funds, reserves, owned, cash, stateGoals, stateIn
   const amount = money(transaction.amount);
   const status = transaction.allocationStatus || '';
   const type = transaction.type;
-  if (type === 'income') return { owned: owned + amount, cash: cash + amount };
+  if (type === 'income' || type === 'borrowedCash' || type === 'reimbursement') return { owned: owned + amount, cash: cash + amount };
+  if (type === 'personalRepayment') return { owned: owned - amount, cash: cash - amount };
   if (type === 'creditPurchaseRefund') {
     if ((transaction.refundStatus || 'received') !== 'received' || transaction.refundDestination !== 'user') return { owned, cash };
     return { owned: owned + amount, cash: cash + amount };
   }
   if (type === 'refund') {
     const original = stateTransactions.find(item => item.id === transaction.originalTransactionId);
-    if ((transaction.refundStatus || 'received') !== 'received' || !original || original.type !== 'expense' || original.financeGroup || original.donationPaymentId || (original.creditAgreementId && original.creditPaymentKind !== 'deposit')) return { owned, cash };
+    if ((transaction.refundStatus || 'received') !== 'received' || !original || original.type !== 'expense' || original.financeGroup || original.donationPaymentId || (original.creditAgreementId && original.creditPaymentKind !== 'deposit') || transaction.refundToPerson || transaction.refundToCard) return { owned, cash };
     if (original.creditCardId) return { owned, cash };
     const destination = transaction.refundDestination || original.paidFromFundId || '';
     if (destination && Object.hasOwn(funds, destination)) funds[destination] += amount;
@@ -60,6 +61,10 @@ function movement(transaction, funds, reserves, owned, cash, stateGoals, stateIn
     return { owned, cash };
   }
   if (type === 'expense') {
+    if (Array.isArray(transaction.fundingSources)) {
+      const ownedAmount = transaction.fundingSources.filter(source => ['owned','bank','cash'].includes(source.kind)).reduce((sum, source) => sum + money(source.amount), 0);
+      return { owned: owned - ownedAmount, cash: cash - ownedAmount };
+    }
     if (transaction.creditCardId) return { owned, cash };
     const reservation = transaction.linkedReservationId && stateTransactions.find(item => item.id === transaction.linkedReservationId && item.type === 'donation' && item.allocationStatus === 'allocated');
     if (reservation) {

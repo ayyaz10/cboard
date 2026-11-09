@@ -1,4 +1,5 @@
 import { deriveFinancePosition } from './financeLedger.js';
+import { flexibleBalanceSummary } from './flexiblePayments.js';
 
 export const balanceComponents = [
   { id: 'savings', label: 'Savings' },
@@ -28,9 +29,12 @@ export function transactionCashEffect(transaction) {
   if (!transaction || transaction.reversedAt || isCancelled(transaction) || isReserved(transaction) || isInternalTransfer(transaction)) return 0;
   if (isIncome(transaction)) return transaction.amount;
   if (transaction.type === 'transfer' && transaction.transferKind === 'card-payment' && transaction.accountingKind === 'card-liability-only') return 0;
-  if (transaction.type === 'refund') return (transaction.refundStatus || 'received') === 'received' && transaction.originalTransactionId && !transaction.refundToCard ? transaction.amount : 0;
+  if (transaction.type === 'refund') return (transaction.refundStatus || 'received') === 'received' && transaction.originalTransactionId && !transaction.refundToCard && !transaction.refundToPerson ? transaction.amount : 0;
   if (transaction.type === 'creditPurchaseRefund') return (transaction.refundStatus || 'received') === 'received' && transaction.refundDestination === 'user' ? transaction.amount : 0;
   if (transaction.type === 'transfer') return transaction.transferKind === 'external-in' ? transaction.amount : -transaction.amount;
+  if (transaction.type === 'personalRepayment') return -transaction.amount;
+  if (transaction.type === 'reimbursement' || transaction.type === 'borrowedCash') return transaction.amount;
+  if (transaction.type === 'expense' && Array.isArray(transaction.fundingSources)) return -transaction.fundingSources.filter(source => ['owned', 'bank', 'cash'].includes(source.kind)).reduce((sum, source) => sum + Number(source.amount || 0), 0);
   if (transaction.type === 'expense' && transaction.creditCardId) return 0;
   return cashOutTypes.has(transaction.type) ? -transaction.amount : 0;
 }
@@ -157,7 +161,8 @@ export function calculateFinanceBalances(state, { month = null, openingBalance =
   }
   for (const [key, value] of Object.entries(position.reserves)) reserved[key] = (reserved[key] || 0) + value;
   const timeline = buildFinanceTimeline(state, month, openingBalance);
-  const liabilities = position.debtOutstanding + position.cardLiability;
+  const flexible = flexibleBalanceSummary(state);
+  const liabilities = position.debtOutstanding + position.cardLiability + flexible.liabilities;
   return {
     actualCash: position.totalOwned,
     reserved,
@@ -166,6 +171,8 @@ export function calculateFinanceBalances(state, { month = null, openingBalance =
     overallOwned: position.totalOwned,
     investments: 0,
     liabilities,
+    receivables: flexible.receivables,
+    netPosition: position.totalOwned + flexible.receivables - liabilities,
     timeline,
   };
 }

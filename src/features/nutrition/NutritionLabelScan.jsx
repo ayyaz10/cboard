@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { NUTRIENTS, nutritionFieldDefinitions } from './nutrients.js';
-import { buildFoodLookupPrompt, buildLabelExtractionPrompt, canFillMissingNutrition, createNutritionJsonApplication, createNutritionJsonTemplate, hasExistingNutrition, NUTRITION_BASIS_UNITS, parseNutritionJson } from './nutritionJsonImport.js';
+import { buildFoodLookupPrompt, buildLabelExtractionPrompt, canFillMissingNutrition, createNutritionJsonApplication, hasExistingNutrition, NUTRITION_BASIS_UNITS, parseNutritionJson } from './nutritionJsonImport.js';
 import { applyNutritionReview, currentAtBasis } from './nutritionLabelReview.js';
 import { createNutritionOcrSession } from './nutritionLabelOcr.js';
 import { validateOcrImage } from '../../services/ocr/imageOcr.js';
@@ -14,7 +14,7 @@ const display=value=>value==null?'Unknown':new Intl.NumberFormat(undefined,{maxi
 const jsonFieldGroups=[['energy','Energy'],['macros','Macros'],['fat','Fat details'],['vitamins','Vitamins'],['bVitamins','B vitamins'],['minerals','Minerals'],['other','Other']];
 
 export function NutritionLabelScan({current=null,onApply,disabled=false,initialOpen=false,basisUnits=['g','ml','pieces','servings'],foodName:controlledFoodName,amount:controlledAmount,unit:controlledUnit,onFoodNameChange,draftId:ownerDraftId}) {
-  const id=useId(),session=useRef(null),job=useRef(0),fileRef=useRef(null),urlRef=useRef(null),imageDialog=useRef(null),jsonDialog=useRef(null),pendingImportRef=useRef(null),clipboardReadInProgress=useRef(false),autoReadAttempt=useRef(''),contextRef=useRef(null),popupBlocked=useRef(false);
+  const id=useId(),session=useRef(null),job=useRef(0),fileRef=useRef(null),urlRef=useRef(null),imageDialog=useRef(null),jsonDialog=useRef(null),jsonTextarea=useRef(null),pendingImportRef=useRef(null),clipboardReadInProgress=useRef(false),autoReadAttempt=useRef(''),contextRef=useRef(null),popupBlocked=useRef(false);
   const [open,setOpen]=useState(initialOpen),[photo,setPhoto]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[basicMode,setBasicMode]=useState(false),[fallbackMessage,setFallbackMessage]=useState('');
   const [showImage,setShowImage]=useState(false);
   const [progress,setProgress]=useState(null),[rotation,setRotation]=useState(0),[crop,setCrop]=useState({left:0,top:0,right:100,bottom:100});
@@ -63,21 +63,17 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
   function updatePendingImport(value){pendingImportRef.current=value;setPendingImport(value);}
   function cancelPendingImport(){updatePendingImport(null);setClipboardFallback(false);setClipboardReading(false);setImportMessage('');}
   function changeLookupFood(value){if(controlledFoodName!==undefined)onFoodNameChange?.(value);else setLookupFoodDraft(value);setJsonCopied('');setPromptText('');}
-  function promptFor(kind){return kind==='label'?buildLabelExtractionPrompt():buildFoodLookupPrompt({foodName:String(lookupFood||'').trim(),amount:Number(lookupAmount),unit:lookupUnit});}
-  async function copyNutritionPrompt(kind){
-    const prompt=promptFor(kind);
-    setPromptText(prompt);
-    try{await navigator.clipboard.writeText(prompt);setJsonCopied(kind);setJsonError('');}
-    catch{setJsonError('Clipboard access is unavailable. Select and copy the generated prompt manually.');}
-  }
+  function promptFor(kind){return kind==='nutrition_label'?buildLabelExtractionPrompt():buildFoodLookupPrompt({foodName:String(lookupFood||'').trim(),amount:Number(lookupAmount),unit:lookupUnit});}
   function openChatGPTWithPrompt(kind='food_reference'){
-    const food=String(lookupFood||'');
+    const food=String(lookupFood||'').trim();
+    const labelMode=kind==='nutrition_label';
+    if(!labelMode){if(controlledFoodName!==undefined)onFoodNameChange?.(food);else setLookupFoodDraft(food);}
     const amount=Number(lookupAmount);
-    if(!food.trim()){setImportMessage('Enter the exact food name and preparation first.');return;}
-    if(!Number.isFinite(amount)||amount<=0||!NUTRITION_BASIS_UNITS.includes(lookupUnit)){setImportMessage('Enter a valid nutrition amount and unit first.');return;}
+    if(!labelMode&&!food){setImportMessage('Enter a food name.');return;}
+    if(!labelMode&&(!Number.isFinite(amount)||amount<=0||!NUTRITION_BASIS_UNITS.includes(lookupUnit))){setImportMessage('Enter a valid nutrition amount and unit first.');return;}
     const prompt=promptFor(kind);
     let pending;
-    try{pending=createPendingNutritionImport({foodName:food,amount,unit:lookupUnit,draftId:activeDraftId,mode:kind==='label'?'nutrition_label':'food_reference'});}
+    try{pending=createPendingNutritionImport({foodName:food||'Nutrition label',amount:Number.isFinite(amount)&&amount>0?amount:100,unit:NUTRITION_BASIS_UNITS.includes(lookupUnit)?lookupUnit:'g',draftId:activeDraftId,mode:kind});}
     catch(err){setImportMessage(err.message||'Check the food name and nutrition basis.');return;}
     updatePendingImport(pending);
     autoReadAttempt.current='';popupBlocked.current=false;
@@ -101,17 +97,17 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
   }
   function applyPendingImport(parsed,pending){
     const context=contextRef.current;
-    const result={...createNutritionJsonApplication(parsed,context.current,'replace'),foodName:pending.foodName};
+    const result={...createNutritionJsonApplication(parsed,context.current,'replace'),foodName:pending.mode==='nutrition_label'?parsed.food.name:pending.foodName};
     context.onApply(result);
     updatePendingImport(null);
     setClipboardFallback(false);
-    setImportMessage(`Nutrition imported for ${pending.foodName}.`);
-    notify.success(`Nutrition imported for ${pending.foodName}.`);
+    const importedName=pending.mode==='nutrition_label'?parsed.food.name:pending.foodName;
+    setImportMessage(`Nutrition imported for ${importedName}.`);
+    notify.success(`Nutrition imported for ${importedName}.`);
   }
   function showNutritionReview(raw,parsed,pending,{mismatch=null,existing=false}={}){
     setJsonText(raw);
     setJsonPreview(parsed);
-    setJsonMode(parsed.source.sourceType);
     setJsonConflict(existing);
     setJsonError('');
     setJsonFoodMismatch(mismatch);
@@ -126,7 +122,7 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
     if(isPendingNutritionImportExpired(pending)){
       updatePendingImport(null);setClipboardFallback(false);setImportMessage('This nutrition lookup expired. Start a new ChatGPT lookup.');return;
     }
-    if(pending.draftId!==context.draftId||!nutritionJsonMatchesFood(pending.foodName,{name:context.foodName})){
+    if(pending.draftId!==context.draftId||(pending.mode!=='nutrition_label'&&!nutritionJsonMatchesFood(pending.foodName,{name:context.foodName}))){
       updatePendingImport(null);setClipboardFallback(false);setImportMessage('The food name changed while ChatGPT was open. Start a new lookup before importing.');return;
     }
     if(!navigator.clipboard?.readText){setClipboardFallback(true);setImportMessage('Nutrition JSON ready? Use Paste from clipboard, or paste it manually.');return;}
@@ -138,11 +134,11 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
       try{parsed=parseNutritionJson(raw);}
       catch{setClipboardFallback(true);setImportMessage("Clipboard doesn't contain valid CBoard nutrition JSON. Paste manually or try Paste from clipboard again.");return;}
       const freshContext=contextRef.current;
-      if(pending.draftId!==freshContext.draftId||!nutritionJsonMatchesFood(pending.foodName,{name:freshContext.foodName})){
+      if(pending.draftId!==freshContext.draftId||(pending.mode!=='nutrition_label'&&!nutritionJsonMatchesFood(pending.foodName,{name:freshContext.foodName}))){
         updatePendingImport(null);setClipboardFallback(false);setImportMessage('The food name changed while ChatGPT was open. Start a new lookup before importing.');return;
       }
-      const foodMismatch=!nutritionJsonMatchesFood(pending.foodName,parsed.food);
-      const basisMismatch=parsed.quantity!==pending.amount||parsed.unit!==pending.unit;
+      const foodMismatch=pending.mode!=='nutrition_label'&&!nutritionJsonMatchesFood(pending.foodName,parsed.food);
+      const basisMismatch=pending.mode!=='nutrition_label'&&(parsed.quantity!==pending.amount||parsed.unit!==pending.unit);
       if(foodMismatch||basisMismatch){
         showNutritionReview(raw,parsed,pending,{mismatch:{type:foodMismatch?'food':'basis',requested:foodMismatch?pending.foodName:`${pending.amount} ${pending.unit}`,found:foodMismatch?formatNutritionFoodName(parsed.food):`${parsed.quantity} ${parsed.unit}`},existing:hasExistingNutrition(freshContext.current)});return;
       }
@@ -161,21 +157,21 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
       const parsed=parseNutritionJson(jsonText);
       const pending=pendingImportRef.current;
       if(pending){
-        const foodMismatch=!nutritionJsonMatchesFood(pending.foodName,parsed.food);
-        const basisMismatch=parsed.quantity!==pending.amount||parsed.unit!==pending.unit;
+        const foodMismatch=pending.mode!=='nutrition_label'&&!nutritionJsonMatchesFood(pending.foodName,parsed.food);
+        const basisMismatch=pending.mode!=='nutrition_label'&&(parsed.quantity!==pending.amount||parsed.unit!==pending.unit);
         if(foodMismatch||basisMismatch){
           setJsonFoodMismatch({type:foodMismatch?'food':'basis',requested:foodMismatch?pending.foodName:`${pending.amount} ${pending.unit}`,found:foodMismatch?formatNutritionFoodName(parsed.food):`${parsed.quantity} ${parsed.unit}`});
           updatePendingImport(null);setClipboardFallback(false);
         }else setJsonFoodMismatch(null);
       }else setJsonFoodMismatch(null);
       setJsonPreview(parsed);setJsonMode(parsed.source.sourceType);setJsonConflict(false);setJsonError('');
-    }catch(err){setJsonPreview(null);setJsonFoodMismatch(null);setJsonError(err.message||'Could not validate this nutrition JSON.');}
+    }catch(err){setJsonPreview(null);setJsonFoodMismatch(null);setJsonError(err.message||'Nutrition JSON is not valid.');jsonTextarea.current?.focus();}
   }
   function applyJsonImport(strategy){
     try{
       const pending=pendingImportRef.current;
       const imported=createNutritionJsonApplication(jsonPreview,current,strategy);
-      onApply({...imported,foodName:pending?.foodName||jsonPreview.food.name});
+      onApply({...imported,foodName:pending?.mode==='nutrition_label'?jsonPreview.food.name:pending?.foodName||jsonPreview.food.name});
       updatePendingImport(null);setClipboardFallback(false);setJsonFoodMismatch(null);setImportMessage(`Nutrition imported for ${pending?.foodName||jsonPreview.food.name}.`);
       setJsonOpen(false);setJsonText('');setJsonPreview(null);setJsonConflict(false);
       notify.success(`Nutrition imported for ${pending?.foodName||jsonPreview.food.name}.`);
@@ -241,25 +237,15 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
     {found && (found.uncertain||found.confidence<70) && <small className="nscan-warning">{found.reasons?.length?[...new Set(found.reasons)].join(' '):'Low OCR confidence. Compare with the image.'}</small>}
     {found?.rawLabel&&found.rawLabel!==label&&<small className="nscan-source-label">Source label: {found.rawLabel} · matched as {label}</small>}
   </div>;}
-  return <section className="nscan" aria-label="Nutrition label scanner">
-    <section className="njson-fast-lookup" aria-label="Get nutrition with ChatGPT">
-      <strong>Get nutrition with ChatGPT</strong>
-      {lookupIsControlled?<p>Food / preparation: <b>{lookupFood||'Enter a food name above'}</b><br/>Nutrition basis: {lookupAmount} {lookupUnit}. Edit the food name or basis above before launching.</p>:<div className="njson-basis-grid"><label>Food / preparation<input value={lookupFood} maxLength={160} placeholder="e.g. raw uncooked chickpeas" onChange={event=>changeLookupFood(event.target.value)}/></label><label>Amount<input type="number" min="0.0001" step="any" value={lookupAmount} onChange={event=>setLookupAmountDraft(event.target.value)}/></label><label>Unit<select value={lookupUnit} onChange={event=>setLookupUnitDraft(event.target.value)}>{NUTRITION_BASIS_UNITS.map(unit=><option key={unit}>{unit}</option>)}</select></label></div>}
-      <div className="njson-actions"><button type="button" disabled={disabled||!String(lookupFood||'').trim()||!(Number(lookupAmount)>0)} onClick={()=>openChatGPTWithPrompt('food_reference')}>Copy Prompt &amp; Open ChatGPT</button><button type="button" disabled={disabled||!String(lookupFood||'').trim()||!(Number(lookupAmount)>0)} onClick={()=>void copyNutritionPrompt('food_reference')}>Copy Food Lookup Prompt</button><button type="button" onClick={()=>setJsonOpen(true)}>Paste nutrition JSON</button></div>
-      {jsonCopied==='food_reference'&&<span role="status">Prompt copied</span>}
-      {promptText&&!jsonCopied&&<details><summary>Show prompt for manual copying</summary><textarea aria-label="Generated nutrition prompt" readOnly rows={6} value={promptText}/></details>}
-      {importMessage&&<p role="status" className="nscan-warning">{importMessage}</p>}
-      {pendingImport&&clipboardFallback&&<div className="njson-actions" role="group" aria-label="Clipboard import fallback"><strong>Nutrition JSON ready?</strong><button type="button" disabled={clipboardReading} onClick={()=>void readPendingClipboard()}>{clipboardReading?'Reading clipboard?':'Paste from clipboard'}</button><button type="button" onClick={()=>setJsonOpen(true)}>Paste manually</button><button type="button" onClick={cancelPendingImport}>Cancel lookup</button></div>}
-      {pendingImport&&!clipboardFallback&&<button type="button" onClick={cancelPendingImport}>Cancel pending lookup</button>}
-      <details><summary>How this works</summary><ol><li>Enter the exact food and preparation in the food name above.</li><li>Click Copy Prompt &amp; Open ChatGPT.</li><li>Paste the prompt into ChatGPT and copy its JSON code block.</li><li>Return here; CBoard checks the clipboard for this pending lookup.</li><li>If clipboard access is blocked, click Paste from clipboard or paste the JSON manually.</li></ol></details>
-    </section>
-    {!open?<div className="nscan-launch-actions"><button type="button" disabled={disabled} onClick={()=>setOpen(true)}>Scan nutrition label</button><button type="button" disabled={disabled} onClick={()=>setJsonOpen(true)}>Paste nutrition JSON</button></div>:<>
-      <div className="nscan-actions"><strong id={`${id}-title`}>Nutrition label scan</strong><div className="nscan-actions"><button type="button" disabled={disabled} onClick={()=>setJsonOpen(true)}>Paste nutrition JSON</button><button type="button" onClick={discard}>Close scanner</button></div></div>
+  return <section className="nscan" aria-label="Nutrition import">
+    {!open?<div className="nscan-launch-actions"><button type="button" disabled={disabled} onClick={()=>setOpen(true)}>Scan nutrition label</button><button type="button" disabled={disabled} onClick={()=>{setJsonMode('food_reference');setJsonOpen(true);}}>Import with ChatGPT</button></div>:<>
+      <div className="nscan-actions"><strong id={`${id}-title`}>Scan nutrition label</strong><button type="button" onClick={discard}>Close scanner</button></div>
       <p>CBoard tries secure cloud OCR first and switches to the local scanner if needed. Cloud scan processes this temporary image with OCR.Space. Include the column headings and serving size. JPEG, PNG or WEBP, up to 15 MB. Review before applying; the image is not saved.</p>
       <div className="nscan-actions">
         <label>Upload nutrition label<input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy||disabled} onChange={event=>{upload(event.target.files?.[0]);event.target.value='';}}/></label>
         <label>Take nutrition photo<input type="file" capture="environment" accept="image/jpeg,image/png,image/webp" disabled={busy||disabled} onChange={event=>{upload(event.target.files?.[0]);event.target.value='';}}/></label>
       </div>
+      <div className="nscan-chatgpt-label"><button type="button" disabled={disabled} onClick={()=>{setJsonMode('nutrition_label');setJsonOpen(true);setImportMessage('');}}>Use ChatGPT to read this label</button><small>Attach this label image in ChatGPT, then return here. CBoard checks the clipboard for this pending label import.</small></div>
       <div className={`nscan-paste${busy||disabled?' is-disabled':''}`} tabIndex={busy||disabled?-1:0} role="group" aria-label="Paste nutrition label image" onPaste={pasteImage}>
         <strong>Paste nutrition label image</strong>
         <span>Click here, then paste an image with Ctrl+V or ⌘V</span>
@@ -309,35 +295,36 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
     </>}
     <dialog ref={jsonDialog} className="njson-dialog" aria-labelledby={`${id}-json-title`} onClose={()=>setJsonOpen(false)} onClick={event=>{if(event.target===event.currentTarget)setJsonOpen(false);}}>
       <div className="njson-dialog__body">
-        <header className="njson-header"><div><span className="njson-eyebrow">Nutrition import</span><h2 id={`${id}-json-title`}>Paste nutrition JSON</h2></div><button type="button" onClick={()=>setJsonOpen(false)}>Close</button></header>
-        <p>Ask ChatGPT for CBoard JSON, then paste it here. CBoard does not call ChatGPT or a nutrition database; review the source and values before importing.</p>
-        <div className="njson-tabs" role="tablist" aria-label="ChatGPT prompt type">
-          <button type="button" role="tab" aria-selected={jsonMode==='food_reference'} onClick={()=>{setJsonMode('food_reference');setJsonCopied('');setPromptText('');setJsonFoodMismatch(null);}}>Food name lookup</button>
-          <button type="button" role="tab" aria-selected={jsonMode==='nutrition_label'} onClick={()=>{setJsonMode('nutrition_label');setJsonCopied('');setPromptText('');setJsonFoodMismatch(null);}}>Nutrition label</button>
-        </div>
-        {jsonMode==='food_reference'?<section className="njson-guide" aria-label="Get nutrition for a food">
-          <strong>Get nutrition for a food</strong>
-          <p>Include the exact preparation or state, such as uncooked, cooked, canned and drained, or dry. The prompt asks for reference data on the entered basis.</p>
-          {lookupIsControlled?<p>Using {lookupFood||'unnamed food'} ? basis {lookupAmount} {lookupUnit}. Change these in the food editor above.</p>:<div className="njson-basis-grid"><label>Food / preparation<input value={lookupFood} maxLength={160} placeholder="e.g. uncooked white chickpeas" onChange={event=>changeLookupFood(event.target.value)}/></label><label>Amount<input type="number" min="0.0001" step="any" value={lookupAmount} onChange={event=>{setLookupAmountDraft(event.target.value);setJsonCopied('');setPromptText('');}}/></label><label>Unit<select value={lookupUnit} onChange={event=>{setLookupUnitDraft(event.target.value);setJsonCopied('');setPromptText('');}}>{NUTRITION_BASIS_UNITS.map(unit=><option key={unit}>{unit}</option>)}</select></label></div>}
-          <button type="button" disabled={!lookupFood.trim()||!(Number(lookupAmount)>0)} onClick={()=>openChatGPTWithPrompt('food_reference')}>Open ChatGPT with Food Prompt</button>
-          <button type="button" disabled={!lookupFood.trim()||!(Number(lookupAmount)>0)} onClick={()=>void copyNutritionPrompt('food_reference')}>Copy Food Lookup Prompt</button>
+        <header className="njson-header"><div><span className="njson-eyebrow">Nutrition import</span><h2 id={`${id}-json-title`}>Import with ChatGPT</h2></div><button type="button" onClick={()=>setJsonOpen(false)}>Close</button></header>
+        <p>Copy the prompt, ask ChatGPT, then return here. Imported values fill this draft; save the food separately.</p>
+        {jsonMode==='nutrition_label'?<section className="njson-guide" aria-label="ChatGPT label extraction">
+          <strong>Read the label image</strong><p>Use the image uploaded in Scan nutrition label. Attach it to ChatGPT, then paste or copy its returned CBoard JSON below.</p>
+          <button type="button" disabled={disabled} onClick={()=>openChatGPTWithPrompt('nutrition_label')}>Copy label prompt &amp; open ChatGPT</button>
+          {promptText&&<details className="njson-prompt-copy"><summary>Show prompt for manual copying</summary><textarea readOnly rows={8} value={promptText}/></details>}
+          {importMessage&&<p role="status" className="nscan-warning">{importMessage}</p>}
+          {pendingImport&&clipboardFallback&&<div className="njson-actions" role="group" aria-label="Clipboard import fallback"><button type="button" disabled={clipboardReading} onClick={()=>void readPendingClipboard()}>{clipboardReading?'Reading clipboard?':'Paste from clipboard'}</button><button type="button" onClick={()=>jsonTextarea.current?.focus()}>Paste manually</button><button type="button" onClick={cancelPendingImport}>Cancel lookup</button></div>}
+          {pendingImport&&!clipboardFallback&&<button type="button" onClick={cancelPendingImport}>Cancel lookup</button>}
+          <details><summary>How this works</summary><p>The prompt only reads displayed label values. Unknown nutrients stay null. On return, CBoard checks the clipboard only for this pending label import.</p></details>
+        </section>:<section className="njson-guide" aria-label="Nutrition lookup details">
+          <label className="njson-name-label">Food / preparation{lookupIsControlled&&<small>Uses the food name above and updates that same item.</small>}<input value={lookupFood} maxLength={160} placeholder="e.g. raw uncooked chickpeas" onChange={event=>changeLookupFood(event.target.value)} onBlur={()=>changeLookupFood(String(lookupFood||'').trim())}/></label>
+          <div className="njson-basis-grid njson-basis-compact"><label>Nutrition basis amount<input type="number" min="0.0001" step="any" value={lookupAmount} onChange={event=>{setLookupAmountDraft(event.target.value);setJsonCopied('');setPromptText('');}}/></label><label>Unit<select value={lookupUnit} onChange={event=>{setLookupUnitDraft(event.target.value);setJsonCopied('');setPromptText('');}}>{NUTRITION_BASIS_UNITS.map(unit=><option key={unit}>{unit}</option>)}</select></label></div>
+          <button type="button" disabled={disabled||!String(lookupFood||'').trim()||!(Number(lookupAmount)>0)} onClick={()=>openChatGPTWithPrompt()}>Copy prompt &amp; open ChatGPT</button>
           {jsonCopied==='food_reference'&&<span role="status">Prompt copied</span>}
-        </section>:<section className="njson-guide" aria-label="Extract nutrition from a label">
-          <strong>Get nutrition from a label</strong><p>Give ChatGPT a label photo, screenshot, table, or copied label text. Label mode must extract only displayed values; absent values stay null.</p>
-          <button type="button" onClick={()=>void copyNutritionPrompt('label')}>Copy Label Extraction Prompt</button>{' '}
-          <button type="button" onClick={()=>openChatGPTWithPrompt('label')}>Open ChatGPT with Prompt</button>
-          {jsonCopied==='label'&&<span role="status">Prompt copied</span>}
+          {promptText&&<details className="njson-prompt-copy"><summary>Show prompt for manual copying</summary><textarea readOnly rows={8} value={promptText}/></details>}
+          {importMessage&&<p role="status" className="nscan-warning">{importMessage}</p>}
+          {pendingImport&&clipboardFallback&&<div className="njson-actions" role="group" aria-label="Clipboard import fallback"><button type="button" disabled={clipboardReading} onClick={()=>void readPendingClipboard()}>{clipboardReading?'Reading clipboard?':'Paste from clipboard'}</button><button type="button" onClick={()=>jsonTextarea.current?.focus()}>Paste manually</button><button type="button" onClick={cancelPendingImport}>Cancel lookup</button></div>}
+          {pendingImport&&!clipboardFallback&&<button type="button" onClick={cancelPendingImport}>Cancel lookup</button>}
+          <details><summary>How this works</summary><p>CBoard copies a schema-based prompt and opens ChatGPT. When you return, it checks the clipboard only for this pending import. If clipboard access is blocked, use Paste from clipboard or paste the JSON below.</p></details>
         </section>}
-        {promptText&&<details className="njson-prompt-copy"><summary>Show generated prompt for manual copying</summary><textarea readOnly rows={10} value={promptText}/></details>}
-        <label className="njson-paste-label">Paste JSON<textarea value={jsonText} rows={7} spellCheck="false" autoCapitalize="off" autoCorrect="off" placeholder="Paste the complete cboard-nutrition-v1 JSON object" onChange={event=>{setJsonText(event.target.value);setJsonPreview(null);setJsonConflict(false);setJsonFoodMismatch(null);setJsonError('');}} /></label>
+        <label className="njson-paste-label">Paste returned nutrition JSON<textarea ref={jsonTextarea} value={jsonText} rows={5} spellCheck="false" autoCapitalize="off" autoCorrect="off" placeholder="Paste JSON or one JSON code block" onChange={event=>{setJsonText(event.target.value);setJsonPreview(null);setJsonConflict(false);setJsonFoodMismatch(null);setJsonError('');}} /></label>
         {jsonError&&<p role="alert" className="nscan-warning">{jsonError}</p>}
-        <div className="njson-actions"><button type="button" disabled={!jsonText.trim()} onClick={previewNutritionJson}>Validate &amp; Preview</button><button type="button" onClick={()=>setJsonText(JSON.stringify(createNutritionJsonTemplate({foodName:lookupFood||'Food name',amount:Number(lookupAmount)||100,unit:lookupUnit,sourceType:jsonMode,sourceName:jsonMode==='nutrition_label'?'Supplied nutrition label':'Name of source actually used'}),null,2))}>Insert empty JSON template</button></div>
+        <div className="njson-actions"><button type="button" disabled={!jsonText.trim()} onClick={previewNutritionJson}>Validate JSON</button></div>
         {jsonPreview&&<section className="njson-preview" aria-label="Nutrition JSON preview">
           {jsonFoodMismatch&&<div className="njson-conflict" role="alert"><strong>This JSON may describe a different food or basis.</strong><p>JSON describes {jsonFoodMismatch.found}; you requested {jsonFoodMismatch.requested}.</p><div className="njson-actions"><button type="button" onClick={()=>setJsonFoodMismatch(null)}>Review JSON anyway</button><button type="button" onClick={cancelFoodMismatch}>Cancel</button></div></div>}
-          <h3>{jsonPreview.food.name}{jsonPreview.food.state?` · ${jsonPreview.food.state}`:''}</h3><p>Basis: {jsonPreview.quantity} {jsonPreview.unit} · Source: {jsonPreview.source.name} ({jsonPreview.source.sourceType==='nutrition_label'?'label extraction':'food reference'})</p>
+          <h3>{jsonPreview.food.name}{jsonPreview.food.state?`  ? ${jsonPreview.food.state}`:''}</h3><p>Basis: {jsonPreview.quantity} {jsonPreview.unit} ? Source: {jsonPreview.source.name} ({jsonPreview.source.sourceType==='nutrition_label'?'label extraction':'food reference'})</p>
           {jsonFieldGroups.map(([group,title])=>{const fields=nutritionFieldDefinitions.filter(field=>field.group===group&&jsonPreview.nutrition[field.key]!==null);return fields.length?<div className="njson-preview-group" key={group}><strong>{title}</strong><div>{fields.map(field=><span key={field.key}>{field.label}<b>{display(jsonPreview.nutrition[field.key])} {field.unit}</b></span>)}</div></div>:null;})}
           <small>{nutritionFieldDefinitions.filter(field=>jsonPreview.nutrition[field.key]===null).length} nutrients unavailable or not provided. They remain unknown.</small>
-          {!jsonConflict?<button type="button" disabled={!!jsonFoodMismatch} onClick={()=>hasCurrentNutrition?setJsonConflict(true):applyJsonImport('replace')}>{hasCurrentNutrition?'Choose how to apply':'Import Nutrition'}</button>:<div className="njson-conflict" role="group" aria-label="Choose how to apply imported nutrition"><strong>Existing nutrition found</strong><p>Replace clears values the JSON leaves null. Fill missing only keeps every existing number, including zero. Cancel returns to the preview.</p><div className="njson-actions"><button type="button" onClick={()=>applyJsonImport('replace')}>Replace nutrition</button><button type="button" disabled={!fillMissingAllowed} onClick={()=>applyJsonImport('fill-missing')}>Fill missing only</button><button type="button" onClick={()=>setJsonConflict(false)}>Cancel</button></div>{!fillMissingAllowed&&<small>Existing values use a different basis, so they cannot be safely merged. Replace or cancel.</small>}</div>}
+          {!jsonConflict?<button type="button" disabled={!!jsonFoodMismatch} onClick={()=>hasCurrentNutrition?setJsonConflict(true):applyJsonImport('replace')}>{hasCurrentNutrition?'Choose how to apply':'Apply nutrition to draft'}</button>:<div className="njson-conflict" role="group" aria-label="Choose how to apply imported nutrition"><strong>Existing nutrition found</strong><p>Replace clears values the JSON leaves null. Fill missing only keeps every existing number, including zero. Cancel returns to the preview.</p><div className="njson-actions"><button type="button" onClick={()=>applyJsonImport('replace')}>Replace nutrition</button><button type="button" disabled={!fillMissingAllowed} onClick={()=>applyJsonImport('fill-missing')}>Fill missing only</button><button type="button" onClick={()=>setJsonConflict(false)}>Cancel</button></div>{!fillMissingAllowed&&<small>Existing values use a different basis, so they cannot be safely merged. Replace or cancel.</small>}</div>}
         </section>}
       </div>
     </dialog>

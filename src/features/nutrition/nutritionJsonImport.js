@@ -87,7 +87,7 @@ export function parseNutritionJson(input) {
   if (String(input).length > 50000) fail('Nutrition JSON must be 50 KB or smaller.');
   let value;
   const raw = String(input).trim();
-  const fenced = raw.match(/^\`\`\`(?:json)?[ \t]*\r?\n([\s\S]*?)\r?\n\`\`\`$/i);
+  const fenced = raw.match(/^\`\`\`json[ \t]*\r?\n([\s\S]*?)\r?\n\`\`\`$/i);
   try { value = JSON.parse(fenced ? fenced[1] : raw); }
   catch { fail('Enter valid JSON or one JSON code block.'); }
   if (!isRecord(value)) fail('The JSON must be one object.');
@@ -95,14 +95,14 @@ export function parseNutritionJson(input) {
   if (unknownRoot.length) fail(`Unknown top-level field${unknownRoot.length > 1 ? 's' : ''}: ${unknownRoot.join(', ')}.`);
   if (value.schema !== NUTRITION_JSON_SCHEMA) fail(`Schema must be "${NUTRITION_JSON_SCHEMA}".`);
   if (!isRecord(value.food) || Object.keys(value.food).some(key => !['name', 'state'].includes(key))) fail('Food must contain only name and state.');
-  if (typeof value.food.name !== 'string' || !value.food.name.trim() || value.food.name.length > 160) fail('Food name is required and must be 160 characters or fewer.');
+  if (typeof value.food.name !== 'string' || !value.food.name.trim() || value.food.name.trim().length > 160) fail('Food name is required and must be 160 characters or fewer.');
   if (value.food.state != null && (typeof value.food.state !== 'string' || value.food.state.length > 120)) fail('Food state must be text of 120 characters or fewer.');
   if (!isRecord(value.basis) || Object.keys(value.basis).some(key => !['amount', 'unit'].includes(key))) fail('Basis must contain only amount and unit.');
   if (typeof value.basis.amount !== 'number' || !Number.isFinite(value.basis.amount) || value.basis.amount <= 0 || value.basis.amount > 100000) fail('Basis amount must be a number greater than 0 and at most 100000.');
   if (!NUTRITION_BASIS_UNITS.includes(value.basis.unit)) fail(`Basis unit must be one of: ${NUTRITION_BASIS_UNITS.join(', ')}.`);
   if (!isRecord(value.source) || Object.keys(value.source).some(key => !['type', 'name'].includes(key))) fail('Source must contain only type and name.');
   if (!['food_reference', 'nutrition_label'].includes(value.source.type)) fail('Source type must be food_reference or nutrition_label.');
-  if (typeof value.source.name !== 'string' || !value.source.name.trim() || value.source.name.length > 160) fail('Source name is required and must be 160 characters or fewer.');
+  if (typeof value.source.name !== 'string' || !value.source.name.trim() || value.source.name.trim().length > 160) fail('Enter the data source in source.name (160 characters max), such as USDA FoodData Central. Keep the food description in food.name.');
   if (!isRecord(value.nutrition)) fail('Nutrition must be an object of CBoard nutrient keys.');
   const unknownNutrients = Object.keys(value.nutrition).filter(key => !nutrientKeys.includes(key));
   if (unknownNutrients.length) fail(`Unknown nutrient key${unknownNutrients.length > 1 ? 's' : ''}: ${unknownNutrients.join(', ')}.`);

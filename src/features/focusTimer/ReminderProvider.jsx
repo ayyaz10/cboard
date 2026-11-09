@@ -319,7 +319,7 @@ function ReminderStore({ userId, children }) {
           <button type="button" onClick={() => openReminder(false)} className="ui-button ui-button--sm mt-4 w-full">Open reminder settings</button>
         </aside>
       )}
-      {route !== '/food-diary' && <button
+      {route !== '/food-diary' && (!route.startsWith('/habit-improvement') || liveTimerCount > 0 || ringing.length > 0) && <button
         type="button"
         className={`ui-button reminder-toggle fixed right-4 z-50 min-h-12 gap-2 px-4 py-3 font-bold ${ringing.length > 0 ? 'ui-button--warning' : 'ui-button--primary'}`}
         aria-expanded={widgetOpen}

@@ -1,4 +1,4 @@
-export const transactionTypes = ['income', 'expense', 'refund', 'donation', 'investment', 'debt', 'creditPayment', 'savings', 'budget', 'goal', 'transfer', 'cardCredit', 'creditPurchaseRefund'];
+export const transactionTypes = ['income', 'expense', 'refund', 'donation', 'investment', 'debt', 'creditPayment', 'savings', 'budget', 'goal', 'transfer', 'cardCredit', 'creditPurchaseRefund', 'personalRepayment', 'reimbursement', 'borrowedCash'];
 
 export function parseMoney(value, { allowZero = false } = {}) {
   if (typeof value === 'number' && Number.isSafeInteger(value)) return value;
@@ -54,7 +54,10 @@ export function financeSummary(state, selectedMonth) {
   const creditPurchaseRefunds = transactions.filter(item => item.type === 'creditPurchaseRefund' && (item.refundStatus || 'received') === 'received').reduce((total, item) => total + item.amount, 0);
   const refundCashIn = transactions.filter(item => item.type === 'creditPurchaseRefund' && item.refundDestination === 'user' && (item.refundStatus || 'received') === 'received').reduce((total, item) => total + item.amount, 0);
   const refundFor = predicate => refundTransactions.filter(refund => refund.originalTransactionId && predicate(state.transactions.find(item => item.id === refund.originalTransactionId))).reduce((total,item)=>total+item.amount,0);
-  const expenses = Math.max(0, grossExpenses - refundFor(original => original?.type === 'expense' && !isDonationExpense(original)));
+  const expensesBeforeReimbursements = Math.max(0, grossExpenses - refundFor(original => original?.type === 'expense' && !isDonationExpense(original)));
+  const reimbursementTransactions = transactions.filter(item => item.type === 'reimbursement');
+  const reimbursements = reimbursementTransactions.reduce((total, item) => total + item.amount, 0);
+  const expenses = Math.max(0, expensesBeforeReimbursements - reimbursements);
   const donations = Math.max(0, grossDonations - refundFor(original => isDonationExpense(original || {})));
   const investments = sum('investment');
   const debtPayments = sum('debt');
@@ -76,7 +79,7 @@ export function financeSummary(state, selectedMonth) {
     return total + (state.budgets[month] || []).reduce((sum, item) => sum + budgetTarget(item, monthIncome || state.settings.monthlyIncome), 0);
   }, 0);
   return {
-    income, expenses, grossExpenses, refunds, creditPurchaseRefunds, refundCashIn, donations, investments, debtPayments, creditPayments, creditPrincipalPaid, creditFinanceCosts, remaining, savings, budgetAllocated, goalContributions, transferIn, transferOut,
+    income, expenses, expensesBeforeReimbursements, reimbursements, grossExpenses, refunds, creditPurchaseRefunds, refundCashIn, donations, investments, debtPayments, creditPayments, creditPrincipalPaid, creditFinanceCosts, remaining, savings, budgetAllocated, goalContributions, transferIn, transferOut,
     savingsRate: income ? Math.round(saved * 10000 / income) : 0,
     budgetPlanned,
     budgetUsed: budgetPlanned ? Math.round(expenses * 10000 / budgetPlanned) : 0,

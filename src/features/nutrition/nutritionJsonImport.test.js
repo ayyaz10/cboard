@@ -142,3 +142,22 @@ test('uses an explicit matching serving basis for fill-missing values', () => {
 test('bounds pasted JSON input size', () => {
   assert.throws(() => parseNutritionJson(' '.repeat(50001)), /50 KB or smaller/);
 });
+
+test('trims the canonical food and source fields and maps source.name independently', () => {
+  const input = payload({
+    food: { name: '  Raw uncooked chickpeas  ', state: '  dry  ' },
+    source: { type: 'food_reference', name: '  USDA FoodData Central  ' },
+  });
+  const imported = parseNutritionJson(JSON.stringify(input));
+  assert.equal(imported.food.name, 'Raw uncooked chickpeas');
+  assert.equal(imported.food.state, 'dry');
+  assert.equal(imported.source.name, 'USDA FoodData Central');
+  assert.equal(createNutritionJsonApplication(imported, null).foodName, 'Raw uncooked chickpeas');
+});
+
+test('requires the source.name field and accepts only a recognized json fence', () => {
+  const input = payload();
+  assert.throws(() => parseNutritionJson(JSON.stringify({ ...input, source: { type: 'food_reference', name: '' } })), /source\.name/);
+  assert.throws(() => parseNutritionJson('```\n' + JSON.stringify(input) + '\n```'), /valid JSON/);
+  assert.equal(parseNutritionJson('```json\n' + JSON.stringify(input) + '\n```').food.name, 'Uncooked white chickpeas');
+});

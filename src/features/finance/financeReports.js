@@ -120,11 +120,17 @@ export function expenseCategoryReport(state, { mode = 'month', month = monthKey(
     row.transactions.push(refund);
     total -= refund.amount;
   }
+  for (const reimbursement of accepted.filter(item => item.type === 'reimbursement' && withinPeriod(item.date))) {
+    const receivable = (state.personalReceivables || []).find(item => item.id === reimbursement.personalEntryId);
+    const original = accepted.find(item => item.id === receivable?.transactionId);
+    if (!original || original.type !== 'expense') continue;
+    const row = rowFor(original); row.amount -= reimbursement.amount; row.transactions.push(reimbursement); total -= reimbursement.amount;
+  }
   total = Math.max(0, total);
   const breakdown = [...categories.values()].filter(row => row.amount > 0)
     .map(row => ({ ...row, percentage: total ? (row.amount / total) * 100 : 0 }))
     .sort((left, right) => right.amount - left.amount || left.name.localeCompare(right.name));
-  return { mode, month, year, total, categories: breakdown, transactions: [...transactions, ...refunds] };
+  return { mode, month, year, total, categories: breakdown, transactions: [...transactions, ...refunds, ...accepted.filter(item => item.type === 'reimbursement' && withinPeriod(item.date))] };
 }
 
 export function markGoalCompletion(goal, date) {

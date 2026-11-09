@@ -10,3 +10,5 @@ vite-dev*.log
 .env
 .env.local
 .env.*.local
+playwright-report/
+test-results/

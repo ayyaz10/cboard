@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { navigateTo } from '../../app/useRoute.js';
+import { createHabitFocusReturn, findLinkedHabitFocusSession, getHabitFocusMarker, hasHabitFocusSessionConflict } from '../drivingImprovement/habitFocusBridge.js';
 import { useAuth } from '../../contexts/AuthContext.jsx';
 import { AppNavigation } from '../../components/layout/AppNavigation';
 import { PageShell } from '../../components/layout/PageShell';
@@ -97,7 +98,7 @@ function FocusCompleteModal({ isOpen, session, onStartBreak, onSkipBreak, onFini
         <p className="mt-3 text-sm font-semibold leading-6 text-[var(--color-text-secondary)]">
           {session.title} is ready to close out or move into a break.
         </p>
-        {habitContext && <p className="mt-3 text-sm font-semibold text-[var(--color-text-secondary)]">Habit: {habitContext.habitTitle} · {habitContext.focusMinutes} min session</p>}
+        {habitContext && <p className="mt-3 text-sm font-semibold text-[var(--color-text-secondary)]">Habit: {habitContext.habitTitle} · {habitContext.focusMinutes} min planned</p>}
         <div className="mt-6 grid gap-3 sm:grid-cols-3">
           <button
             type="button"
@@ -305,12 +306,12 @@ export function FocusTimerPage() {
       let nextSessions = savedSessions;
       let nextActiveSession = savedActiveSession;
       if (launch?.requestId && launch.userId === user?.id) {
-        const marker = `[habit-run:${launch.requestId}]`;
-        let linked = savedSessions.find(session => session.intention?.includes(marker));
+        const marker = getHabitFocusMarker(launch);
+        let linked = findLinkedHabitFocusSession(savedSessions, launch);
         if (linked) {
           launch = { ...launch, focusSessionId: linked.id };
           try { sessionStorage.setItem('cboard:habit-focus-launch', JSON.stringify(launch)); } catch {}
-          if (savedActiveSession && savedActiveSession.id !== linked.id) {
+          if (hasHabitFocusSessionConflict(savedActiveSession, linked)) {
             nextActiveSession = savedActiveSession;
             setHabitLaunchConflict(true);
           } else if (savedActiveSession?.id === linked.id) nextActiveSession = linked;
@@ -324,7 +325,7 @@ export function FocusTimerPage() {
             navigateTo(launch.returnTo || '/habit-improvement');
             return;
           }
-        } else if (savedActiveSession) {
+        } else if (hasHabitFocusSessionConflict(savedActiveSession, null)) {
           setHabitLaunch(launch);
           setHabitLaunchConflict(true);
         } else if (!launchHandled.current) {
@@ -445,7 +446,7 @@ export function FocusTimerPage() {
 
   function returnToHabit(status) {
     if (!habitLaunch) return false;
-    const result = { ...habitLaunch, status, focusSessionId: activeSession?.id || habitLaunch.focusSessionId || null, endedAt: new Date().toISOString() };
+    const result = createHabitFocusReturn(habitLaunch, status, activeSession?.id || habitLaunch.focusSessionId || null);
     try { sessionStorage.setItem('cboard:habit-focus-return', JSON.stringify(result)); } catch {}
     navigateTo(habitLaunch.returnTo || '/habit-improvement');
     return true;
@@ -466,7 +467,6 @@ export function FocusTimerPage() {
     try { sessionStorage.removeItem('cboard:habit-focus-launch'); } catch {}
     setHabitLaunch(null);
     setHabitLaunchConflict(false);
-    navigateTo('/habit-improvement');
   }
 
   async function handlePause() {

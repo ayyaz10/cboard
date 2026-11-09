@@ -124,3 +124,9 @@ test('credit purchase deposit refunds return owned money without rewriting the a
   assert.equal(financeSummary(state, null).expenses, 7500);
   assert.deepEqual(state.creditAgreements[0], agreementBefore);
 });
+
+test('refund paid directly to the person reduces their payable but does not add owned cash',()=>{
+  const state=setup(); state.financePeople=[{id:'ahmed',name:'Ahmed',archived:false}]; state.personalLiabilities=[{id:'owed',personId:'ahmed',originalAmount:10000,remainingAmount:10000,transactionId:'purchase',history:[{kind:'purchase',amount:10000,date:'2026-11-02'}]}]; state.transactions.find(item=>item.id==='purchase').fundingSources=[{kind:'person',personId:'ahmed',amount:10000}];
+  const before=deriveFinancePosition(state).totalOwned; createRefundState(state,{originalTransactionId:'purchase',amount:3000,date:'2026-11-04',destination:'person:ahmed'});
+  assert.equal(deriveFinancePosition(state).totalOwned,before); assert.equal(state.personalLiabilities[0].remainingAmount,7000); assert.equal(financeSummary(state,'2026-11').expenses,5000);
+});
