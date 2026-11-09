@@ -424,3 +424,4 @@ html[data-theme="matrix"] .finance .f-transaction-row:hover{background:var(--mat
 .f-credit-refund-panel{margin:1rem 0;padding:1rem;border:1px solid var(--f-border,#d0d5dd);border-radius:1rem;background:var(--f-surface,#fff)}.f-credit-refund-panel ul{display:grid;gap:.5rem;margin:.75rem 0 0;padding-left:1.25rem}.f-credit-refund-panel li{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
 
 .f-import-reclassify{display:grid;gap:.45rem;margin-top:.35rem;padding:.5rem;border:1px solid var(--color-border);border-radius:.6rem}.f-import-reclassify summary{cursor:pointer;font-weight:700}
+html[data-theme="midnight"] .finance .f-credit-page .f-credit-preview p{color:var(--color-text-muted)}
