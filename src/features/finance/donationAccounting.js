@@ -27,12 +27,12 @@ export function reopenedDonationDues(state) {
     .sort((a, b) => String(a.accrual.effectiveDate).localeCompare(String(b.accrual.effectiveDate)) || String(a.accrual.id).localeCompare(String(b.accrual.id)));
 }
 
-export function accrueDonation(state, { categoryId = '', amount, currency = state.settings?.currency || 'GBP', effectiveDate, sourceType = 'manual', linkedIncomeTransactionId = '', automationRuleId = '', linkedDonationTargetId = '', note = '', executionKey = '' }) {
+export function accrueDonation(state, { categoryId = '', amount, currency = state.settings?.currency || 'GBP', effectiveDate, sourceType = 'manual', linkedIncomeTransactionId = '', sourceIncomeAmount = null, sourceIncomeDescription = '', sourceIncomeDate = '', automationRuleId = '', linkedDonationTargetId = '', note = '', executionKey = '' }) {
   const value = Number(amount);
   if (!Number.isSafeInteger(value) || value <= 0) throw new Error('Donation due must be a positive amount.');
   if (executionKey && (state.donationAccruals || []).some(item => item.executionKey === executionKey)) return false;
   state.donationAccruals ||= [];
-  state.donationAccruals.push({ id: id(), categoryId, amount: value, accruedAmount: value, paidAmount: 0, currency, effectiveDate, sourceType, linkedIncomeTransactionId, automationRuleId, linkedDonationTargetId, executionKey, note, status: 'outstanding', createdAt: nextCreatedAt(state) });
+  state.donationAccruals.push({ id: id(), categoryId, amount: value, accruedAmount: value, paidAmount: 0, currency, effectiveDate, sourceType, linkedIncomeTransactionId, sourceIncomeAmount, sourceIncomeDescription, sourceIncomeDate, automationRuleId, linkedDonationTargetId, executionKey, note, status: 'outstanding', createdAt: nextCreatedAt(state) });
   return true;
 }
 
@@ -110,6 +110,7 @@ export function reconcileDonationIncome(state, income, operation = 'replace') {
   const deleting = operation === 'delete' || operation === true;
   const linked = (state.donationAccruals || []).filter(item => item.linkedIncomeTransactionId === income.id && item.automationRuleId);
   for (const accrual of linked) {
+    accrual.sourceIncomeAmount = income.amount; accrual.sourceIncomeDescription = income.title || 'Income'; accrual.sourceIncomeDate = income.date || accrual.effectiveDate;
     const rule = (state.allocationRules || []).find(item => item.id === accrual.automationRuleId);
     const desired = deleting || !rule ? 0 : amountFor(rule, income.amount);
     const paid = Number(accrual.paidAmount || 0);
@@ -137,7 +138,7 @@ export function reconcileDonationIncome(state, income, operation = 'replace') {
       const executionKey = `${rule.id}:${income.id}`;
       const amount = amountFor(rule, income.amount);
       if (!(state.donationAccruals || []).some(item => item.executionKey === executionKey) && amount > 0) {
-        accrueDonation(state, { categoryId: rule.donationCategoryId || '', amount, effectiveDate: income.date, sourceType: 'income_percentage', linkedIncomeTransactionId: income.id, automationRuleId: rule.id, linkedDonationTargetId: rule.donationTargetId || '', note: rule.name || '', executionKey });
+        accrueDonation(state, { categoryId: rule.donationCategoryId || '', amount, effectiveDate: income.date, sourceType: 'income_percentage', linkedIncomeTransactionId: income.id, sourceIncomeAmount: income.amount, sourceIncomeDescription: income.title || 'Income', sourceIncomeDate: income.date, automationRuleId: rule.id, linkedDonationTargetId: rule.donationTargetId || '', note: rule.name || '', executionKey });
       }
     }
   }

@@ -130,7 +130,7 @@ export function debtAccrualSettlementStatus(accrual) {
   return paid > 0 ? 'partially_settled' : 'outstanding';
 }
 
-export function accrueDebtPayment(state, { debtId, amount, effectiveDate, sourceType = 'income_rule', linkedIncomeTransactionId = '', repaymentRuleId = '', executionKey = '', note = '' }) {
+export function accrueDebtPayment(state, { debtId, amount, effectiveDate, sourceType = 'income_rule', linkedIncomeTransactionId = '', sourceIncomeAmount = null, sourceIncomeDescription = '', sourceIncomeDate = '', repaymentRuleId = '', executionKey = '', note = '' }) {
   const debt = (state.debts || []).find(item => item.id === debtId);
   const requested = cents(amount);
   if (!debt || requested <= 0 || !effectiveDate) return false;
@@ -141,7 +141,7 @@ export function accrueDebtPayment(state, { debtId, amount, effectiveDate, source
   if (!accruedAmount) return false;
   state.debtAccruals.push({
     id: id(), debtId, amount: accruedAmount, accruedAmount, paidAmount: 0, effectiveDate,
-    sourceType, linkedIncomeTransactionId, repaymentRuleId, executionKey,
+    sourceType, linkedIncomeTransactionId, sourceIncomeAmount, sourceIncomeDescription, sourceIncomeDate, repaymentRuleId, executionKey,
     status: 'outstanding', note,
   });
   return true;
@@ -187,7 +187,7 @@ export function migrateLegacyDebtAllocations(state) {
     const created = accrueDebtPayment(state, {
       debtId: transaction.targetId, amount: transaction.amount, effectiveDate: transaction.date,
       sourceType: transaction.sourceIncomeId ? 'income_rule' : 'scheduled_rule',
-      linkedIncomeTransactionId: transaction.sourceIncomeId || '', repaymentRuleId: transaction.allocationRuleId,
+      linkedIncomeTransactionId: transaction.sourceIncomeId || '', sourceIncomeAmount: transaction.sourceIncomeAmount ?? null, sourceIncomeDescription: transaction.sourceIncomeDescription || '', sourceIncomeDate: transaction.sourceIncomeDate || '', repaymentRuleId: transaction.allocationRuleId,
       executionKey, note: transaction.note || 'Migrated from an unpaid automatic allocation',
     });
     if (exists || created) migrated.push(transaction);
@@ -414,6 +414,8 @@ export function reconcileDebtIncome(state, income, operation = 'replace') {
     const paid = cents(accrual.paidAmount);
     if (accrual.manuallyOverriddenAt) continue;
     if (deleting) {
+      accrual.sourceIncomeAmount ??= income.amount; accrual.sourceIncomeDescription ||= income.title || 'Income'; accrual.sourceIncomeDate ||= income.date || accrual.effectiveDate;
+      accrual.originalSourceIncomeId ||= income.id;
       if (paid) {
         accrual.accruedAmount = paid;
         accrual.amount = paid;
@@ -422,6 +424,7 @@ export function reconcileDebtIncome(state, income, operation = 'replace') {
       } else accrual.status = 'reversed';
       continue;
     }
+    accrual.sourceIncomeAmount = income.amount; accrual.sourceIncomeDescription = income.title || 'Income'; accrual.sourceIncomeDate = income.date || accrual.effectiveDate;
     const rule = rules.find(item => item.id === accrual.repaymentRuleId);
     const debt = state.debts.find(item => item.id === accrual.debtId);
     if (!rule || !debt) continue;

@@ -3,6 +3,7 @@ import { formatMoney, moneyInput, parseMoney } from './financeMath.js';
 import { canRefundTransaction, receivedRefundTotal, remainingRefundable, refundsForTransaction } from './refunds.js';
 import { canDeleteTransaction, canDuplicateTransaction, canEditTransaction, canOpenLinkedRecord, canReclassifyTransaction, getTransactionAmountPresentation, getTransactionDisplayType, getTransactionLinkedContext } from './transactionPresentation.js';
 import { ReceiptItems } from './ReceiptEditor.jsx';
+import { autoAllocationEvents, groupAutoAllocationsByIncome } from './autoAllocationHistory.js';
 
 const dateLabel = value => {
   const date=String(value||'').slice(0,10);
@@ -19,6 +20,7 @@ export function TransactionDetailDialog({ transaction, data, busy, close, edit, 
   useEffect(()=>{dialogRef.current?.showModal();return ()=>{if(dialogRef.current?.open)dialogRef.current.close()}},[]);
   if (!transaction) return null;
   const linked=getTransactionLinkedContext(transaction,data);
+  const incomeAllocations=transaction.type==='income'?groupAutoAllocationsByIncome(autoAllocationEvents(data)).find(group=>group.id===transaction.id):null;
   const amount=getTransactionAmountPresentation(transaction);
   const category=data.categories.find(item=>item.id===transaction.categoryId)?.name || 'Uncategorized';
   const fundLabel=value=>{if(!value)return 'Spendable money';const [kind,id]=String(value).split(':',2);if(kind==='goal')return `${data.goals.find(item=>item.id===id)?.title||'Fund'} goal`;if(kind==='investment')return data.investments.find(item=>item.id===id)?.name||'Investment fund';if(kind==='savings')return 'Savings';return value};
@@ -63,6 +65,7 @@ export function TransactionDetailDialog({ transaction, data, busy, close, edit, 
         {transaction.reversedAt&&<div><dt>Status</dt><dd>Reversed on {dateLabel(transaction.reversedAt)}</dd></div>}
         {transaction.receipt&&<div className="f-transaction-receipt" id={`receipt-${transaction.id}`}><dt>Receipt attached</dt><dd><p>{transaction.receipt.merchantName||transaction.title} · Total {formatMoney(transaction.receipt.total??transaction.amount,data.settings.currency)}</p><details><summary>View receipt items and details</summary><ReceiptItems receipt={transaction.receipt} currency={data.settings.currency}/></details></dd></div>}
       </dl>
+      {incomeAllocations&&<section className="f-transaction-refunds f-income-allocation-detail" aria-label="Automatic allocations"><h3>Automatic allocations</h3>{incomeAllocations.events.length?<><ul>{incomeAllocations.events.map(event=><li key={event.id}><span>{event.targetName} <small>{event.status}</small></span><strong>{formatMoney(event.plannedAmount,data.settings.currency)}</strong></li>)}</ul><p>Total allocated <strong>{formatMoney(incomeAllocations.allocatedAmount,data.settings.currency)}</strong></p><p>Income less planned allocations <strong>{formatMoney(incomeAllocations.remainingAmount,data.settings.currency)}</strong></p><p className="f-help">This is not a cash balance. Some amounts are reserved until you record a payment.</p></>:<p>No automatic allocations are linked to this income.</p>}</section>}
       {(linkedRefunds.length>0||canRefundTransaction(data.transactions,transaction)||(transaction.type==='refund'&&transaction.originalTransactionId))&&<section className="f-transaction-refunds" aria-label="Refund history"><h3>{transaction.type==='refund'?'Refund details':'Refunds'}</h3>
         {linkedRefunds.length>0&&<ul>{linkedRefunds.map(refund=><li key={refund.id}><span>{dateLabel(refund.date)} · +{formatMoney(refund.amount,data.settings.currency)} · {refund.reversedAt?'Reversed':refund.refundStatus==='pending'?'Pending':'Received'}</span>{refund.note&&<small>{refund.note}</small>}{!refund.reversedAt&&<button type="button" className="f-button" disabled={busy} onClick={async()=>{try{await reverseRefund(refund)}catch(error){setActionError(error.message)}}}>Reverse</button>}</li>)}</ul>}
         {transaction.type!=='refund'&&<div className="f-refund-totals"><span>Original <strong>{formatMoney(transaction.amount,data.settings.currency)}</strong></span><span>Refunded <strong>{formatMoney(receivedRefunds,data.settings.currency)}</strong></span><span>Net cost <strong>{formatMoney(Math.max(0,transaction.amount-receivedRefunds),data.settings.currency)}</strong></span></div>}

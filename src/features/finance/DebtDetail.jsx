@@ -25,7 +25,7 @@ function HistoryRows({ rows, empty, limit, setLimit, children }) {
 
 export function DebtDetail({
   debt, currency, sourceCurrency, sourceRemaining, remaining, status, metrics, progress, planLabel,
-  accumulations, payments, getSettlementStatus, getPaymentSource, canEditPayment, canReversePayment,
+  accumulations, incomeAllocations = [], payments, getSettlementStatus, getPaymentSource, canEditPayment, canReversePayment,
   onBack, onRecordPayment, onAddAccumulation, onEditAccumulation, onRemoveAccumulation,
   onEditPayment, onReversePayment, onEditDebt, onEditPlan, onPause, onResume, onArchive, openTransactionDetail,
   onDelete, canDelete, children,
@@ -74,6 +74,8 @@ export function DebtDetail({
             }}
           </HistoryRows>
         </section>
+
+          <section className="f-debt-history-section" aria-labelledby="debt-auto-history-heading"><header><div><h3 id="debt-auto-history-heading">Automatic allocations from income</h3><p className="f-help">Amounts set aside for this debt, linked to the income that triggered them.</p></div></header>{incomeAllocations.length?<ul className="f-debt-history-list">{incomeAllocations.map(event=><li className="f-debt-history-row" key={event.id}><div className="f-debt-history-copy"><strong><Money amount={event.plannedAmount} currency={currency}/></strong><span>{event.sourceIncomeDate} · From {event.sourceIncomeDescription} ({event.status})</span></div>{event.sourceIncomeAvailable&&<button type="button" className="f-button" onClick={()=>openTransactionDetail?.(event.sourceIncomeId)}>Income details</button>}</li>)}</ul>:<p className="f-debt-empty">No automatic income allocations for this debt.</p>}</section>
 
           <section className="f-debt-history-section" aria-labelledby="debt-paid-heading">
           <header><div><h3 id="debt-paid-heading">Paid</h3><p className="f-help">Actual Finance payments. Reversed payments stay in history and are excluded from this total.</p></div><strong><Money amount={metrics.paidAllTime} currency={currency}/></strong></header>

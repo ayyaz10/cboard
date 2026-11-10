@@ -37,13 +37,15 @@ function allocationTitle(rule, state) {
 
 export function applyAllocation(state, rule, income, date, sourceIncomeId = '') {
   let amount = amountFor(rule, income);
+  const sourceIncome = sourceIncomeId ? state.transactions.find(item => item.id === sourceIncomeId) : null;
+  const incomeSnapshot = sourceIncome ? { sourceIncomeAmount: sourceIncome.amount, sourceIncomeDescription: sourceIncome.title || 'Income', sourceIncomeDate: sourceIncome.date || date } : {};
   if (!amount || amount < 0) return false;
   if (rule.targetType === 'debt') {
     const debt = state.debts.find(item => item.id === rule.targetId);
     const remaining = debt && debtRemainingAmount(state, debt.id);
     if (!debt || !remaining || debtPlanStatus({ ...debt, remaining }, state.allocationRules, date) !== 'active') return false;
     const executionKey = sourceIncomeId ? `${rule.id}:${sourceIncomeId}` : `${rule.id}:monthly:${monthKey(date)}`;
-    return accrueDebtPayment(state, { debtId: debt.id, amount, effectiveDate: date, sourceType: sourceIncomeId ? 'income_rule' : 'scheduled_rule', linkedIncomeTransactionId: sourceIncomeId, repaymentRuleId: rule.id, executionKey, note: rule.name || '' });
+    return accrueDebtPayment(state, { debtId: debt.id, amount, effectiveDate: date, sourceType: sourceIncomeId ? 'income_rule' : 'scheduled_rule', linkedIncomeTransactionId: sourceIncomeId, ...incomeSnapshot, repaymentRuleId: rule.id, executionKey, note: rule.name || '' });
   }
   if (rule.targetType === 'donation') {
     const executionKey = sourceIncomeId ? `${rule.id}:${sourceIncomeId}` : `${rule.id}:monthly:${monthKey(date)}`;
@@ -55,7 +57,7 @@ export function applyAllocation(state, rule, income, date, sourceIncomeId = '') 
       amount = Math.min(amount, Math.max(0, target.targetAmount - linkedPaid - linkedDue));
       if (!amount) { rule.active = false; target.status = 'completed'; target.completedAt ||= date; return false; }
     }
-    const created = accrueDonation(state, { categoryId: rule.donationCategoryId || target?.categoryId || '', amount, effectiveDate: date, sourceType: sourceIncomeId ? 'income_percentage' : 'adjustment', linkedIncomeTransactionId: sourceIncomeId, automationRuleId: rule.id, linkedDonationTargetId: target?.id || '', note: rule.note || rule.name || '', executionKey });
+    const created = accrueDonation(state, { categoryId: rule.donationCategoryId || target?.categoryId || '', amount, effectiveDate: date, sourceType: sourceIncomeId ? 'income_percentage' : 'adjustment', linkedIncomeTransactionId: sourceIncomeId, ...incomeSnapshot, automationRuleId: rule.id, linkedDonationTargetId: target?.id || '', note: rule.note || rule.name || '', executionKey });
     if (target && linkedDueForTarget(state, target.id) >= target.targetAmount) { target.status = 'completed'; target.completedAt ||= date; rule.active = false; }
     return created;
   }
@@ -69,7 +71,7 @@ export function applyAllocation(state, rule, income, date, sourceIncomeId = '') 
   const previousTime = Math.max(0, ...state.transactions.map(item => Date.parse(item.createdAt) || 0));
   const now = new Date(Math.max(Date.now(), previousTime + 1)).toISOString();
   const merchant=state.merchantProfiles?.find(item=>item.id===rule.merchantId);
-  const transaction = { id: id(), sequence: nextTransactionSequence(state), title: allocationTitle(rule, state), amount, type: rule.targetType, targetId: rule.targetId || '', categoryId: rule.categoryId || '', donationCategoryId: donationTarget?.categoryId || rule.donationCategoryId || '', linkedDonationTargetId: donationTarget?.id || '', merchantId:merchant?.id||null, resolvedMerchantName:merchant?.displayName||'', date, note: rule.note || 'Automatic income allocation', paymentMethod: '', createdAt: now, updatedAt: now, allocationRuleId: rule.id, sourceIncomeId, allocationStatus: 'allocated', accountingKind: 'allocation', allocatedOn: date };
+  const transaction = { id: id(), sequence: nextTransactionSequence(state), title: allocationTitle(rule, state), amount, type: rule.targetType, targetId: rule.targetId || '', categoryId: rule.categoryId || '', donationCategoryId: donationTarget?.categoryId || rule.donationCategoryId || '', linkedDonationTargetId: donationTarget?.id || '', merchantId:merchant?.id||null, resolvedMerchantName:merchant?.displayName||'', date, note: rule.note || 'Automatic income allocation', paymentMethod: '', createdAt: now, updatedAt: now, allocationRuleId: rule.id, sourceIncomeId, ...incomeSnapshot, allocationStatus: 'allocated', accountingKind: 'allocation', allocatedOn: date };
   if (rule.targetType === 'goal') {
     const goal = state.goals.find(x => x.id === rule.targetId);
     if (!goal) return false;
@@ -78,7 +80,7 @@ export function applyAllocation(state, rule, income, date, sourceIncomeId = '') 
     transaction.amount = applied;
     goal.saved += applied;
     markGoalCompletion(goal, date);
-    state.goalContributions.push({ id: id(), goalId: goal.id, amount: applied, kind: 'contribution', date, allocationRuleId: rule.id, sourceIncomeId, transactionId: transaction.id });
+    state.goalContributions.push({ id: id(), goalId: goal.id, amount: applied, kind: 'contribution', date, allocationRuleId: rule.id, sourceIncomeId, ...incomeSnapshot, transactionId: transaction.id });
   }
   if (rule.targetType === 'investment') {
     const investment = state.investments.find(x => x.id === rule.targetId);
@@ -107,6 +109,7 @@ function linkedDueForTarget(state, targetId) {
 // manually-created transactions and unrelated allocations untouched.
 export function reconcileIncomeAllocations(state, income, operation = 'replace') {
   const deleting = operation === 'delete' || operation === true;
+  if (!deleting) state.allocationHistory = (state.allocationHistory || []).filter(item => item.sourceIncomeId !== income.id);
   reconcileDonationIncome(state, income, deleting ? 'delete' : 'replace');
   reconcileDebtIncome(state, income, deleting ? 'delete' : 'replace');
   const linked = state.transactions.filter(x => x.sourceIncomeId === income.id && x.allocationRuleId);
@@ -130,15 +133,39 @@ export function reconcileIncomeAllocations(state, income, operation = 'replace')
   return { protectedCount: protectedRecords.length };
 }
 
+function recordSkippedIncomeAllocation(state, rule, income, status = 'skipped', reason = '') {
+  state.allocationHistory ||= [];
+  const executionKey = `${rule.id}:${income.id}`;
+  if (state.allocationHistory.some(item => item.executionKey === executionKey)) return;
+  const target = rule.targetType === 'goal' ? state.goals.find(item => item.id === rule.targetId)
+    : rule.targetType === 'debt' ? state.debts.find(item => item.id === rule.targetId)
+      : rule.targetType === 'donation' ? state.donationTargets?.find(item => item.id === rule.donationTargetId) : null;
+  state.allocationHistory.push({
+    id: id(), executionKey, sourceIncomeId: income.id, sourceIncomeDate: income.date || '',
+    sourceIncomeDescription: income.title || 'Income', sourceIncomeAmount: income.amount,
+    allocationRuleId: rule.id, allocationType: ['donation','goal','debt'].includes(rule.targetType) ? rule.targetType : 'other', targetId: rule.targetId || rule.donationTargetId || '',
+    targetName: target?.title || target?.name || rule.name || rule.targetType || 'Allocation',
+    plannedAmount: amountFor(rule, income.amount), appliedAmount: 0, status, createdAt: new Date().toISOString(), reason,
+  });
+}
+
 export function applyIncomeAllocations(state, incomeTransaction) {
-  for (const rule of (state.allocationRules || []).filter(x => x.active && x.timing === 'income' && (!x.startedOn || x.startedOn <= incomeTransaction.date))) {
+  state.allocationHistory ||= [];
+  for (const rule of (state.allocationRules || []).filter(x => x.active && x.timing === 'income')) {
+    if (rule.startedOn && rule.startedOn > incomeTransaction.date) {
+      recordSkippedIncomeAllocation(state, rule, incomeTransaction, 'not_applicable', 'Rule starts after this income.');
+      continue;
+    }
     if (rule.targetType === 'donation' || rule.targetType === 'debt') {
       const executionKey = `${rule.id}:${incomeTransaction.id}`;
       const accruals = rule.targetType === 'donation' ? state.donationAccruals || [] : state.debtAccruals || [];
-      if (!accruals.some(item => item.executionKey === executionKey)) applyAllocation(state, rule, incomeTransaction.amount, incomeTransaction.date, incomeTransaction.id);
+      if (state.allocationHistory.some(item => item.executionKey === executionKey)) continue;
+      if (!accruals.some(item => item.executionKey === executionKey) && !applyAllocation(state, rule, incomeTransaction.amount, incomeTransaction.date, incomeTransaction.id)) recordSkippedIncomeAllocation(state, rule, incomeTransaction);
       continue;
     }
-    if (!state.transactions.some(x => x.allocationRuleId === rule.id && x.sourceIncomeId === incomeTransaction.id)) applyAllocation(state, rule, incomeTransaction.amount, incomeTransaction.date, incomeTransaction.id);
+    const executionKey = `${rule.id}:${incomeTransaction.id}`;
+    if (state.allocationHistory.some(item => item.executionKey === executionKey)) continue;
+    if (!state.transactions.some(x => x.allocationRuleId === rule.id && x.sourceIncomeId === incomeTransaction.id) && !applyAllocation(state, rule, incomeTransaction.amount, incomeTransaction.date, incomeTransaction.id)) recordSkippedIncomeAllocation(state, rule, incomeTransaction);
   }
   return state;
 }

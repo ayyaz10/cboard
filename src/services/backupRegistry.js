@@ -119,7 +119,7 @@ const finance = {
   recordCount(data) {
     const state = data.workspace?.state;
     if (!state) return 0;
-    return ['categories', 'donationCategories', 'donationTargets', 'donationAccruals', 'donationPayments', 'donationReversals', 'transactions', 'merchantProfiles', 'budgetPresets', 'goals', 'goalContributions', 'investments', 'debts', 'debtPayments', 'debtAccruals', 'creditAgreements', 'recurring', 'transactionPresets', 'allocationRules', 'financePeople', 'personalLiabilities', 'personalReceivables', 'accounts', 'creditCards'].reduce((count, key) => count + (Array.isArray(state[key]) ? state[key].length : 0), 0)
+    return ['categories', 'donationCategories', 'donationTargets', 'donationAccruals', 'donationPayments', 'donationReversals', 'transactions', 'allocationHistory', 'merchantProfiles', 'budgetPresets', 'goals', 'goalContributions', 'investments', 'debts', 'debtPayments', 'debtAccruals', 'creditAgreements', 'recurring', 'transactionPresets', 'allocationRules', 'financePeople', 'personalLiabilities', 'personalReceivables', 'accounts', 'creditCards'].reduce((count, key) => count + (Array.isArray(state[key]) ? state[key].length : 0), 0)
       + (Array.isArray(state.creditAgreements) ? state.creditAgreements.reduce((total, item) => total + (Array.isArray(item.schedule) ? item.schedule.length : 0), 0) : 0)
       + (state.budgets && typeof state.budgets === 'object' ? Object.keys(state.budgets).length : 0);
   },

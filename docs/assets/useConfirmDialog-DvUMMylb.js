@@ -1,1 +1,0 @@
-import{c as n}from"./index-Brqvc5CN.js";function o(){const[c,l]=n.useState(null);return{confirm:n.useCallback(e=>new Promise(a=>{l({title:e.title,message:e.message,confirmLabel:e.confirmLabel,cancelLabel:e.cancelLabel,onConfirm:()=>{l(null),a(!0)},onCancel:()=>{l(null),a(!1)}})}),[]),dialog:c}}export{o as u};
