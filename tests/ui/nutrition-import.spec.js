@@ -1,4 +1,4 @@
-﻿import { test, expect } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { createNutritionJsonTemplate } from '../../src/features/nutrition/nutritionJsonImport.js';
 
 const validNutrition = JSON.stringify({
@@ -87,4 +87,41 @@ test('ChatGPT label extraction is available inside Scan Nutrition Label', async 
   await expect.poll(() => page.evaluate(() => window.__prompt)).toContain('Do not use general food knowledge');
   await page.evaluate(() => window.dispatchEvent(new Event('focus')));
   await expect(page.getByLabel('Applied food name')).toHaveText('Brand chickpeas|130');
+});
+
+for (const width of [390, 1366]) {
+  test(`missing preparation imports nutrition and preserves the canonical user-entered food name at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('tests/ui/fixtures/nutrition.html');
+    await page.getByLabel('Canonical food item name').fill("Pepe's Peri Chicken");
+    await page.getByRole('button', { name: 'Import with ChatGPT' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Import with ChatGPT' });
+    const payloadWithoutState = JSON.stringify({
+      ...createNutritionJsonTemplate({ foodName: 'Chicken, peri peri', sourceName: 'USDA FoodData Central' }),
+      food: { name: 'Chicken, peri peri' },
+      nutrition: { calories: 207, protein: 25 },
+    });
+    await dialog.getByLabel('Paste returned nutrition JSON').fill(payloadWithoutState);
+    await dialog.getByRole('button', { name: 'Validate JSON' }).click();
+    await expect(dialog.getByRole('alert')).toHaveCount(0);
+    await dialog.getByRole('button', { name: 'Apply nutrition to draft' }).click();
+    await expect(page.getByLabel('Applied food name')).toHaveText("Pepe's Peri Chicken|207");
+  });
+}
+test('invalid preparation JSON shows an inline preparation error', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('tests/ui/fixtures/nutrition.html');
+  await page.getByRole('button', { name: 'Import with ChatGPT' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Import with ChatGPT' });
+  const invalidPreparation = JSON.stringify({
+    ...createNutritionJsonTemplate({ foodName: 'Raw uncooked chickpeas', sourceName: 'USDA FoodData Central' }),
+    food: { name: 'Raw uncooked chickpeas', state: { text: 'raw' } },
+    nutrition: { calories: 164 },
+  });
+  const jsonField = dialog.getByLabel('Paste returned nutrition JSON');
+  await jsonField.fill(invalidPreparation);
+  await dialog.getByRole('button', { name: 'Validate JSON' }).click();
+  await expect(dialog.getByText('Preparation must be text up to 120 characters.', { exact: true })).toBeVisible();
+  await expect(jsonField).toHaveAttribute('aria-invalid', 'true');
+  await expect(jsonField).toHaveAttribute('aria-describedby', /json-error/);
 });

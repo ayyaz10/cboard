@@ -94,9 +94,12 @@ export function parseNutritionJson(input) {
   const unknownRoot = Object.keys(value).filter(key => !rootKeys.includes(key));
   if (unknownRoot.length) fail(`Unknown top-level field${unknownRoot.length > 1 ? 's' : ''}: ${unknownRoot.join(', ')}.`);
   if (value.schema !== NUTRITION_JSON_SCHEMA) fail(`Schema must be "${NUTRITION_JSON_SCHEMA}".`);
-  if (!isRecord(value.food) || Object.keys(value.food).some(key => !['name', 'state'].includes(key))) fail('Food must contain only name and state.');
+  if (!isRecord(value.food) || Object.keys(value.food).some(key => !['name', 'state', 'preparation', 'foodState'].includes(key))) fail('Food must contain only name and preparation/state.');
   if (typeof value.food.name !== 'string' || !value.food.name.trim() || value.food.name.trim().length > 160) fail('Food name is required and must be 160 characters or fewer.');
-  if (value.food.state != null && (typeof value.food.state !== 'string' || value.food.state.length > 120)) fail('Food state must be text of 120 characters or fewer.');
+  const stateValue = hasOwn(value.food, 'state') ? value.food.state : hasOwn(value.food, 'preparation') ? value.food.preparation : value.food.foodState;
+  if (stateValue != null && typeof stateValue !== 'string') fail('Preparation must be text up to 120 characters.');
+  const state = typeof stateValue === 'string' ? stateValue.trim() : '';
+  if (state.length > 120) fail('Preparation must be text up to 120 characters.');
   if (!isRecord(value.basis) || Object.keys(value.basis).some(key => !['amount', 'unit'].includes(key))) fail('Basis must contain only amount and unit.');
   if (typeof value.basis.amount !== 'number' || !Number.isFinite(value.basis.amount) || value.basis.amount <= 0 || value.basis.amount > 100000) fail('Basis amount must be a number greater than 0 and at most 100000.');
   if (!NUTRITION_BASIS_UNITS.includes(value.basis.unit)) fail(`Basis unit must be one of: ${NUTRITION_BASIS_UNITS.join(', ')}.`);
@@ -114,7 +117,7 @@ export function parseNutritionJson(input) {
   if (!Object.values(nutrition).some(nutrient => nutrient !== null)) fail('Include at least one known nutrition value.');
   return {
     schema: NUTRITION_JSON_SCHEMA,
-    food: { name: value.food.name.trim(), state: String(value.food.state || '').trim() },
+    food: { name: value.food.name.trim(), state },
     quantity: value.basis.amount,
     unit: value.basis.unit,
     nutrition,

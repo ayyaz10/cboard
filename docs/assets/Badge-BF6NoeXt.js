@@ -1,1 +1,0 @@
-import{j as t}from"./index-BKLXPL0y.js";function n({variant:a="neutral",className:e="",children:r,...s}){return t.jsx("span",{className:`ui-badge ui-badge--${a} ${e}`.trim(),...s,children:r})}export{n as B};

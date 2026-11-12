@@ -5,14 +5,14 @@ import { normalizeMerchantName } from './merchantDirectory.js';
 import { isValidFinanceDate } from './transactionOrder.js';
 import { canRefundTransaction, remainingRefundable } from './refunds.js';
 
-export const MAX_IMPORT_ROWS = 1000;
+export const MAX_IMPORT_ROWS = 2500;
 export const MAX_IMPORT_TEXT_LENGTH = 25 * 1024 * 1024;
 const rowLimitError = () => new Error('Import files can contain at most ' + MAX_IMPORT_ROWS.toLocaleString() + ' transaction rows. Split the statement and import it in parts.');
 
 const aliases = {
   date: ['date', 'transaction date', 'posted date', 'booking date', 'value date'],
   description: ['description', 'merchant', 'payee', 'transaction', 'details', 'narrative', 'memo', 'reference'],
-  amount: ['amount', 'transaction amount'], debit: ['debit', 'money out', 'paid out', 'withdrawal'],
+  amount: ['amount', 'transaction amount'], debit: ['debit', 'money out', 'paid out', 'withdrawal', 'withdrawn'],
   credit: ['credit', 'money in', 'paid in', 'deposit'], balance: ['balance', 'running balance'], currency: ['currency', 'ccy'], account: ['account', 'account name', 'account nickname', 'account holder'],
 };
 const normalizeHeader = value => String(value || '').replace(/^\uFEFF/, '').trim().toLocaleLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -103,9 +103,22 @@ export function suggestCategory(description, direction, categories, transactions
   return category?.id || (categories || []).find(item => item.name === (direction === 'income' ? 'Other income' : 'Other') && item.type === direction)?.id || '';
 }
 
-export function findImportDuplicate(record, transactions) {
-  const title = String(record.description || '').trim().toLocaleLowerCase();
-  return (transactions || []).find(item => !item.reversedAt && item.date === record.date && Math.abs(Number(item.amount)) === record.amount && String(item.title || '').trim().toLocaleLowerCase() === title && ((record.direction === 'income' ? ['income', 'refund', 'cardCredit'].includes(item.type) : item.type === 'expense') || (item.sourceType === 'file_import' && item.importDirection === record.direction))) || null;
+function normalizeImportDescription(value) {
+  return String(value || '').normalize('NFKC').toLocaleLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
+}
+
+export function findImportDuplicate(record, transactions, accountId = '') {
+  const description = normalizeImportDescription(record.description);
+  const reference = normalizeImportDescription(record.reference);
+  const selectedAccountId = accountId || record.accountId || '';
+  return (transactions || []).find(item => {
+    const existingAccountId = item.accountId || item.creditCardId || '';
+    if (selectedAccountId && existingAccountId && selectedAccountId !== existingAccountId) return false;
+    const sameDescription = description && normalizeImportDescription(item.title || item.rawMerchantText) === description;
+    const sameReference = reference && normalizeImportDescription(item.reference) === reference;
+    const sameDirection = (record.direction === 'income' ? ['income', 'refund', 'cardCredit'].includes(item.type) : item.type === 'expense') || (item.sourceType === 'file_import' && item.importDirection === record.direction);
+    return !item.reversedAt && item.date === record.date && Math.abs(Number(item.amount)) === record.amount && (sameDescription || sameReference) && sameDirection;
+  }) || null;
 }
 
 export function matchImportAccount(accountName, state) {
@@ -184,26 +197,228 @@ export function linkImportedPersonalSettlementState(state, { record, entryId, ac
   return transaction;
 }
 
-export function parseStatementText(text, { sourceType = 'statement', dateOrder = 'dmy' } = {}) {
-  const records = [], source = String(text || '');
+const statementDatePattern = /^(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[./-]\d{1,2}[./-]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}(?:\s+\d{2,4})?|[A-Za-z]{3,9}\s+\d{1,2},?(?:\s+\d{2,4})?)$/i;
+const statementCurrency = /[$£€¥]/;
+const statementMonth = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 };
+
+function parseStatementDate(value, context, dateOrder) {
+  const text = String(value || '').trim().replace(/,$/, '');
+  if (!statementDatePattern.test(text)) return '';
+  const yearless = text.match(/^(\d{1,2})\s+([A-Za-z]{3,9})$/i) || text.match(/^([A-Za-z]{3,9})\s+(\d{1,2})$/i);
+  if (yearless) {
+    if (!Number.isInteger(context.year)) return '';
+    const day = Number(/^[A-Za-z]/.test(yearless[1]) ? yearless[2] : yearless[1]);
+    const monthName = /^[A-Za-z]/.test(yearless[1]) ? yearless[1] : yearless[2];
+    const month = statementMonth[monthName.slice(0, 3).toLowerCase()];
+    const date = `${context.year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return month && isValidFinanceDate(date) ? date : '';
+  }
+  const explicit = parseImportDate(text, dateOrder);
+  if (explicit) context.year = Number(explicit.slice(0, 4));
+  return explicit;
+}
+
+function normalizeStatementInput(input) {
+  if (Array.isArray(input)) return input.map((line, index) => typeof line === 'string' ? { text: line, sourceRow: index + 1 } : { ...line, text: String(line?.text || ''), sourceRow: line?.sourceRow ?? index + 1 });
+  const source = String(input || '');
   if (source.length > MAX_IMPORT_TEXT_LENGTH) throw new Error('This statement is too large to parse safely.');
-  for (const [index, raw] of source.split(/\r?\n/).entries()) {
-    const line = raw.trim().replace(/\s+/g, ' ');
-    const dateMatch = line.match(/^((?:\d{1,4}[./-]\d{1,2}[./-]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}|[A-Za-z]{3,9}\s+\d{1,2},?\s+\d{4}))\s+(.+)$/);
-    if (!dateMatch) continue;
-    const amounts = [...dateMatch[2].matchAll(/(?:\(?[-+]?\s*[$£€]?\s*\d[\d,.]*\)?-?)/g)].filter(match => parseImportAmount(match[0]) !== null);
-    if (!amounts.length) continue;
-    const amountMatch = amounts.length >= 2 && !/[+-]|\(|\)/.test(amounts.at(-1)[0]) ? amounts.at(-2) : amounts.at(-1);
-    const afterAmount = dateMatch[2].slice(amountMatch.index + amountMatch[0].length);
-    const suffix = afterAmount.match(/^\s*(DR|DEBIT|CR|CREDIT)\b/i)?.[1]?.toUpperCase() || '';
-    const description = dateMatch[2].slice(0, amountMatch.index).trim().replace(/[|·-]+$/, '').trim();
-    const parsedAmount = parseImportAmount(amountMatch[0]), date = parseImportDate(dateMatch[1], dateOrder);
-    const explicitDirection = /[-+]|\(|\)$/.test(amountMatch[0]) || Boolean(suffix);
-    const ignored = /\b(?:opening|closing|statement total|page \d+)\b/i.test(description);
-    const invalid = !date || description.length < 2 || !parsedAmount || ignored || !explicitDirection;
-    const direction = suffix ? (suffix.startsWith('D') ? 'expense' : 'income') : parsedAmount < 0 ? 'expense' : 'income';
+  return source.split(/\r?\n/).map((text, index) => ({ text, sourceRow: index + 1 }));
+}
+
+function findStatementColumns(lines) {
+  for (const line of lines) {
+    if (!Array.isArray(line.items) || !line.items.length) continue;
+    const joined = line.items.map(item => item.text).join(' ').toLowerCase().replace(/[^a-z]+/g, ' ');
+    if (!/\bdate\b/.test(joined) || !/\bdescription\b|\bdetails\b/.test(joined) || !/\bpaid\b/.test(joined) || !/\bwithdrawn\b|\bpaid out\b/.test(joined) || !/\bbalance\b/.test(joined)) continue;
+    const fieldX = {
+      date: line.items.find(item => /^date$/i.test(item.text.trim()))?.x,
+      description: line.items.find(item => /^(?:description|details)$/i.test(item.text.trim()))?.x,
+      paidIn: line.items.find(item => /^paid(?:\s*in)?\b/i.test(item.text.trim()))?.x,
+      withdrawn: line.items.find(item => /^(?:withdrawn|paid\s*out)\b/i.test(item.text.trim()))?.x,
+      balance: line.items.find(item => /^balance\b/i.test(item.text.trim()))?.x,
+    };
+    if (Object.values(fieldX).every(Number.isFinite)) return fieldX;
+  }
+  return null;
+}
+
+function columnsForLine(line, columnX) {
+  const fields = Object.entries(columnX).sort((a, b) => a[1] - b[1]);
+  const columns = Object.fromEntries(Object.keys(columnX).map(key => [key, []]));
+  for (const item of line.items || []) {
+    let field = fields[0]?.[0];
+    for (let index = 0; index < fields.length - 1; index++) {
+      if (item.x >= (fields[index][1] + fields[index + 1][1]) / 2) field = fields[index + 1][0];
+      else break;
+    }
+    columns[field].push(item.text);
+  }
+  return Object.fromEntries(Object.entries(columns).map(([key, values]) => [key, values.join(' ').replace(/\s+/g, ' ').trim()]));
+}
+
+function statementAmountToken(text) {
+  const match = String(text || '').match(/(?:[$£€¥]\s*[-+]?\s*\d[\d,.]*|[-+]?\s*\d[\d,.]*\s*[$£€¥]?)/);
+  if (!match) return null;
+  const token = match[0].trim();
+  if (!statementCurrency.test(token) && !/[,.]\d{1,2}$/.test(token) && !/^[-+]\s*\d/.test(token)) return null;
+  return parseImportAmount(token);
+}
+
+function cleanStatementDescription(value) {
+  return String(value || '').replace(/[|·]+/g, ' ').replace(/\s+/g, ' ').replace(/^[\s,:;-]+|[\s,:;-]+$/g, '').trim();
+}
+
+function statementHeaderOrFooter(line) {
+  const value = String(line || '').trim();
+  return !value || /^(?:date\s+description\b|description\s+date\b|paid in(?:\s*\([^)]*\))?$|withdrawn(?:\s*\([^)]*\))?$|balance(?:\s*\([^)]*\))?$|page\s+\d+(?:\s+of\s+\d+)?|statement(?:\s+date|\s+number|\s+period)?\b|account\s+(?:number|name)\b|sort code\b|customer service\b)/i.test(value);
+}
+
+function makeStatementRecord({ date, description, amount, direction, sourceType, sourceRow, confidence = 'ready', validation = '' }) {
+  return { date: date || '', description: cleanStatementDescription(description).slice(0, 200), amount: Math.abs(amount || 0), direction, currency: '', balance: null, reference: '', sourceType, sourceRow, confidence: !date || !cleanStatementDescription(description) ? 'review' : confidence, validation: !date ? 'Statement year or transaction date is missing.' : !cleanStatementDescription(description) ? 'Add a transaction description.' : validation, ...(direction === 'income' ? { classification: 'review' } : {}) };
+}
+
+export function parseStatementText(input, options = {}) {
+  const { sourceType = 'statement', dateOrder = 'dmy', context: sharedContext = null, sourceRowPrefix = '', diagnostics = null } = options;
+  const lines = normalizeStatementInput(input), context = sharedContext || {};
+  context.year ??= null;
+  context.currentDate ??= '';
+  context.pendingDescription ??= [];
+  context.pendingBalanceKind ??= '';
+  context.statementColumns ??= null;
+  context.openingBalance ??= null;
+  context.closingBalance ??= null;
+  if (diagnostics) diagnostics.linesProcessed = (diagnostics.linesProcessed || 0) + lines.length;
+  context.statementColumns = findStatementColumns(lines) || context.statementColumns;
+  const records = [];
+  const pushRecord = (description, amount, direction, sourceRow, confidence = 'ready', validation = '') => {
     if (records.length >= MAX_IMPORT_ROWS) throw rowLimitError();
-    records.push({ date, description: description.slice(0, 200), amount: Math.abs(parsedAmount || 0), direction, currency: '', balance: null, reference: '', sourceType, sourceRow: index + 1, confidence: invalid ? 'review' : 'ready', validation: invalid ? (!explicitDirection ? 'Confirm whether this is money in or out.' : 'Review this extracted line.') : '' });
+    const normalized = cleanStatementDescription(description);
+    if (/\b(?:brought forward|opening balance|closing balance|carried forward|statement total)\b/i.test(normalized)) {
+      if (diagnostics) diagnostics.ignoredBalanceRows = (diagnostics.ignoredBalanceRows || 0) + 1;
+      return;
+    }
+    records.push(makeStatementRecord({ date: context.currentDate, description: normalized, amount, direction, sourceType, sourceRow: sourceRowPrefix ? `${sourceRowPrefix}:${sourceRow}` : sourceRow, confidence, validation }));
+  };
+
+  for (const line of lines) {
+    const rawText = line.text.trim().replace(/\s+/g, ' ');
+    if (context.statementColumns && Array.isArray(line.items) && line.items.length) {
+      const columns = columnsForLine(line, context.statementColumns);
+      const combined = line.items.map(item => item.text).join(' ').trim();
+      const headerLine = /\bdate\b/i.test(combined) && /\bbalance\b/i.test(combined) && (/\bpaid\b/i.test(combined) || /\bwithdrawn\b/i.test(combined));
+      if (headerLine) { if (diagnostics) diagnostics.ignoredHeaderRows = (diagnostics.ignoredHeaderRows || 0) + 1; continue; }
+      if (columns.date) {
+        const parsedDate = parseStatementDate(columns.date, context, dateOrder);
+        if (parsedDate) {
+          if (context.currentDate && parsedDate !== context.currentDate && context.pendingDescription.length) context.pendingDescription = [];
+          context.currentDate = parsedDate;
+        }
+      }
+      const description = cleanStatementDescription(columns.description);
+      const balance = statementAmountToken(columns.balance);
+      const balanceLabel = /\b(?:brought forward|opening balance|closing balance|carried forward|statement total)\b/i.test(combined);
+      if (/\b(?:brought forward|opening balance)\b/i.test(combined)) context.pendingBalanceKind = 'opening';
+      if (/\b(?:closing balance|balance carried forward|balance brought forward)\b/i.test(combined)) context.pendingBalanceKind = 'closing';
+      if (balance !== null) {
+        if (context.pendingBalanceKind === 'opening') context.openingBalance = Math.abs(balance);
+        if (context.pendingBalanceKind === 'closing') context.closingBalance = Math.abs(balance);
+        context.pendingBalanceKind = '';
+        if (diagnostics) diagnostics.ignoredBalanceRows = (diagnostics.ignoredBalanceRows || 0) + 1;
+      }
+      if (balanceLabel) {
+        if (diagnostics) diagnostics.ignoredBalanceRows = (diagnostics.ignoredBalanceRows || 0) + 1;
+        context.pendingDescription = [];
+        continue;
+      }
+      const paidIn = statementAmountToken(columns.paidIn), withdrawn = statementAmountToken(columns.withdrawn);
+      if (paidIn !== null || withdrawn !== null) {
+        if (description) context.pendingDescription.push(description);
+        if (paidIn !== null && withdrawn !== null) {
+          pushRecord(context.pendingDescription.join(' '), paidIn, 'income', line.sourceRow, 'review', 'Both Paid In and Withdrawn columns contain an amount.');
+          pushRecord(context.pendingDescription.join(' '), withdrawn, 'expense', line.sourceRow, 'review', 'Both Paid In and Withdrawn columns contain an amount.');
+        } else pushRecord(context.pendingDescription.join(' '), paidIn ?? withdrawn, paidIn !== null ? 'income' : 'expense', line.sourceRow);
+        context.pendingDescription = [];
+        continue;
+      }
+      if (description) context.pendingDescription.push(description);
+      continue;
+    }
+
+    const dateMatch = rawText.match(/^((?:\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[./-]\d{1,2}[./-]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}(?:\s+\d{2,4})?|[A-Za-z]{3,9}\s+\d{1,2},?(?:\s+\d{2,4})?))(?:\s+(.+))?$/i);
+    let lineText = rawText;
+    if (dateMatch) {
+      const nextDate = parseStatementDate(dateMatch[1], context, dateOrder);
+      if (nextDate) {
+        if (context.currentDate && nextDate !== context.currentDate && context.pendingDescription.length) context.pendingDescription = [];
+        context.currentDate = nextDate;
+        lineText = dateMatch[2] || '';
+        if (!lineText) continue;
+      }
+    }
+    if (/\b(?:brought forward|opening balance)\b/i.test(lineText)) context.pendingBalanceKind = 'opening';
+    if (/\b(?:closing balance|balance carried forward|balance brought forward)\b/i.test(lineText)) context.pendingBalanceKind = 'closing';
+    const balanceLine = lineText.match(/\bbalance\b\s*[:]?\s*(.*)$/i);
+    if (balanceLine) {
+      const amount = statementAmountToken(balanceLine[1]);
+      if (amount !== null && context.pendingBalanceKind === 'opening') context.openingBalance = Math.abs(amount);
+      if (amount !== null && context.pendingBalanceKind === 'closing') context.closingBalance = Math.abs(amount);
+      if (amount !== null) context.pendingBalanceKind = '';
+      if (diagnostics) diagnostics.ignoredBalanceRows = (diagnostics.ignoredBalanceRows || 0) + 1;
+      continue;
+    }
+    if (/\b(?:brought forward|opening balance|closing balance|balance carried forward|statement total)\b/i.test(lineText)) {
+      if (diagnostics) diagnostics.ignoredBalanceRows = (diagnostics.ignoredBalanceRows || 0) + 1;
+      context.pendingDescription = [];
+      continue;
+    }
+    if (statementHeaderOrFooter(lineText)) { if (diagnostics) diagnostics.ignoredHeaderRows = (diagnostics.ignoredHeaderRows || 0) + 1; continue; }
+    const labelled = lineText.match(/\b(paid\s*in|money\s*in|deposit|credit|withdrawn|paid\s*out|money\s*out|debit|withdrawal)\b\s*[:]?\s*(.*)$/i);
+    if (labelled) {
+      const directionLabel = labelled[1].toLowerCase().replace(/\s+/g, ' '), amountText = labelled[2].split(/\bbalance\b/i)[0];
+      const amount = statementAmountToken(amountText);
+      if (amount !== null) {
+        const prefix = cleanStatementDescription(lineText.slice(0, labelled.index));
+        if (prefix) context.pendingDescription.push(prefix);
+        const direction = ['paid in', 'money in', 'deposit', 'credit'].includes(directionLabel) ? 'income' : 'expense';
+        pushRecord(context.pendingDescription.join(' '), amount, direction, line.sourceRow);
+        context.pendingDescription = [];
+        context.pendingBalanceKind = '';
+        continue;
+      }
+    }
+    const inline = lineText.match(/(?:[$£€¥]\s*[-+]?\s*\d[\d,.]*|[-+]\s*(?:[$£€¥]\s*)?\d[\d,.]*|\(?\d[\d,.]*\)?-?\s*(?:DR|DEBIT|CR|CREDIT))\s*$/i);
+    if (inline) {
+      const token = inline[0].trim(), parsedAmount = parseImportAmount(token.replace(/\s*(?:DR|DEBIT|CR|CREDIT)$/i, ''));
+      const moneyTokens = [...lineText.matchAll(/(?:[$£€¥]\s*[-+]?\s*\d[\d,.]*|[-+]?\s*\d[\d,.]*\s*[$£€¥]?)/g)].filter(match => statementAmountToken(match[0]) !== null);
+      if (moneyTokens.length > 1) {
+        if (diagnostics) diagnostics.unparsedCandidateRows = (diagnostics.unparsedCandidateRows || 0) + 1;
+        context.pendingDescription = [];
+        continue;
+      }
+      const explicitDirection = /[-+]|\(|\)|\b(?:DR|DEBIT|CR|CREDIT)\b/i.test(token);
+      if (parsedAmount !== null) {
+        const beforeAmount = cleanStatementDescription(lineText.slice(0, inline.index));
+        if (beforeAmount) context.pendingDescription.push(beforeAmount);
+        const suffix = token.match(/(DR|DEBIT|CR|CREDIT)$/i)?.[1]?.toUpperCase();
+        const direction = suffix ? (suffix.startsWith('D') ? 'expense' : 'income') : parsedAmount < 0 ? 'expense' : 'income';
+        pushRecord(context.pendingDescription.join(' '), parsedAmount, direction, line.sourceRow, explicitDirection ? 'ready' : 'review', explicitDirection ? '' : 'Confirm whether this is money in or out.');
+        context.pendingDescription = [];
+        context.pendingBalanceKind = '';
+        continue;
+      }
+    }
+    if (statementHeaderOrFooter(lineText)) { if (diagnostics) diagnostics.ignoredHeaderRows = (diagnostics.ignoredHeaderRows || 0) + 1; continue; }
+    if (context.currentDate && /(?:[$£€¥]\s*\d|[-+]\s*\d+[.,]\d{1,2})/.test(lineText)) {
+      if (diagnostics) diagnostics.unparsedCandidateRows = (diagnostics.unparsedCandidateRows || 0) + 1;
+      context.pendingDescription = [];
+      continue;
+    }
+    if (context.currentDate && lineText) context.pendingDescription.push(lineText);
+  }
+  if (diagnostics) {
+    diagnostics.transactionRowsDetected = (diagnostics.transactionRowsDetected || 0) + records.length;
+    diagnostics.openingBalance = context.openingBalance;
+    diagnostics.closingBalance = context.closingBalance;
   }
   return records;
 }

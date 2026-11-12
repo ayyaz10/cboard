@@ -1,0 +1,69 @@
+03 OCT 2026
+BROUGHT FORWARD
+Balance Â£429.64
+Date Description Paid In (Â£) Withdrawn (Â£) Balance (Â£)
+05 OCT
+Automated Credit SOI WAD LTD - FP 05/10/26 0945
+54416004843074297
+Paid In Â£225.00
+Balance Â£654.64
+Card Transaction 7118 02OCT26 D STAGECOACH
+SERVICES STOCKPORT GB
+Withdrawn Â£89.60
+Balance Â£565.04
+Card Transaction 7118 02OCT26 CD BEST KEBAB
+KIRKCALDY KIRKCALDY GB
+Withdrawn Â£1.50
+06 OCT
+Card Transaction 7118 03OCT26 CD CITY SHOP
+Withdrawn Â£2.64
+Card Transaction 7118 03OCT26 CD COFFEE HOUSE
+Withdrawn Â£6.56
+07 OCT
+Card Transaction 7118 04OCT26 CD GROCERY SHOP
+Withdrawn Â£18.87
+Card Transaction 7118 04OCT26 CD BUS FARE
+Withdrawn Â£2.50
+Card Transaction 7118 04OCT26 CD CAFE
+Withdrawn Â£3.78
+09 OCT
+Card Transaction 7118 06OCT26 CD SHOP ONE
+Withdrawn Â£4.95
+Card Transaction 7118 06OCT26 CD SHOP TWO
+Withdrawn Â£12.77
+12 OCT
+Automated Credit SOI WAD LTD SENT FROM SUMUP FP
+12/10/26 1709 45737489914382949
+Paid In Â£150.00
+Account interest
+Paid In Â£1.00
+Card Transaction 7118 09OCT26 CD SHOP THREE
+Withdrawn Â£14.27
+Card Transaction 7118 09OCT26 CD SHOP FOUR
+Withdrawn Â£11.99
+Card Transaction 7118 09OCT26 CD SHOP FIVE
+Withdrawn Â£2.95
+Card Transaction 7118 09OCT26 CD SHOP SIX
+Withdrawn Â£2.49
+Card Transaction 7118 09OCT26 CD SHOP SEVEN
+Withdrawn Â£3.70
+Date Description Paid In (Â£) Withdrawn (Â£) Balance (Â£)
+Page 2 of 4
+14 OCT
+Card Transaction 7118 11OCT26 CD SHOP EIGHT
+Withdrawn Â£9.15
+Card Transaction 7118 11OCT26 CD SHOP NINE
+Withdrawn Â£18.50
+15 OCT
+Card Transaction 7118 12OCT26 CD SHOP TEN
+Withdrawn Â£1.80
+Card Transaction 7118 12OCT26 CD SHOP ELEVEN
+Withdrawn Â£4.90
+Card Transaction 7118 12OCT26 CD SHOP TWELVE
+Withdrawn Â£13.06
+26 OCT
+Card Transaction 7118 23OCT26 D STAGECOACH
+SERVICES STOCKPORT GB
+Withdrawn Â£2.50
+CLOSING BALANCE
+Balance Â£100.00

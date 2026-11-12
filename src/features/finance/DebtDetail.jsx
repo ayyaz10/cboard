@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import { Badge } from '../../components/ui/Badge.jsx';
 import { formatMoney } from './financeMath.js';
 import { debtAccrualSettlementStatus } from './debtAccounting.js';
@@ -26,7 +26,7 @@ function HistoryRows({ rows, empty, limit, setLimit, children }) {
 export function DebtDetail({
   debt, currency, sourceCurrency, sourceRemaining, remaining, status, metrics, progress, planLabel,
   accumulations, incomeAllocations = [], payments, getSettlementStatus, getPaymentSource, canEditPayment, canReversePayment,
-  onBack, onRecordPayment, onAddAccumulation, onEditAccumulation, onRemoveAccumulation,
+  onBack, onRecordPayment, onSendMoney, onAddAccumulation, onEditAccumulation, onRemoveAccumulation,
   onEditPayment, onReversePayment, onEditDebt, onEditPlan, onPause, onResume, onArchive, openTransactionDetail,
   onDelete, canDelete, children,
 }) {
@@ -59,7 +59,7 @@ export function DebtDetail({
         </section>
 
         <div className="f-debt-primary-actions">
-          {!paidOff && <button type="button" className="f-primary" onClick={onRecordPayment}>Record payment</button>}
+          {!paidOff && <button type="button" className="f-primary" onClick={onRecordPayment}>Record payment</button>}{!paidOff && onSendMoney && <button type="button" className="f-button" onClick={onSendMoney}>Send money</button>}
           {!paidOff && <button type="button" className="f-button" onClick={onAddAccumulation}>＋ Add to accumulated</button>}
         </div>
 

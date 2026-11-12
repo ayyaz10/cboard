@@ -1,1 +1,0 @@
-import{c as a}from"./index-BKLXPL0y.js";import{a3 as t,a4 as o}from"./CartesianChart-D9_nMx6V.js";var i=["axis"],s=a.forwardRef((r,e)=>a.createElement(t,{chartName:"LineChart",defaultTooltipEventType:"axis",validateTooltipEventTypes:i,tooltipPayloadSearcher:o,categoricalChartProps:r,ref:e}));export{s as L};

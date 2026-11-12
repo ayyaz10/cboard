@@ -1,5 +1,6 @@
 ﻿import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { buildImportedTransaction, matchImportAccount, rememberImportAccount, detectDelimiter, detectImportColumns, detectPossibleRefund, findImportDuplicate, MAX_IMPORT_ROWS, parseDelimitedText, parseImportAmount, parseImportDate, parseStatementText, rowsToImportTransactions, suggestCategory, suggestPersonalSettlement } from './transactionImport.js';
 
 test('quoted CSV supports BOM, commas, escaped quotes, and CRLF', () => {
@@ -85,9 +86,14 @@ test('refund duplicates match incoming refund rows without confusing them with e
 
 test('delimited and statement imports reject more than the bounded transaction row count', () => {
   const rows = ['Date,Description,Amount', ...Array.from({ length: MAX_IMPORT_ROWS + 1 }, (_, index) => '01/11/2026,Shop ' + index + ',1.00')].join('\n');
-  assert.throws(() => parseDelimitedText(rows, ','), /at most 1,000 transaction rows/);
+  assert.throws(() => parseDelimitedText(rows, ','), /at most 2,500 transaction rows/);
   const statement = Array.from({ length: MAX_IMPORT_ROWS + 1 }, (_, index) => '01/11/2026 Shop ' + index + ' -1.00').join('\n');
-  assert.throws(() => parseStatementText(statement), /at most 1,000 transaction rows/);
+  assert.throws(() => parseStatementText(statement), /at most 2,500 transaction rows/);
+});
+
+test('statement parser accepts more than one thousand transaction rows within its bound', () => {
+  const statement = Array.from({ length: 1200 }, (_, index) => '01/11/2026 Shop ' + index + ' -1.00').join('\n');
+  assert.equal(parseStatementText(statement).length, 1200);
 });
 
 test('possible refund hints require an eligible purchase with enough refundable room', () => {
@@ -141,4 +147,94 @@ test('confirmed imported borrowed money keeps an incoming bank row out of income
  const record={description:'Ahmed loan',direction:'income',amount:20000,date:'2026-11-08',confidence:'ready',sourceType:'csv'};
  const transaction=linkImportedBorrowedMoneyState(state,{record,personName:'Ahmed',accountId:'bank-1'});
  assert.equal(transaction.type,'borrowedCash');assert.equal(transaction.accountId,'bank-1');assert.equal(state.personalLiabilities[0].remainingAmount,20000);assert.equal(transaction.personalEntryId,state.personalLiabilities[0].id);
+});
+
+
+test('grouped bank statement fixture keeps inherited dates, descriptions, directions, references, and balances separate', () => {
+  const statement = readFileSync(new URL('./fixtures/groupedBankStatement.txt', import.meta.url), 'utf8');
+  const diagnostics = {};
+  const records = parseStatementText(statement, { sourceType: 'pdf-scan', diagnostics });
+  assert.equal(records.length, 23);
+  assert.deepEqual(records.slice(0, 3).map(item => [item.date, item.amount, item.direction]), [
+    ['2026-10-05', 22500, 'income'], ['2026-10-05', 8960, 'expense'], ['2026-10-05', 150, 'expense'],
+  ]);
+  assert.equal(records[0].description, 'Automated Credit SOI WAD LTD - FP 05/10/26 0945 54416004843074297');
+  assert.match(records[1].description, /STAGECOACH SERVICES STOCKPORT GB/);
+  assert.equal(records.find(item => item.amount === 100).description, 'Account interest');
+  assert.deepEqual(records.filter(item => item.date === '2026-10-12').map(item => item.amount), [15000, 100, 1427, 1199, 295, 249, 370]);
+  assert.ok(records.filter(item => item.direction === 'expense').every(item => item.confidence === 'ready'));
+  assert.ok(records.filter(item => item.direction === 'income').every(item => item.classification === 'review'));
+  assert.equal(records.some(item => /brought forward|balance/i.test(item.description)), false);
+  assert.equal(diagnostics.openingBalance, 42964);
+  assert.equal(diagnostics.closingBalance, 10000);
+  assert.equal(diagnostics.transactionRowsDetected, 23);
+  assert.ok(diagnostics.ignoredBalanceRows >= 8);
+});
+
+test('parser context carries a grouped date and a split description across PDF pages and repeated headers', () => {
+  const context = {};
+  const first = parseStatementText('03 OCT 2026\n26 OCT\nCard Transaction 7118 23OCT26 D STAGECOACH', { sourceType: 'pdf', context, sourceRowPrefix: '1' });
+  const second = parseStatementText('Page 2 of 4\nDate Description Paid In (£) Withdrawn (£) Balance (£)\nSERVICES STOCKPORT GB\nWithdrawn £2.50', { sourceType: 'pdf-scan', context, sourceRowPrefix: '2' });
+  assert.equal(first.length, 0);
+  assert.equal(second.length, 1);
+  assert.equal(second[0].date, '2026-10-26');
+  assert.equal(second[0].description, 'Card Transaction 7118 23OCT26 D STAGECOACH SERVICES STOCKPORT GB');
+  assert.equal(second[0].amount, 250);
+  assert.equal(second[0].direction, 'expense');
+  assert.equal(second[0].sourceRow.startsWith('2:'), true);
+});
+
+test('positioned PDF text uses the Paid In and Withdrawn columns and never imports the running balance', () => {
+  const header = { text: 'Date Description Paid In (£) Withdrawn (£) Balance (£)', sourceRow: 1, items: [
+    { x: 10, text: 'Date' }, { x: 60, text: 'Description' }, { x: 220, text: 'Paid In (£)' }, { x: 340, text: 'Withdrawn (£)' }, { x: 440, text: 'Balance (£)' },
+  ] };
+  const positioned = (sourceRow, cells) => ({ sourceRow, text: cells.map(item => item.text).join(' '), items: cells });
+  const records = parseStatementText([
+    header,
+    positioned(2, [{ x: 10, text: '03 OCT 2026' }, { x: 60, text: 'BROUGHT FORWARD' }, { x: 440, text: '£429.64' }]),
+    positioned(3, [{ x: 10, text: '05 OCT' }, { x: 60, text: 'Automated Credit long reference 54416004843074297' }]),
+    positioned(4, [{ x: 220, text: '£225.00' }, { x: 440, text: '£654.64' }]),
+    positioned(5, [{ x: 60, text: 'Card Transaction 7118 02OCT26 D STAGECOACH' }]),
+    positioned(6, [{ x: 60, text: 'SERVICES STOCKPORT GB' }]),
+    positioned(7, [{ x: 340, text: '£89.60' }, { x: 440, text: '£565.04' }]),
+  ], { sourceType: 'pdf' });
+  assert.deepEqual(records.map(item => [item.date, item.amount, item.direction]), [['2026-10-05', 22500, 'income'], ['2026-10-05', 8960, 'expense']]);
+  assert.match(records[0].description, /54416004843074297/);
+  assert.match(records[1].description, /STAGECOACH SERVICES STOCKPORT GB/);
+});
+
+test('Paid In and Withdrawn CSV headers map directly and running balance is not the amount', () => {
+  const headers = ['Date', 'Description', 'Paid In (£)', 'Withdrawn (£)', 'Balance (£)'];
+  const rows = parseDelimitedText('Date,Description,Paid In (£),Withdrawn (£),Balance (£)\n05/10/2026,Salary,225.00,,654.64\n05/10/2026,Travel,,89.60,565.04', ',').slice(1);
+  const records = rowsToImportTransactions(rows, headers);
+  assert.deepEqual(records.map(item => [item.amount, item.direction, item.balance]), [[22500, 'income', 65464], [8960, 'expense', 56504]]);
+});
+
+
+test('statement duplicate matching normalizes descriptions and respects account and reference signals', () => {
+  const record = { date: '2026-10-05', amount: 8960, description: 'Card Transaction 7118 02OCT26 D Stagecoach Services', direction: 'expense', reference: 'FP 0945' };
+  const canonical = { id: 'saved', date: record.date, amount: 8960, title: 'card transaction 7118 02oct26 d-stagecoach services', type: 'expense', accountId: 'bank-1', reference: 'FP 0945' };
+  assert.equal(findImportDuplicate(record, [canonical], 'bank-1'), canonical);
+  assert.equal(findImportDuplicate(record, [canonical], 'bank-2'), null);
+  assert.equal(findImportDuplicate({ ...record, description: 'Different narrative' }, [canonical], 'bank-1'), canonical);
+});
+
+test('labelled amount rows with no description require review', () => {
+  const [record] = parseStatementText('03 OCT 2026\n05 OCT\nPaid In £1.00');
+  assert.equal(record.date, '2026-10-05');
+  assert.equal(record.amount, 100);
+  assert.equal(record.confidence, 'review');
+  assert.equal(record.validation, 'Add a transaction description.');
+});
+
+
+test('unlabelled positive currency amounts need direction review and a second column amount is never used as balance', () => {
+  const uncertain = parseStatementText('03 OCT 2026\n05 OCT Shop £5.00');
+  assert.equal(uncertain.length, 1);
+  assert.equal(uncertain[0].confidence, 'review');
+  assert.equal(uncertain[0].validation, 'Confirm whether this is money in or out.');
+  const diagnostics = {};
+  const ambiguous = parseStatementText('03 OCT 2026\n05 OCT Shop £5.00 £100.00', { diagnostics });
+  assert.equal(ambiguous.length, 0);
+  assert.equal(diagnostics.unparsedCandidateRows, 1);
 });

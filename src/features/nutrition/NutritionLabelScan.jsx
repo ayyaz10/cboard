@@ -95,9 +95,16 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
       else{popupBlocked.current=true;setImportMessage('The browser blocked the ChatGPT tab. The prompt is still available to copy.');}
     }catch{popupBlocked.current=true;setImportMessage('ChatGPT could not be opened. The prompt is still available to copy.');}
   }
+  function preferredImportFoodName(importedName,pending){
+    if(pending?.mode==='nutrition_label')return importedName;
+    const currentName=String(contextRef.current.foodName||'').trim();
+    if(currentName)return currentName;
+    if(pending?.mode!=='nutrition_label'&&pending?.foodName)return pending.foodName;
+    return importedName;
+  }
   function applyPendingImport(parsed,pending){
     const context=contextRef.current;
-    const result={...createNutritionJsonApplication(parsed,context.current,'replace'),foodName:pending.mode==='nutrition_label'?parsed.food.name:pending.foodName};
+    const result={...createNutritionJsonApplication(parsed,context.current,'replace'),foodName:preferredImportFoodName(parsed.food.name,pending)};
     context.onApply(result);
     updatePendingImport(null);
     setClipboardFallback(false);
@@ -171,7 +178,7 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
     try{
       const pending=pendingImportRef.current;
       const imported=createNutritionJsonApplication(jsonPreview,current,strategy);
-      onApply({...imported,foodName:pending?.mode==='nutrition_label'?jsonPreview.food.name:pending?.foodName||jsonPreview.food.name});
+      onApply({...imported,foodName:preferredImportFoodName(jsonPreview.food.name,pending)});
       updatePendingImport(null);setClipboardFallback(false);setJsonFoodMismatch(null);setImportMessage(`Nutrition imported for ${pending?.foodName||jsonPreview.food.name}.`);
       setJsonOpen(false);setJsonText('');setJsonPreview(null);setJsonConflict(false);
       notify.success(`Nutrition imported for ${pending?.foodName||jsonPreview.food.name}.`);
@@ -316,8 +323,8 @@ export function NutritionLabelScan({current=null,onApply,disabled=false,initialO
           {pendingImport&&!clipboardFallback&&<button type="button" onClick={cancelPendingImport}>Cancel lookup</button>}
           <details><summary>How this works</summary><p>CBoard copies a schema-based prompt and opens ChatGPT. When you return, it checks the clipboard only for this pending import. If clipboard access is blocked, use Paste from clipboard or paste the JSON below.</p></details>
         </section>}
-        <label className="njson-paste-label">Paste returned nutrition JSON<textarea ref={jsonTextarea} value={jsonText} rows={5} spellCheck="false" autoCapitalize="off" autoCorrect="off" placeholder="Paste JSON or one JSON code block" onChange={event=>{setJsonText(event.target.value);setJsonPreview(null);setJsonConflict(false);setJsonFoodMismatch(null);setJsonError('');}} /></label>
-        {jsonError&&<p role="alert" className="nscan-warning">{jsonError}</p>}
+        <label className="njson-paste-label">Paste returned nutrition JSON<textarea ref={jsonTextarea} value={jsonText} rows={5} spellCheck="false" autoCapitalize="off" autoCorrect="off" aria-invalid={!!jsonError} aria-describedby={jsonError?`${id}-json-error`:undefined} placeholder="Paste JSON or one JSON code block" onChange={event=>{setJsonText(event.target.value);setJsonPreview(null);setJsonConflict(false);setJsonFoodMismatch(null);setJsonError('');}} /></label>
+        {jsonError&&<p id={`${id}-json-error`} aria-live="polite" className="nscan-warning">{jsonError}</p>}
         <div className="njson-actions"><button type="button" disabled={!jsonText.trim()} onClick={previewNutritionJson}>Validate JSON</button></div>
         {jsonPreview&&<section className="njson-preview" aria-label="Nutrition JSON preview">
           {jsonFoodMismatch&&<div className="njson-conflict" role="alert"><strong>This JSON may describe a different food or basis.</strong><p>JSON describes {jsonFoodMismatch.found}; you requested {jsonFoodMismatch.requested}.</p><div className="njson-actions"><button type="button" onClick={()=>setJsonFoodMismatch(null)}>Review JSON anyway</button><button type="button" onClick={cancelFoodMismatch}>Cancel</button></div></div>}

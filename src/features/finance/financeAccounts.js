@@ -1,4 +1,4 @@
-import { id } from './financeData.js';
+﻿import { id } from './financeData.js';
 
 const live = item => item && !item.reversedAt && !['cancelled', 'planned'].includes(item.allocationStatus);
 
@@ -22,6 +22,7 @@ export function financeAccountBalance(state, accountId, asOfDate = '9999-12-31')
       if (item.type === 'transfer' && item.transferKind === 'card-payment' && item.accountId === accountId && item.accountingKind !== 'card-liability-only') return balance - item.amount;
       if (item.type === 'transfer' && item.transferKind === 'external-in') return balance + item.amount;
       if (item.type === 'expense') return balance - item.amount;
+      if (item.type === 'debt' && item.allocationStatus !== 'allocated' && item.allocationStatus !== 'cancelled' && item.allocationStatus !== 'planned') return balance - item.amount;
       if (['income', 'reimbursement', 'borrowedCash'].includes(item.type) || item.type === 'refund' && (item.refundStatus || 'received') === 'received') return balance + item.amount;
       return balance;
     }, account.openingBalance || 0);

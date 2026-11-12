@@ -7,6 +7,7 @@ import { calculateFinanceBalances } from '../../../src/features/finance/financeB
 import { TransactionForm, PeopleFinance } from '../../../src/features/finance/FinancePage.jsx';
 import { TransactionImport } from '../../../src/features/finance/TransactionImport.jsx';
 import { TransactionDetailDialog } from '../../../src/features/finance/TransactionDetailDialog.jsx';
+import { SendMoneyPlanner } from '../../../src/features/finance/SendMoneyPlanner.jsx';
 import { AutoAllocationHistory } from '../../../src/features/finance/AutoAllocationHistory.jsx';
 import { applyIncomeAllocations } from '../../../src/features/finance/financeAllocations.js';
 import { reclassifySavedTransactionState } from '../../../src/features/finance/transactionReclassification.js';
@@ -26,7 +27,7 @@ function Harness() {
   return <main style={{ maxWidth: 900, margin: '0 auto', padding: 16, fontFamily: 'sans-serif' }}>
     <h1>Finance flexible payments QA</h1>
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-      <button onClick={() => setMode('transaction')}>Open Add Transaction</button>
+      <button onClick={() => setMode('transaction')}>Open Add Transaction</button><button onClick={() => change(next => { next.transactions.push({ id: 'send-money-income', type: 'income', title: 'Salary', amount: 200000, date: '2026-11-01' }); next.debts = [{ id: 'debt-ahmed', name: 'Ahmed', original: 24000, remaining: 24000 }]; return next; })}>Prepare Send Money</button><button onClick={() => setMode('sendMoney')}>Open Send Money</button>
       <button onClick={() => setMode('people')}>Open People and Shared Costs</button>
       <button onClick={() => setMode('import')}>Open Transaction Import</button>
       <button onClick={() => change(next => { next.goals = [{ id: 'goal-emergency', title: 'Emergency Fund', target: 50000, saved: 0, status: 'active' }]; next.debts = [{ id: 'debt-card', name: 'Card debt', original: 100000, remaining: 100000, repaymentPlanStatus: 'active' }]; next.allocationRules = [{ id: 'rule-donation', name: 'Giving', targetType: 'donation', donationCategoryId: 'donation-default-general', mode: 'percent', value: 500, timing: 'income', active: true }, { id: 'rule-goal', name: 'Emergency Fund', targetType: 'goal', targetId: 'goal-emergency', mode: 'amount', value: 20000, timing: 'income', active: true }, { id: 'rule-debt', name: 'Card debt', targetType: 'debt', targetId: 'debt-card', mode: 'amount', value: 25000, timing: 'income', active: true }]; next.transactions.push({ id: 'amazon-purchase', title: 'Amazon', type: 'expense', amount: 6000, date: '2026-11-05', accountId: 'account-current' }, { id: 'savings-transfer-out', title: 'Savings transfer', type: 'expense', amount: 15000, date: '2026-11-10', accountId: 'account-current' }); next.personalReceivables = [{ id: 'receivable-ahmed', personId: 'person-ahmed', remainingAmount: 500000, originalAmount: 500000, history: [] }]; return next; })}>Prepare import rules and matches</button>
@@ -35,7 +36,7 @@ function Harness() {
       <button onClick={() => { setDetailId(state.transactions.find(item => item.type === 'income')?.id || ''); }}>Open salary details</button>
       <button onClick={() => setMode('home')}>Close</button><button onClick={() => setDetailId(state.transactions.find(item => item.type === 'expense')?.id || '')}>View first purchase details</button>
     </div>
-    {mode === 'transaction' && <section role="dialog" aria-label="Add transaction"><TransactionForm data={state} initial={null} close={() => setMode('home')} change={change} busy={false}/></section>}
+    {mode === 'sendMoney' && <section role="dialog" aria-label="Send money"><SendMoneyPlanner data={state} change={change} busy={false} close={() => setMode('home')}/></section>}{mode === 'transaction' && <section role="dialog" aria-label="Add transaction"><TransactionForm data={state} initial={null} close={() => setMode('home')} change={change} busy={false}/></section>}
     {mode === 'people' && <PeopleFinance data={state} change={change} busy={false}/>}
     {mode === 'import' && <section role="dialog" aria-label="Import transactions"><TransactionImport data={state} busy={false} change={change} close={() => setMode('home')}/></section>}
     {mode === 'allocations' && <AutoAllocationHistory key={historyType} data={state} filterType={historyType} onOpenIncome={id => setDetailId(id)}/>}

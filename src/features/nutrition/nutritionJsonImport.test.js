@@ -161,3 +161,31 @@ test('requires the source.name field and accepts only a recognized json fence', 
   assert.throws(() => parseNutritionJson('```\n' + JSON.stringify(input) + '\n```'), /valid JSON/);
   assert.equal(parseNutritionJson('```json\n' + JSON.stringify(input) + '\n```').food.name, 'Uncooked white chickpeas');
 });
+
+test('food preparation is optional and normalized before its length check', () => {
+  const base = payload();
+  const cases = [
+    [{ name: 'Food' }, ''],
+    [{ name: 'Food', state: null }, ''],
+    [{ name: 'Food', state: '' }, ''],
+    [{ name: 'Food', state: 'grilled' }, 'grilled'],
+    [{ name: 'Food', state: '  grilled  ' }, 'grilled'],
+    [{ name: 'Food', state: 'x'.repeat(120) }, 'x'.repeat(120)],
+    [{ name: 'Food', preparation: '  boiled  ' }, 'boiled'],
+    [{ name: 'Food', foodState: 'drained' }, 'drained'],
+  ];
+  for (const [food, state] of cases) {
+    const imported = parseNutritionJson(JSON.stringify({ ...base, food }));
+    assert.equal(imported.food.state, state);
+  }
+});
+
+test('invalid preparation types and values report a preparation-specific validation error', () => {
+  const base = payload();
+  for (const state of [{ cooked: true }, ['cooked'], true, 7, 'x'.repeat(121)]) {
+    assert.throws(
+      () => parseNutritionJson(JSON.stringify({ ...base, food: { name: 'Food', state } })),
+      /Preparation must be text up to 120 characters\./,
+    );
+  }
+});
