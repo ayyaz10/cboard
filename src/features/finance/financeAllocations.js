@@ -109,7 +109,7 @@ function linkedDueForTarget(state, targetId) {
 // manually-created transactions and unrelated allocations untouched.
 export function reconcileIncomeAllocations(state, income, operation = 'replace') {
   const deleting = operation === 'delete' || operation === true;
-  if (!deleting) state.allocationHistory = (state.allocationHistory || []).filter(item => item.sourceIncomeId !== income.id);
+  if (!deleting) state.allocationHistory = (state.allocationHistory || []).filter(item => item.sourceIncomeId !== income.id || item.status === 'reversed');
   reconcileDonationIncome(state, income, deleting ? 'delete' : 'replace');
   reconcileDebtIncome(state, income, deleting ? 'delete' : 'replace');
   const linked = state.transactions.filter(x => x.sourceIncomeId === income.id && x.allocationRuleId);
@@ -117,6 +117,23 @@ export function reconcileIncomeAllocations(state, income, operation = 'replace')
   const protectedIds = new Set(protectedRecords.map(x => x.id));
   const removable = linked.filter(x => !protectedIds.has(x.id));
   const ids = new Set(removable.map(x => x.id));
+  state.allocationHistory ||= [];
+  for (const record of removable) {
+    const reversalKey = `reversal:${record.id}`;
+    if (!state.allocationHistory.some(item => item.executionKey === reversalKey)) {
+      const target = record.type === 'goal' ? state.goals.find(item => item.id === record.targetId)
+        : record.type === 'debt' ? state.debts.find(item => item.id === record.targetId)
+          : record.type === 'donation' ? state.donationTargets?.find(item => item.id === record.linkedDonationTargetId) : null;
+      state.allocationHistory.push({
+        id: id(), executionKey: reversalKey, sourceIncomeId: income.id,
+        sourceIncomeDate: record.sourceIncomeDate || income.date || '', sourceIncomeDescription: record.sourceIncomeDescription || income.title || 'Income',
+        sourceIncomeAmount: record.sourceIncomeAmount ?? income.amount, allocationRuleId: record.allocationRuleId,
+        allocationType: ['donation', 'goal', 'debt'].includes(record.type) ? record.type : 'other', targetId: record.targetId || record.linkedDonationTargetId || '',
+        targetName: target?.title || target?.name || record.title || record.type, plannedAmount: record.amount, appliedAmount: 0,
+        status: 'reversed', reason: 'Source transaction classification changed.', createdAt: new Date().toISOString(),
+      });
+    }
+  }
   for (const tx of removable) {
     if (tx.type === 'goal') { const goal=state.goals.find(x=>x.id===tx.targetId); if(goal) goal.saved=Math.max(0,goal.saved-tx.amount); }
     if (tx.type === 'investment' && ['paid','completed','transferred'].includes(tx.allocationStatus)) { const inv=state.investments.find(x=>x.id===tx.targetId); if(inv){inv.contributed=Math.max(0,inv.contributed-tx.amount);inv.currentValue=Math.max(0,inv.currentValue-tx.amount);} }
@@ -129,6 +146,10 @@ export function reconcileIncomeAllocations(state, income, operation = 'replace')
     record.sourceIncomeId = '';
   }
   if (!deleting) applyIncomeAllocations(state, income);
+  if (deleting) {
+    for (const record of state.donationAccruals || []) if (record.linkedIncomeTransactionId === income.id && record.status === 'reversed' && record.executionKey) { record.originalExecutionKey ||= record.executionKey; record.executionKey = ''; }
+    for (const record of state.debtAccruals || []) if ((record.linkedIncomeTransactionId === income.id || record.originalSourceIncomeId === income.id) && record.status === 'reversed' && record.executionKey) { record.originalExecutionKey ||= record.executionKey; record.executionKey = ''; }
+  }
   refreshDonationTargetStatus(state, income.date);
   return { protectedCount: protectedRecords.length };
 }
@@ -149,6 +170,16 @@ function recordSkippedIncomeAllocation(state, rule, income, status = 'skipped', 
   });
 }
 
+export function processIncomeTransactionChange(state, previous, transaction) {
+  const wasIncome = previous?.type === 'income';
+  const isIncome = transaction?.type === 'income';
+  if (wasIncome && (!isIncome || previous.amount !== transaction.amount || previous.date !== transaction.date)) {
+    const current = state.transactions.find(item => item.id === previous.id) || transaction;
+    reconcileIncomeAllocations(state, current, isIncome ? 'replace' : 'delete');
+  } else if (!wasIncome && isIncome) {
+    applyIncomeAllocations(state, transaction);
+  }
+}
 export function applyIncomeAllocations(state, incomeTransaction) {
   state.allocationHistory ||= [];
   for (const rule of (state.allocationRules || []).filter(x => x.active && x.timing === 'income')) {

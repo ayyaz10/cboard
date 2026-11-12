@@ -1,4 +1,4 @@
-﻿import { test } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createFinanceAccount, financeAccountBalance, findMatchingAccountTransaction, findPossibleCardPayment, findPossibleTransfer, linkCardPaymentState, linkExistingTransactionsAsTransferState } from './financeAccounts.js';
 
@@ -45,4 +45,10 @@ test('card purchase, refund, and linked bank payment move cash and liability onc
 test('account IDs and linked transfer relationships survive workspace restore normalization', () => {
   const restored = normalizeFinanceState(JSON.parse(JSON.stringify({ settings: { currency: 'GBP' }, importAccountMappings: { 'my current': 'current' }, accounts: [{ id: 'current', name: 'Current', type: 'bank', openingBalance: 10000 }], creditCards: [{ id: 'card', name: 'Card', openingLiability: 0, creditLimit: 20000 }], transactions: [{ id: 'out', type: 'transfer', accountId: 'current', amount: 500, date: '2026-11-01', transferKind: 'linked', linkedTransferId: 'pair', transferSide: 'out' }, { id: 'in', type: 'transfer', accountId: 'card', amount: 500, date: '2026-11-01', transferKind: 'linked', linkedTransferId: 'pair', transferSide: 'in' }] })));
   assert.equal(restored.accounts[0].id, 'current'); assert.equal(restored.importAccountMappings['my current'], 'current'); assert.equal(restored.transactions[0].linkedTransferId, 'pair'); assert.equal(restored.transactions[1].accountId, 'card');
+});
+
+test('reclassified reimbursements and borrowed money remain positive account movements', () => {
+  const data=state(); createFinanceAccount(data,{name:'Current',accountId:'current',openingBalance:10000});
+  data.transactions.push({id:'reimbursed',accountId:'current',type:'reimbursement',amount:2500,date:'2026-11-01'},{id:'borrowed',accountId:'current',type:'borrowedCash',amount:5000,date:'2026-11-02'});
+  assert.equal(financeAccountBalance(data,'current'),17500);
 });

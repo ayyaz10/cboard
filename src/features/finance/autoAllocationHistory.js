@@ -1,4 +1,4 @@
-﻿const amount = value => Math.max(0, Math.round(Number(value) || 0));
+const amount = value => Math.max(0, Math.round(Number(value) || 0));
 const hasIncomeSnapshot = record => record.sourceIncomeAmount != null || Boolean(record.sourceIncomeDescription || record.sourceIncomeDate);
 
 function allocationStatus(record, plannedAmount, appliedAmount) {
@@ -63,10 +63,10 @@ export function autoAllocationEvents(state) {
     events.push(base(income, record, record.allocationRuleId, type, record.targetId, label || record.title, value, record.reversedAt ? 0 : value, record.reversedAt ? 'Reversed' : record.allocationStatus === 'allocated' ? 'Allocated' : 'Applied', 'transaction'));
   }
   for (const record of state?.allocationHistory || []) {
-    if (!['skipped', 'not_applicable'].includes(record.status) || !record.sourceIncomeId || !record.allocationRuleId) continue;
+    if (!['skipped', 'not_applicable', 'reversed'].includes(record.status) || !record.sourceIncomeId || !record.allocationRuleId) continue;
     const income = incomes.get(record.sourceIncomeId) || { id: record.sourceIncomeId };
     if (!incomes.has(record.sourceIncomeId) && !hasIncomeSnapshot(record)) continue;
-    events.push(base(income, record, record.allocationRuleId, record.allocationType || 'other', record.targetId, record.targetName, amount(record.plannedAmount), amount(record.appliedAmount), record.status === 'not_applicable' ? 'Not applicable' : 'Skipped', 'skipped'));
+    events.push(base(income, record, record.allocationRuleId, record.allocationType || 'other', record.targetId, record.targetName, amount(record.plannedAmount), amount(record.appliedAmount), record.status === 'reversed' ? 'Reversed' : record.status === 'not_applicable' ? 'Not applicable' : 'Skipped', record.status === 'reversed' ? 'reversal' : 'skipped'));
   }
   return events.sort((a, b) => String(b.sourceIncomeDate).localeCompare(String(a.sourceIncomeDate)) || String(b.createdAt).localeCompare(String(a.createdAt)) || a.id.localeCompare(b.id));
 }

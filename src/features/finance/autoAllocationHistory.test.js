@@ -1,7 +1,7 @@
-﻿import test from 'node:test';
+import test from 'node:test';
 import assert from 'node:assert/strict';
 import { autoAllocationEvents, filterAutoAllocationEvents, groupAutoAllocationsByIncome } from './autoAllocationHistory.js';
-import { applyIncomeAllocations } from './financeAllocations.js';
+import { applyIncomeAllocations, processIncomeTransactionChange } from './financeAllocations.js';
 import { deriveFinancePosition } from './financeLedger.js';
 import { normalizeFinanceState } from './financeData.js';
 
@@ -101,7 +101,12 @@ test('income allocation workflow creates one shared event per target without mov
   assert.deepEqual(state, snapshot, 'reading history never changes Finance state');
   const backupState = JSON.parse(JSON.stringify(state));
   const restoredEvents = autoAllocationEvents(backupState);
-  assert.deepEqual(restoredEvents.map(event => [event.id, event.sourceIncomeId, event.allocationRuleId, event.targetId, event.status]), events.map(event => [event.id, event.sourceIncomeId, event.allocationRuleId, event.targetId, event.status]));
+  assert.deepEqual(restoredEvents.map(event => [event.id, event.sourceIncomeId, event.allocationRuleId, event.targetId, event.status]), events.map(event => [event.id, event.sourceIncomeId, event.allocationRuleId, event.targetId, event.status]));  const restoredState = normalizeFinanceState(backupState);
+  const restoredIncome = restoredState.transactions.find(item => item.id === 'income-1');
+  const priorAllocationIds = restoredState.transactions.filter(item => item.sourceIncomeId === restoredIncome.id).map(item => item.id);
+  processIncomeTransactionChange(restoredState, null, restoredIncome);
+  assert.deepEqual(restoredState.transactions.filter(item => item.sourceIncomeId === restoredIncome.id).map(item => item.id), priorAllocationIds);
+  assert.deepEqual(autoAllocationEvents(restoredState).map(event => event.id), events.map(event => event.id));
 });
 
 

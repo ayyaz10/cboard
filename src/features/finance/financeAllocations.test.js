@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { allocationRuleStartDate, applyDueMonthlyAllocations, applyIncomeAllocations, reconcileIncomeAllocations, settleAllocation } from './financeAllocations.js';
+import { allocationRuleStartDate, applyDueMonthlyAllocations, applyIncomeAllocations, processIncomeTransactionChange, reconcileIncomeAllocations, settleAllocation } from './financeAllocations.js';
 import { financeSummary } from './financeMath.js';
 import { deriveFinancePosition } from './financeLedger.js';
 import { debtPaymentDue, recordDebtPayment } from './debtAccounting.js';
@@ -9,6 +9,44 @@ function state() {
   return { settings:{monthlyIncome:300000,currency:'GBP'}, budgets:{}, transactions:[], allocationRules:[], goals:[], goalContributions:[], investments:[], debts:[], debtPayments:[], debtAccruals:[] };
 }
 
+test('canonical income handling runs imported income rules once and reconciles edits and reclassification', () => {
+  const value=state();
+  value.goals=[{id:'emergency',title:'Emergency',target:50000,saved:0,status:'active'}];
+  value.allocationRules=[{id:'goal-rule',targetType:'goal',targetId:'emergency',mode:'amount',value:20000,timing:'income',active:true}];
+  const income={id:'imported-salary',type:'income',amount:200000,date:'2026-11-10',title:'Salary',sourceType:'file_import'};
+  value.transactions.push(income);
+  processIncomeTransactionChange(value,null,income);
+  processIncomeTransactionChange(value,null,income);
+  assert.equal(value.transactions.filter(item=>item.sourceIncomeId===income.id).length,1);
+  assert.equal(value.goalContributions.filter(item=>item.sourceIncomeId===income.id).length,1);
+  assert.equal(value.goalContributions[0].sourceIncomeId,income.id);
+
+  const edited={...income,amount:210000};
+  value.transactions[0]=edited;
+  processIncomeTransactionChange(value,income,edited);
+  assert.equal(value.transactions.filter(item=>item.sourceIncomeId===income.id).length,1);
+  assert.equal(value.transactions.find(item=>item.sourceIncomeId===income.id).amount,20000);
+  assert.equal(value.goalContributions.filter(item=>item.sourceIncomeId===income.id).length,1);
+
+  const reimbursed={...edited,type:'reimbursement'};
+  value.transactions[0]=reimbursed;
+  processIncomeTransactionChange(value,edited,reimbursed);
+  assert.equal(value.transactions.some(item=>item.sourceIncomeId===income.id),false);
+  assert.equal(value.goalContributions.some(item=>item.sourceIncomeId===income.id),false);
+});
+
+test('incoming non-income classifications cannot run income allocation rules', () => {
+  const value=state();
+  value.allocationRules=[{id:'rule',targetType:'savings',mode:'amount',value:1000,timing:'income',active:true}];
+  for (const type of ['refund','reimbursement','transfer','borrowedCash','cardCredit']) {
+    const transaction={id:type,type,amount:10000,date:'2026-11-10'};
+    value.transactions.push(transaction);
+    processIncomeTransactionChange(value,null,transaction);
+  }
+  assert.equal(value.transactions.length,5);
+  assert.equal(value.transactions.some(item=>item.sourceIncomeId),false);
+  assert.equal((value.allocationHistory||[]).length,0);
+});
 test('legacy deduction edits keep the original date shown on the rule card', () => {
   const rule = { id:'emergency', targetType:'goal' };
   const transactions = [
