@@ -59,6 +59,7 @@ function itemLine(rawText) {
 
 function costcoItemPairs(lines, merchantName) {
   const details = [], names = [];
+  // This malformed multiplication sign is an intentional OCR/PDF input variant.
   const detailPattern = /^(\d{4,8})\s+(\d+(?:[.,]\d+)?)\s*[xÃ—]\s*(\d+(?:,\d{3})*[.,]\d{2})\s+(\d+(?:,\d{3})*[.,]\d{2})\s*-?\s*[A-Z]\s*$/i;
   const blockedName = /please\s+keep|warehouse|edinburgh|\b(?:reg|registration|awrs|individual|receipt|subtotal|total|costco|gbp)\b/i;
   lines.forEach((line, index) => {

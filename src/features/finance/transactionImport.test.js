@@ -172,6 +172,7 @@ test('confirmed imported borrowed money keeps an incoming bank row out of income
 });
 
 
+// This PDF-text fixture intentionally keeps double-encoded pound signs to verify import recovery.
 test('grouped bank statement fixture keeps inherited dates, descriptions, directions, references, and balances separate', () => {
   const statement = readFileSync(new URL('./fixtures/groupedBankStatement.txt', import.meta.url), 'utf8');
   const diagnostics = {};

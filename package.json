@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run check:source && vite build",
+    "check:source": "node scripts/check-source-mojibake.js",
     "copy-docs": "node scripts/copy-dist-to-docs.js",
     "deploy": "npm run build && npm run copy-docs",
     "preview": "vite preview",

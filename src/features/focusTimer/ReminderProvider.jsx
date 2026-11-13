@@ -19,7 +19,7 @@ export function ReminderProvider({ children }) {
   return <ReminderStore key={user?.id || 'signed-out'} userId={user?.id}>{children}</ReminderStore>;
 }
 
-function ReminderStore({ userId, children }) {
+export function ReminderStore({ userId, children }) {
   const route = useRoute();
   const storageKey = `cboard:reminders:${userId}`;
   const [storageError, setStorageError] = useState('');
@@ -44,6 +44,9 @@ function ReminderStore({ userId, children }) {
   const audio = useRef(null);
   const announced = useRef(new Set());
   const mountedAt = useRef(Date.now());
+  const reminderToggleRef = useRef(null);
+  const reminderCloseRef = useRef(null);
+  const focusRestoreRef = useRef(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -101,6 +104,24 @@ function ReminderStore({ userId, children }) {
       window.removeEventListener('cboard:focus-session-changed', syncFocusSession);
     };
   }, [userId]);
+
+  useEffect(() => {
+    if (!widgetOpen) return undefined;
+    focusRestoreRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement : reminderToggleRef.current;
+    reminderCloseRef.current?.focus();
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setWidgetOpen(false);
+      }
+    };
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('keydown', closeOnEscape);
+      if (focusRestoreRef.current?.isConnected) focusRestoreRef.current.focus();
+    };
+  }, [widgetOpen]);
 
   useEffect(() => () => { audio.current?.close().catch(() => {}); }, []);
 
@@ -222,7 +243,7 @@ function ReminderStore({ userId, children }) {
     <ReminderContext.Provider value={{ reminders, history, now, addReminder, dismiss, cancel, snooze, prepareSound, playSound, storageError }}>
       {children}
       {userId && liveTimerCount > 0 && liveDockVisible && !widgetOpen && (
-        <aside aria-label="Live timers" className="ui-popover fixed right-3 top-20 z-[60] w-[min(20rem,calc(100vw-1.5rem))] p-3 sm:right-4 sm:top-3">
+        <aside aria-label="Live timers" className="ui-popover live-timer-dock fixed p-3">
           <div className="flex items-center justify-between gap-3 px-1">
             <div className="flex items-center gap-2">
               <span aria-hidden="true" className="relative flex h-3 w-3">
@@ -247,7 +268,7 @@ function ReminderStore({ userId, children }) {
             {liveFocusSession && (
               <button type="button" onClick={() => navigateTo('/focus-timer')} className="ui-button ui-button--sm w-full justify-between text-left" aria-label={`Open ${focusIsBreak ? 'break' : 'focus'} timer for ${liveFocusSession.title}`}>
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-black">{liveFocusSession.title}</span>
+                  <span className="block break-words text-sm font-black">{liveFocusSession.title}</span>
                   <span className="block text-[0.68rem] font-bold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">
                     {focusRemaining === 0 && !focusIsPaused ? `${focusIsBreak ? 'Break' : 'Focus'} finished` : `${focusIsPaused ? 'Paused ' : ''}${focusIsBreak ? 'break' : 'focus'}`}
                   </span>
@@ -275,17 +296,17 @@ function ReminderStore({ userId, children }) {
         </aside>
       )}
       {widgetOpen && (
-        <aside id="reminder-widget" aria-label="Reminders" className="ui-dialog reminder-widget fixed right-4 left-4 z-50 overflow-y-auto p-5 sm:left-auto sm:w-96">
+        <aside id="reminder-widget" aria-label="Reminders" role="dialog" aria-labelledby="reminder-widget-title" className="ui-dialog reminder-widget fixed overflow-y-auto p-5">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-lg font-bold">Reminders</p>
+              <p id="reminder-widget-title" className="text-lg font-bold">Reminders</p>
               {ringing.length > 0 ? (
                 <p role="alert" className="mt-1 text-sm font-bold">{ringing.length === 1 ? 'Your reminder is ready' : `${ringing.length} reminders are ready`}</p>
               ) : (
                 <p className="mt-1 text-sm font-semibold text-[var(--color-text-secondary)]">Nothing is due right now.</p>
               )}
             </div>
-            <button type="button" onClick={() => setWidgetOpen(false)} aria-label="Close reminders" className="ui-button ui-button--sm h-10 w-10 shrink-0 p-0">
+            <button type="button" ref={reminderCloseRef} onClick={() => setWidgetOpen(false)} aria-label="Close reminders" className="ui-button ui-button--sm h-10 w-10 shrink-0 p-0">
               <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                 <path d="M6 6l12 12M18 6 6 18" />
               </svg>
@@ -321,7 +342,8 @@ function ReminderStore({ userId, children }) {
       )}
       {route !== '/food-diary' && (!route.startsWith('/habit-improvement') || liveTimerCount > 0 || ringing.length > 0) && <button
         type="button"
-        className={`ui-button reminder-toggle fixed right-4 z-50 min-h-12 gap-2 px-4 py-3 font-bold ${ringing.length > 0 ? 'ui-button--warning' : 'ui-button--primary'}`}
+        ref={reminderToggleRef}
+        className={`ui-button reminder-toggle fixed min-h-12 gap-2 px-4 py-3 font-bold ${ringing.length > 0 ? 'ui-button--warning' : 'ui-button--primary'}`}
         aria-expanded={widgetOpen}
         aria-controls="reminder-widget"
         onClick={() => {

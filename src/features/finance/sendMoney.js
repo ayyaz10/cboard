@@ -92,7 +92,7 @@ export function recordSendMoney(state, plan) {
     } else if (item.kind === 'other') {
       const categoryId = (state.categories || []).some(category => category.id === item.categoryId && category.type === 'expense' && !category.archived) ? item.categoryId : '';
       if (!categoryId) throw new Error('Choose a current expense category for each other payment.');
-      const transaction = { id: id(), title: String(item.recipient || '').trim().slice(0, 100) || 'Other payment', amount: item.amount, type: 'expense', categoryId, accountId: plan.accountId || '', date, note: [item.purpose, item.note, plan.note].filter(Boolean).join(' Â· ').slice(0, 300), createdAt: new Date().toISOString(), sendMoneyId: plan.id, sourceType: 'send_money' };
+      const transaction = { id: id(), title: String(item.recipient || '').trim().slice(0, 100) || 'Other payment', amount: item.amount, type: 'expense', categoryId, accountId: plan.accountId || '', date, note: [item.purpose, item.note, plan.note].filter(Boolean).join(' · ').slice(0, 300), createdAt: new Date().toISOString(), sendMoneyId: plan.id, sourceType: 'send_money' };
       state.transactions.push(transaction);
       createdTransactionIds.push(transaction.id);
     } else throw new Error('A selected payment type is not supported.');

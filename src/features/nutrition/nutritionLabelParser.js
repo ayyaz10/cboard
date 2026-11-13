@@ -141,6 +141,7 @@ export function parseNutritionLabel(input) {
     if (stopped) continue;
     const decorationClean=line.text.replace(/^\s*(?:[↳↓↪➜→•▪◦└├]+|[-*]+)\s*/, '');
     const decorationOffset=line.text.length-decorationClean.length;
+    // Preserve malformed and Greek micro-unit variants accepted from OCR.
     const rowUnit=line.rawUnit||line.text.match(/[\dOIlS]+(?:\s*[.,]\s*[\dOIlS]+)*\s*(kcal|kJ|mcg|[ÂµÎ¼u]g|mg|g|ml)\b/i)?.[1];
     const resolved=line.rawLabel
       ? matchCanonicalNutrientPrefix(line.rawLabel,{category:line.category,unit:rowUnit})

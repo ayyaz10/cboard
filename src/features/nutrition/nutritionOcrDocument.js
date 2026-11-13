@@ -1,3 +1,4 @@
+// Intentionally detects suspicious code points in external PaddleOCR text.
 const mojibake=/[ÃÂâ]/;
 
 function repairEncoding(value='') {
