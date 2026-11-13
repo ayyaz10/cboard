@@ -9,6 +9,7 @@ export function plannedDebtPayment(debt) {
 
 export function debtPlanStatus(debt, rules = [], asOfDate = new Date().toISOString().slice(0, 10)) {
   if (!debt || debt.status === 'paid' || Number(debt.remaining) <= 0) return 'completed';
+  if (debt.archivedAt) return 'paused';
   const rulesForDebt = rules.filter(rule => rule.targetType === 'debt' && rule.targetId === debt.id);
   if (debt.repaymentPlanStatus && PLAN_STATUSES.has(debt.repaymentPlanStatus)) {
     if (debt.repaymentPlanStatus === 'scheduled' && debt.repaymentStartDate <= asOfDate) return 'active';
@@ -25,7 +26,6 @@ export function debtPlanStatus(debt, rules = [], asOfDate = new Date().toISOStri
   if (debt.repaymentStartDate && debt.repaymentStartDate > asOfDate) return 'scheduled';
   return 'not_started';
 }
-
 export function migrateDebtPlanStatuses(debts = [], rules = [], asOfDate = new Date().toISOString().slice(0, 10)) {
   for (const debt of debts) {
     debt.status = Number(debt.remaining) <= 0 || debt.status === 'paid' ? 'paid' : 'open';

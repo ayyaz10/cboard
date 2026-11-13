@@ -1,4 +1,4 @@
-import test from 'node:test';
+﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 import { allocationRuleStartDate, applyDueMonthlyAllocations, applyIncomeAllocations, processIncomeTransactionChange, reconcileIncomeAllocations, settleAllocation } from './financeAllocations.js';
 import { financeSummary } from './financeMath.js';
@@ -119,6 +119,45 @@ test('debt automatic income rule creates capped due, then only actual payment co
   assert.equal(value.allocationRules[0].active,false);
 });
 
+test('debt automatic fixed and percentage income rules accumulate once and cap at remaining principal', () => {
+  const value = state();
+  value.debts = [{ id: 'loan', name: 'Loan', original: 15_000, remaining: 15_000, status: 'open', repaymentPlanStatus: 'active' }];
+  value.allocationRules = [{ id: 'rule', name: 'Loan accumulation', targetType: 'debt', targetId: 'loan', mode: 'amount', value: 5_000, timing: 'income', active: true }];
+  const first = { id: 'salary-1', type: 'income', amount: 100_000, date: '2026-10-01' };
+  const second = { id: 'salary-2', type: 'income', amount: 100_000, date: '2026-10-15' };
+  value.transactions.push(first, second);
+  applyIncomeAllocations(value, first);
+  applyIncomeAllocations(value, first);
+  applyIncomeAllocations(value, second);
+  assert.deepEqual(value.debtAccruals.map(item => item.accruedAmount), [5_000, 5_000]);
+  assert.equal(value.debts[0].remaining, 15_000);
+  assert.equal(value.debtPayments.length, 0);
+  value.allocationRules[0].mode = 'percent';
+  value.allocationRules[0].value = 1_000;
+  const third = { id: 'salary-3', type: 'income', amount: 100_000, date: '2026-10-30' };
+  value.transactions.push(third);
+  applyIncomeAllocations(value, third);
+  assert.deepEqual(value.debtAccruals.map(item => item.accruedAmount), [5_000, 5_000, 5_000]);
+  const fourth = { id: 'salary-4', type: 'income', amount: 100_000, date: '2026-10-31' };
+  value.transactions.push(fourth);
+  applyIncomeAllocations(value, fourth);
+  assert.equal(value.debtAccruals.length, 3);
+});
+
+test('monthly debt rule creates one traceable capped reserve per month', () => {
+  const value = state();
+  value.debts = [{ id: 'loan', name: 'Loan', original: 5_400, remaining: 5_400, status: 'open', repaymentPlanStatus: 'active' }];
+  value.allocationRules = [{ id: 'monthly-loan', name: 'Loan monthly', targetType: 'debt', targetId: 'loan', mode: 'amount', value: 10_000, timing: 'monthly', day: 5, startedOn: '2026-10-05', active: true }];
+  applyDueMonthlyAllocations(value, '2026-10-04');
+  assert.equal(value.debtAccruals.length, 0);
+  applyDueMonthlyAllocations(value, '2026-10-05');
+  applyDueMonthlyAllocations(value, '2026-10-20');
+  assert.equal(value.debtAccruals.length, 1);
+  assert.equal(value.debtAccruals[0].accruedAmount, 5_400);
+  assert.equal(value.debtAccruals[0].sourceType, 'scheduled_rule');
+  assert.equal(value.debtAccruals[0].executionKey, 'monthly-loan:monthly:2026-10');
+  assert.equal(value.debts[0].remaining, 5_400);
+});
 test('settling a savings reserve transfers it without losing total owned money', () => {
   const value=state();
   value.transactions.push({id:'save',type:'savings',amount:2000,date:'2026-09-01',allocationStatus:'allocated'});

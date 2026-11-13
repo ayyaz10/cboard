@@ -438,3 +438,41 @@ html[data-theme="midnight"] .finance .f-credit-page .f-credit-preview p{color:va
 .f-send-actions { position: sticky; bottom: -.25rem; padding: .75rem 0 .25rem; background: var(--color-panel, #fffdf6); }
 .f-send-history { border-top: 1px solid #aaa; padding-top: .8rem; }
 @media (max-width: 560px) { .f-send-line { grid-template-columns: 1fr auto; } .f-send-copy { grid-column: 1/-1; } .f-send-amount { grid-column: 1; } .f-send-other { grid-template-columns: 1fr; } .f-send-money .f-row { grid-template-columns: 1fr; } }
+
+.f-send-transfer-details { max-width: 100%; overflow-wrap: anywhere; }
+.f-send-transfer-details ul { list-style: none; padding: 0; margin: .75rem 0; }
+.f-send-transfer-details li { gap: .75rem; padding: .55rem 0; border-bottom: 1px solid var(--color-border, #ddd); }
+.f-send-transfer-details .f-card { min-width: 0; }
+.f-send-transfer-details .f-actions { flex-wrap: wrap; }
+@media (max-width: 600px) { .f-send-transfer-details .f-between { align-items: flex-start; flex-wrap: wrap; } .f-send-transfer-details .f-card { padding: .85rem; } }
+
+@media (max-width: 620px) { .f-import-summary { position: static; } }
+
+
+/* Send Money uses the dialog as its frame and the form as its only scroll area. */
+.f-dialog.f-send-dialog{box-sizing:border-box;display:flex;flex-direction:column;overflow:hidden;width:min(42rem,calc(100% - 1rem));max-height:calc(100dvh - 1rem);padding:1rem}
+.f-send-dialog>.f-between{flex:none;align-items:flex-start;flex-wrap:nowrap;gap:.75rem;padding:0 .1rem .5rem}
+.f-send-dialog>.f-between h2{min-width:0;margin:0;font-size:clamp(1.35rem,5vw,1.8rem);line-height:1.15}
+.f-send-dialog>.f-between .f-button{flex:none;min-width:2.75rem;min-height:2.75rem;padding:.45rem}
+.f-send-money{box-sizing:border-box;min-height:0;max-height:none;flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain;padding:.25rem .1rem calc(.5rem + env(safe-area-inset-bottom));gap:.7rem}
+.f-send-section{gap:.65rem;padding:.8rem;border-color:#d5d0c5}
+.f-send-section h3{font-size:1rem}
+.f-send-total{min-width:0;min-height:3.1rem;box-sizing:border-box;background:#e9f5ff;color:#173044}
+.f-send-total span{min-width:0;overflow-wrap:anywhere}
+.f-send-total strong{color:inherit;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.f-send-actions{z-index:2;bottom:0;margin:0 -.1rem;padding:.65rem .1rem calc(.25rem + env(safe-area-inset-bottom));border-top:1px solid #d5d0c5;background:var(--color-panel,#fffdf6)}
+.f-send-actions>*{min-height:2.75rem}
+html[data-theme="matrix"] .finance .f-send-section{border-color:var(--matrix-border);background:var(--matrix-surface);color:var(--matrix-text)}
+html[data-theme="matrix"] .finance .f-send-line{background:var(--matrix-surface-raised);color:var(--matrix-text)}
+html[data-theme="matrix"] .finance .f-send-copy small{color:var(--matrix-muted)}
+html[data-theme="matrix"] .finance .f-send-total{border:1px solid var(--matrix-border);background:var(--matrix-surface-soft);color:var(--matrix-text)}
+html[data-theme="matrix"] .finance .f-send-actions{border-color:var(--matrix-border);background:var(--matrix-surface)}
+@media(max-width:640px){.f-dialog.f-send-dialog{width:calc(100% - 1rem);max-height:calc(100dvh - 1rem);padding:.85rem}.f-send-dialog>.f-between{padding-bottom:.35rem}.f-send-money{gap:.6rem}.f-send-section{padding:.7rem}.f-send-money .f-row{grid-template-columns:minmax(0,1fr)}}
+
+
+html[data-theme="matrix"] .finance .f-credit-page .f-credit-refund-panel{border-color:var(--matrix-border);background:var(--matrix-surface);color:var(--matrix-text)}
+html[data-theme="matrix"] .finance .f-credit-page .f-credit-refund-panel .f-help{color:var(--matrix-muted)}
+html[data-theme="midnight"] .finance .f-credit-page .f-credit-refund-panel{border-color:var(--border-default);background:var(--surface-elevated);color:var(--color-text)}
+html[data-theme="midnight"] .finance .f-credit-page .f-credit-refund-panel .f-help{color:var(--color-text-muted)}
+
+.f-record-metadata{min-width:0;border:1px solid var(--color-border,var(--border-default,#aaa));border-radius:.8rem;padding:.7rem}.f-record-metadata>summary{cursor:pointer;font-weight:800;min-height:2.4rem;display:flex;align-items:center}.f-record-metadata>.f-credit-form-grid{margin-top:.65rem}.f-custom-field-row{border-top:1px solid var(--color-border,var(--border-default,#aaa));padding:.65rem 0}.f-custom-field-row>button{align-self:end}.f-record-metadata-view{border:1px solid var(--color-border,var(--border-default,#aaa));border-radius:.85rem;padding:.85rem;min-width:0}.f-record-metadata-view h3{font-size:.95rem;font-weight:800;margin:.15rem 0 .35rem}.f-record-metadata-view h3:not(:first-child){margin-top:.8rem}.f-record-metadata-view dl{display:grid;gap:0;margin:0}.f-record-metadata-view dl>div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.75rem;border-top:1px solid var(--color-border,var(--border-default,#aaa));padding:.5rem 0}.f-record-metadata-view dt{font-weight:700;color:var(--color-text-muted,#666)}.f-record-metadata-view dd{margin:0;overflow-wrap:anywhere}@media(max-width:620px){.f-record-metadata-view dl>div{grid-template-columns:minmax(0,1fr);gap:.15rem}.f-custom-field-row{grid-template-columns:minmax(0,1fr)}}

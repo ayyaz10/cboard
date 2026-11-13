@@ -2,7 +2,7 @@
 import { autoAllocationEvents, groupAutoAllocationsByIncome } from './autoAllocationHistory.js';
 import { formatMoney } from './financeMath.js';
 
-const kinds = [['all', 'All'], ['donation', 'Donation'], ['goal', 'Goals'], ['debt', 'Debt'], ['other', 'Other']];
+const kinds = [['all', 'All'], ['donation', 'Donation'], ['goal', 'Goals'], ['debt', 'Debt'], ['familySupport', 'Family Support'], ['other', 'Other']];
 const statusLabel = events => events.every(event => event.status === 'Applied') ? 'Applied' : [...new Set(events.map(event => event.status))].join(' · ');
 const dateLabel = value => value ? new Date(`${value.slice(0, 10)}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : 'Date not recorded';
 
@@ -24,7 +24,7 @@ export function AutoAllocationHistory({ data, filterType = 'all', targetId = '',
     <header className="f-auto-history-heading"><div><h3>{filterType === 'donation' ? 'Donation history' : targetId ? 'Automatic allocation history' : 'Auto allocation history'}</h3><p className="f-help">See which income triggered each rule and where it went. “Remaining” is income less planned allocations; it is not a cash balance.</p></div>
       <div className="f-auto-history-filters">
         {filterType === 'all' && <label>Type<select className="f-input" aria-label="Filter allocations by type" value={type} onChange={event => setType(event.target.value)}>{kinds.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>}
-        <label>Status<select className="f-input" aria-label="Filter allocations by status" value={status} onChange={event => setStatus(event.target.value)}><option value="all">All statuses</option><option value="applied">Applied</option><option value="allocated">Allocated</option><option value="partial">Partial</option><option value="skipped">Skipped</option><option value="not-applicable">Not applicable</option><option value="reversed">Reversed</option></select></label>
+        <label>Status<select className="f-input" aria-label="Filter allocations by status" value={status} onChange={event => setStatus(event.target.value)}><option value="all">All statuses</option><option value="applied">Applied</option><option value="allocated">Allocated</option><option value="available">Available</option><option value="sent">Sent</option><option value="restored">Restored</option><option value="partial">Partial</option><option value="skipped">Skipped</option><option value="not-applicable">Not applicable</option><option value="reversed">Reversed</option><option value="restored">Restored</option></select></label>
       </div>
     </header>
     {groups.length ? <div className="f-auto-history-list">{groups.slice(0, limit).map(group => <details className="f-auto-history-group" key={group.id}>

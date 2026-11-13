@@ -1,4 +1,4 @@
-import { id } from './financeData.js';
+﻿import { id } from './financeData.js';
 import { nextTransactionSequence } from './transactionOrder.js';
 import { convertMinorUnits } from '../../services/currencyService.js';
 import { debtPlanStatus } from './financeDebtPlans.js';
@@ -53,11 +53,38 @@ export function debtPaymentDue(state, debtId = '') {
   if (!debtId) return (state.debts || []).reduce((sum, debt) => sum + debtPaymentDue(state, debt.id), 0);
   const accrued = (state.debtAccruals || [])
     .filter(item => item.debtId === debtId && item.status !== 'reversed')
-    .reduce((sum, item) => sum + Math.max(0, cents(item.accruedAmount ?? item.amount) - cents(item.paidAmount)), 0);
+    .reduce((sum, item) => sum + Math.max(0, cents(item.accruedAmount ?? item.amount) - cents(item.paidAmount) - cents(item.releasedAmount)), 0);
   // Old workspaces can have both stale principal balances and due entries
   // that exceed the debt after recorded payments. Never offer more due than
   // the amount that remains to repay.
   return Math.min(accrued, debtRemainingAmount(state, debtId));
+}
+
+export function debtAccumulationExcess(state, debtId) {
+  const reserved = (state.debtAccruals || [])
+    .filter(item => item.debtId === debtId && item.status !== 'reversed')
+    .reduce((sum, item) => sum + Math.max(0, cents(item.accruedAmount ?? item.amount) - cents(item.paidAmount) - cents(item.releasedAmount)), 0);
+  return Math.max(0, reserved - debtRemainingAmount(state, debtId));
+}
+
+export function releaseDebtAccumulationExcess(state, debtId, date = new Date().toISOString().slice(0, 10)) {
+  let excess = debtAccumulationExcess(state, debtId);
+  if (!excess) return 0;
+  const accruals = (state.debtAccruals || [])
+    .filter(item => item.debtId === debtId && item.status !== 'reversed')
+    .sort((left, right) => String(right.effectiveDate || '').localeCompare(String(left.effectiveDate || '')) || String(right.id || '').localeCompare(String(left.id || '')));
+  let released = 0;
+  for (const accrual of accruals) {
+    if (!excess) break;
+    const available = Math.max(0, cents(accrual.accruedAmount ?? accrual.amount) - cents(accrual.paidAmount) - cents(accrual.releasedAmount));
+    const amount = Math.min(excess, available);
+    if (!amount) continue;
+    accrual.releasedAmount = cents(accrual.releasedAmount) + amount;
+    accrual.releaseDate = date;
+    excess -= amount;
+    released += amount;
+  }
+  return released;
 }
 
 export function debtPayoffReady(state, debtId) {
@@ -117,8 +144,11 @@ export function deleteDebt(state, debtId) {
 export function setDebtArchived(state, debtId, archived, date = new Date().toISOString()) {
   const debt = (state.debts || []).find(item => item.id === debtId);
   if (!debt || Boolean(debt.archivedAt) === Boolean(archived)) return false;
-  if (archived) debt.archivedAt = date;
-  else delete debt.archivedAt;
+  if (archived) {
+    debt.archivedAt = date;
+    for (const rule of state.allocationRules || []) if (rule.targetType === 'debt' && rule.targetId === debtId) rule.active = false;
+    if ((state.allocationRules || []).some(rule => rule.targetType === 'debt' && rule.targetId === debtId)) debt.repaymentPlanStatus = 'paused';
+  } else delete debt.archivedAt;
   return true;
 }
 
@@ -126,7 +156,8 @@ export function debtAccrualSettlementStatus(accrual) {
   if (!accrual || accrual.status === 'reversed') return 'reversed';
   const total = cents(accrual.accruedAmount ?? accrual.amount);
   const paid = cents(accrual.paidAmount);
-  if (total > 0 && paid >= total) return 'settled';
+  const released = cents(accrual.releasedAmount);
+  if (total > 0 && paid + released >= total) return released > 0 && paid === 0 ? 'released' : 'settled';
   return paid > 0 ? 'partially_settled' : 'outstanding';
 }
 
@@ -149,11 +180,11 @@ export function accrueDebtPayment(state, { debtId, amount, effectiveDate, source
 
 export function editDebtAccumulation(state, accrualId, { amount, effectiveDate, note = '' }) {
   const accrual = (state.debtAccruals || []).find(item => item.id === accrualId);
-  if (!accrual || accrual.status === 'reversed' || cents(accrual.paidAmount) > 0) throw new Error('Only unpaid accumulation entries can be edited.');
+  if (!accrual || accrual.status === 'reversed' || cents(accrual.paidAmount) > 0 || cents(accrual.releasedAmount) > 0) throw new Error('Only unreleased, unpaid accumulation entries can be edited.');
   const requested = cents(amount);
   if (!requested || !effectiveDate) throw new Error('Enter a valid amount and date.');
   const othersDue = (state.debtAccruals || []).filter(item => item.debtId === accrual.debtId && item.status !== 'reversed' && item.id !== accrualId)
-    .reduce((sum, item) => sum + Math.max(0, cents(item.accruedAmount ?? item.amount) - cents(item.paidAmount)), 0);
+    .reduce((sum, item) => sum + Math.max(0, cents(item.accruedAmount ?? item.amount) - cents(item.paidAmount) - cents(item.releasedAmount)), 0);
   if (requested > Math.max(0, debtRemainingAmount(state, accrual.debtId) - othersDue)) throw new Error('Accumulated amount cannot exceed the remaining debt.');
   accrual.amount = requested;
   accrual.accruedAmount = requested;
@@ -215,12 +246,12 @@ export function recordDebtPayment(state, { debtId, amount, sourceAmount = amount
   let toAllocate = value;
   const sourceAccruals = [];
   const outstanding = state.debtAccruals
-    .filter(item => item.debtId === debtId && item.status !== 'reversed' && cents(item.accruedAmount ?? item.amount) > cents(item.paidAmount))
+    .filter(item => item.debtId === debtId && item.status !== 'reversed' && cents(item.accruedAmount ?? item.amount) > cents(item.paidAmount) + cents(item.releasedAmount))
     .sort((a, b) => String(a.effectiveDate).localeCompare(String(b.effectiveDate)) || String(a.id).localeCompare(String(b.id)));
   if (preferredAccrualId) outstanding.sort((a, b) => Number(b.id === preferredAccrualId) - Number(a.id === preferredAccrualId));
   for (const accrual of outstanding) {
     if (!toAllocate) break;
-    const unpaid = cents(accrual.accruedAmount ?? accrual.amount) - cents(accrual.paidAmount);
+    const unpaid = cents(accrual.accruedAmount ?? accrual.amount) - cents(accrual.paidAmount) - cents(accrual.releasedAmount);
     const allocated = Math.min(unpaid, toAllocate);
     accrual.paidAmount = cents(accrual.paidAmount) + allocated;
     accrual.status = accrual.paidAmount >= cents(accrual.accruedAmount ?? accrual.amount) ? 'fully_paid' : 'partially_paid';
@@ -303,7 +334,7 @@ export function correctDebtPayment(state, paymentId, { amount, date, note = '', 
     activePayment.sourceAccruals = [];
     for (const accrual of accruals) {
       if (!unallocated) break;
-      const available = Math.max(0, cents(accrual.accruedAmount ?? accrual.amount) - cents(accrual.paidAmount));
+      const available = Math.max(0, cents(accrual.accruedAmount ?? accrual.amount) - cents(accrual.paidAmount) - cents(accrual.releasedAmount));
       const allocated = Math.min(available, unallocated);
       if (!allocated) continue;
       accrual.paidAmount += allocated;
@@ -316,8 +347,8 @@ export function correctDebtPayment(state, paymentId, { amount, date, note = '', 
   return true;
 }
 
-export function canMarkDebtPaymentUnpaid(state, transaction) {
-  if (!transaction || transaction.type !== 'debt' || transaction.reversedAt || transaction.source === 'bank' || transaction.sourceType === 'bank_import') return false;
+export function canMarkDebtPaymentUnpaid(state, transaction, allowSendMoney = false) {
+  if (!transaction || transaction.type !== 'debt' || transaction.reversedAt || (transaction.sendMoneyId && !allowSendMoney) || transaction.source === 'bank' || transaction.sourceType === 'bank_import') return false;
   const payment = (state.debtPayments || []).find(item => item.transactionId === transaction.id && !item.reversedAt);
   const title = String(transaction.title || '').trim().toLocaleLowerCase();
   const titleDebt = (state.debts || []).find(item => title === `payment to ${String(item.name || '').trim().toLocaleLowerCase()}`);
@@ -325,9 +356,9 @@ export function canMarkDebtPaymentUnpaid(state, transaction) {
   return Boolean((debtId && (state.debts || []).some(item => item.id === debtId)) || (state.debts || []).some(item => item.remaining > 0));
 }
 
-export function markDebtPaymentUnpaid(state, transactionId, date, debtIdOverride = '') {
+export function markDebtPaymentUnpaid(state, transactionId, date, debtIdOverride = '', allowSendMoney = false) {
   const transaction = (state.transactions || []).find(item => item.id === transactionId);
-  if (!canMarkDebtPaymentUnpaid(state, transaction)) return false;
+  if (!canMarkDebtPaymentUnpaid(state, transaction, allowSendMoney)) return false;
   state.debtPayments ||= [];
   let payment = state.debtPayments.find(item => item.transactionId === transactionId && !item.reversedAt);
   const title = String(transaction.title || '').trim().toLocaleLowerCase();
@@ -430,10 +461,11 @@ export function reconcileDebtIncome(state, income, operation = 'replace') {
     if (!rule || !debt) continue;
     const requested = rule.mode === 'percent' ? Math.round(cents(income.amount) * Number(rule.value || 0) / 10000) : cents(rule.value);
     const oldTotal = cents(accrual.accruedAmount ?? accrual.amount);
-    const oldDue = Math.max(0, oldTotal - paid);
+    const released = cents(accrual.releasedAmount);
+    const oldDue = Math.max(0, oldTotal - paid - released);
     const otherDue = Math.max(0, debtPaymentDue(state, debt.id) - oldDue);
     const available = Math.max(0, cents(debt.remaining) - otherDue);
-    const updated = paid + Math.min(Math.max(0, requested - paid), available);
+    const updated = paid + released + Math.min(Math.max(0, requested - paid - released), available);
     accrual.amount = updated;
     accrual.accruedAmount = updated;
     accrual.status = updated <= paid ? 'fully_paid' : paid ? 'partially_paid' : updated ? 'outstanding' : 'reversed';

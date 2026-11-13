@@ -1,5 +1,6 @@
 import { transactionTypes } from './financeMath.js';
 import { migrateDebtPlanStatuses } from './financeDebtPlans.js';
+import { normalizeCustomFields, normalizeVehicleMetadata } from './recordMetadata.js';
 
 export const defaultCategories = [
   ['Salary', 'income', '#c5ff6f'], ['Freelance', 'income', '#9fe3ff'], ['Other income', 'income', '#ffd166'],
@@ -10,7 +11,7 @@ export const defaultCategories = [
   ['Travel', 'expense', '#9fe3ff'], ['Personal care', 'expense', '#ff90e8'], ['Insurance', 'expense', '#ffd166'],
   ['Taxes', 'expense', '#ffd166'], ['Other', 'expense', '#d9d9d0'], ['Charity', 'donation', '#c5ff6f'],
   ['Portfolio', 'investment', '#9fe3ff'], ['Repayment', 'debt', '#ffd166'], ['Transfer', 'transfer', '#d9d9d0'],
-  ['Savings', 'savings', '#c5ff6f'], ['Budget pot', 'budget', '#ffd166'], ['Goal contribution', 'goal', '#9fe3ff'],
+  ['Savings', 'savings', '#c5ff6f'], ['Budget pot', 'budget', '#ffd166'], ['Goal contribution', 'goal', '#9fe3ff'], ['Vehicle Purchase', 'expense', '#9fe3ff'],
 ].map(([name, type, color], index) => ({ id: `default-${index}`, name, type, color, icon: '', archived: false, order: index }));
 
 export const defaultDonationCategories = [
@@ -44,6 +45,7 @@ export function normalizeFinanceState(value) {
     if (!agreement.financeMode) agreement.financeMode = Number(agreement.financeCharge || 0) > 0 ? 'fixed' : 'zero';
     if (agreement.financeMode !== 'apr') agreement.apr = null;
   }
+  if (!Array.isArray(state.sendMoneyHistory)) state.sendMoneyHistory = [];
   if (!Array.isArray(state.merchantProfiles)) state.merchantProfiles = [];
   state.merchantProfiles = state.merchantProfiles.filter(item => item && typeof item.id === 'string' && typeof item.displayName === 'string' && Array.isArray(item.aliases) && item.aliases.every(alias => typeof alias === 'string') && (!item.logoData || (typeof item.logoData === 'string' && item.logoData.startsWith('data:image/webp;base64,') && item.logoData.length <= 500000)));
   if (!state.importAccountMappings || typeof state.importAccountMappings !== 'object' || Array.isArray(state.importAccountMappings)) state.importAccountMappings = {};
@@ -52,6 +54,7 @@ export function normalizeFinanceState(value) {
   if (!state.budgets || typeof state.budgets !== 'object' || Array.isArray(state.budgets)) state.budgets = {};
   if (!state.openingBalances || typeof state.openingBalances !== 'object' || Array.isArray(state.openingBalances)) state.openingBalances = {};
   state.transactions = state.transactions.filter((item) => item && transactionTypes.includes(item.type) && Number.isSafeInteger(item.amount) && item.amount > 0);
+  for (const item of [...state.transactions, ...state.creditAgreements]) { item.vehicleMetadata = normalizeVehicleMetadata(item.vehicleMetadata); item.customFields = normalizeCustomFields(item.customFields); }
   // Previous auto deductions recorded virtual Savings/Goal/Budget allocations as
   // completed cash outflows. Their rule link identifies them safely as reservations.
   for (const item of state.transactions) {

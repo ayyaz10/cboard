@@ -21,9 +21,9 @@ test('provider refund preserves overdue unpaid instalment amounts and reduces on
 test('provider refund that would rewrite overdue debt is rejected atomically',()=>{const state=initialFinanceState();createCreditAgreement(state,{id:'late-cap',title:'Appliance',cashPrice:60000,deposit:0,financeMode:'zero',term:3,scheduleMode:'auto',frequency:'monthly',customDays:30,firstPaymentDate:'2026-10-01',purchaseDate:'2026-09-01'});const agreement=state.creditAgreements[0],count=state.transactions.length;assert.throws(()=>createCreditPurchaseRefundState(state,{agreementId:'late-cap',amount:25000,destination:'provider',date:'2026-11-09'}),/overdue instalment/);assert.equal(state.transactions.length,count);assert.equal(getCreditAgreementBalances(state,agreement).principalRemaining,60000);});
 
 
-test('Credit Purchase cash price counts as one category expense and provider refunds restore category capacity',()=>{
+test('Credit Purchase principal is not category cash spending; deposits remain actual expense after provider refunds',()=>{
  const state=initialFinanceState();state.categories=[{id:'home',name:'Home',type:'expense'}];createCreditAgreement(state,{id:'sofa',title:'Sofa',cashPrice:60000,deposit:10000,categoryId:'home',financeMode:'fixed',financeCharge:0,term:5,scheduleMode:'auto',frequency:'monthly',customDays:30,firstPaymentDate:'2027-01-01',purchaseDate:'2026-11-01',depositDate:'2026-11-01'},{transactionId:'sofa-deposit'});
- assert.equal(financeSummary(state,'2026-11').expenses,60000);assert.equal(financeSummary(state,null).grossExpenses,60000);assert.equal(expenseCategoryReport(state,{mode:'month',month:'2026-11'}).total,60000);
+ assert.equal(financeSummary(state,'2026-11').expenses,10000);assert.equal(financeSummary(state,null).grossExpenses,10000);assert.equal(expenseCategoryReport(state,{mode:'month',month:'2026-11'}).total,10000);
  createCreditPurchaseRefundState(state,{agreementId:'sofa',amount:5000,destination:'provider',date:'2026-11-10'});
- assert.equal(financeSummary(state,'2026-11').expenses,55000);assert.equal(financeSummary(state,'2026-11').income,0);assert.equal(expenseCategoryReport(state,{mode:'month',month:'2026-11'}).total,55000);
+ assert.equal(financeSummary(state,'2026-11').expenses,10000);assert.equal(financeSummary(state,'2026-11').income,0);assert.equal(expenseCategoryReport(state,{mode:'month',month:'2026-11'}).total,10000);
 });

@@ -1,6 +1,6 @@
-import test from 'node:test';
+﻿import test from 'node:test';
 import assert from 'node:assert/strict';
-import { accrueDebtPayment, canDeleteDebt, canEditDebtPayment, canMarkDebtPaymentUnpaid, correctDebtPayment, debtAccrualSettlementStatus, debtPayoffReady, debtPaymentDue, debtPaymentSummary, debtRemainingAmount, editDebtAccumulation, filterDebts, getDebtStatus, markDebtPaymentUnpaid, markOrphanDebtPaymentUnpaid, migrateLegacyDebtAllocations, reconcileDebtBalance, recordDebtPayment, recordDebtPaymentState, removeDebtAccumulation, setDebtArchived } from './debtAccounting.js';
+import { accrueDebtPayment, canDeleteDebt, canEditDebtPayment, canMarkDebtPaymentUnpaid, correctDebtPayment, debtAccrualSettlementStatus, debtPayoffReady, debtPaymentDue, debtPaymentSummary, debtAccumulationExcess, debtRemainingAmount, editDebtAccumulation, filterDebts, getDebtStatus, markDebtPaymentUnpaid, markOrphanDebtPaymentUnpaid, migrateLegacyDebtAllocations, reconcileDebtBalance, recordDebtPayment, recordDebtPaymentState, removeDebtAccumulation, releaseDebtAccumulationExcess, setDebtArchived } from './debtAccounting.js';
 import { applyIncomeAllocations, reconcileIncomeAllocations } from './financeAllocations.js';
 import { deriveFinancePosition, inspectFinanceIntegrity } from './financeLedger.js';
 import { debtSummary, financeSummary } from './financeMath.js';
@@ -13,7 +13,7 @@ function makeState() {
   };
 }
 
-test('income rule accrues due once without creating a payment or moving balances', () => {
+test('income rule accrues due once and reserves spendable cash without creating a payment', () => {
   const state = makeState();
   state.allocationRules = [{ id: 'rule', targetType: 'debt', targetId: 'wasik', mode: 'amount', value: 2_203, timing: 'income', active: true }];
   const income = { id: 'salary-1', type: 'income', amount: 100_000, date: '2026-10-05' };
@@ -26,7 +26,10 @@ test('income rule accrues due once without creating a payment or moving balances
   assert.equal(state.debts[0].remaining, 50_000);
   assert.equal(debtPaymentDue(state, 'wasik'), 2_203);
   assert.equal(debtSummary(state.debts, state.debtPayments, '2026-10').paidThisMonth, 0);
-  assert.equal(deriveFinancePosition(state).totalOwned, 100_000);
+  const position = deriveFinancePosition(state);
+  assert.equal(position.totalOwned, 100_000);
+  assert.equal(position.spendable, 97_797);
+  assert.equal(position.protected, 2_203);
 });
 
 test('payoff is available only when ready amount covers the remaining debt', () => {
@@ -286,6 +289,14 @@ test('archiving and restoring preserve debt history and status filters', () => {
   assert.equal(getDebtStatus(state, 'wasik'), 'completed');
 });
 
+test('archiving a debt pauses its canonical automatic accumulation rule', () => {
+  const state = makeState();
+  state.allocationRules.push({ id: 'debt-rule', targetType: 'debt', targetId: 'wasik', mode: 'amount', value: 5_000, timing: 'income', active: true });
+  assert.equal(setDebtArchived(state, 'wasik', true, '2026-10-08T00:00:00.000Z'), true);
+  assert.equal(state.allocationRules[0].active, false);
+  assert.equal(state.debts[0].repaymentPlanStatus, 'paused');
+  assert.equal(getDebtStatus(state, 'wasik'), 'archived');
+});
 test('bank imported payments cannot be corrected and debt deletion is limited to debts without history', () => {
   const state = makeState();
   const transaction = { id: 'imported', type: 'debt', targetId: 'wasik', amount: 1_000, source: 'bank', sourceType: 'bank_import' };
@@ -294,4 +305,21 @@ test('bank imported payments cannot be corrected and debt deletion is limited to
   assert.equal(canEditDebtPayment(state, 'imported-payment'), false);
   assert.throws(() => correctDebtPayment(state, 'imported-payment', { amount: 900, date: '2026-10-05' }), /cannot be edited/);
   assert.equal(canDeleteDebt(state, 'wasik'), false);
+});
+
+test('manual debt reduction exposes reserve excess and releases it without deleting history', () => {
+  const state = makeState();
+  state.debts[0].original = 10_000;
+  state.debts[0].remaining = 10_000;
+  accrueDebtPayment(state, { debtId: 'wasik', amount: 8_000, effectiveDate: '2026-10-01', sourceType: 'manual' });
+  state.debts[0].original = 5_000;
+  state.debts[0].remaining = 5_000;
+  assert.equal(debtAccumulationExcess(state, 'wasik'), 3_000);
+  assert.equal(releaseDebtAccumulationExcess(state, 'wasik', '2026-10-20'), 3_000);
+  assert.equal(state.debtAccruals.length, 1);
+  assert.equal(state.debtAccruals[0].accruedAmount, 8_000);
+  assert.equal(state.debtAccruals[0].releasedAmount, 3_000);
+  assert.equal(state.debtAccruals[0].releaseDate, '2026-10-20');
+  assert.equal(debtPaymentDue(state, 'wasik'), 5_000);
+  assert.equal(debtAccumulationExcess(state, 'wasik'), 0);
 });

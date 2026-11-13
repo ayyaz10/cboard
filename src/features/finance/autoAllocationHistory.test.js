@@ -1,4 +1,4 @@
-import test from 'node:test';
+﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 import { autoAllocationEvents, filterAutoAllocationEvents, groupAutoAllocationsByIncome } from './autoAllocationHistory.js';
 import { applyIncomeAllocations, processIncomeTransactionChange } from './financeAllocations.js';
@@ -97,7 +97,7 @@ test('income allocation workflow creates one shared event per target without mov
   ]);
   assert.equal(group.allocatedAmount, 47500);
   assert.equal(group.remainingAmount, 102500);
-  assert.equal(afterAllocation, before - 15000, 'only the canonical goal reservation changes spendable money');
+  assert.equal(afterAllocation, before - 40000, 'canonical goal and debt reserves reduce spendable money without external payments');
   assert.deepEqual(state, snapshot, 'reading history never changes Finance state');
   const backupState = JSON.parse(JSON.stringify(state));
   const restoredEvents = autoAllocationEvents(backupState);

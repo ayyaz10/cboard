@@ -1,7 +1,7 @@
 ﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildImportedTransaction, matchImportAccount, rememberImportAccount, detectDelimiter, detectImportColumns, detectPossibleRefund, findImportDuplicate, MAX_IMPORT_ROWS, parseDelimitedText, parseImportAmount, parseImportDate, parseStatementText, rowsToImportTransactions, suggestCategory, suggestPersonalSettlement } from './transactionImport.js';
+import { buildImportedTransaction, matchImportAccount, rememberImportAccount, detectDelimiter, detectImportColumns, detectPossibleRefund, findImportDuplicate, MAX_IMPORT_ROWS, parseDelimitedText, parseImportAmount, parseImportDate, parseStatementText, statementOcrInput, rowsToImportTransactions, suggestCategory, suggestPersonalSettlement } from './transactionImport.js';
 
 test('quoted CSV supports BOM, commas, escaped quotes, and CRLF', () => {
   const text = '\uFEFFDate,Description,Debit,Credit\r\n01/11/2026,"Tesco, ""Express""",45.20,\r\n';
@@ -184,6 +184,29 @@ test('parser context carries a grouped date and a split description across PDF p
   assert.equal(second[0].sourceRow.startsWith('2:'), true);
 });
 
+test('OCR word geometry maps statement columns, ignores running balances, and keeps the first brought-forward opening', () => {
+  const line = (row, pairs) => ({
+    text: pairs.map(([, text]) => text).join(' '),
+    words: pairs.map(([x, text]) => ({ text, bbox: { x0: x, x1: x + text.length * 5, y0: row * 20, y1: row * 20 + 10 } })),
+  });
+  const header = line(1, [[20, 'Date'], [100, 'Description'], [400, 'Paid'], [430, 'In'], [490, 'Withdrawn'], [590, 'Balance']]);
+  const opening = line(2, [[20, '03'], [32, 'OCT'], [47, '2026'], [100, 'BROUGHT'], [150, 'FORWARD'], [590, '429.64']]);
+  const credit = line(3, [[20, '05'], [38, 'OCT'], [60, '2026'], [100, 'Automated'], [155, 'Credit'], [195, 'SOI'], [220, 'WAD'], [250, 'LTD'], [400, '225.00'], [590, '654.64']]);
+  const debit = line(4, [[100, 'Card'], [130, 'Transaction'], [200, 'STAGECOACH'], [490, '89.60'], [590, '565.04']]);
+  const nextPageHeader = line(5, [[20, 'Date'], [100, 'Description'], [400, 'Paid'], [430, 'In'], [490, 'Withdrawn'], [590, 'Balance']]);
+  const carried = line(6, [[100, 'BROUGHT'], [150, 'FORWARD'], [590, '579.66']]);
+  const context = {}, diagnostics = {};
+  const ocrInput = statementOcrInput({ lines: [header, opening, credit, debit, nextPageHeader, carried] });
+  const records = parseStatementText(ocrInput, { sourceType: 'pdf-scan', context, diagnostics });
+  assert.deepEqual(records.map(record => [record.date, record.amount, record.direction]), [
+    ['2026-10-05', 22500, 'income'],
+    ['2026-10-05', 8960, 'expense'],
+  ]);
+  assert.equal(context.openingBalance, 42964);
+  assert.equal(context.closingBalance, null);
+  assert.ok(diagnostics.ignoredBalanceRows >= 2);
+});
+
 test('positioned PDF text uses the Paid In and Withdrawn columns and never imports the running balance', () => {
   const header = { text: 'Date Description Paid In (£) Withdrawn (£) Balance (£)', sourceRow: 1, items: [
     { x: 10, text: 'Date' }, { x: 60, text: 'Description' }, { x: 220, text: 'Paid In (£)' }, { x: 340, text: 'Withdrawn (£)' }, { x: 440, text: 'Balance (£)' },
@@ -237,4 +260,12 @@ test('unlabelled positive currency amounts need direction review and a second co
   const ambiguous = parseStatementText('03 OCT 2026\n05 OCT Shop £5.00 £100.00', { diagnostics });
   assert.equal(ambiguous.length, 0);
   assert.equal(diagnostics.unparsedCandidateRows, 1);
+});
+
+test('import duplicate detection recognizes a linked Credit Purchase payment by provider and stable account', () => {
+  const payment = { id: 'cp-payment', type: 'creditPayment', amount: 2925, date: '2026-11-25', accountId: 'bank-current', creditAgreementId: 'agreement-1', creditAgreementTitle: 'Philips Series 9000 Trimmer', creditAgreementMerchant: 'Klarna' };
+  const imported = { date: '2026-11-27', amount: 2925, direction: 'expense', description: 'KLARNA payment' };
+  assert.equal(findImportDuplicate(imported, [payment], 'bank-current'), payment);
+  assert.equal(findImportDuplicate(imported, [payment], 'bank-savings'), null);
+  assert.equal(findImportDuplicate({ ...imported, description: 'Tesco groceries' }, [payment], 'bank-current'), null);
 });

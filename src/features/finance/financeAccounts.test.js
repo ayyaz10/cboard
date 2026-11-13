@@ -52,3 +52,11 @@ test('reclassified reimbursements and borrowed money remain positive account mov
   data.transactions.push({id:'reimbursed',accountId:'current',type:'reimbursement',amount:2500,date:'2026-11-01'},{id:'borrowed',accountId:'current',type:'borrowedCash',amount:5000,date:'2026-11-02'});
   assert.equal(financeAccountBalance(data,'current'),17500);
 });
+test('Credit Purchase payments reduce the selected stable account once and reversal restores it', () => {
+  const data = state(); createFinanceAccount(data, { name: 'Current', accountId: 'current', openingBalance: 10000 });
+  const payment = { id: 'credit-payment', accountId: 'current', type: 'creditPayment', amount: 2925, date: '2026-11-25' };
+  data.transactions.push(payment);
+  assert.equal(financeAccountBalance(data, 'current'), 7075);
+  payment.reversedAt = '2026-11-26T10:00:00.000Z';
+  assert.equal(financeAccountBalance(data, 'current'), 10000);
+});

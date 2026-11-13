@@ -394,7 +394,7 @@ export function createCreditAgreement(state, agreement, { transactionId = '', da
   if (deposit > 0) {
     if (!transactionId || !validDate(agreement.depositDate || dateCreated)) throw new Error('A deposit must be recorded as a dated Finance transaction.');
     if ((state.transactions || []).some(item => item.id === transactionId)) throw new Error('This Finance transaction identifier is already in use.');
-    state.transactions.push({ id: transactionId, title: `Deposit for ${result.title}`, type: 'expense', amount: deposit, categoryId: agreement.categoryId || '', date: agreement.depositDate || dateCreated, paidFromFundId: agreement.depositPaidFromFundId || '', note: 'Credit purchase deposit', creditAgreementId: agreement.id, creditPaymentKind: 'deposit' });
+    state.transactions.push({ id: transactionId, title: `Deposit for ${result.title}`, type: 'expense', amount: deposit, categoryId: agreement.categoryId || '', date: agreement.depositDate || dateCreated, paidFromFundId: agreement.depositPaidFromFundId || '', note: 'Credit purchase deposit', creditAgreementId: agreement.id, creditPaymentKind: 'deposit', vehicleMetadata: agreement.vehicleMetadata || {}, customFields: agreement.customFields || [] });
   }
   state.creditAgreements.push(result);
   return result;
@@ -419,9 +419,9 @@ function applyExtraPrincipalToSchedule(state, agreement, amount, date, transacti
   }
 }
 
-export function recordCreditPayment(state, { agreementId, amount, date, paidFromFundId = '', note = '', instalmentId = '', paymentId, transactionId }) {
+export function recordCreditPayment(state, { agreementId, amount, date, paidFromFundId = '', accountId = '', note = '', instalmentId = '', paymentId, transactionId }) {
   state.creditAgreements ||= [];
-  if (!paymentId || !transactionId || !Number.isSafeInteger(amount) || amount <= 0 || !validDate(date)) throw new Error('Enter a valid payment amount and date.');
+  if (!paymentId || !transactionId || !Number.isSafeInteger(amount) || amount <= 0 || !validDate(date)) throw new Error('Enter a valid payment amount and date.'); if (accountId && !(state.accounts || []).some(item => item.id === accountId && !item.archivedAt)) throw new Error('Choose an active Finance account.'); if (accountId && paidFromFundId) throw new Error('Choose one payment source.');
   const existing = (state.transactions || []).find(item => item.type === 'creditPayment' && item.creditPaymentId === paymentId);
   if (existing) {
     if (existing.creditAgreementId !== agreementId) throw new Error('This payment identifier is already linked to another agreement.');
@@ -452,12 +452,18 @@ export function recordCreditPayment(state, { agreementId, amount, date, paidFrom
     extraPrincipalAmount = amount;
   }
   const paymentKind = !scheduledInstalmentId ? 'extra' : extraPrincipalAmount ? 'scheduled_extra' : scheduledPortionAmount < getCreditInstalmentAmounts(state, agreement, (agreement.schedule || []).find(item => item.id === instalmentId)).remaining ? 'partial' : 'scheduled';
-  const transaction = { id: transactionId, sequence: Math.max(0, ...(state.transactions || []).map((item, index) => item.sequence ?? index + 1)) + 1, title: `${agreement.title} credit payment`, type: 'creditPayment', amount, date, paidFromFundId, note: String(note || '').trim(), creditAgreementId: agreement.id, creditPaymentId: paymentId, creditPaymentKind: paymentKind, scheduledInstalmentId, ...(scheduledInstalmentId ? { scheduledPortionAmount, scheduledPrincipalAmount } : {}), ...(extraPrincipalAmount ? { extraPrincipalAmount } : {}), creditPrincipalAmount: principalAmount, creditFinanceCostAmount: financeCostAmount };
+  const transaction = { id: transactionId, sequence: Math.max(0, ...(state.transactions || []).map((item, index) => item.sequence ?? index + 1)) + 1, title: `${agreement.title} credit payment`, type: 'creditPayment', creditAgreementTitle: agreement.title, creditAgreementMerchant: agreement.merchant || '', amount, date, paidFromFundId, ...(accountId ? { accountId } : {}), note: String(note || '').trim(), creditAgreementId: agreement.id, creditPaymentId: paymentId, creditPaymentKind: paymentKind, scheduledInstalmentId, ...(scheduledInstalmentId ? { scheduledPortionAmount, scheduledPrincipalAmount } : {}), ...(extraPrincipalAmount ? { extraPrincipalAmount } : {}), creditPrincipalAmount: principalAmount, creditFinanceCostAmount: financeCostAmount };
   state.transactions.push(transaction);
   return transaction;
 }
 
-export function settleCreditAgreement(state, { agreementId, settlementAmount, settlementFee = 0, date, paidFromFundId = '', note = '', paymentId, transactionId }) {
+export function recordImportedCreditPayment(state, { agreementId, amount, date, accountId, instalmentId = '', record, paymentId, transactionId }) {
+  if (!record || record.direction !== 'expense' || !record.description) throw new Error('Choose a valid imported bank payment.');
+  const transaction = recordCreditPayment(state, { agreementId, amount, date, accountId, note: record.description, instalmentId, paymentId, transactionId });
+  Object.assign(transaction, { sourceType: 'file_import', importSource: record.sourceType || 'statement', importDirection: 'expense', sourceRow: record.sourceRow, reference: record.reference || '' });
+  return transaction;
+}
+export function settleCreditAgreement(state, { agreementId, settlementAmount, settlementFee = 0, date, paidFromFundId = '', accountId = '', note = '', paymentId, transactionId }) {
   const existing = (state.transactions || []).find(item => item.type === 'creditPayment' && item.creditPaymentId === paymentId);
   if (existing && paymentId) {
     if (existing.creditAgreementId !== agreementId) throw new Error('This payment identifier is already linked to another agreement.');
@@ -467,12 +473,12 @@ export function settleCreditAgreement(state, { agreementId, settlementAmount, se
   if (!agreement || getCreditAgreementStatus(state, agreement) !== 'active') throw new Error('This credit agreement is no longer active.');
   const balances = getCreditAgreementBalances(state, agreement);
   if (!Number.isSafeInteger(settlementAmount) || settlementAmount <= 0 || !Number.isSafeInteger(settlementFee) || settlementFee < 0 || !validDate(date) || !paymentId || !transactionId) throw new Error('Enter a valid settlement amount, fee, and date.');
-  if (!Number.isSafeInteger(settlementAmount + settlementFee)) throw new Error('The settlement amount is outside the supported range.');
+  if (!Number.isSafeInteger(settlementAmount + settlementFee)) throw new Error('The settlement amount is outside the supported range.'); if (accountId && !(state.accounts || []).some(item => item.id === accountId && !item.archivedAt)) throw new Error('Choose an active Finance account.'); if (accountId && paidFromFundId) throw new Error('Choose one payment source.');
   if ((state.transactions || []).some(item => item.id === transactionId)) throw new Error('This Finance transaction identifier is already in use.');
   const principalAmount = Math.min(balances.principalRemaining, Math.max(0, settlementAmount - balances.financeCostRemaining));
   const financeCostAmount = settlementAmount + settlementFee - principalAmount;
   const amount = settlementAmount + settlementFee;
-  const transaction = { id: transactionId, sequence: Math.max(0, ...(state.transactions || []).map((item, index) => item.sequence ?? index + 1)) + 1, title: `${agreement.title} early settlement`, type: 'creditPayment', amount, date, paidFromFundId, note: String(note || '').trim(), creditAgreementId: agreement.id, creditPaymentId: paymentId, creditPaymentKind: 'settlement', creditPrincipalAmount: principalAmount, creditFinanceCostAmount: financeCostAmount };
+  const transaction = { id: transactionId, sequence: Math.max(0, ...(state.transactions || []).map((item, index) => item.sequence ?? index + 1)) + 1, title: `${agreement.title} early settlement`, type: 'creditPayment', creditAgreementTitle: agreement.title, creditAgreementMerchant: agreement.merchant || '', amount, date, paidFromFundId, ...(accountId ? { accountId } : {}), note: String(note || '').trim(), creditAgreementId: agreement.id, creditPaymentId: paymentId, creditPaymentKind: 'settlement', creditPrincipalAmount: principalAmount, creditFinanceCostAmount: financeCostAmount };
   state.transactions.push(transaction);
   agreement.settledEarlyAt = date;
   agreement.settlement = { date, settlementAmount, settlementFee, financeTransactionId: transactionId, note: String(note || '').trim() };
@@ -569,15 +575,15 @@ export function updateCreditPayment(state, transactionId, changes) {
     if (extraPrincipal) { transaction.extraPrincipalAmount = extraPrincipal; transaction.creditPaymentKind = 'scheduled_extra'; }
     else { delete transaction.extraPrincipalAmount; transaction.creditPaymentKind = scheduledAmount < due ? 'partial' : 'scheduled'; }
   }
-  const before = { amount: transaction.amount, date: transaction.date, paidFromFundId: transaction.paidFromFundId || '', note: transaction.note || '' };
+  const before = { amount: transaction.amount, date: transaction.date, paidFromFundId: transaction.paidFromFundId || '', accountId: transaction.accountId || '', note: transaction.note || '' };
   transaction.amount = amount;
   transaction.date = date;
-  transaction.paidFromFundId = String(changes.paidFromFundId ?? transaction.paidFromFundId ?? '');
+  transaction.paidFromFundId = String(changes.paidFromFundId ?? transaction.paidFromFundId ?? ''); if (Object.hasOwn(changes, 'accountId')) { if (changes.accountId) transaction.accountId = String(changes.accountId); else delete transaction.accountId; }
   transaction.note = String(changes.note ?? transaction.note ?? '').trim();
   transaction.corrections ||= [];
   transaction.corrections.push({ ...before, updatedAt: new Date().toISOString() });
   agreement.history ||= [];
-  agreement.history.push({ type: 'payment_corrected', paymentId: transaction.creditPaymentId, transactionId: transaction.id, before, after: { amount, date, paidFromFundId: transaction.paidFromFundId, note: transaction.note }, createdAt: new Date().toISOString() });
+  agreement.history.push({ type: 'payment_corrected', paymentId: transaction.creditPaymentId, transactionId: transaction.id, before, after: { amount, date, paidFromFundId: transaction.paidFromFundId, accountId: transaction.accountId || '', note: transaction.note }, createdAt: new Date().toISOString() });
   return transaction;
 }
 
@@ -670,6 +676,12 @@ export function reverseCreditPurchaseRefundState(state, transactionId, date = ne
 export function updateCreditAgreement(state, agreementId, changes, asOfDate = new Date().toISOString().slice(0, 10)) {
   const agreement = (state.creditAgreements || []).find(item => item.id === agreementId);
   if (!agreement || getCreditAgreementStatus(state, agreement) !== 'active') throw new Error('Only an active credit agreement can be updated.');
+  if (Object.hasOwn(changes, 'vehicleMetadata')) agreement.vehicleMetadata = changes.vehicleMetadata;
+  if (Object.hasOwn(changes, 'customFields')) agreement.customFields = changes.customFields;
+  for (const transaction of (state.transactions || []).filter(item => item.creditAgreementId === agreementId && item.creditPaymentKind === 'deposit' && !item.reversedAt)) {
+    if (Object.hasOwn(changes, 'vehicleMetadata')) transaction.vehicleMetadata = changes.vehicleMetadata;
+    if (Object.hasOwn(changes, 'customFields')) transaction.customFields = changes.customFields;
+  }
   const hasPayments = activeTransactions(state).some(item => item.creditAgreementId === agreementId);
   const hasPaymentHistory = (state.transactions || []).some(item => item.type === 'creditPayment' && item.creditAgreementId === agreementId);
   const nextCashPrice = changes.cashPrice ?? agreement.cashPrice;

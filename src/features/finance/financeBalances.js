@@ -7,6 +7,7 @@ export const balanceComponents = [
   { id: 'goal', label: 'Goals' },
   { id: 'investment', label: 'Investments' },
   { id: 'donation', label: 'Donations' },
+  { id: 'familySupport', label: 'Family Support' },
   { id: 'debt', label: 'Debt' },
   { id: 'budget', label: 'Budget pots' },
 ];
@@ -96,7 +97,7 @@ function applyEvent(event, balances) {
     if (component) balances.reserved[component] = Math.max(0, balances.reserved[component] - transaction.amount);
   } else if (kind === 'cash' || kind === 'transfer') {
     balances.actualCash += transactionCashEffect(transaction);
-    if (transaction.type === 'expense' && transaction.linkedReservationId) balances.reserved.donation = Math.max(0, balances.reserved.donation - transaction.amount);
+    if (transaction.type === 'expense' && transaction.linkedReservationId) { const reservation = (state.transactions || []).find(item => item.id === transaction.linkedReservationId); if (reservation?.type !== 'familySupport') balances.reserved.donation = Math.max(0, balances.reserved.donation - transaction.amount); }
     if (transaction.type === 'savings' && !['allocated', 'cancelled'].includes(transaction.allocationStatus) && transaction.accountingKind !== 'allocation') balances.savingsAsset += transaction.amount;
   }
   balances.reservedTotal = componentTotal(balances.reserved);

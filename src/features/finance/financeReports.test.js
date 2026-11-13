@@ -1,4 +1,4 @@
-import test from 'node:test';
+﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 import { expenseCategoryReport, markGoalCompletion, monthlyFinanceReport, monthlyFinanceReports } from './financeReports.js';
 
@@ -92,6 +92,19 @@ test('expense category report includes actual expense and donation payments, exc
   assert.equal(report.categories.find(row => row.id === 'groceries').percentage, 22000 / 46400 * 100);
 });
 
+test('credit purchase category reporting includes only recorded cash deposits', () => {
+  const state = {
+    ...expenseReportState([]),
+    categories: [...expenseReportCategories, { id: 'insurance', name: 'Car Insurance', type: 'expense' }],
+    creditAgreements: [{ id: 'agreement', title: 'Car Insurance', cashPrice: 54225, purchaseDate: '2026-11-05', categoryId: 'insurance' }],
+    transactions: [{ id: 'legacy-synthetic', type: 'expense', amount: 54225, categoryId: 'insurance', date: '2026-11-05', creditAgreementId: 'agreement', creditPaymentKind: 'purchase' }],
+  };
+  assert.equal(expenseCategoryReport(state, { mode: 'month', month: '2026-11' }).total, 0);
+  state.transactions.push({ id: 'deposit', type: 'expense', amount: 10000, categoryId: 'insurance', date: '2026-11-05', creditAgreementId: 'agreement', creditPaymentKind: 'deposit' });
+  assert.equal(expenseCategoryReport(state, { mode: 'month', month: '2026-11' }).total, 10000);
+  state.transactions.push({ id: 'payment', type: 'creditPayment', amount: 7553, creditAgreementId: 'agreement', date: '2026-11-10' });
+  assert.equal(expenseCategoryReport(state, { mode: 'month', month: '2026-11' }).total, 10000);
+});
 test('uncategorised actual expenses remain included and all-time/year views use effective transaction dates', () => {
   const state = expenseReportState([
     { id: 'oct-end', type: 'expense', categoryId: 'groceries', amount: 2000, date: '2026-10-31' },

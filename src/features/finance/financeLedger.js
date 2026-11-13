@@ -1,8 +1,8 @@
-import { orderedTransactions } from './transactionOrder.js';
+﻿import { orderedTransactions } from './transactionOrder.js';
 import { creditCardLiability } from './creditCards.js';
 
 const FUND_TYPES = new Set(['savings', 'goal', 'investment']);
-const RESERVED_TYPES = new Set(['donation', 'debt', 'budget']);
+const RESERVED_TYPES = new Set(['donation', 'familySupport', 'debt', 'budget']);
 const cancelled = new Set(['cancelled', 'planned']);
 const accepted = transactions => orderedTransactions(transactions || [], false)
   .filter(item => (!item.source || item.providerStatus === 'BOOK') && !cancelled.has(item.allocationStatus) && !item.reversedAt);
@@ -66,9 +66,9 @@ function movement(transaction, funds, reserves, owned, cash, stateGoals, stateIn
       return { owned: owned - ownedAmount, cash: cash - ownedAmount };
     }
     if (transaction.creditCardId) return { owned, cash };
-    const reservation = transaction.linkedReservationId && stateTransactions.find(item => item.id === transaction.linkedReservationId && item.type === 'donation' && item.allocationStatus === 'allocated');
+    const reservation = transaction.linkedReservationId && stateTransactions.find(item => item.id === transaction.linkedReservationId && (item.type === 'donation' && item.allocationStatus === 'allocated' || item.type === 'familySupport' && item.allocationStatus === 'paid' && item.settlementTransactionId === transaction.id));
     if (reservation) {
-      reserves.donation = Math.max(0, (reserves.donation || 0) - amount);
+      if (reservation.type === 'donation') reserves.donation = Math.max(0, (reserves.donation || 0) - amount);
       return { owned: owned - amount, cash };
     }
     const rawFundId = transaction.paidFromFundId || transaction.goalId;
@@ -110,6 +110,7 @@ function movement(transaction, funds, reserves, owned, cash, stateGoals, stateIn
       }
       const wasReserved = transaction._settlementPhase || (status === 'paid' && transaction.allocatedOn && (reserves[type] || 0) >= amount);
       if (wasReserved) reserves[type] = Math.max(0, reserves[type] - amount);
+      if (type === 'familySupport' && transaction.settlementTransactionId && wasReserved) return { owned, cash };
       return { owned: owned - amount, cash: cash - (wasReserved ? 0 : amount) };
     }
   }
@@ -127,14 +128,45 @@ export function deriveFinancePosition(state, { asOfDate = '9999-12-31', openingB
     ];
     return [item];
   }).filter(item => String(item.date || '').slice(0, 10) <= asOfDate).sort((left, right) => String(left.date || '').localeCompare(String(right.date || '')) || String(left.sequence || '').localeCompare(String(right.sequence || '')));
+  const activeAccruals = (state.debtAccruals || []).filter(item => item.status !== 'reversed' && String(item.effectiveDate || '').slice(0, 10) <= asOfDate);
+  for (const accrual of activeAccruals) {
+    events.push({ id: `debt-reserve:${accrual.id}`, date: accrual.effectiveDate, sequence: `debt-reserve:${accrual.id}`, _debtReserveAmount: money(accrual.accruedAmount ?? accrual.amount) });
+    const released = money(accrual.releasedAmount);
+    if (released && String(accrual.releaseDate || '').slice(0, 10) <= asOfDate) events.push({ id: `debt-reserve-release:${accrual.id}`, date: accrual.releaseDate || accrual.effectiveDate, sequence: `debt-reserve-release:${accrual.id}`, _debtReserveAmount: -released });
+  }
+  const paidByAccrual = new Map();
+  const debtReservePaymentEvents = new Map();
+  for (const payment of (state.debtPayments || []).filter(item => !item.reversedAt && String(item.date || '').slice(0, 10) <= asOfDate)) {
+    for (const allocation of payment.sourceAccruals || []) {
+      paidByAccrual.set(allocation.accrualId, (paidByAccrual.get(allocation.accrualId) || 0) + money(allocation.amount));
+      debtReservePaymentEvents.set(`${payment.id}:${allocation.accrualId}`, { date: payment.date, accrualId: allocation.accrualId, amount: money(allocation.amount), paymentId: payment.id });
+    }
+  }
+  for (const accrual of activeAccruals) {
+    const paid = Math.min(money(accrual.paidAmount), paidByAccrual.get(accrual.id) || 0);
+    let remainingPaid = paid;
+    const paymentEvents = [...debtReservePaymentEvents.values()].filter(item => item.accrualId === accrual.id).sort((left, right) => String(left.date).localeCompare(String(right.date)));
+    for (const payment of paymentEvents) {
+      const amount = Math.min(payment.amount, remainingPaid);
+      if (amount) events.push({ id: `debt-reserve-payment:${payment.paymentId}:${accrual.id}`, date: payment.date, sequence: `0-debt-reserve-payment:${payment.paymentId}:${accrual.id}`, _debtReserveAmount: -amount });
+      remainingPaid -= amount;
+      if (!remainingPaid) break;
+    }
+  }
+  events.sort((left, right) => String(left.date || '').localeCompare(String(right.date || '')) || String(left.sequence || '').localeCompare(String(right.sequence || '')));
   const funds = {};
-  const reserves = { donation: 0, debt: 0, budget: 0 };
+  const reserves = { donation: 0, familySupport: 0, debt: 0, budget: 0 };
   let owned = money(openingBalance), spendable = money(openingBalance);
   let income = 0, expenses = 0, donationsPaid = 0, debtPaid = 0, movedToFunds = 0;
   const donationCategoryIds = new Set((state.categories || []).filter(category => category.type === 'donation').map(category => category.id));
   const point = (date, transaction) => ({ date, spendable: owned - sum(Object.values(funds)) - sum(Object.values(reserves)), protected: sum(Object.values(funds)) + sum(Object.values(reserves)), totalOwned: owned, funds: { ...funds }, reserves: { ...reserves }, transaction });
   const points = [point(events[0]?.date || '', null)];
   for (const transaction of events) {
+    if (Number.isSafeInteger(transaction._debtReserveAmount)) {
+      reserves.debt = Math.max(0, reserves.debt + transaction._debtReserveAmount);
+      points.push(point(transaction.date, transaction));
+      continue;
+    }
     const amount = money(transaction.amount), status = transaction.allocationStatus || '';
     if (!transaction._reservePhase) {
       if (transaction.type === 'income') income += amount;

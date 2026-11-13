@@ -1,4 +1,4 @@
-﻿const labels = { cardCredit: 'Card credit', income: 'Income', expense: 'Expense', refund: 'Refund', creditPurchaseRefund: 'Credit purchase refund', donation: 'Donation payment', investment: 'Investment', debt: 'Debt payment', creditPayment: 'Credit payment', savings: 'Savings', budget: 'Budget allocation', goal: 'Goal contribution', transfer: 'Transfer', personalRepayment: 'Personal repayment', reimbursement: 'Reimbursement', borrowedCash: 'Borrowed money' };
+const labels = { cardCredit: 'Card credit', income: 'Income', expense: 'Expense', refund: 'Refund', creditPurchaseRefund: 'Credit purchase refund', donation: 'Donation payment', familySupport: 'Family Support allocation', investment: 'Investment', debt: 'Debt payment', creditPayment: 'Credit payment', savings: 'Savings', budget: 'Budget allocation', goal: 'Goal contribution', transfer: 'Transfer', personalRepayment: 'Personal repayment', reimbursement: 'Reimbursement', borrowedCash: 'Borrowed money' };
 const outflowTypes = new Set(['expense', 'donation', 'debt', 'creditPayment']);
 
 export function getTransactionDisplayType(transaction, data) {
@@ -8,7 +8,7 @@ export function getTransactionDisplayType(transaction, data) {
     || transaction.financeGroup === 'donation'
     || Boolean(transaction.donationCategoryId)
     || (data.categories || []).some(category => category.id === transaction.categoryId && category.type === 'donation');
-  return donation ? 'Donation payment' : labels[transaction.type] || 'Finance activity';
+  if (transaction.type === 'creditPayment' && transaction.creditAgreementId) return 'Credit Purchase payment'; return donation ? 'Donation payment' : labels[transaction.type] || 'Finance activity';
 }
 
 export function getTransactionMoneyEffect(transaction, data) {
@@ -66,7 +66,7 @@ export function canEditTransaction(transaction, data) {
   return ['expense', 'income', 'transfer', 'donation'].includes(transaction.type);
 }
 export function canDeleteTransaction(transaction, data) {
-  if (!transaction || transaction.reversedAt || hasPersonalLinks(transaction, data) || isBankTransaction(transaction) || transaction.type === 'refund' || transaction.originalTransactionId || transaction.linkedTransferId || transaction.cardPaymentLinkId || (data.transactions || []).some(item => item.type === 'refund' && item.originalTransactionId === transaction.id)) return false;
+  if (!transaction || transaction.sendMoneyId || transaction.reversedAt || hasPersonalLinks(transaction, data) || isBankTransaction(transaction) || transaction.type === 'refund' || transaction.originalTransactionId || transaction.linkedTransferId || transaction.cardPaymentLinkId || (data.transactions || []).some(item => item.type === 'refund' && item.originalTransactionId === transaction.id)) return false;
   if (transaction.donationPaymentId || transaction.creditPaymentId || transaction.type === 'debt' || transaction.type === 'creditPayment' || ['goal', 'investment', 'savings', 'budget'].includes(transaction.type)) return false;
   if (getTransactionDisplayType(transaction, data) === 'Donation payment') return false;
   return ['expense', 'income', 'transfer', 'cardCredit'].includes(transaction.type);

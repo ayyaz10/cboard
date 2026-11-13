@@ -57,10 +57,11 @@ export function autoAllocationEvents(state) {
     if (!linkedIncomeId || !record.allocationRuleId || represented.has(record.id)) continue;
     const income = incomes.get(linkedIncomeId) || { id: linkedIncomeId };
     if (!incomes.has(linkedIncomeId) && !hasIncomeSnapshot(record)) continue;
-    const type = ['donation', 'goal', 'debt'].includes(record.type) ? record.type : 'other';
+    const type = ['donation', 'goal', 'debt', 'familySupport'].includes(record.type) ? record.type : 'other';
     const label = type === 'goal' ? goals.get(record.targetId)?.title : type === 'debt' ? debts.get(record.targetId)?.name : type === 'donation' ? targets.get(record.linkedDonationTargetId)?.name : record.title;
     const value = amount(record.amount);
-    events.push(base(income, record, record.allocationRuleId, type, record.targetId, label || record.title, value, record.reversedAt ? 0 : value, record.reversedAt ? 'Reversed' : record.allocationStatus === 'allocated' ? 'Allocated' : 'Applied', 'transaction'));
+    const familyStatus = type === 'familySupport' ? (record.reversalId && record.allocationStatus === 'allocated' ? 'Restored' : record.allocationStatus === 'allocated' ? 'Available' : 'Sent') : '';
+    events.push(base(income, record, record.allocationRuleId, type, record.targetId, label || record.title, value, record.reversedAt ? 0 : value, record.reversedAt ? 'Reversed' : familyStatus || (record.allocationStatus === 'allocated' ? 'Allocated' : 'Applied'), 'transaction'));
   }
   for (const record of state?.allocationHistory || []) {
     if (!['skipped', 'not_applicable', 'reversed'].includes(record.status) || !record.sourceIncomeId || !record.allocationRuleId) continue;

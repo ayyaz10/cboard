@@ -1,1 +1,0 @@
-import{j as e}from"./index-CXbBH850.js";function c({as:a="section",variant:s="default",className:t="",children:r,...n}){const i=s==="default"?"":`ui-card--${s}`;return e.jsx(a,{className:`ui-card ${i} ${t}`.trim(),...n,children:r})}function o({as:a="section",className:s="",children:t,...r}){return e.jsx(a,{className:`ui-panel ${s}`.trim(),...r,children:t})}export{c as C,o as P};

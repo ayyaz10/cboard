@@ -1,4 +1,4 @@
-import test from 'node:test';
+﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 import { deriveFinancePosition, inspectFinanceIntegrity } from './financeLedger.js';
 
@@ -58,4 +58,38 @@ test('current backup derives the simple balances without mutating legacy side le
   assert.deepEqual({ spendable: result.spendable, protected: result.protected, totalOwned: result.totalOwned, debtOutstanding: result.debtOutstanding }, { spendable: 1_930, protected: 41_203, totalOwned: 43_133, debtOutstanding: 17_794 });
   assert.ok(inspectFinanceIntegrity(state).some(issue => issue.type === 'goal-balance-mismatch'));
   assert.equal(JSON.stringify({ goals: state.goals, contributions: state.goalContributions, debts: state.debts, payments: state.debtPayments }), before);
+});
+
+test('debt accrual reserves spendable cash and a payment consumes the reserve exactly once', async () => {
+  const { accrueDebtPayment, recordDebtPayment } = await import('./debtAccounting.js');
+  const state = {
+    debts: [{ id: 'loan', name: 'Loan', original: 5_000, remaining: 5_000 }],
+    debtAccruals: [], debtPayments: [], goals: [], transactions: [income],
+  };
+  accrueDebtPayment(state, { debtId: 'loan', amount: 3_000, effectiveDate: '2026-10-02', sourceType: 'income_rule' });
+  let position = deriveFinancePosition(state);
+  assert.equal(position.totalOwned, 100_000);
+  assert.equal(position.protected, 3_000);
+  assert.equal(position.spendable, 97_000);
+  recordDebtPayment(state, { debtId: 'loan', amount: 1_000, date: '2026-10-03' });
+  position = deriveFinancePosition(state);
+  assert.equal(position.totalOwned, 99_000);
+  assert.equal(position.protected, 2_000);
+  assert.equal(position.spendable, 97_000);
+});
+
+test('releasing excess debt reserve returns it to spendable on the release date', async () => {
+  const { accrueDebtPayment, releaseDebtAccumulationExcess } = await import('./debtAccounting.js');
+  const state = {
+    debts: [{ id: 'loan', name: 'Loan', original: 10_000, remaining: 10_000 }],
+    debtAccruals: [], debtPayments: [], goals: [], transactions: [income],
+  };
+  accrueDebtPayment(state, { debtId: 'loan', amount: 8_000, effectiveDate: '2026-10-02', sourceType: 'income_rule' });
+  state.debts[0].original = 5_000;
+  state.debts[0].remaining = 5_000;
+  assert.equal(releaseDebtAccumulationExcess(state, 'loan', '2026-10-03'), 3_000);
+  const position = deriveFinancePosition(state);
+  assert.equal(position.totalOwned, 100_000);
+  assert.equal(position.protected, 5_000);
+  assert.equal(position.spendable, 95_000);
 });

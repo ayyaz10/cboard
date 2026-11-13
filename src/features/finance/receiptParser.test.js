@@ -67,7 +67,7 @@ test('receipt serialization roundtrip uses minor units, preserves IDs and replac
   assert.notEqual(copy.items[0].id, saved.items[0].id);
   const legacy = { ...transaction, id:'legacy' };
   const state = normalizeFinanceState({ transactions:[legacy, { ...transaction, receipt:updated }] });
-  assert.deepEqual(state.transactions[0], legacy); assert.deepEqual(state.transactions[1].receipt, updated);
+  assert.deepEqual(state.transactions[0], { ...legacy, vehicleMetadata: { registration: '', makeModel: '', modelYear: '', mileage: '', mileageUnit: '', vin: '' }, customFields: [] }); assert.deepEqual(state.transactions[1].receipt, updated);
 });
 test('invalid numeric inputs fail; missing values and zero prices remain valid', () => {
   assert.equal(optionalReceiptMoney(''), null); assert.equal(optionalReceiptMoney('0.00'), 0);

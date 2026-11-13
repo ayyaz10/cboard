@@ -116,8 +116,12 @@ export function findImportDuplicate(record, transactions, accountId = '') {
     if (selectedAccountId && existingAccountId && selectedAccountId !== existingAccountId) return false;
     const sameDescription = description && normalizeImportDescription(item.title || item.rawMerchantText) === description;
     const sameReference = reference && normalizeImportDescription(item.reference) === reference;
-    const sameDirection = (record.direction === 'income' ? ['income', 'refund', 'cardCredit'].includes(item.type) : item.type === 'expense') || (item.sourceType === 'file_import' && item.importDirection === record.direction);
-    return !item.reversedAt && item.date === record.date && Math.abs(Number(item.amount)) === record.amount && (sameDescription || sameReference) && sameDirection;
+    const creditPurchase = item.type === 'creditPayment' && item.creditAgreementId && record.direction === 'expense' && selectedAccountId && existingAccountId === selectedAccountId;
+    const agreementTerms = [item.creditAgreementMerchant, item.creditAgreementTitle].map(normalizeImportDescription).filter(value => value.length >= 3);
+    const matchesCreditAgreement = Boolean(creditPurchase && agreementTerms.some(term => description.includes(term)));
+    const sameDirection = (record.direction === 'income' ? ['income', 'refund', 'cardCredit'].includes(item.type) : item.type === 'expense') || matchesCreditAgreement || (item.sourceType === 'file_import' && item.importDirection === record.direction);
+    const sameDate = item.date === record.date || matchesCreditAgreement && Math.abs(Date.parse(item.date + 'T00:00:00Z') - Date.parse(record.date + 'T00:00:00Z')) <= 3 * 86400000;
+    return !item.reversedAt && sameDate && Math.abs(Number(item.amount)) === record.amount && (sameDescription || sameReference || matchesCreditAgreement) && sameDirection;
   }) || null;
 }
 
@@ -277,6 +281,16 @@ function makeStatementRecord({ date, description, amount, direction, sourceType,
   return { date: date || '', description: cleanStatementDescription(description).slice(0, 200), amount: Math.abs(amount || 0), direction, currency: '', balance: null, reference: '', sourceType, sourceRow, confidence: !date || !cleanStatementDescription(description) ? 'review' : confidence, validation: !date ? 'Statement year or transaction date is missing.' : !cleanStatementDescription(description) ? 'Add a transaction description.' : validation, ...(direction === 'income' ? { classification: 'review' } : {}) };
 }
 
+export function statementOcrInput(result) {
+  const lines = (result?.lines || []).filter(line => line?.words?.some(word => word?.bbox && Number.isFinite(word.bbox.x0)));
+  if (!lines.length) return String(result?.text || '');
+  return lines.map((line, index) => ({
+    text: String(line.text || line.words.map(word => word.text).join(' ')),
+    items: line.words.filter(word => word?.bbox && Number.isFinite(word.bbox.x0) && word.text?.trim()).map(word => ({ x: word.bbox.x0, text: word.text.trim() })),
+    sourceRow: index + 1,
+  }));
+}
+
 export function parseStatementText(input, options = {}) {
   const { sourceType = 'statement', dateOrder = 'dmy', context: sharedContext = null, sourceRowPrefix = '', diagnostics = null } = options;
   const lines = normalizeStatementInput(input), context = sharedContext || {};
@@ -310,6 +324,7 @@ export function parseStatementText(input, options = {}) {
       if (columns.date) {
         const parsedDate = parseStatementDate(columns.date, context, dateOrder);
         if (parsedDate) {
+          if (diagnostics) diagnostics.dateCandidates = (diagnostics.dateCandidates || 0) + 1;
           if (context.currentDate && parsedDate !== context.currentDate && context.pendingDescription.length) context.pendingDescription = [];
           context.currentDate = parsedDate;
         }
@@ -320,7 +335,7 @@ export function parseStatementText(input, options = {}) {
       if (/\b(?:brought forward|opening balance)\b/i.test(combined)) context.pendingBalanceKind = 'opening';
       if (/\b(?:closing balance|balance carried forward|balance brought forward)\b/i.test(combined)) context.pendingBalanceKind = 'closing';
       if (balance !== null) {
-        if (context.pendingBalanceKind === 'opening') context.openingBalance = Math.abs(balance);
+        if (context.pendingBalanceKind === 'opening' && !Number.isSafeInteger(context.openingBalance)) context.openingBalance = Math.abs(balance);
         if (context.pendingBalanceKind === 'closing') context.closingBalance = Math.abs(balance);
         context.pendingBalanceKind = '';
         if (diagnostics) diagnostics.ignoredBalanceRows = (diagnostics.ignoredBalanceRows || 0) + 1;
@@ -349,18 +364,31 @@ export function parseStatementText(input, options = {}) {
     if (dateMatch) {
       const nextDate = parseStatementDate(dateMatch[1], context, dateOrder);
       if (nextDate) {
+        if (diagnostics) diagnostics.dateCandidates = (diagnostics.dateCandidates || 0) + 1;
         if (context.currentDate && nextDate !== context.currentDate && context.pendingDescription.length) context.pendingDescription = [];
         context.currentDate = nextDate;
         lineText = dateMatch[2] || '';
         if (!lineText) continue;
       }
     }
-    if (/\b(?:brought forward|opening balance)\b/i.test(lineText)) context.pendingBalanceKind = 'opening';
-    if (/\b(?:closing balance|balance carried forward|balance brought forward)\b/i.test(lineText)) context.pendingBalanceKind = 'closing';
+    if (/\b(?:brought forward|opening balance|balance brought forward)\b/i.test(lineText)) context.pendingBalanceKind = 'opening';
+    if (/\bclosing balance\b/i.test(lineText)) context.pendingBalanceKind = 'closing';
+    const balanceRow = lineText.match(/\b(?:brought forward|opening balance|closing balance|carried forward)\b/i);
+    if (balanceRow) {
+      const amount = statementAmountToken(lineText.slice(balanceRow.index + balanceRow[0].length));
+      if (amount !== null) {
+        if (context.pendingBalanceKind === 'opening' && !Number.isSafeInteger(context.openingBalance)) context.openingBalance = Math.abs(amount);
+        if (context.pendingBalanceKind === 'closing') context.closingBalance = Math.abs(amount);
+        context.pendingBalanceKind = '';
+      }
+      context.pendingDescription = [];
+      if (diagnostics) diagnostics.ignoredBalanceRows = (diagnostics.ignoredBalanceRows || 0) + 1;
+      continue;
+    }
     const balanceLine = lineText.match(/\bbalance\b\s*[:]?\s*(.*)$/i);
     if (balanceLine) {
       const amount = statementAmountToken(balanceLine[1]);
-      if (amount !== null && context.pendingBalanceKind === 'opening') context.openingBalance = Math.abs(amount);
+      if (amount !== null && context.pendingBalanceKind === 'opening' && !Number.isSafeInteger(context.openingBalance)) context.openingBalance = Math.abs(amount);
       if (amount !== null && context.pendingBalanceKind === 'closing') context.closingBalance = Math.abs(amount);
       if (amount !== null) context.pendingBalanceKind = '';
       if (diagnostics) diagnostics.ignoredBalanceRows = (diagnostics.ignoredBalanceRows || 0) + 1;
@@ -376,6 +404,7 @@ export function parseStatementText(input, options = {}) {
     if (labelled) {
       const directionLabel = labelled[1].toLowerCase().replace(/\s+/g, ' '), amountText = labelled[2].split(/\bbalance\b/i)[0];
       const amount = statementAmountToken(amountText);
+      if (amount === null && context.currentDate && diagnostics) diagnostics.missingAmountCandidates = (diagnostics.missingAmountCandidates || 0) + 1;
       if (amount !== null) {
         const prefix = cleanStatementDescription(lineText.slice(0, labelled.index));
         if (prefix) context.pendingDescription.push(prefix);
@@ -391,12 +420,14 @@ export function parseStatementText(input, options = {}) {
       const token = inline[0].trim(), parsedAmount = parseImportAmount(token.replace(/\s*(?:DR|DEBIT|CR|CREDIT)$/i, ''));
       const moneyTokens = [...lineText.matchAll(/(?:[$£€¥]\s*[-+]?\s*\d[\d,.]*|[-+]?\s*\d[\d,.]*\s*[$£€¥]?)/g)].filter(match => statementAmountToken(match[0]) !== null);
       if (moneyTokens.length > 1) {
+        if (diagnostics) diagnostics.ambiguousAmountRows = (diagnostics.ambiguousAmountRows || 0) + 1;
         if (diagnostics) diagnostics.unparsedCandidateRows = (diagnostics.unparsedCandidateRows || 0) + 1;
         context.pendingDescription = [];
         continue;
       }
       const explicitDirection = /[-+]|\(|\)|\b(?:DR|DEBIT|CR|CREDIT)\b/i.test(token);
       if (parsedAmount !== null) {
+        if (diagnostics) diagnostics.amountCandidates = (diagnostics.amountCandidates || 0) + 1;
         const beforeAmount = cleanStatementDescription(lineText.slice(0, inline.index));
         if (beforeAmount) context.pendingDescription.push(beforeAmount);
         const suffix = token.match(/(DR|DEBIT|CR|CREDIT)$/i)?.[1]?.toUpperCase();

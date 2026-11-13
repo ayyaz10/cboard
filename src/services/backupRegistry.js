@@ -1,4 +1,4 @@
-﻿import { getUserScopedClient, assertSupabaseResult } from './supabaseCrud.js';
+import { getUserScopedClient, assertSupabaseResult } from './supabaseCrud.js';
 import { validateState as validateTrainingState } from '../features/training/trainingData.js';
 import { migrateHabitData } from '../features/drivingImprovement/drivingData.js';
 import { clearDrivingWorkspaceCache } from './drivingImprovementService.js';

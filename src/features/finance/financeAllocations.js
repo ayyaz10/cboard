@@ -1,4 +1,4 @@
-import { nextTransactionSequence } from './transactionOrder.js';
+﻿import { nextTransactionSequence } from './transactionOrder.js';
 import { id } from './financeData.js';
 import { inMonth, monthKey } from './financeMath.js';
 import { markGoalCompletion } from './financeReports.js';
@@ -7,7 +7,7 @@ import { refreshDonationTargetStatus } from './donationAnalytics.js';
 import { accrueDonation, reconcileDonationIncome } from './donationAccounting.js';
 import { accrueDebtPayment, debtRemainingAmount, reconcileDebtIncome } from './debtAccounting.js';
 
-export const allocationTargets = ['savings', 'budget', 'goal', 'investment', 'debt', 'donation'];
+export const allocationTargets = ['savings', 'budget', 'goal', 'investment', 'debt', 'donation', 'familySupport'];
 
 export function allocationRuleStartDate(rule, transactions = []) {
   if (rule?.startedOn) return String(rule.startedOn).slice(0, 10);
@@ -128,7 +128,7 @@ export function reconcileIncomeAllocations(state, income, operation = 'replace')
         id: id(), executionKey: reversalKey, sourceIncomeId: income.id,
         sourceIncomeDate: record.sourceIncomeDate || income.date || '', sourceIncomeDescription: record.sourceIncomeDescription || income.title || 'Income',
         sourceIncomeAmount: record.sourceIncomeAmount ?? income.amount, allocationRuleId: record.allocationRuleId,
-        allocationType: ['donation', 'goal', 'debt'].includes(record.type) ? record.type : 'other', targetId: record.targetId || record.linkedDonationTargetId || '',
+        allocationType: ['donation', 'goal', 'debt', 'familySupport'].includes(record.type) ? record.type : 'other', targetId: record.targetId || record.linkedDonationTargetId || '',
         targetName: target?.title || target?.name || record.title || record.type, plannedAmount: record.amount, appliedAmount: 0,
         status: 'reversed', reason: 'Source transaction classification changed.', createdAt: new Date().toISOString(),
       });
@@ -164,7 +164,7 @@ function recordSkippedIncomeAllocation(state, rule, income, status = 'skipped', 
   state.allocationHistory.push({
     id: id(), executionKey, sourceIncomeId: income.id, sourceIncomeDate: income.date || '',
     sourceIncomeDescription: income.title || 'Income', sourceIncomeAmount: income.amount,
-    allocationRuleId: rule.id, allocationType: ['donation','goal','debt'].includes(rule.targetType) ? rule.targetType : 'other', targetId: rule.targetId || rule.donationTargetId || '',
+    allocationRuleId: rule.id, allocationType: ['donation','goal','debt','familySupport'].includes(rule.targetType) ? rule.targetType : 'other', targetId: rule.targetId || rule.donationTargetId || '',
     targetName: target?.title || target?.name || rule.name || rule.targetType || 'Allocation',
     plannedAmount: amountFor(rule, income.amount), appliedAmount: 0, status, createdAt: new Date().toISOString(), reason,
   });
@@ -181,6 +181,7 @@ export function processIncomeTransactionChange(state, previous, transaction) {
   }
 }
 export function applyIncomeAllocations(state, incomeTransaction) {
+  if (!incomeTransaction || (incomeTransaction.type && incomeTransaction.type !== 'income') || (incomeTransaction.source && incomeTransaction.providerStatus !== 'BOOK')) return state;
   state.allocationHistory ||= [];
   for (const rule of (state.allocationRules || []).filter(x => x.active && x.timing === 'income')) {
     if (rule.startedOn && rule.startedOn > incomeTransaction.date) {

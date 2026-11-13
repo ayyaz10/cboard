@@ -5,7 +5,7 @@ import { deriveFinancePosition, inspectFinanceIntegrity } from './financeLedger.
 import { financeSummary } from './financeMath.js';
 import {
   archiveCreditAgreement, canDeleteCreditPurchase, cancelCreditAgreement, createCreditAgreement, createCreditTransactionIndex, deleteUnusedCreditAgreement, generateCreditSchedule, getCreditAgreementBalances, getCreditAgreementStatus, getCreditPurchaseDeleteBlockReason,
-  getCreditAgreementMonthlyCommitment, getCreditAgreementRepaymentSummary, getCreditDueSoon, getCreditInstalmentAmounts, getCreditOverview, getMonthlyCreditCommitment, getOverdueCreditPayments, planCreditReminderReconciliation, recordCreditPayment,
+  getCreditAgreementMonthlyCommitment, getCreditAgreementRepaymentSummary, getCreditDueSoon, getCreditInstalmentAmounts, getCreditOverview, getMonthlyCreditCommitment, getOverdueCreditPayments, planCreditReminderReconciliation, recordCreditPayment, recordImportedCreditPayment,
   calculateRemainingBalance, calculateRemainingInstallmentCount, generateCustomCreditSchedule, mutateCreditState, restoreCreditAgreement, reverseCreditPayment, settleCreditAgreement, updateCreditAgreement, updateCreditInstalment, updateCreditPayment, validateCustomSchedule,
 } from './creditPurchases.js';
 
@@ -58,6 +58,23 @@ test('invalid calendar dates and invalid payment terms are rejected', () => {
   assert.throws(() => generateCreditSchedule({ agreementId: 'x', principalAmount: 100, term: 1, firstPaymentDate: '2026-02-30' }));
   assert.throws(() => generateCreditSchedule({ agreementId: 'x', principalAmount: 100, term: 0, firstPaymentDate: '2026-02-28' }));
   assert.throws(() => generateCreditSchedule({ agreementId: 'x', principalAmount: 100, term: 1, frequency: 'custom', customDays: 0, firstPaymentDate: '2026-02-28' }));
+});
+
+test('vehicle and custom metadata share the linked deposit and leave the repayment plan unchanged', () => {
+  const vehicleMetadata = { mileage: 82450, mileageUnit: 'miles', registration: 'AB12 CDE', makeModel: 'Toyota Yaris', modelYear: '2017', vin: 'VIN1234' };
+  const customFields = [{ id: 'warranty', label: 'Warranty expiry', type: 'date', value: '2027-11-14' }];
+  const { state, agreement } = makeAgreement({ vehicleMetadata, customFields });
+  const deposit = state.transactions.find(item => item.creditAgreementId === agreement.id);
+  assert.deepEqual(deposit.vehicleMetadata, vehicleMetadata);
+  assert.deepEqual(deposit.customFields, customFields);
+  const schedule = structuredClone(agreement.schedule), balance = getCreditAgreementBalances(state, agreement);
+  const nextVehicle = { ...vehicleMetadata, mileage: 82700 };
+  updateCreditAgreement(state, agreement.id, { vehicleMetadata: nextVehicle, customFields: [] });
+  assert.deepEqual(agreement.schedule, schedule);
+  assert.deepEqual(getCreditAgreementBalances(state, agreement), balance);
+  assert.deepEqual(deposit.vehicleMetadata, nextVehicle);
+  assert.deepEqual(deposit.customFields, []);
+  assert.equal(state.transactions.filter(item => item.creditAgreementId === agreement.id && item.type === 'expense').length, 1);
 });
 
 test('creating an agreement records only the real deposit as cash outflow', () => {
@@ -602,4 +619,33 @@ test('legacy Finance state normalizes with an empty credit agreement collection'
   const legacy = initialFinanceState();
   delete legacy.creditAgreements;
   assert.deepEqual(normalizeFinanceState(legacy).creditAgreements, []);
+});
+
+test('recording a scheduled payment links the chosen account and stable transaction exactly once', () => {
+  const { state, agreement } = makeAgreement({ deposit: 0, financedAmount: 120000 });
+  state.accounts.push({ id: 'current', name: 'Current Account', type: 'bank', openingBalance: 50000, archivedAt: '' });
+  const row = agreement.schedule[0];
+  const payment = recordCreditPayment(state, { agreementId: agreement.id, instalmentId: row.id, amount: row.amount, date: '2026-02-15', accountId: 'current', paymentId: 'account-payment', transactionId: 'account-transaction' });
+  assert.equal(payment.accountId, 'current');
+  assert.equal(payment.type, 'creditPayment');
+  assert.equal(payment.creditAgreementId, agreement.id);
+  assert.equal(payment.scheduledInstalmentId, row.id);
+  assert.equal(state.transactions.filter(item => item.creditPaymentId === 'account-payment').length, 1);
+  assert.throws(() => recordCreditPayment(state, { agreementId: agreement.id, instalmentId: row.id, amount: row.amount, date: '2026-02-15', accountId: 'missing', paymentId: 'bad-account-payment', transactionId: 'bad-account-transaction' }), /active Finance account/);
+});
+
+test('statement-confirmed Credit Purchase payments use one canonical imported payment transaction', () => {
+  const { state, agreement } = makeAgreement({ deposit: 0, financedAmount: 120000 });
+  state.accounts.push({ id: 'current', name: 'Current Account', type: 'bank', openingBalance: 50000, archivedAt: '' });
+  const row = agreement.schedule[0];
+  const payment = recordImportedCreditPayment(state, { agreementId: agreement.id, amount: row.amount, date: row.dueDate, accountId: 'current', instalmentId: row.id, record: { direction: 'expense', description: 'KLARNA payment', sourceType: 'statement', sourceRow: 7, reference: 'K123' }, paymentId: 'imported-cp-payment', transactionId: 'imported-cp-transaction' });
+  assert.equal(payment.type, 'creditPayment');
+  assert.equal(payment.accountId, 'current');
+  assert.equal(payment.sourceType, 'file_import');
+  assert.equal(payment.importSource, 'statement');
+  assert.equal(payment.reference, 'K123');
+  assert.equal(payment.creditAgreementId, agreement.id);
+  assert.equal(payment.scheduledInstalmentId, row.id);
+  assert.equal(state.transactions.filter(item => item.creditPaymentId === payment.creditPaymentId).length, 1);
+  assert.equal(getCreditInstalmentAmounts(state, agreement, row).remaining, 0);
 });

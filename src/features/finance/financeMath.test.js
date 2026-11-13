@@ -1,4 +1,4 @@
-import test from 'node:test';
+﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 import { budgetTarget, debtSummary, financeSummary, goalProjection, investmentSummary, monthKey, nextRecurringDate, parseMoney, shiftMonth } from './financeMath.js';
 
@@ -29,6 +29,26 @@ test('monthly totals separate income and each outflow type', () => {
   assert.equal(result.budgetUsed, 20000);
 });
 
+test('credit purchase liabilities do not count as cash spending, while deposits and paid instalments do', () => {
+  const agreement = { id: 'agreement', title: 'Car Insurance', cashPrice: 54225, purchaseDate: '2026-11-05', categoryId: 'insurance' };
+  const state = { settings: { monthlyIncome: 0 }, budgets: {}, creditAgreements: [agreement], transactions: [{ id: 'legacy-synthetic', type: 'expense', amount: 54225, categoryId: 'insurance', date: '2026-11-05', creditAgreementId: agreement.id, creditPaymentKind: 'purchase' }] };
+  const unpaid = financeSummary(state, '2026-11');
+  assert.equal(unpaid.expenses, 0);
+  assert.equal(unpaid.creditPayments, 0);
+  assert.equal(unpaid.transactions.length, 0);
+
+  state.transactions.push({ id: 'deposit', type: 'expense', amount: 10000, categoryId: 'insurance', date: '2026-11-05', creditAgreementId: agreement.id, creditPaymentKind: 'deposit' });
+  const withDeposit = financeSummary(state, '2026-11');
+  assert.equal(withDeposit.expenses, 10000);
+  assert.equal(withDeposit.transactions.some(item => item.creditPaymentKind === 'deposit'), true);
+
+  state.transactions.push({ id: 'instalment', type: 'creditPayment', amount: 7553, date: '2026-11-10', creditAgreementId: agreement.id, creditPrincipalAmount: 7000, creditFinanceCostAmount: 553 });
+  const withPayment = financeSummary(state, '2026-11');
+  assert.equal(withPayment.expenses, 10000);
+  assert.equal(withPayment.creditPayments, 7553);
+  assert.equal(withPayment.creditPrincipalPaid, 7000);
+  assert.equal(withPayment.creditFinanceCosts, 553);
+});
 test('investment gain, debt partial payments, and goal projections are correct', () => {
   assert.deepEqual(investmentSummary([{ contributed: 10000, currentValue: 12500 }]), { contributed:10000,value:12500,gain:2500,gainRate:2500 });
   assert.deepEqual(debtSummary([{ remaining: 7000 }],[{ amount:3000,date:'2026-09-10' }],'2026-09'),{ outstanding:7000,paidThisMonth:3000,paidAllTime:3000,paymentCount:1 });
