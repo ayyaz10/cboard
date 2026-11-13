@@ -1,7 +1,7 @@
 import { nextTransactionSequence } from './transactionOrder.js';
 import { addFinancePerson, createPersonLiabilityState } from './flexiblePayments.js';
 import { matchingTransactions } from './transactionSuggestions.js';
-import { normalizeMerchantName } from './merchantDirectory.js';
+import { matchMerchant, normalizeMerchantName } from './merchantDirectory.js';
 import { isValidFinanceDate } from './transactionOrder.js';
 import { canRefundTransaction, remainingRefundable } from './refunds.js';
 
@@ -82,7 +82,7 @@ const cell = (row, index) => Number.isInteger(index) ? String(row[index] ?? '').
 export function rowsToImportTransactions(rows, headers, mapping = detectImportColumns(headers), { sourceType = 'csv', dateOrder = 'dmy' } = {}) {
   if (rows.length > MAX_IMPORT_ROWS) throw rowLimitError();
   return rows.map((row, index) => {
-    const date = parseImportDate(cell(row, mapping.date), dateOrder), description = cell(row, mapping.description).slice(0, 200);
+    const date = parseImportDate(cell(row, mapping.date), dateOrder), description = normalizeImportedDescription(cell(row, mapping.description)).slice(0, 200);
     const debit = parseImportAmount(cell(row, mapping.debit)), credit = parseImportAmount(cell(row, mapping.credit));
     const amount = Number.isInteger(mapping.amount) ? parseImportAmount(cell(row, mapping.amount)) : null;
     const value = amount !== null ? amount : debit !== null ? -Math.abs(debit) : credit !== null ? Math.abs(credit) : null;
@@ -104,7 +104,18 @@ export function suggestCategory(description, direction, categories, transactions
 }
 
 function normalizeImportDescription(value) {
-  return String(value || '').normalize('NFKC').toLocaleLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
+  return normalizeMerchantName(normalizeImportedDescription(value));
+}
+
+export function normalizeImportedDescription(value) {
+  const text = String(value || '').normalize('NFKC').trim();
+  const card = text.match(/^card\s+transaction\s+\d{3,8}\s+\d{1,2}[a-z]{3}\d{2,4}\s+(?:(?:cd|d|pos)\s+)?(.+)$/i);
+  if (!card) return text;
+  const merchantText = card[1].replace(/\s+[A-Z]{2}$/i, '').replace(/\s+/g, ' ').trim();
+  const knownMerchant = matchMerchant(merchantText);
+  if (knownMerchant) return knownMerchant.displayName;
+  if (/^vinted\b/i.test(merchantText)) return 'Vinted';
+  return merchantText;
 }
 
 export function findImportDuplicate(record, transactions, accountId = '') {
@@ -141,11 +152,11 @@ export function rememberImportAccount(state, accountName, accountId) {
   state.importAccountMappings[key] = accountId;
 }
 
-export function buildImportedTransaction(record, state, { accountId = '', categoryId = '' } = {}) {
+export function buildImportedTransaction(record, state, { accountId = '', categoryId } = {}) {
   if (record.confidence !== 'ready' || !record.date || !record.description || !Number.isSafeInteger(record.amount) || record.amount <= 0) throw new Error('Resolve invalid import rows before saving.');
   const selectedAccount = (state.accounts || []).find(item => item.id === accountId) || (state.creditCards || []).find(item => item.id === accountId);
   const card = selectedAccount && (state.creditCards || []).some(item => item.id === selectedAccount.id);
-  return { id: crypto.randomUUID(), sequence: nextTransactionSequence(state), title: record.description, amount: record.amount, type: card ? record.direction === 'expense' ? 'expense' : 'cardCredit' : record.direction, ...(accountId ? { accountId } : {}), ...(card ? { creditCardId: accountId } : {}), categoryId: card && record.direction === 'income' ? '' : categoryId || record.categoryId || suggestCategory(record.description, record.direction, state.categories, state.transactions), date: record.date, note: '', paymentMethod: '', paidFromFundId: record.direction === 'expense' && !card ? accountId || '' : '', sourceType: 'file_import', importSource: record.sourceType, importDirection: record.direction, reference: record.reference || '', createdAt: new Date().toISOString() };
+  return { id: crypto.randomUUID(), sequence: nextTransactionSequence(state), title: record.description, amount: record.amount, type: card ? record.direction === 'expense' ? 'expense' : 'cardCredit' : record.direction, ...(accountId ? { accountId } : {}), ...(card ? { creditCardId: accountId } : {}), categoryId: card && record.direction === 'income' ? '' : categoryId ?? record.categoryId ?? suggestCategory(record.description, record.direction, state.categories, state.transactions), date: record.date, note: '', paymentMethod: '', paidFromFundId: record.direction === 'expense' && !card ? accountId || '' : '', sourceType: 'file_import', importSource: record.sourceType, importDirection: record.direction, reference: record.reference || '', createdAt: new Date().toISOString() };
 }
 
 export function detectPossibleRefund(record, transactions) {
@@ -278,7 +289,7 @@ function statementHeaderOrFooter(line) {
 }
 
 function makeStatementRecord({ date, description, amount, direction, sourceType, sourceRow, confidence = 'ready', validation = '' }) {
-  return { date: date || '', description: cleanStatementDescription(description).slice(0, 200), amount: Math.abs(amount || 0), direction, currency: '', balance: null, reference: '', sourceType, sourceRow, confidence: !date || !cleanStatementDescription(description) ? 'review' : confidence, validation: !date ? 'Statement year or transaction date is missing.' : !cleanStatementDescription(description) ? 'Add a transaction description.' : validation, ...(direction === 'income' ? { classification: 'review' } : {}) };
+  return { date: date || '', description: normalizeImportedDescription(cleanStatementDescription(description)).slice(0, 200), amount: Math.abs(amount || 0), direction, currency: '', balance: null, reference: '', sourceType, sourceRow, confidence: !date || !cleanStatementDescription(description) ? 'review' : confidence, validation: !date ? 'Statement year or transaction date is missing.' : !cleanStatementDescription(description) ? 'Add a transaction description.' : validation, ...(direction === 'income' ? { classification: 'review' } : {}) };
 }
 
 export function statementOcrInput(result) {

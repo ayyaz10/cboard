@@ -1,7 +1,7 @@
 ﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildImportedTransaction, matchImportAccount, rememberImportAccount, detectDelimiter, detectImportColumns, detectPossibleRefund, findImportDuplicate, MAX_IMPORT_ROWS, parseDelimitedText, parseImportAmount, parseImportDate, parseStatementText, statementOcrInput, rowsToImportTransactions, suggestCategory, suggestPersonalSettlement } from './transactionImport.js';
+import { buildImportedTransaction, matchImportAccount, rememberImportAccount, detectDelimiter, detectImportColumns, detectPossibleRefund, findImportDuplicate, MAX_IMPORT_ROWS, normalizeImportedDescription, parseDelimitedText, parseImportAmount, parseImportDate, parseStatementText, statementOcrInput, rowsToImportTransactions, suggestCategory, suggestPersonalSettlement } from './transactionImport.js';
 
 test('quoted CSV supports BOM, commas, escaped quotes, and CRLF', () => {
   const text = '\uFEFFDate,Description,Debit,Credit\r\n01/11/2026,"Tesco, ""Express""",45.20,\r\n';
@@ -45,6 +45,22 @@ test('duplicate detection is based on date, amount, title, and direction', () =>
   assert.equal(findImportDuplicate(row, []), null);
 });
 
+test('card descriptors keep the merchant name and discard card/date metadata', () => {
+  assert.equal(normalizeImportedDescription('Card Transaction 7118 14OCT26 CD ALDI KIRKCALDY GB'), 'Aldi');
+  assert.equal(normalizeImportedDescription('Card Transaction 7118 14OCT26 D VINTED VILNIUS GB'), 'Vinted');
+  const [record] = parseStatementText('15 OCT 2026\nCard Transaction 7118 14OCT26 D VINTED VILNIUS GB -4.90');
+  assert.equal(record.description, 'Vinted');
+  assert.equal(record.date, '2026-10-15');
+  assert.equal(record.amount, 490);
+});
+
+test('card merchant names match an already saved transaction as a duplicate', () => {
+  const record = { date: '2026-10-15', amount: 490, description: 'Card Transaction 7118 14OCT26 D VINTED VILNIUS GB', direction: 'expense' };
+  const saved = { id: 'vinted', date: record.date, amount: record.amount, title: 'Vinted', type: 'expense', accountId: 'card-1' };
+  assert.equal(findImportDuplicate(record, [saved], 'card-1'), saved);
+  assert.equal(findImportDuplicate(record, [saved], 'card-2'), null);
+});
+
 test('imported transactions use the canonical Finance transaction shape and sequence', () => {
   const state = { transactions: [{ id: 'a', sequence: 4 }], categories: [{ id: 'other', name: 'Other', type: 'expense' }] };
   const transaction = buildImportedTransaction({ date: '2026-11-01', description: 'Shop', amount: 100, direction: 'expense', confidence: 'ready', sourceType: 'csv' }, state);
@@ -52,6 +68,12 @@ test('imported transactions use the canonical Finance transaction shape and sequ
   assert.equal(transaction.sequence, 5);
   assert.equal(transaction.categoryId, 'other');
   assert.equal(transaction.sourceType, 'file_import');
+});
+
+test('an explicit uncategorized choice is preserved during import', () => {
+  const state = { transactions: [], categories: [{ id: 'other', name: 'Other', type: 'expense' }] };
+  const record = { date: '2026-11-01', description: 'Shop', amount: 100, direction: 'expense', confidence: 'ready', sourceType: 'csv', categoryId: '' };
+  assert.equal(buildImportedTransaction(record, state, { categoryId: '' }).categoryId, '');
 });
 
 test('statement text extraction rejects headings and keeps dated transaction lines', () => {
@@ -159,7 +181,7 @@ test('grouped bank statement fixture keeps inherited dates, descriptions, direct
     ['2026-10-05', 22500, 'income'], ['2026-10-05', 8960, 'expense'], ['2026-10-05', 150, 'expense'],
   ]);
   assert.equal(records[0].description, 'Automated Credit SOI WAD LTD - FP 05/10/26 0945 54416004843074297');
-  assert.match(records[1].description, /STAGECOACH SERVICES STOCKPORT GB/);
+  assert.equal(records[1].description, 'Stagecoach');
   assert.equal(records.find(item => item.amount === 100).description, 'Account interest');
   assert.deepEqual(records.filter(item => item.date === '2026-10-12').map(item => item.amount), [15000, 100, 1427, 1199, 295, 249, 370]);
   assert.ok(records.filter(item => item.direction === 'expense').every(item => item.confidence === 'ready'));
@@ -178,7 +200,7 @@ test('parser context carries a grouped date and a split description across PDF p
   assert.equal(first.length, 0);
   assert.equal(second.length, 1);
   assert.equal(second[0].date, '2026-10-26');
-  assert.equal(second[0].description, 'Card Transaction 7118 23OCT26 D STAGECOACH SERVICES STOCKPORT GB');
+  assert.equal(second[0].description, 'Stagecoach');
   assert.equal(second[0].amount, 250);
   assert.equal(second[0].direction, 'expense');
   assert.equal(second[0].sourceRow.startsWith('2:'), true);
@@ -223,7 +245,7 @@ test('positioned PDF text uses the Paid In and Withdrawn columns and never impor
   ], { sourceType: 'pdf' });
   assert.deepEqual(records.map(item => [item.date, item.amount, item.direction]), [['2026-10-05', 22500, 'income'], ['2026-10-05', 8960, 'expense']]);
   assert.match(records[0].description, /54416004843074297/);
-  assert.match(records[1].description, /STAGECOACH SERVICES STOCKPORT GB/);
+  assert.equal(records[1].description, 'Stagecoach');
 });
 
 test('Paid In and Withdrawn CSV headers map directly and running balance is not the amount', () => {
