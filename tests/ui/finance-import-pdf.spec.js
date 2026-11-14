@@ -49,7 +49,10 @@ test('generated searchable PDF runs through PDF.js and imports from the preview'
   await dialog.locator('#finance-import-file').setInputFiles({ name: 'searchable-statement.pdf', mimeType: 'application/pdf', buffer: makePdf([statementPage]) });
 
   await expect(dialog.getByTestId('finance-import-count-found')).toHaveText('1 transactions found', { timeout: 120000 });
-  await expect(dialog.getByTestId('finance-import-count-ready')).toHaveText('1');
+  await expect(dialog.getByTestId('finance-import-count-extracted')).toHaveText('1');
+    await expect(dialog.getByTestId('finance-import-count-ready')).toHaveText('1');
+    await expect(dialog.getByTestId('finance-import-count-duplicates')).toHaveText('0');
+    await expect(dialog.getByText('1 selected', { exact: true })).toBeVisible();
   await expect(dialog.getByTestId('finance-import-ocr-pages')).toHaveText('None');
   await expect(dialog.getByText(/Preview ready: 1 transactions/)).toBeVisible({ timeout: 120000 });
   await expect(dialog.getByTestId('finance-import-reconciliation')).toContainText('reconcile');
@@ -66,6 +69,54 @@ test('generated searchable PDF runs through PDF.js and imports from the preview'
   expect(state.transactions.some(item => item.title === 'Coffee Shop corrected' && item.accountId === 'account-current')).toBe(true);
 });
 
+test('NatWest disclosure values stay out of the real PDF import preview and saved ledger', async ({ browser }) => {
+  test.setTimeout(120000);
+  const disclosurePage = [
+    { x: 40, y: 750, text: 'Date' }, { x: 110, y: 750, text: 'Description' }, { x: 300, y: 750, text: 'Paid In' }, { x: 390, y: 750, text: 'Withdrawn' }, { x: 500, y: 750, text: 'Balance' },
+    { x: 40, y: 720, text: '01 NOV 2026' }, { x: 110, y: 720, text: 'BROUGHT FORWARD' }, { x: 500, y: 720, text: '470.60' },
+    { x: 40, y: 690, text: '03 NOV 2026' }, { x: 110, y: 690, text: 'Card Transaction 7118 02NOV26 CD ALDI KIRKCALDY GB' }, { x: 390, y: 690, text: '17.07' }, { x: 500, y: 690, text: '453.53' },
+    { x: 40, y: 650, text: 'Interest (variable) you currently pay us on overdraft balances' },
+    { x: 110, y: 625, text: 'Over £0' }, { x: 300, y: 625, text: '33.75% NAR' }, { x: 470, y: 625, text: '39.49% EAR' },
+    { x: 40, y: 595, text: 'Interest (variable) we currently pay you on your credit balance' },
+    { x: 40, y: 565, text: 'Overdraft Arrangements' },
+    { x: 40, y: 540, text: 'For charging periods we reduced unpaid transaction fees from £2.15 to £1.55.' },
+  ];
+
+  for (const width of [390, 1280]) {
+    const context = await browser.newContext({ viewport: { width, height: 900 }, isMobile: width === 390, hasTouch: width === 390 });
+    const page = await context.newPage();
+    await page.goto('/cboard/tests/ui/fixtures/finance.html');
+    await page.getByRole('button', { name: 'Set import currency to GBP' }).click();
+    await page.getByRole('button', { name: 'Open Transaction Import' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Import transactions' });
+    await dialog.getByLabel('Import into account').selectOption('account-current');
+    await dialog.locator('#finance-import-file').setInputFiles({ name: 'natwest-disclosure-case.pdf', mimeType: 'application/pdf', buffer: makePdf([disclosurePage]) });
+
+    await expect(dialog.getByTestId('finance-import-count-found')).toHaveText('1 transactions found', { timeout: 120000 });
+    await expect(dialog.getByTestId('finance-import-count-extracted')).toHaveText('1');
+    await expect(dialog.getByTestId('finance-import-count-ready')).toHaveText('1');
+    await expect(dialog.getByTestId('finance-import-count-duplicates')).toHaveText('0');
+    await expect(dialog.getByText('1 selected', { exact: true })).toBeVisible();
+    await expect(dialog.getByTestId('finance-import-count-review')).toHaveText('0');
+    await expect(dialog.getByRole('button', { name: 'Import 1 transaction' })).toBeEnabled();
+    await expect(dialog).toContainText('Withdrawn £17.07');
+    await expect(dialog).not.toContainText('£33.75');
+    await expect(dialog).not.toContainText('£2.15');
+    const row = dialog.getByTestId('finance-import-row');
+    await expect(row).toContainText('ALDI Kirkcaldy');
+    expect((await row.boundingBox())?.width).toBeGreaterThan(width === 390 ? 300 : 700);
+    const before = JSON.parse(await page.getByTestId('finance-state').textContent());
+    const existingIds = new Set(before.transactions.map(item => item.id));
+    await dialog.getByRole('button', { name: 'Import 1 transaction' }).click({ force: true });
+    await expect(dialog.getByRole('status')).toContainText('1 transaction imported');
+    const state = JSON.parse(await page.getByTestId('finance-state').textContent());
+    const imported = state.transactions.filter(item => item.accountId === 'account-current' && !existingIds.has(item.id));
+    expect(imported).toHaveLength(1);
+    expect(imported[0]).toMatchObject({ amount: 1707, type: 'expense' });
+    expect(imported[0].title).toMatch(/ALDI Kirkcaldy/i);
+    await context.close();
+  }
+});
 test('PDF.js retries partial native extraction and OCRs a scanned page without duplicates', async ({ page }) => {
   test.setTimeout(120000);
   await page.goto('/cboard/tests/ui/fixtures/finance.html');

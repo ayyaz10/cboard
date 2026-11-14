@@ -273,13 +273,26 @@ function findStatementColumns(lines) {
   return null;
 }
 
+function isStatementTableHeader(line) {
+  const value = String(line?.text || (line?.items || []).map(item => item.text).join(' ')).toLowerCase().replace(/[^a-z]+/g, ' ');
+  return /\bdate\b/.test(value) && /\bdescription\b|\bdetails\b/.test(value)
+    && /\bpaid\s*in\b/.test(value) && /\bwithdrawn\b|\bpaid\s*out\b/.test(value) && /\bbalance\b/.test(value);
+}
+
+const statementDisclosureHeading = /\b(?:interest\s*\(?(?:variable|credit|debit)|overdraft\s+(?:arrangements|rates?|limit)|arranged\s+overdraft\s+limit|unarranged\s+overdraft|fees?\s+and\s+charges|charges?\s+and\s+fees|important\s+information|changes?\s+to\s+(?:our\s+)?(?:fees?|charges?|rates?))\b/i;
+function isStatementDisclosureHeading(line) {
+  const text = String(line?.text || (line?.items || []).map(item => item.text).join(' ')).replace(/\s+/g, ' ').trim();
+  return statementDisclosureHeading.test(text);
+}
+
 function columnsForLine(line, columnX) {
   const fields = Object.entries(columnX).sort((a, b) => a[1] - b[1]);
   const columns = Object.fromEntries(Object.keys(columnX).map(key => [key, []]));
   for (const item of line.items || []) {
     let field = fields[0]?.[0];
     for (let index = 0; index < fields.length - 1; index++) {
-      if (item.x >= (fields[index][1] + fields[index + 1][1]) / 2) field = fields[index + 1][0];
+      const split = fields[index][1] + (fields[index + 1][1] - fields[index][1]) * (fields[index][0] === 'description' ? 0.7 : 0.5);
+      if (item.x >= split) field = fields[index + 1][0];
       else break;
     }
     columns[field].push(item.text);
@@ -288,13 +301,13 @@ function columnsForLine(line, columnX) {
 }
 
 function statementAmountToken(text) {
-  const match = String(text || '').match(/(?:[$£€¥]\s*[-+]?\s*\d[\d,.]*|[-+]?\s*\d[\d,.]*\s*[$£€¥]?)/);
-  if (!match) return null;
-  const token = match[0].trim();
-  if (!statementCurrency.test(token) && !/[,.]\d{1,2}$/.test(token) && !/^[-+]\s*\d/.test(token)) return null;
-  return parseImportAmount(token);
+  const token = String(text || '').trim().replace(/^\u00C2(?=\u00A3)/, '');
+  if (!token || /[%]|\b(?:NAR|EAR)\b/i.test(token)) return null;
+  if (!/[$\u00A3\u20AC\u00A5]/.test(token) && !/[,.]\d{1,2}$/.test(token) && !/^[-+]\s*\d/.test(token)) return null;
+  // Validate the complete token so percentage rates and prose cannot become amounts.
+  if (!/^(?:[$\u00A3\u20AC\u00A5]\s*)?[-+]?\s*\d[\d,]*(?:\.\d{1,2})?\s*[$\u00A3\u20AC\u00A5]?(?:\s*(?:DR|DEBIT|CR|CREDIT))?$/i.test(token)) return null;
+  return parseImportAmount(token.replace(/\s*(?:DR|DEBIT|CR|CREDIT)$/i, '').trim());
 }
-
 function cleanStatementDescription(value) {
   return String(value || '').replace(/[|·]+/g, ' ').replace(/\s+/g, ' ').replace(/^[\s,:;-]+|[\s,:;-]+$/g, '').trim();
 }
@@ -329,10 +342,11 @@ export function parseStatementText(input, options = {}) {
   context.pendingDescription ??= [];
   context.pendingBalanceKind ??= '';
   context.statementColumns ??= null;
+  context.statementDisclosureActive ??= false;
+  context.statementTextTableActive ??= false;
   context.openingBalance ??= null;
   context.closingBalance ??= null;
   if (diagnostics) diagnostics.linesProcessed = (diagnostics.linesProcessed || 0) + lines.length;
-  context.statementColumns = findStatementColumns(lines) || context.statementColumns;
   const records = [];
   const pushRecord = (description, amount, direction, sourceRow, confidence = 'ready', validation = '') => {
     if (records.length >= MAX_IMPORT_ROWS) throw rowLimitError();
@@ -346,11 +360,33 @@ export function parseStatementText(input, options = {}) {
 
   for (const line of lines) {
     const rawText = line.text.trim().replace(/\s+/g, ' ');
+    const tableHeader = isStatementTableHeader(line);
+    if (isStatementDisclosureHeading(line)) {
+      context.statementDisclosureActive = true;
+      context.statementColumns = null;
+      context.statementTextTableActive = false;
+      context.currentDate = '';
+      context.pendingDescription = [];
+      context.pendingBalanceKind = '';
+      continue;
+    }
+    if (tableHeader) {
+      const detectedColumns = findStatementColumns([line]);
+      if (detectedColumns) context.statementColumns = detectedColumns;
+      context.statementTextTableActive = true;
+      const resumedAfterDisclosure = context.statementDisclosureActive;
+      context.statementDisclosureActive = false;
+      if (resumedAfterDisclosure) {
+        context.currentDate = '';
+        context.pendingDescription = [];
+      }
+      if (diagnostics) diagnostics.ignoredHeaderRows = (diagnostics.ignoredHeaderRows || 0) + 1;
+      continue;
+    }
+    if (context.statementDisclosureActive) continue;
     if (context.statementColumns && Array.isArray(line.items) && line.items.length) {
       const columns = columnsForLine(line, context.statementColumns);
       const combined = line.items.map(item => item.text).join(' ').trim();
-      const headerLine = /\bdate\b/i.test(combined) && /\bbalance\b/i.test(combined) && (/\bpaid\b/i.test(combined) || /\bwithdrawn\b/i.test(combined));
-      if (headerLine) { if (diagnostics) diagnostics.ignoredHeaderRows = (diagnostics.ignoredHeaderRows || 0) + 1; continue; }
       if (columns.date) {
         const parsedDate = parseStatementDate(columns.date, context, dateOrder);
         if (parsedDate) {
@@ -388,8 +424,7 @@ export function parseStatementText(input, options = {}) {
       if (description) context.pendingDescription.push(description);
       continue;
     }
-
-    const dateMatch = rawText.match(/^((?:\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[./-]\d{1,2}[./-]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}(?:\s+\d{2,4})?|[A-Za-z]{3,9}\s+\d{1,2},?(?:\s+\d{2,4})?))(?:\s+(.+))?$/i);
+      const dateMatch = rawText.match(/^((?:\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[./-]\d{1,2}[./-]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}(?:\s+\d{2,4})?|[A-Za-z]{3,9}\s+\d{1,2},?(?:\s+\d{2,4})?))(?:\s+(.+))?$/i);
     let lineText = rawText;
     if (dateMatch) {
       const nextDate = parseStatementDate(dateMatch[1], context, dateOrder);
@@ -414,6 +449,11 @@ export function parseStatementText(input, options = {}) {
       context.pendingDescription = [];
       if (diagnostics) diagnostics.ignoredBalanceRows = (diagnostics.ignoredBalanceRows || 0) + 1;
       continue;
+    }
+    if (context.statementTextTableActive) {
+      const directionColumn = lineText.match(/\b(?:paid\s*in|money\s*in|deposit|credit|withdrawn|paid\s*out|money\s*out|debit|withdrawal)\b/i);
+      const balanceIndex = lineText.toLowerCase().lastIndexOf(' balance');
+      if (directionColumn && balanceIndex > directionColumn.index) lineText = lineText.slice(0, balanceIndex).trim();
     }
     const balanceLine = lineText.match(/\bbalance\b\s*[:]?\s*(.*)$/i);
     if (balanceLine) {

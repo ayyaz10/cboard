@@ -1,6 +1,7 @@
-﻿import test from 'node:test';
+import test from 'node:test';
 import assert from 'node:assert/strict';
 import { assessPdfPageQuality, mergePdfExtractionRecords, reconcileStatementBalances } from './statementPdfExtraction.js';
+import { parseStatementText } from './transactionImport.js';
 
 const record = (overrides = {}) => ({ date: '2026-10-05', description: 'Coffee House branch 55881000214', amount: 1299, direction: 'expense', confidence: 'ready', sourceType: 'pdf', sourceRow: '1:8', reference: '', validation: '', ...overrides });
 
@@ -87,6 +88,34 @@ test('non-unique identical native/OCR candidates are retained for review instead
   assert.ok(merged.every(item => item.confidence === 'review'));
 });
 
+test('positioned and flattened OCR parsing removes NatWest disclosures before native/OCR merge', () => {
+  const header = { text: 'Date Description Paid In Withdrawn Balance', sourceRow: 1, items: [
+    { x: 10, text: 'Date' }, { x: 80, text: 'Description' }, { x: 320, text: 'Paid In' }, { x: 440, text: 'Withdrawn' }, { x: 560, text: 'Balance' },
+  ] };
+  const positioned = (sourceRow, cells) => ({ sourceRow, text: cells.map(item => item.text).join(' '), items: cells });
+  const native = parseStatementText([
+    header,
+    positioned(2, [{ x: 80, text: 'BROUGHT FORWARD' }, { x: 560, text: '470.60' }]),
+    positioned(3, [{ x: 10, text: '03 NOV 2026' }, { x: 80, text: 'Card Transaction 7118 02NOV26 CD ALDI KIRKCALDY GB' }, { x: 440, text: '17.07' }, { x: 560, text: '453.53' }]),
+    { sourceRow: 4, text: 'Interest (variable) you currently pay us on overdraft balances' },
+    { sourceRow: 5, text: '33.75% NAR and 39.49% EAR' },
+    { sourceRow: 6, text: 'Overdraft Arrangements: fee change from £2.15 to £1.55' },
+  ], { sourceType: 'pdf', context: { year: 2026 } });
+  const ocr = parseStatementText([
+    'Date Description Paid In Withdrawn Balance',
+    '03 NOV 2026 BROUGHT FORWARD 470.60',
+    '03 NOV 2026 Card Transaction 7118 02NOV26 CD ALDI KIRKCALDY GB Withdrawn £17.07 Balance £453.53',
+    'Interest (variable) you currently pay us on overdraft balances',
+    '33.75% NAR and 39.49% EAR',
+    'Overdraft Arrangements: fee change from £2.15 to £1.55',
+  ].join('\n'), { sourceType: 'pdf-scan', context: { year: 2026 } });
+  const merged = mergePdfExtractionRecords(native, ocr);
+  assert.equal(native.length, 1);
+  assert.equal(ocr.length, 1);
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].sourceType, 'pdf-merged');
+  assert.deepEqual([merged[0].description, merged[0].amount, merged[0].direction], ['ALDI Kirkcaldy', 1707, 'expense']);
+});
 test('balance reconciliation uses integer minor units, excludes running balances, and tolerates one penny', () => {
   const records = [record({ amount: 1234, direction: 'expense', balance: 98766 }), record({ amount: 1, direction: 'income', balance: 98767 })];
   assert.deepEqual(reconcileStatementBalances(records, { opening: 100000, closing: 98767 }), {

@@ -4,8 +4,8 @@ import { initialFinanceState, normalizeFinanceState } from './financeData.js';
 import { deriveFinancePosition, inspectFinanceIntegrity } from './financeLedger.js';
 import { financeSummary } from './financeMath.js';
 import {
-  archiveCreditAgreement, canDeleteCreditPurchase, cancelCreditAgreement, createCreditAgreement, createCreditTransactionIndex, deleteUnusedCreditAgreement, generateCreditSchedule, getCreditAgreementBalances, getCreditAgreementStatus, getCreditPurchaseDeleteBlockReason,
-  getCreditAgreementMonthlyCommitment, getCreditAgreementRepaymentSummary, getCreditDueSoon, getCreditInstalmentAmounts, getCreditOverview, getMonthlyCreditCommitment, getOverdueCreditPayments, planCreditReminderReconciliation, recordCreditPayment, recordImportedCreditPayment,
+  archiveCreditAgreement, createCreditPurchaseRefundState, buildCreditScheduleRevision, recordCreditPayment, getCreditAgreementRevisionFingerprint, getCreditScheduleRevisionCounts, canDeleteCreditPurchase, cancelCreditAgreement, createCreditAgreement, createCreditTransactionIndex, deleteUnusedCreditAgreement, generateCreditSchedule, getCreditAgreementBalances, getCreditAgreementStatus, getCreditPurchaseDeleteBlockReason,
+  getCreditAgreementMonthlyCommitment, getCreditAgreementRepaymentSummary, getCreditDueSoon, getCreditInstalmentAmounts, getCreditOverview, getMonthlyCreditCommitment, getOverdueCreditPayments, planCreditReminderReconciliation, recordImportedCreditPayment,
   calculateRemainingBalance, calculateRemainingInstallmentCount, generateCustomCreditSchedule, mutateCreditState, restoreCreditAgreement, reverseCreditPayment, settleCreditAgreement, updateCreditAgreement, updateCreditInstalment, updateCreditPayment, validateCustomSchedule,
 } from './creditPurchases.js';
 
@@ -97,12 +97,103 @@ test('upfront amount counted as payment one reduces future payment count and doe
   assert.equal(agreement.schedule.length, 3);
   assert.deepEqual(agreement.schedule.map(item => item.amount), [4_500, 2_925, 2_925]);
   assert.equal(getCreditInstalmentAmounts(state, agreement, agreement.schedule[0]).paid, 4_500);
+  assert.equal(getCreditScheduleRevisionCounts(state, agreement, '2026-10-26').completedCount, 1);
   assert.equal(getCreditAgreementBalances(state, agreement).paidTotal, 4_500);
   assert.equal(getCreditAgreementBalances(state, agreement).totalRemaining, 5_850);
   assert.equal(state.transactions.filter(item => item.creditAgreementId === agreement.id).length, 1);
   assert.equal(calculateRemainingInstallmentCount(3, 1), 2);
   assert.equal(calculateRemainingBalance(10_350, 4_500), 5_850);
   assert.equal(getMonthlyCreditCommitment(state, '2026-11-01'), 2_925);
+});
+
+test('remaining schedule revision separates completed, protected, and eligible counts and supports both count interpretations', () => {
+  const { state, agreement } = makeAgreement({ id: 'revision-24', financedAmount: 240_000, cashPrice: 240_000, deposit: 0, term: 24, firstPaymentDate: '2026-02-15' });
+  state.accounts.push({ id: 'bank-current', name: 'Current Account', type: 'bank', openingBalance: 500_000, archivedAt: '' });
+  for (let index = 0; index < 4; index++) recordCreditPayment(state, { agreementId: agreement.id, instalmentId: agreement.schedule[index].id, amount: agreement.schedule[index].amount, date: agreement.schedule[index].dueDate, paymentId: `rev-paid-${index}`, transactionId: `rev-paid-${index}`, accountId: 'bank-current' });
+  const counts = getCreditScheduleRevisionCounts(state, agreement, '2026-06-01');
+  assert.deepEqual([counts.completedCount, counts.protectedCount, counts.eligibleCount], [4, 0, 20]);
+  const remaining = buildCreditScheduleRevision(state, agreement.id, { revisionId: 'remaining-12', futureCount: 12, firstPaymentDate: '2026-06-15' }, '2026-06-01');
+  assert.equal(remaining.revised.term, 16);
+  assert.equal(remaining.futureRows.length, 12);
+  const totalMode12 = buildCreditScheduleRevision(state, agreement.id, { revisionId: 'total-12', futureCount: 12 - counts.completedCount, firstPaymentDate: '2026-06-15' }, '2026-06-01');
+  assert.equal(totalMode12.revised.term, 12);
+  assert.equal(totalMode12.futureRows.length, 8);
+  assert.equal(remaining.futureRows.reduce((sum, row) => sum + row.amount, 0), getCreditAgreementBalances(remaining.candidate, remaining.revised).totalRemaining);
+  assert.equal(getCreditAgreementRevisionFingerprint(state, agreement.id), remaining.fingerprint);
+});
+
+test('partial and overdue rows remain protected, while refunds and extra principal feed revised balances once', () => {
+  const { state, agreement } = makeAgreement({ id: 'revision-protected', financedAmount: 120_000, cashPrice: 120_000, deposit: 0, term: 12, firstPaymentDate: '2026-01-15' });
+  const partial = agreement.schedule[0], overdue = agreement.schedule[1];
+  recordCreditPayment(state, { agreementId: agreement.id, instalmentId: partial.id, amount: 2_000, date: '2026-01-15', paymentId: 'partial-one', transactionId: 'partial-one' });
+  recordCreditPayment(state, { agreementId: agreement.id, instalmentId: partial.id, amount: 1_000, date: '2026-01-16', paymentId: 'partial-two', transactionId: 'partial-two' });
+  const counts = getCreditScheduleRevisionCounts(state, agreement, '2026-03-01');
+  assert.equal(counts.completedCount, 0);
+  assert.equal(counts.protectedCount, 2);
+  const preview = buildCreditScheduleRevision(state, agreement.id, { revisionId: 'protected-rev', futureCount: 4, firstPaymentDate: '2026-03-15' }, '2026-03-01');
+  assert.equal(preview.revised.term, 6);
+  assert.equal(preview.revised.schedule.find(row => row.id === partial.id).amount, partial.amount);
+  assert.equal(preview.revised.schedule.find(row => row.id === overdue.id).amount, overdue.amount);
+  assert.equal(preview.futureRows.reduce((sum, row) => sum + row.principalAmount, 0), getCreditAgreementBalances(preview.candidate, preview.revised).principalRemaining - preview.counts.protectedRows.reduce((sum, row) => sum + row.principalRemaining, 0));
+});
+
+test('a refund and extra principal are included in the revised balance without creating revision transactions', () => {
+  const { state, agreement } = makeAgreement({ id: 'revision-refund-extra', financedAmount: 100_000, cashPrice: 100_000, deposit: 0, term: 10, firstPaymentDate: '2026-12-15' });
+  recordCreditPayment(state, { agreementId: agreement.id, amount: 15_000, date: '2026-12-15', paymentId: 'revision-extra-payment', transactionId: 'revision-extra-payment', kind: 'extra' });
+  assert.equal(getCreditScheduleRevisionCounts(state, agreement, '2026-12-14').completedCount, 0);
+  const beforeRefund = getCreditAgreementBalances(state, agreement).principalRemaining;
+  createCreditPurchaseRefundState(state, { agreementId: agreement.id, amount: 5_000, date: '2026-12-16', destination: 'provider', status: 'received', transactionId: 'revision-provider-refund' });
+  const expectedPrincipal = getCreditAgreementBalances(state, agreement).principalRemaining;
+  assert.notEqual(expectedPrincipal, beforeRefund);
+  const txCount = state.transactions.length;
+  const preview = buildCreditScheduleRevision(state, agreement.id, { revisionId: 'after-refund-extra', futureCount: 4, firstPaymentDate: '2027-01-15' }, '2026-12-20');
+  assert.equal(getCreditAgreementBalances(preview.candidate, preview.revised).principalRemaining, expectedPrincipal);
+  updateCreditAgreement(state, agreement.id, preview.changes, '2026-12-20');
+  assert.equal(state.transactions.length, txCount);
+});
+
+test('schedule revisions preserve linked payment history, add durable terms history once, and record future payments once', () => {
+  const { state, agreement } = makeAgreement({ id: 'revision-idempotent', financedAmount: 12_000, cashPrice: 12_000, deposit: 0, term: 3, firstPaymentDate: '2026-02-15' });
+  state.accounts.push({ id: 'bank-current', name: 'Current Account', type: 'bank', openingBalance: 500_000, archivedAt: '' });
+  recordCreditPayment(state, { agreementId: agreement.id, instalmentId: agreement.schedule[0].id, amount: agreement.schedule[0].amount, date: '2026-02-15', paymentId: 'revision-old-payment', transactionId: 'revision-old-payment', accountId: 'bank-current' });
+  assert.equal(getCreditScheduleRevisionCounts(state, agreement, '2026-03-01').completedCount, 1);
+  const oldTransactionCount = state.transactions.length;
+  const oldId = agreement.schedule[0].id;
+  const revision = buildCreditScheduleRevision(state, agreement.id, { revisionId: 'stable-rev', futureCount: 2, firstPaymentDate: '2026-03-15' }, '2026-03-01');
+  updateCreditAgreement(state, agreement.id, revision.changes, '2026-03-01');
+  const revisedSchedule = structuredClone(agreement.schedule);
+  updateCreditAgreement(state, agreement.id, revision.changes, '2026-03-01');
+  assert.deepEqual(agreement.schedule, revisedSchedule);
+  assert.equal(agreement.history.filter(row => row.revisionId === 'stable-rev').length, 1);
+  assert.equal(state.transactions.length, oldTransactionCount);
+  assert.equal(state.transactions.find(row => row.id === 'revision-old-payment').scheduledInstalmentId, oldId);
+  const next = agreement.schedule.find(row => row.id.startsWith('revision-idempotent:revision:stable-rev:'));
+  recordCreditPayment(state, { agreementId: agreement.id, instalmentId: next.id, amount: next.amount, date: next.dueDate, paymentId: 'revision-next', transactionId: 'revision-next', accountId: 'bank-current' });
+  assert.equal(state.transactions.filter(row => row.id === 'revision-next').length, 1);
+  assert.equal(state.transactions.find(row => row.id === 'revision-next').accountId, 'bank-current');
+  assert.equal(getCreditInstalmentAmounts(state, agreement, next).remaining, 0);
+});
+
+test('revised schedules reconcile for APR estimates, fixed charges, and lender-provided rows', () => {
+  const apr = makeAgreement({ id: 'revision-apr', financedAmount: 120_000, cashPrice: 120_000, deposit: 0, term: 12, financeMode: 'apr', apr: 14.54, firstPaymentDate: '2026-02-15' });
+  const aprPreview = buildCreditScheduleRevision(apr.state, apr.agreement.id, { revisionId: 'apr-rev', futureCount: 8, firstPaymentDate: '2026-04-15' }, '2026-03-01');
+  assert.equal(aprPreview.futureRows.length, 8);
+  const aprCounts = getCreditScheduleRevisionCounts(apr.state, apr.agreement, '2026-03-01');
+  const futurePrincipal = getCreditAgreementBalances(apr.state, apr.agreement).principalRemaining - aprCounts.protectedRows.reduce((sum, row) => sum + row.principalRemaining, 0);
+  const lenderRows = generateCreditSchedule({ agreementId: 'lender-apr', principalAmount: futurePrincipal, financeCharge: 5_000, term: 8, firstPaymentDate: '2026-03-15' });
+  const lenderApr = buildCreditScheduleRevision(apr.state, apr.agreement.id, { revisionId: 'apr-lender-rev', futureCount: 8, firstPaymentDate: '2026-03-15', scheduleMode: 'custom', confirmedFutureFinanceCost: 5_000, customSchedule: lenderRows.map(row => ({ dueDate: row.dueDate, amount: row.amount })) }, '2026-03-01');
+  assert.equal(lenderApr.revised.scheduleMode, 'custom');
+  assert.equal(lenderApr.futureRows.reduce((sum, row) => sum + row.financeCostAmount, 0), 5_000);
+  assert.equal(aprPreview.futureRows.reduce((sum, row) => sum + row.principalAmount + row.financeCostAmount, 0) + aprPreview.counts.protectedRows.reduce((sum, row) => sum + row.remaining, 0), getCreditAgreementBalances(aprPreview.candidate, aprPreview.revised).totalRemaining);
+  const fixed = makeAgreement({ id: 'revision-fixed', financedAmount: 100_000, cashPrice: 100_000, deposit: 0, financeCharge: 12_000, financeMode: 'fixed', term: 10, firstPaymentDate: '2026-02-15' });
+  const fixedPreview = buildCreditScheduleRevision(fixed.state, fixed.agreement.id, { revisionId: 'fixed-rev', futureCount: 5, firstPaymentDate: '2026-03-15' }, '2026-03-01');
+  assert.equal(fixedPreview.futureRows.reduce((sum, row) => sum + row.amount, 0) + fixedPreview.counts.protectedRows.reduce((sum, row) => sum + row.remaining, 0), getCreditAgreementBalances(fixedPreview.candidate, fixedPreview.revised).totalRemaining);
+  const confirmedFixed = buildCreditScheduleRevision(fixed.state, fixed.agreement.id, { revisionId: 'fixed-confirmed-rev', futureCount: 5, firstPaymentDate: '2026-03-15', confirmedFinanceCharge: 14_000 }, '2026-01-01');
+  assert.equal(confirmedFixed.revised.financeCharge, 14_000);
+  const custom = makeAgreement({ id: 'revision-custom', financedAmount: 10_000, cashPrice: 10_000, deposit: 0, term: 2, firstPaymentDate: '2026-02-15' });
+  const customPreview = buildCreditScheduleRevision(custom.state, custom.agreement.id, { revisionId: 'custom-rev', futureCount: 2, firstPaymentDate: '2026-03-15', scheduleMode: 'custom', customSchedule: [{ dueDate: '2026-03-15', amount: 5_000 }, { dueDate: '2026-04-15', amount: 5_000 }] }, '2026-01-01');
+  assert.deepEqual(customPreview.futureRows.map(row => row.amount), [5_000, 5_000]);
+  assert.throws(() => buildCreditScheduleRevision(custom.state, custom.agreement.id, { revisionId: 'bad-custom', futureCount: 2, firstPaymentDate: '2026-03-15', scheduleMode: 'custom', customSchedule: [{ dueDate: '2026-03-15', amount: 4_999 }, { dueDate: '2026-04-15', amount: 5_000 }] }, '2026-01-01'), /match|reconcile|amount|total/i);
 });
 
 test('an existing deposit plan can explicitly convert to an upfront first instalment without duplicating cash', () => {
@@ -114,6 +205,7 @@ test('an existing deposit plan can explicitly convert to an upfront first instal
   assert.deepEqual(agreement.schedule.map(item => item.amount), [4_500, 2_925, 2_925]);
   assert.equal(agreement.schedule[0].upfrontTransactionId, 'deposit');
   assert.equal(getCreditInstalmentAmounts(state, agreement, agreement.schedule[0]).paid, 4_500);
+  assert.equal(getCreditScheduleRevisionCounts(state, agreement, '2026-10-26').completedCount, 1);
   assert.equal(getCreditAgreementBalances(state, agreement).paidTotal, 4_500);
   assert.equal(getCreditAgreementBalances(state, agreement).totalRemaining, 5_850);
   assert.equal(deriveFinancePosition(state).totalOwned, before);
@@ -228,6 +320,7 @@ test('custom upfront plan links its paid first row and leaves future custom amou
   }), { transactionId: 'custom-deposit', dateCreated: '2026-10-25' });
   assert.deepEqual(agreement.schedule.map(item => item.amount), [4_500, 3_000, 2_850]);
   assert.equal(getCreditInstalmentAmounts(state, agreement, agreement.schedule[0]).paid, 4_500);
+  assert.equal(getCreditScheduleRevisionCounts(state, agreement, '2026-10-26').completedCount, 1);
   assert.equal(agreement.schedule.reduce((sum, item) => sum + item.amount, 0), agreement.totalRepayable);
   assert.equal(getMonthlyCreditCommitment(state, '2026-11-01'), 3_000);
 });
@@ -259,7 +352,7 @@ test('product links are normalized, optional, and restricted to safe web URLs', 
   assert.throws(() => makeAgreement({ productUrl: `https://shop.example/${'a'.repeat(2048)}` }), /2,048 characters/);
 });
 
-test('the requested £1,200 purchase creates only a £200 cash outflow and ten £100 dues', () => {
+test('the requested \u00a31,200 purchase creates only a \u00a3200 cash outflow and ten \u00a3100 dues', () => {
   const { state, agreement } = makeAgreement({ cashPrice: 120_000, deposit: 20_000, financedAmount: 100_000, term: 10 });
   assert.equal(deriveFinancePosition(state).totalOwned, 180_000);
   assert.equal(agreement.totalRepayable, 100_000);

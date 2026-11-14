@@ -1,4 +1,4 @@
-﻿import { test, expect } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 
 async function openPreview(page, width) {
   await page.setViewportSize({ width, height: 900 });
@@ -13,6 +13,7 @@ async function openPreview(page, width) {
   await expect(missing.getByText('Possible duplicate', { exact: true })).toHaveCount(1);
   await expect(missing.getByRole('button', { name: 'Review match' })).toBeVisible();
   await expect(missing.getByRole('checkbox')).not.toBeChecked();
+  await expect(dialog).toContainText('Provisional totals');
   return dialog;
 }
 
@@ -29,6 +30,7 @@ test('native/OCR Same transaction resolves one ?33.75 row and imports one amount
   await expect(dialog.getByTestId('finance-import-count-found')).toHaveText('2 transactions found');
   await expect(dialog.getByTestId('finance-import-count-review')).toHaveText('0');
   await expect(dialog.getByTestId('finance-import-count-ready')).toHaveText('2');
+  await expect(dialog).not.toContainText('Provisional totals');
   await expect(dialog.getByRole('button', { name: 'Import 2 transactions' })).toBeEnabled();
   await dialog.getByRole('button', { name: 'Import 2 transactions' }).click();
   const state = JSON.parse(await page.getByTestId('finance-state').textContent());

@@ -52,3 +52,42 @@ for (const width of [390, 768, 1024, 1366, 1920]) {
     await context.close();
   });
 }
+
+for (const width of [390, 1366]) {
+  test('remaining schedule revision preview and next payment stay usable at ' + width + 'px', async ({ browser }) => {
+    const context = await browser.newContext({ viewport: { width, height: 900 }, isMobile: width === 390, hasTouch: width === 390 });
+    const page = await context.newPage();
+    await page.goto('/cboard/tests/ui/fixtures/finance-credit-payment.html');
+    await page.getByRole('button', { name: 'Open Credit Purchases' }).click();
+    await page.getByRole('button', { name: 'Seed schedule revision plan' }).click();
+    await page.locator('.f-credit-plan').getByText('Schedule revision test').click();
+    await expect(page.locator('.f-credit-detail-header').getByRole('heading', { name: 'Schedule revision test' })).toBeVisible();
+    await page.locator('.f-credit-detail-header').getByRole('button', { name: 'Revise remaining schedule' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Revise remaining schedule' });
+    await expect(dialog.getByLabel('Count input mode')).toHaveValue('remaining');
+    await dialog.getByLabel('Future instalments to recalculate').fill('2');
+    await expect(dialog.getByLabel('Total payments in revised plan')).toHaveValue('2');
+    await expect(dialog.getByRole('heading', { name: 'Current schedule' })).toBeVisible();
+    await expect(dialog.getByRole('heading', { name: 'Revised schedule' })).toBeVisible();
+    await expect(dialog.getByText('Review proposed instalments (2)')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+    const before = JSON.parse(await page.getByTestId('finance-state').textContent()).transactions.length;
+    await dialog.getByRole('button', { name: 'Save revised schedule' }).click();
+    await expect(dialog).not.toBeVisible();
+    let state = JSON.parse(await page.getByTestId('finance-state').textContent());
+    expect(state.creditAgreements[0].schedule.filter(row => !row.supersededAt)).toHaveLength(2);
+    expect(state.creditAgreements[0].history.filter(row => row.type === 'schedule_revised')).toHaveLength(1);
+    expect(state.transactions).toHaveLength(before);
+    const next = page.locator('.f-credit-detail-metrics > div').filter({ hasText: 'Next payment' });
+    await next.getByRole('button', { name: 'Record payment' }).click();
+    const paymentForm = page.locator('form.f-credit-form').filter({ has: page.getByRole('heading', { name: 'Record a payment' }) });
+    await expect(paymentForm.getByLabel('Amount')).toHaveValue('60.00');
+    await paymentForm.getByRole('button', { name: 'Record real payment' }).click();
+    state = JSON.parse(await page.getByTestId('finance-state').textContent());
+    const payments = state.transactions.filter(row => row.type === 'creditPayment' && row.creditAgreementId === state.creditAgreements[0].id);
+    expect(payments).toHaveLength(1);
+    expect(payments[0].scheduledInstalmentId).toBe(state.creditAgreements[0].schedule.find(row => !row.supersededAt && row.amount === 6000).id);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+    await context.close();
+  });
+}

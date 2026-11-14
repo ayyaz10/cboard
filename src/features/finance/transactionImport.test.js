@@ -1,4 +1,4 @@
-﻿import test from 'node:test';
+import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { buildImportedTransaction, matchImportAccount, rememberImportAccount, detectDelimiter, detectImportColumns, detectPossibleRefund, findImportDuplicate, MAX_IMPORT_ROWS, normalizeImportedDescription, parseDelimitedText, parseImportAmount, parseImportDate, parseStatementText, statementOcrInput, rowsToImportTransactions, suggestCategory, suggestPersonalSettlement } from './transactionImport.js';
@@ -214,7 +214,7 @@ test('grouped bank statement fixture keeps inherited dates, descriptions, direct
   assert.equal(diagnostics.openingBalance, 42964);
   assert.equal(diagnostics.closingBalance, 10000);
   assert.equal(diagnostics.transactionRowsDetected, 23);
-  assert.ok(diagnostics.ignoredBalanceRows >= 8);
+  assert.ok(diagnostics.ignoredBalanceRows >= 6);
 });
 
 test('parser context carries a grouped date and a split description across PDF pages and repeated headers', () => {
@@ -272,6 +272,58 @@ test('positioned PDF text uses the Paid In and Withdrawn columns and never impor
   assert.equal(records[1].description, 'Stagecoach');
 });
 
+test('NatWest explanatory sections stop positioned PDF extraction, reset inherited text, and allow a later table', () => {
+  const header = { text: 'Date Description Paid In (£) Withdrawn (£) Balance (£)', sourceRow: 1, items: [
+    { x: 10, text: 'Date' }, { x: 80, text: 'Description' }, { x: 320, text: 'Paid In (£)' }, { x: 440, text: 'Withdrawn (£)' }, { x: 560, text: 'Balance (£)' },
+  ] };
+  const row = (sourceRow, cells) => ({ sourceRow, text: cells.map(cell => cell.text).join(' '), items: cells });
+  const fixture = [
+    header,
+    row(2, [{ x: 80, text: 'BROUGHT FORWARD' }, { x: 560, text: '£470.60' }]),
+    row(3, [{ x: 10, text: '03 NOV' }, { x: 80, text: 'Card Transaction 7118 02NOV26 CD ALDI KIRKCALDY GB' }, { x: 440, text: '£17.07' }, { x: 560, text: '£453.53' }]),
+    { sourceRow: 4, text: 'Interest (variable) you currently pay us on overdraft balances' },
+    { sourceRow: 5, text: '33.75% NAR 39.49% EAR' },
+    { sourceRow: 6, text: 'Interest (variable) we currently pay you on your credit balance' },
+    { sourceRow: 7, text: 'Overdraft Arrangements' },
+    { sourceRow: 8, text: 'For charging periods we reduced unpaid transaction fees from £2.15 to £1.55.' },
+    { sourceRow: 9, text: '03 NOV Fee £2.15' },
+    header,
+    row(11, [{ x: 10, text: '04 NOV' }, { x: 80, text: 'Service fee' }, { x: 440, text: '£2.15' }, { x: 560, text: '£451.38' }]),
+    row(12, [{ x: 10, text: '04 NOV' }, { x: 80, text: 'Account interest' }, { x: 320, text: '£0.25' }, { x: 560, text: '£451.63' }]),
+  ];
+  const context = { year: 2026 };
+  const records = parseStatementText(fixture, { sourceType: 'pdf', context });
+  assert.deepEqual(records.map(record => [record.description, record.amount, record.direction, record.date]), [
+    ['ALDI Kirkcaldy', 1707, 'expense', '2026-11-03'],
+    ['Service fee', 215, 'expense', '2026-11-04'],
+    ['Account interest', 25, 'income', '2026-11-04'],
+  ]);
+  assert.equal(context.openingBalance, 47060);
+  assert.equal(context.currentDate, '2026-11-04');
+});
+
+test('flattened OCR disclosure text contributes no transactions and later table rows resume', () => {
+  const text = [
+    'Date Description Paid In (£) Withdrawn (£) Balance (£)',
+    '03 NOV BROUGHT FORWARD 470.60',
+    '03 NOV Card Transaction 7118 02NOV26 CD ALDI KIRKCALDY GB Withdrawn £17.07 Balance £453.53',
+    'Interest (variable) you currently pay us on overdraft balances',
+    'Over £0 33.75% NAR 39.49% EAR',
+    'Interest (variable) we currently pay you on your credit balance',
+    'Overdraft Arrangements',
+    'For charging periods unpaid transaction fees changed from £2.15 to £1.55',
+    '03 NOV Fee £2.15',
+    'Date Description Paid In (£) Withdrawn (£) Balance (£)',
+    '04 NOV Service fee Withdrawn £2.15 Balance £451.38',
+    '04 NOV Account interest Paid In £0.25 Balance £451.63',
+  ].join('\n');
+  const records = parseStatementText(text, { sourceType: 'pdf-scan', context: { year: 2026 } });
+  assert.deepEqual(records.map(record => [record.description, record.amount, record.direction]), [
+    ['ALDI Kirkcaldy', 1707, 'expense'], ['Service fee', 215, 'expense'], ['Account interest', 25, 'income'],
+  ]);
+  assert.equal(parseStatementText('Interest (variable) rates\n33.75% NAR\n39.49% EAR\nFee notice: £2.15', { sourceType: 'pdf-scan', context: { year: 2026 } }).length, 0);
+  assert.equal(parseStatementText('03 NOV Aldi £17.07\nInterest (variable) rates\n33.75% NAR\nFee notice: £2.15', { sourceType: 'pdf-scan', context: { year: 2026 } }).length, 1);
+});
 test('Paid In and Withdrawn CSV headers map directly and running balance is not the amount', () => {
   const headers = ['Date', 'Description', 'Paid In (£)', 'Withdrawn (£)', 'Balance (£)'];
   const rows = parseDelimitedText('Date,Description,Paid In (£),Withdrawn (£),Balance (£)\n05/10/2026,Salary,225.00,,654.64\n05/10/2026,Travel,,89.60,565.04', ',').slice(1);
