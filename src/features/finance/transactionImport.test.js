@@ -43,15 +43,38 @@ test('duplicate detection is based on date, amount, title, and direction', () =>
   const row = { date: '2026-11-01', amount: 4520, description: 'Tesco', direction: 'expense' };
   assert.equal(findImportDuplicate(row, [{ date: row.date, amount: 4520, title: 'tesco', type: 'expense' }]).type, 'expense');
   assert.equal(findImportDuplicate(row, []), null);
+  const purchasePosting = { ...row, date: '2026-10-15', purchaseDate: '2026-10-14', description: 'Vinted' };
+  const manuallySaved = { id: 'manual-vinted', date: '2026-10-14', amount: 490, title: 'Vinted', type: 'expense' };
+  assert.equal(findImportDuplicate({ ...purchasePosting, amount: 4520 }, [manuallySaved]), null);
+  const vinted = { ...purchasePosting, amount: 490 };
+  assert.equal(findImportDuplicate(vinted, [{ ...manuallySaved, amount: 490 }]).id, manuallySaved.id);
 });
 
 test('card descriptors keep the merchant name and discard card/date metadata', () => {
-  assert.equal(normalizeImportedDescription('Card Transaction 7118 14OCT26 CD ALDI KIRKCALDY GB'), 'Aldi');
+  assert.equal(normalizeImportedDescription('Card Transaction 7118 14OCT26 CD ALDI KIRKCALDY GB'), 'ALDI Kirkcaldy');
   assert.equal(normalizeImportedDescription('Card Transaction 7118 14OCT26 D VINTED VILNIUS GB'), 'Vinted');
   const [record] = parseStatementText('15 OCT 2026\nCard Transaction 7118 14OCT26 D VINTED VILNIUS GB -4.90');
   assert.equal(record.description, 'Vinted');
   assert.equal(record.date, '2026-10-15');
   assert.equal(record.amount, 490);
+  assert.equal(record.paymentMethod, 'Card');
+  assert.equal(record.purchaseDate, '2026-10-14');
+  assert.equal(record.statementDetails, 'Card Transaction ****7118 14OCT26 D VINTED VILNIUS GB');
+});
+
+test('saved card metadata continues to match after the preview title is renamed', () => {
+  const row = { date: '2026-10-15', purchaseDate: '2026-10-14', amount: 490, description: 'My title', statementMerchant: 'Vinted', direction: 'expense' };
+  const saved = { id: 'saved', date: '2026-10-15', amount: 490, title: 'Vinted', type: 'expense', statementDetails: { merchantTitle: 'Vinted' } };
+  assert.equal(findImportDuplicate(row, [saved]).id, saved.id);
+});
+
+test('card statement details mask the card number and keep explicit reference and time metadata', () => {
+  const [record] = parseStatementText('15 OCT 2026\nCard Transaction 71184 14OCT26 D Vinted ref:ABCD1234 at 14:06 GB -4.90');
+  assert.equal(record.description, 'Vinted');
+  assert.equal(record.reference, 'ABCD1234');
+  assert.equal(record.time, '14:06');
+  assert.equal(record.cardLastFour, '1184');
+  assert.equal(record.statementDetails, 'Card Transaction ****1184 14OCT26 D Vinted ref:ABCD1234 at 14:06 GB');
 });
 
 test('card merchant names match an already saved transaction as a duplicate', () => {

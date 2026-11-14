@@ -51,14 +51,16 @@ test('generated searchable PDF runs through PDF.js and imports from the preview'
   await expect(dialog.getByTestId('finance-import-count-found')).toHaveText('1 transactions found', { timeout: 120000 });
   await expect(dialog.getByTestId('finance-import-count-ready')).toHaveText('1');
   await expect(dialog.getByTestId('finance-import-ocr-pages')).toHaveText('None');
+  await expect(dialog.getByText(/Preview ready: 1 transactions/)).toBeVisible({ timeout: 120000 });
   await expect(dialog.getByTestId('finance-import-reconciliation')).toContainText('reconcile');
   const row = dialog.getByTestId('finance-import-row');
   await expect(row).toContainText('Coffee Shop 55881000214');
   await expect(row.getByTestId('finance-import-source')).toContainText('1:');
-  await row.getByText('Edit details').click();
-  await row.getByLabel('Description').fill('Coffee Shop corrected');
+  await row.getByRole('button', { name: 'Edit' }).click({ force: true });
+  await dialog.getByLabel('Merchant / title').fill('Coffee Shop corrected');
+  await dialog.getByRole('button', { name: 'Apply changes' }).click({ force: true });
   await expect(row).toContainText('Coffee Shop corrected');
-  await dialog.getByRole('button', { name: 'Import 1 transaction' }).click();
+  await dialog.getByRole('button', { name: 'Import 1 transaction' }).click({ force: true });
   await expect(dialog.getByRole('status')).toContainText('1 transaction imported');
   const state = JSON.parse(await page.getByTestId('finance-state').textContent());
   expect(state.transactions.some(item => item.title === 'Coffee Shop corrected' && item.accountId === 'account-current')).toBe(true);
@@ -75,18 +77,21 @@ test('PDF.js retries partial native extraction and OCRs a scanned page without d
     const { extractPdfStatement } = await import('/cboard/src/features/finance/statementPdfExtraction.js');
     let scans = 0;
     let disposed = false;
+    const progress = [];
     const file = new File([new Uint8Array(bytes)], 'mixed-statement.pdf', { type: 'application/pdf' });
-    const extraction = await extractPdfStatement(file, () => {}, {
-      createOcrSession: () => ({
-        async scan() { scans++; return { text: scans === 1 ? '05 OCT 2026 Salary paid in 100.00\n06 OCT Water bill Paid Out 20.00' : '06 OCT Corner Shop Paid Out 5.00', confidence: 99 }; },
+    const extraction = await extractPdfStatement(file, message => progress.push(message), {
+      createOcrSession: (profile, reportProgress) => ({
+        async scan() { scans++; reportProgress({ status: 'recognizing text', progress: 0.25 }); return { text: scans === 1 ? '05 OCT 2026 Salary paid in 100.00\n06 OCT Water bill Paid Out 20.00' : '06 OCT Corner Shop Paid Out 5.00', confidence: 99 }; },
         dispose() { disposed = true; },
       }),
     });
-    return { scans, disposed, records: extraction.records, diagnostics: extraction.diagnostics };
+    return { scans, disposed, progress, records: extraction.records, diagnostics: extraction.diagnostics };
   }, [...pdfBytes]);
 
   expect(result.scans).toBe(2);
   expect(result.disposed).toBe(true);
+expect(result.progress).toContain('Reading PDF page 1 of 2...');
+expect(result.progress).toContain('Scanning page 1 of 2 with OCR 25%');
   expect(result.records).toHaveLength(3);
   expect(result.records.map(record => record.date)).toEqual(['2026-10-05', '2026-10-06', '2026-10-06']);
   expect(result.records.map(record => record.sourceRow.split(':')[0])).toEqual(['1', '1', '2']);

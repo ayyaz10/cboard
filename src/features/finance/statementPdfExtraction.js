@@ -76,8 +76,13 @@ const sameTuple = (left, right) => normalizeDate(left.date) === normalizeDate(ri
 const sameReference = (left, right) => Boolean(recordReference(left) && recordReference(left) === recordReference(right));
 const descriptionRelated = (left, right) => descriptionSimilarity(left.description, right.description) >= 0.55;
 
-function reviewRecord(record, reason) {
-  return { ...record, confidence: 'review', validation: [record.validation, reason].filter(Boolean).join(' ') };
+function addReviewReason(record, reason) {
+  const existing = Array.isArray(record.reviewReasons) ? record.reviewReasons : [];
+  return { ...record, confidence: 'review', reviewReasons: existing.some(item => item.id === reason.id) ? existing : [...existing, reason] };
+}
+function reviewRecord(record, id, message) {
+  const validation = record.validation && !record.validation.includes(message) ? `${record.validation} ${message}` : record.validation || message;
+  return { ...addReviewReason(record, { id, message }), validation };
 }
 
 export function mergePdfExtractionRecords(nativeRecords, ocrRecords) {
@@ -117,11 +122,12 @@ export function mergePdfExtractionRecords(nativeRecords, ocrRecords) {
       sourceType: 'pdf-merged',
       sourceRows,
       confidence: conflict || a.confidence === 'review' || b.confidence === 'review' ? 'review' : 'ready',
+      reviewReasons: [...new Map([...(a.reviewReasons || []), ...(b.reviewReasons || []), ...(conflict ? [{ id: 'native-ocr-disagreement', message: 'Native PDF text and OCR disagree; verify this transaction before importing.' }] : [])].map(reason => [reason.id, reason])).values()],
       validation: conflict ? [a.validation, b.validation, 'Native PDF text and OCR disagree; verify this transaction before importing.'].filter(Boolean).join(' ') : [a.validation, b.validation].filter(Boolean).join(' '),
     });
   }
-  for (const [index, record] of native.entries()) if (!usedNative.has(index)) merged.push({ ...(ambiguousNative.has(index) ? reviewRecord(record, 'Native/OCR matches are ambiguous; confirm the transaction before importing.') : record), sourceRows: record.sourceRows || [record.sourceRow].filter(Boolean) });
-  for (const [index, record] of ocr.entries()) if (!usedOcr.has(index)) merged.push({ ...(ambiguousOcr.has(index) ? reviewRecord(record, 'Native/OCR matches are ambiguous; confirm the transaction before importing.') : record), sourceRows: record.sourceRows || [record.sourceRow].filter(Boolean) });
+  for (const [index, record] of native.entries()) if (!usedNative.has(index)) merged.push({ ...(ambiguousNative.has(index) ? reviewRecord(record, 'native-ocr-ambiguous-match', 'Possible duplicate') : record), sourceRows: record.sourceRows || [record.sourceRow].filter(Boolean) });
+  for (const [index, record] of ocr.entries()) if (!usedOcr.has(index)) merged.push({ ...(ambiguousOcr.has(index) ? reviewRecord(record, 'native-ocr-ambiguous-match', 'Possible duplicate') : record), sourceRows: record.sourceRows || [record.sourceRow].filter(Boolean) });
 
   // Same date, amount and direction without a reliable narrative/reference match is
   // ambiguous. Keep both candidates visible, but prevent either from auto-importing.
@@ -130,8 +136,14 @@ export function mergePdfExtractionRecords(nativeRecords, ocrRecords) {
     if (a.sourceType === 'pdf-merged' || b.sourceType === 'pdf-merged' || !sameTuple(a, b)) continue;
     if (a.sourceType === b.sourceType && a.sourceType !== 'pdf-scan' && a.sourceType !== 'pdf') continue;
     if (sameReference(a, b) || descriptionRelated(a, b)) continue;
-    merged[i] = reviewRecord(a, 'A matching native/OCR candidate is ambiguous; confirm whether these are separate transactions.');
-    merged[j] = reviewRecord(b, 'A matching native/OCR candidate is ambiguous; confirm whether these are separate transactions.');
+    const group = [...new Set([...(a.matchCandidateRows || []), a.sourceRow, ...(b.matchCandidateRows || []), b.sourceRow].filter(Boolean))];
+    merged[i] = reviewRecord({ ...a, matchCandidateRows: group }, 'native-ocr-ambiguous-match', 'Possible duplicate');
+    merged[j] = reviewRecord({ ...b, matchCandidateRows: group }, 'native-ocr-ambiguous-match', 'Possible duplicate');
+    const candidates = merged.filter(row => group.includes(row.sourceRow)).map(row => ({ sourceRow: row.sourceRow, description: row.description || '', amount: row.amount, date: row.date, page: String(row.sourceRow || '').split(':')[0] || '', sourceType: row.sourceType }));
+    for (const k of group.map(sourceRow => merged.findIndex(row => row.sourceRow === sourceRow)).filter(index => index >= 0)) {
+      const row = merged[k];
+      merged[k] = { ...row, matchCandidates: candidates, reviewReasons: (row.reviewReasons || []).map(reason => reason.id === 'native-ocr-ambiguous-match' ? { ...reason, candidates } : reason) };
+    }
   }
   return merged;
 }
@@ -167,7 +179,7 @@ export async function extractPdfStatement(file, onProgress = () => {}, dependenc
   const pdfDocument = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
   if (pdfDocument.numPages > 80) { await pdfDocument.destroy(); throw new Error('This PDF has more than 80 pages. Split the statement and import it in parts.'); }
   const records = [], pageDiagnostics = [], context = {};
-  let session = null;
+  let session = null, activeOcrPage = 0;
   const makeSession = dependencies.createOcrSession || ((profile, progress) => createImageOcrSession(profile, progress));
   try {
     for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber++) {
@@ -185,13 +197,14 @@ export async function extractPdfStatement(file, onProgress = () => {}, dependenc
       let ocrRecords = [], ocrContext = cloneContext(context), ocrConfidence = null, ocrError = '';
       if (needsOcr) {
         try {
-          if (!session) session = makeSession(OCR_PROFILE, event => onProgress(event.status || 'Reading scanned page locally...'));
+          if (!session) session = makeSession(OCR_PROFILE, event => onProgress(`Scanning page ${activeOcrPage} of ${pdfDocument.numPages} with OCR${Number.isFinite(event.progress) ? ` ${Math.round(event.progress * 100)}%` : ''}`));
+          activeOcrPage = pageNumber;
           const imageFile = dependencies.renderPage ? await dependencies.renderPage(page, pageNumber) : await pageToFile(page, pageNumber);
           const result = await session.scan(imageFile, 0);
           ocrConfidence = Number.isFinite(result.confidence) ? result.confidence : null;
           ocrRecords = parseStatementText(statementOcrInput(result), { sourceType: 'pdf-scan', context: ocrContext, sourceRowPrefix: String(pageNumber), diagnostics: {} });
           if (ocrConfidence !== null && ocrConfidence < (dependencies.minimumOcrConfidence ?? 55)) {
-            ocrRecords = ocrRecords.map(record => reviewRecord(record, 'OCR confidence is low; verify the recognized text and amount.'));
+            ocrRecords = ocrRecords.map(record => reviewRecord(record, 'ocr-low-confidence', 'OCR confidence is low; verify the recognized text and amount.'));
           }
           if (!ocrRecords.length) ocrError = 'OCR did not recover a transaction from this page.';
         } catch (error) { ocrError = String(error?.message || 'OCR failed for this page.'); }

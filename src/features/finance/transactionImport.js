@@ -10,7 +10,7 @@ export const MAX_IMPORT_TEXT_LENGTH = 25 * 1024 * 1024;
 const rowLimitError = () => new Error('Import files can contain at most ' + MAX_IMPORT_ROWS.toLocaleString() + ' transaction rows. Split the statement and import it in parts.');
 
 const aliases = {
-  date: ['date', 'transaction date', 'posted date', 'booking date', 'value date'],
+  date: ['date', 'transaction date', 'posted date', 'booking date', 'value date'], reference: ['reference', 'transaction reference', 'authorisation code', 'authorization code'],
   description: ['description', 'merchant', 'payee', 'transaction', 'details', 'narrative', 'memo', 'reference'],
   amount: ['amount', 'transaction amount'], debit: ['debit', 'money out', 'paid out', 'withdrawal', 'withdrawn'],
   credit: ['credit', 'money in', 'paid in', 'deposit'], balance: ['balance', 'running balance'], currency: ['currency', 'ccy'], account: ['account', 'account name', 'account nickname', 'account holder'],
@@ -82,12 +82,12 @@ const cell = (row, index) => Number.isInteger(index) ? String(row[index] ?? '').
 export function rowsToImportTransactions(rows, headers, mapping = detectImportColumns(headers), { sourceType = 'csv', dateOrder = 'dmy' } = {}) {
   if (rows.length > MAX_IMPORT_ROWS) throw rowLimitError();
   return rows.map((row, index) => {
-    const date = parseImportDate(cell(row, mapping.date), dateOrder), description = normalizeImportedDescription(cell(row, mapping.description)).slice(0, 200);
+    const date = parseImportDate(cell(row, mapping.date), dateOrder), sourceDescription = cell(row, mapping.description), cardDetails = parseCardStatementDetails(sourceDescription), description = cardDetails.description.slice(0, 200);
     const debit = parseImportAmount(cell(row, mapping.debit)), credit = parseImportAmount(cell(row, mapping.credit));
     const amount = Number.isInteger(mapping.amount) ? parseImportAmount(cell(row, mapping.amount)) : null;
     const value = amount !== null ? amount : debit !== null ? -Math.abs(debit) : credit !== null ? Math.abs(credit) : null;
     const invalid = !date || !description || value === null || value === 0 || (debit !== null && credit !== null && debit !== 0 && credit !== 0);
-    return { date, description, amount: value === null ? 0 : Math.abs(value), direction: value < 0 ? 'expense' : 'income', currency: cell(row, mapping.currency), accountName: cell(row, mapping.account).slice(0, 80), balance: parseImportAmount(cell(row, mapping.balance)), reference: '', sourceType, sourceRow: index + 2, confidence: invalid ? 'review' : 'ready', validation: invalid ? 'Check date, description, and amount.' : '' };
+    return { date, description, ...(cardDetails.paymentMethod ? { paymentMethod: cardDetails.paymentMethod, statementDetails: cardDetails.statementDetails, statementMerchant: cardDetails.description, cardLastFour: cardDetails.cardLastFour, purchaseDate: cardDetails.purchaseDate, ...(cardDetails.time ? { time: cardDetails.time } : {}) } : {}), amount: value === null ? 0 : Math.abs(value), direction: value < 0 ? 'expense' : 'income', currency: cell(row, mapping.currency), reference: cell(row, mapping.reference) || cardDetails.reference || '', accountName: cell(row, mapping.account).slice(0, 80), balance: parseImportAmount(cell(row, mapping.balance)), reference: '', sourceType, sourceRow: index + 2, confidence: invalid ? 'review' : 'ready', validation: invalid ? 'Check date, description, and amount.' : '' };
   });
 }
 
@@ -107,15 +107,26 @@ function normalizeImportDescription(value) {
   return normalizeMerchantName(normalizeImportedDescription(value));
 }
 
-export function normalizeImportedDescription(value) {
+export function parseCardStatementDetails(value, context = {}) {
   const text = String(value || '').normalize('NFKC').trim();
-  const card = text.match(/^card\s+transaction\s+\d{3,8}\s+\d{1,2}[a-z]{3}\d{2,4}\s+(?:(?:cd|d|pos)\s+)?(.+)$/i);
-  if (!card) return text;
-  const merchantText = card[1].replace(/\s+[A-Z]{2}$/i, '').replace(/\s+/g, ' ').trim();
+  const match = text.match(/^card\s+transaction\s+(\d{3,8})\s+(\d{1,2}[a-z]{3}\d{2,4})\s+(?:(?:cd|d|pos)\s+)?(.+)$/i);
+  if (!match) return { description: text, paymentMethod: '', statementDetails: text, cardLastFour: '', purchaseDate: '', reference: '', time: '' };
+  const [, cardNumber, compactDate, rest] = match;
+  const date = compactDate.match(/^(\d{1,2})([a-z]{3})(\d{2,4})$/i);
+  const month = {jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'}[date?.[2]?.toLowerCase()];
+  const year = date?.[3]?.length === 2 ? `20${date[3]}` : date?.[3];
+  const purchaseDate = month ? `${year}-${month}-${date[1].padStart(2,'0')}` : '';
+  const referenceMatch = rest.match(/\b(?:ref(?:erence)?|auth(?:orization)?|id)\s*[:#-]?\s*([A-Z0-9-]{4,30})/i);
+  const time = rest.match(/\b(\d{1,2}:\d{2}(?:\s*[ap]m)?)\b/i)?.[1] || '';
+  const merchantText = rest.replace(/\b(?:ref(?:erence)?|auth(?:orization)?|id)\s*[:#-]?\s*[A-Z0-9-]{4,30}/i, '').replace(/\b\d{1,2}:\d{2}(?:\s*[ap]m)?\b/i, '').replace(/\s+[A-Z]{2}$/i, '').replace(/\s+/g, ' ').trim();
   const knownMerchant = matchMerchant(merchantText);
-  if (knownMerchant) return knownMerchant.displayName;
-  if (/^vinted\b/i.test(merchantText)) return 'Vinted';
-  return merchantText;
+  let description = knownMerchant?.displayName || (/^vinted\b/i.test(merchantText) ? 'Vinted' : merchantText);
+  if (/^aldi\b/i.test(merchantText) && /kirkcaldy/i.test(merchantText)) description = 'ALDI Kirkcaldy';
+  return { description, paymentMethod: 'Card', statementDetails: text.replace(cardNumber, `****${cardNumber.slice(-4)}`), cardLastFour: cardNumber.slice(-4), purchaseDate, reference: referenceMatch?.[1] || '', time };
+}
+
+export function normalizeImportedDescription(value) {
+  return parseCardStatementDetails(value).description;
 }
 
 export function findImportDuplicate(record, transactions, accountId = '') {
@@ -123,16 +134,21 @@ export function findImportDuplicate(record, transactions, accountId = '') {
   const reference = normalizeImportDescription(record.reference);
   const selectedAccountId = accountId || record.accountId || '';
   return (transactions || []).find(item => {
-    const existingAccountId = item.accountId || item.creditCardId || '';
+    const existingAccountId = item.accountId || item.creditCardId || item.paidFromFundId || '';
     if (selectedAccountId && existingAccountId && selectedAccountId !== existingAccountId) return false;
-    const sameDescription = description && normalizeImportDescription(item.title || item.rawMerchantText) === description;
+    const statementMerchant = record.statementMerchant || record.statementDetails && parseCardStatementDetails(record.statementDetails).description || '';
+    const statementKey = normalizeImportDescription(statementMerchant);
+    const sameDescription = description && (normalizeImportDescription(item.title || item.rawMerchantText) === description || Boolean(statementKey && statementKey === normalizeImportDescription(item.title || item.rawMerchantText)) || Boolean(item.statementDetails?.merchantTitle && normalizeImportDescription(item.statementDetails.merchantTitle) === statementKey));
     const sameReference = reference && normalizeImportDescription(item.reference) === reference;
     const creditPurchase = item.type === 'creditPayment' && item.creditAgreementId && record.direction === 'expense' && selectedAccountId && existingAccountId === selectedAccountId;
     const agreementTerms = [item.creditAgreementMerchant, item.creditAgreementTitle].map(normalizeImportDescription).filter(value => value.length >= 3);
     const matchesCreditAgreement = Boolean(creditPurchase && agreementTerms.some(term => description.includes(term)));
     const sameDirection = (record.direction === 'income' ? ['income', 'refund', 'cardCredit'].includes(item.type) : item.type === 'expense') || matchesCreditAgreement || (item.sourceType === 'file_import' && item.importDirection === record.direction);
-    const sameDate = item.date === record.date || matchesCreditAgreement && Math.abs(Date.parse(item.date + 'T00:00:00Z') - Date.parse(record.date + 'T00:00:00Z')) <= 3 * 86400000;
-    return !item.reversedAt && sameDate && Math.abs(Number(item.amount)) === record.amount && (sameDescription || sameReference || matchesCreditAgreement) && sameDirection;
+    const itemDate = String(item.date || '').slice(0, 10), recordDate = String(record.date || '').slice(0, 10);
+    const purchaseDate = record.purchaseDate || record.statementMetadata?.purchaseDate || '';
+    const sameDate = itemDate === recordDate || Boolean(purchaseDate && itemDate === purchaseDate) || matchesCreditAgreement && Math.abs(Date.parse(itemDate + 'T00:00:00Z') - Date.parse(recordDate + 'T00:00:00Z')) <= 3 * 86400000;
+    const sameCurrency = !record.currency || !item.currency || String(record.currency).toUpperCase() === String(item.currency).toUpperCase();
+    return !item.reversedAt && sameDate && sameCurrency && Math.abs(Number(item.amount)) === record.amount && (sameDescription || sameReference || matchesCreditAgreement) && sameDirection;
   }) || null;
 }
 
@@ -156,7 +172,7 @@ export function buildImportedTransaction(record, state, { accountId = '', catego
   if (record.confidence !== 'ready' || !record.date || !record.description || !Number.isSafeInteger(record.amount) || record.amount <= 0) throw new Error('Resolve invalid import rows before saving.');
   const selectedAccount = (state.accounts || []).find(item => item.id === accountId) || (state.creditCards || []).find(item => item.id === accountId);
   const card = selectedAccount && (state.creditCards || []).some(item => item.id === selectedAccount.id);
-  return { id: crypto.randomUUID(), sequence: nextTransactionSequence(state), title: record.description, amount: record.amount, type: card ? record.direction === 'expense' ? 'expense' : 'cardCredit' : record.direction, ...(accountId ? { accountId } : {}), ...(card ? { creditCardId: accountId } : {}), categoryId: card && record.direction === 'income' ? '' : categoryId ?? record.categoryId ?? suggestCategory(record.description, record.direction, state.categories, state.transactions), date: record.date, note: '', paymentMethod: '', paidFromFundId: record.direction === 'expense' && !card ? accountId || '' : '', sourceType: 'file_import', importSource: record.sourceType, importDirection: record.direction, reference: record.reference || '', createdAt: new Date().toISOString() };
+  return { id: crypto.randomUUID(), sequence: nextTransactionSequence(state), title: record.description, amount: record.amount, type: card ? record.direction === 'expense' ? 'expense' : 'cardCredit' : record.direction, ...(accountId ? { accountId } : {}), ...(card ? { creditCardId: accountId } : {}), categoryId: card && record.direction === 'income' ? '' : categoryId ?? record.categoryId ?? suggestCategory(record.description, record.direction, state.categories, state.transactions), date: record.date, note: record.note || '', paymentMethod: record.paymentMethod || '', ...(record.statementDetails ? { statementDetails: { originalDescription: record.statementDetails, merchantTitle: record.statementMerchant || record.description, cardLastFour: record.cardLastFour || '', purchaseDate: record.purchaseDate || '', ...(record.time ? { time: record.time } : {}) } } : {}), paidFromFundId: record.direction === 'expense' && !card ? accountId || '' : '', sourceType: 'file_import', importSource: record.sourceType, importDirection: record.direction, reference: record.reference || '', createdAt: new Date().toISOString() };
 }
 
 export function detectPossibleRefund(record, transactions) {
@@ -289,7 +305,10 @@ function statementHeaderOrFooter(line) {
 }
 
 function makeStatementRecord({ date, description, amount, direction, sourceType, sourceRow, confidence = 'ready', validation = '' }) {
-  return { date: date || '', description: normalizeImportedDescription(cleanStatementDescription(description)).slice(0, 200), amount: Math.abs(amount || 0), direction, currency: '', balance: null, reference: '', sourceType, sourceRow, confidence: !date || !cleanStatementDescription(description) ? 'review' : confidence, validation: !date ? 'Statement year or transaction date is missing.' : !cleanStatementDescription(description) ? 'Add a transaction description.' : validation, ...(direction === 'income' ? { classification: 'review' } : {}) };
+  const originalDescription = cleanStatementDescription(description), cardDetails = parseCardStatementDetails(originalDescription);
+  const missingDescription = !cleanStatementDescription(description);
+  const missingDate = !date;
+  return { date: date || '', description: cardDetails.description.slice(0, 200), ...(cardDetails.paymentMethod ? { paymentMethod: cardDetails.paymentMethod } : {}), ...(cardDetails.statementDetails ? { statementDetails: cardDetails.statementDetails, statementMerchant: cardDetails.description, cardLastFour: cardDetails.cardLastFour, purchaseDate: cardDetails.purchaseDate, ...(cardDetails.reference ? { reference: cardDetails.reference } : {}), ...(cardDetails.time ? { time: cardDetails.time } : {}) } : {}), amount: Math.abs(amount || 0), direction, currency: '', balance: null, reference: cardDetails.reference || '', sourceType, sourceRow, confidence: missingDate || missingDescription ? 'review' : confidence, ...(missingDescription ? { reviewReasons: [{ id: 'description-missing', message: 'Description missing' }] } : {}), validation: missingDate ? 'Statement year or transaction date is missing.' : missingDescription ? 'Add a transaction description.' : validation, ...(direction === 'income' ? { classification: 'review' } : {}) };
 }
 
 export function statementOcrInput(result) {

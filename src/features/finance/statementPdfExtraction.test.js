@@ -63,6 +63,22 @@ test('same date and amount with unrelated narratives are never silently merged',
   assert.ok(merged.every(item => item.confidence === 'review'));
 });
 
+test('\u00a333.75 with a missing description and several OCR candidates keeps each review reason once', () => {
+  const native = record({ description: '', amount: 3375, sourceRow: '2:8', validation: 'Description missing', confidence: 'review', reviewReasons: [{ id: 'description-missing', message: 'Description missing' }] });
+  const ocr = ['Corner shop', 'Coffee kiosk', 'Market stall'].map((description, index) => record({ description, amount: 3375, sourceType: 'pdf-scan', sourceRow: `2:${index + 10}` }));
+  const merged = mergePdfExtractionRecords([native], ocr);
+  const affected = merged.filter(item => item.reviewReasons?.some(reason => reason.id === 'native-ocr-ambiguous-match'));
+  assert.equal(affected.length, 4);
+  assert.ok(affected.every(item => item.reviewReasons.filter(reason => reason.id === 'native-ocr-ambiguous-match').length === 1));
+  assert.ok(affected.every(item => (item.reviewReasons.find(reason => reason.id === 'native-ocr-ambiguous-match').candidates || []).length === 4));
+  const missingDescription = merged.find(item => item.sourceRow === '2:8');
+  assert.equal(missingDescription.reviewReasons.filter(reason => reason.id === 'description-missing').length, 1);
+  assert.equal(missingDescription.reviewReasons.filter(reason => reason.id === 'native-ocr-ambiguous-match').length, 1);
+  assert.equal(mergePdfExtractionRecords([native], ocr).find(item => item.sourceRow === '2:8').reviewReasons.length, 2);
+  const repeated = mergePdfExtractionRecords(merged.filter(item => item.sourceType === 'pdf'), merged.filter(item => item.sourceType === 'pdf-scan'));
+  assert.equal(repeated.find(item => item.sourceRow === '2:8').reviewReasons.length, 2);
+});
+
 test('non-unique identical native/OCR candidates are retained for review instead of duplicated imports', () => {
   const native = [record({ sourceRow: '1:8' }), record({ sourceRow: '1:9' })];
   const ocr = [record({ sourceType: 'pdf-scan', sourceRow: '1:10' }), record({ sourceType: 'pdf-scan', sourceRow: '1:11' })];

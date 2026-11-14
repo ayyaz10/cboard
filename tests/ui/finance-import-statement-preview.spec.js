@@ -12,6 +12,8 @@ for (const width of [390, 768, 1024, 1366, 1920]) {
     test.setTimeout(120000);
     const context = await browser.newContext({ viewport: { width, height: 900 }, isMobile: width === 390, hasTouch: width === 390 });
     const page = await context.newPage();
+    page.on('pageerror', error => console.log('PAGEERROR', error.stack));
+    page.on('console', message => { if (message.type() === 'error') console.log('CONSOLEERROR', message.text()); });
     await page.goto('/cboard/tests/ui/fixtures/finance.html');
     await page.getByRole('button', { name: 'Prepare import rules and matches' }).click();
     await page.getByRole('button', { name: 'Open Transaction Import' }).click();
@@ -24,9 +26,9 @@ for (const width of [390, 768, 1024, 1366, 1920]) {
     await expect(dialog.getByTestId('finance-import-count-review')).toHaveText('1');
     await expect(dialog.getByTestId('finance-import-count-duplicates')).toHaveText('1');
     await expect(dialog.getByRole('button', { name: 'Import 2 transactions' })).toBeEnabled();
-    await expect(dialog.getByText(/Duplicate.*skipped/)).toHaveCount(1);
+    await expect(dialog.getByText('Already recorded')).toHaveCount(1);
     await expect(dialog.getByLabel('Classification for Salary')).toBeVisible();
-    await dialog.getByRole('button', { name: 'Deselect duplicates' }).click();
+    await dialog.getByRole('button', { name: 'Deselect duplicates' }).click({ force: true });
     await dialog.getByLabel('Classification for Salary').selectOption('income');
     await expect(dialog.getByTestId('finance-import-count-ready')).toHaveText('3');
     await expect(dialog.getByTestId('finance-import-count-review')).toHaveText('0');
@@ -34,9 +36,16 @@ for (const width of [390, 768, 1024, 1366, 1920]) {
     await expect(dialog.getByRole('button', { name: 'Import 3 transactions' })).toBeEnabled();
 
     const cityShop = dialog.getByTestId('finance-import-row').filter({ hasText: 'City Shop' });
-    await cityShop.getByText('Edit details').click();
-    await cityShop.getByLabel('Description').fill('City Shop corrected');
+    await cityShop.getByRole('button', { name: 'Edit' }).click({ force: true });
+    await dialog.getByLabel('Merchant / title').fill('Temporary edit');
+    await dialog.getByRole('button', { name: 'Cancel' }).last().click({ force: true });
+    await expect(cityShop.getByText('City Shop')).toBeVisible();
+    await cityShop.getByRole('button', { name: 'Edit' }).click({ force: true });
+    await dialog.getByLabel('Merchant / title').fill('City Shop corrected');
+    await dialog.getByLabel('Category').selectOption('default-4');
+    await dialog.getByRole('button', { name: 'Apply changes' }).click({ force: true });
     await expect(cityShop.getByText('City Shop corrected')).toBeVisible();
+    await expect(cityShop.getByRole('button', { name: 'Edit' })).toBeFocused();
 
     const layout = await dialog.evaluate(node => {
       const workspace = node.querySelector('.f-import-workspace');
@@ -49,10 +58,10 @@ for (const width of [390, 768, 1024, 1366, 1920]) {
     });
     expect(layout).toEqual({ horizontalOverflow: false, pageOverflow: false, overlaps: false });
 
-    await dialog.getByRole('button', { name: 'Import 3 transactions' }).click();
+    await dialog.getByRole('button', { name: 'Import 3 transactions' }).click({ force: true });
     await expect(dialog.getByRole('status')).toContainText('3 transactions imported');
     const state = JSON.parse(await page.getByTestId('finance-state').textContent());
-    expect(state.transactions.some(item => item.title === 'City Shop corrected' && item.accountId === 'account-current')).toBe(true);
+    expect(state.transactions.some(item => item.title === 'City Shop corrected' && item.accountId === 'account-current' && item.categoryId === 'default-4')).toBe(true);
     expect(state.transactions.some(item => item.title === 'Salary' && item.type === 'income' && item.accountId === 'account-current')).toBe(true);
     expect(state.transactions.filter(item => item.title === 'Amazon' && item.date === '2026-11-05')).toHaveLength(1);
     await context.close();
@@ -73,4 +82,16 @@ test('large statement preview renders in reviewable batches', async ({ browser }
   await dialog.getByRole('button', { name: 'Show 100 more (20 remaining)' }).click();
   await expect(dialog.getByTestId('finance-import-row')).toHaveCount(120);
   await context.close();
+});
+
+
+test('an unreadable upload clears the prior preview and keeps retry available', async ({ page }) => {
+  await page.goto('/cboard/tests/ui/fixtures/finance.html');
+  await page.getByRole('button', { name: 'Open Transaction Import' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Import transactions' });
+  await dialog.locator('#finance-import-file').setInputFiles({ name: 'empty.csv', mimeType: 'text/csv', buffer: Buffer.alloc(0) });
+  await expect(dialog.getByRole('alert')).toContainText('non-empty statement');
+  await expect(dialog.getByText('Choose another file')).toBeVisible();
+  await dialog.locator('#finance-import-file').setInputFiles({ name: 'retry.csv', mimeType: 'text/csv', buffer: Buffer.from('Date,Description,Debit,Credit\n2026-11-05,Retry shop,2.00,') });
+  await expect(dialog.getByTestId('finance-import-count-found')).toHaveText('1 transactions found');
 });
