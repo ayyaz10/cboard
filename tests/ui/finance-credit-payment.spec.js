@@ -91,3 +91,81 @@ for (const width of [390, 1366]) {
     await context.close();
   });
 }
+
+for (const width of [390, 1366]) {
+  test(`Credit Purchase row actions stay aligned and keyboard accessible at ${width}px`, async ({ browser }) => {
+    const context = await browser.newContext({ viewport: { width, height: 640 }, isMobile: width === 390, hasTouch: width === 390 });
+    const page = await context.newPage();
+    await page.goto('/cboard/tests/ui/fixtures/finance-credit-payment.html');
+    await page.getByRole('button', { name: 'Open Credit Purchases' }).click();
+    await page.getByRole('button', { name: 'Seed menu positioning plans' }).click();
+    await expect(page.locator('.f-credit-plan')).toHaveCount(3);
+    const plansHeading = page.getByRole('heading', { name: 'Active plans' });
+    await expect(plansHeading).toBeVisible();
+
+    const trigger = page.getByRole('button', { name: 'More actions for Menu positioning plan 3' });
+    const targetBox = await trigger.boundingBox();
+    expect(targetBox.width).toBeGreaterThanOrEqual(44);
+    expect(targetBox.height).toBeGreaterThanOrEqual(44);
+    await trigger.focus();
+    await page.keyboard.press('ArrowDown');
+    const menu = page.getByRole('menu', { name: 'Menu positioning plan 3 actions' });
+    await expect(menu).toBeVisible();
+    const menuThemeContrast = await page.evaluate(() => {
+      const root = document.documentElement;
+      const original = root.dataset.theme;
+      const luminance = (rgb) => {
+        const channels = rgb.match(/[\d.]+/g).slice(0, 3).map(value => Number(value) / 255).map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+        return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+      };
+      const result = {};
+      for (const theme of ['default', 'matrix', 'midnight']) {
+        if (theme === 'default') delete root.dataset.theme;
+        else root.dataset.theme = theme;
+        const menu = document.querySelector('.f-credit-plan-menu');
+        const foreground = luminance(getComputedStyle(menu).color);
+        const background = luminance(getComputedStyle(menu).backgroundColor);
+        result[theme] = (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
+      }
+      if (original) root.dataset.theme = original;
+      else delete root.dataset.theme;
+      return result;
+    });
+    for (const contrast of Object.values(menuThemeContrast)) expect(contrast).toBeGreaterThanOrEqual(4.5);
+    await page.keyboard.press('Tab');
+    await expect(menu.getByRole('menuitem', { name: 'Open details' })).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(menu.getByRole('menuitem', { name: 'Edit agreement' })).toBeFocused();
+    await page.keyboard.press('Escape');
+    await expect(menu).toBeHidden();
+    await expect(trigger).toBeFocused();
+    await expect(plansHeading).toBeVisible();
+
+    await page.evaluate(() => {
+      const trigger = document.querySelector('.f-credit-menu-trigger[aria-label="More actions for Menu positioning plan 3"]');
+      trigger.closest('.f-credit-card-entry').style.zIndex = '70';
+      trigger.style.position = 'fixed';
+      trigger.style.top = '560px';
+      trigger.style.right = '12px';
+      trigger.style.zIndex = '95';
+    });
+    if (width === 390) await trigger.tap();
+    else await trigger.click();
+    await expect(menu).toBeVisible();
+    const triggerBox = await trigger.boundingBox();
+    const menuBox = await menu.boundingBox();
+    expect(menuBox.x).toBeGreaterThanOrEqual(0);
+    expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(width);
+    expect(menuBox.y).toBeGreaterThanOrEqual(0);
+    expect(menuBox.y + menuBox.height).toBeLessThanOrEqual(640);
+    expect(menuBox.y + menuBox.height).toBeLessThan(triggerBox.y);
+    await expect(plansHeading).toBeVisible();
+
+    await page.getByRole('heading', { name: 'Active plans' }).click();
+    await expect(menu).toBeHidden();
+    await trigger.click();
+    await menu.getByRole('menuitem', { name: 'Open details' }).click();
+    await expect(page.locator('.f-credit-detail-header').getByRole('heading', { name: 'Menu positioning plan 3' })).toBeVisible();
+    await context.close();
+  });
+}

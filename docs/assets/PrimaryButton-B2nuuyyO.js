@@ -1,0 +1,1 @@
+import{j as n,ao as s}from"./index-qd5s_S0j.js";function m({children:t,type:r="button",className:a="",...o}){return n.jsx(s,{type:r,...o,variant:"primary",className:`primary-button w-full sm:w-auto ${a}`,children:t})}export{m as P};

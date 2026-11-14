@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { deriveFinancePosition } from './financeLedger.js';
 import { formatMoney, moneyInput, parseMoney } from './financeMath.js';
 import { id, today } from './financeData.js';
@@ -69,6 +69,9 @@ export function FinanceCreditPurchases({ data, change, busy, confirmAction, setT
   const transactionIndex = useMemo(() => createCreditTransactionIndex(data), [data.transactions]);
   const summary = useMemo(() => getCreditOverview(data, undefined, transactionIndex), [data, transactionIndex]);
   const [view, setView] = useState('active'), [query, setQuery] = useState(''), [selectedId, setSelectedId] = useState('');
+  const [openPlanMenuId, setOpenPlanMenuId] = useState('');
+  const [planMenuPosition, setPlanMenuPosition] = useState(null);
+  const planMenuTriggerRef = useRef(null), planMenuRef = useRef(null);
   const [creating, setCreating] = useState(false), [draft, setDraft] = useState(() => blankDraft(data.categories.find(item => item.type === 'expense' && !item.archived)?.id || ''));
   const [createError, setCreateError] = useState(''), [actionError, setActionError] = useState(''), [pendingAction, setPendingAction] = useState('');
   const paymentSubmitLock = useRef(false);
@@ -79,6 +82,57 @@ export function FinanceCreditPurchases({ data, change, busy, confirmAction, setT
   const [refundDraft, setRefundDraft] = useState(null), [revisionDraft, setRevisionDraft] = useState(null);
   const revisionSubmitLock = useRef(false);
   const [editDraft, setEditDraft] = useState(null), [paymentEditDraft, setPaymentEditDraft] = useState(null), [scheduleEditDraft, setScheduleEditDraft] = useState(null), [showPaymentForm, setShowPaymentForm] = useState(false), [showSettlementForm, setShowSettlementForm] = useState(false), [showAllSchedule, setShowAllSchedule] = useState(false);
+
+  useLayoutEffect(() => {
+    if (!openPlanMenuId) return undefined;
+    let frame = 0;
+    const positionMenu = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const trigger = planMenuTriggerRef.current?.getBoundingClientRect();
+        const menu = planMenuRef.current?.getBoundingClientRect();
+        if (!trigger || !menu) return;
+        const gutter = 8;
+        const left = Math.max(gutter, Math.min(trigger.right - menu.width, window.innerWidth - menu.width - gutter));
+        const roomBelow = window.innerHeight - trigger.bottom - gutter;
+        const roomAbove = trigger.top - gutter;
+        const opensAbove = roomBelow < menu.height && roomAbove > roomBelow;
+        const top = opensAbove
+          ? Math.max(gutter, trigger.top - menu.height - gutter)
+          : Math.min(trigger.bottom + gutter, window.innerHeight - menu.height - gutter);
+        setPlanMenuPosition({ left, top, maxHeight: Math.max(120, window.innerHeight - gutter * 2) });
+      });
+    };
+    positionMenu();
+    const closeOnOutside = (event) => {
+      if (planMenuRef.current?.contains(event.target) || planMenuTriggerRef.current?.contains(event.target)) return;
+      setOpenPlanMenuId('');
+      setPlanMenuPosition(null);
+    };
+    const onMenuKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setOpenPlanMenuId('');
+        setPlanMenuPosition(null);
+        planMenuTriggerRef.current?.focus();
+        return;
+      }
+    };
+    document.addEventListener('pointerdown', closeOnOutside);
+    document.addEventListener('keydown', onMenuKeyDown);
+    window.addEventListener('resize', positionMenu);
+    window.addEventListener('scroll', positionMenu, true);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener('pointerdown', closeOnOutside);
+      document.removeEventListener('keydown', onMenuKeyDown);
+      window.removeEventListener('resize', positionMenu);
+      window.removeEventListener('scroll', positionMenu, true);
+    };
+  }, [openPlanMenuId]);
+
+
+
   const selected = data.creditAgreements.find(item => item.id === selectedId) || null;
   const selectedBalances = selected ? getCreditAgreementBalances(data, selected, transactionIndex) : null;
   const selectedRepayment = selected ? getCreditAgreementRepaymentSummary(data, selected, transactionIndex) : null;
@@ -538,7 +592,37 @@ export function FinanceCreditPurchases({ data, change, busy, confirmAction, setT
       </section>}
       <div className="f-credit-tools"><label className="f-credit-search">Search<input value={query} onChange={event => setQuery(event.target.value)} placeholder="Purchase, provider, notes or reference" aria-label="Search credit purchases"/></label><label className="f-credit-filter">Filter<select value={view} onChange={event => setView(event.target.value)}><option value="active">Active</option><option value="overdue">Overdue</option><option value="settled">Settled</option><option value="cancelled">Cancelled</option><option value="archived">Archived</option><option value="due-soon">Due soon</option><option value="zero">0% finance</option><option value="interest">Interest-bearing</option></select></label></div>
       <div className="f-credit-section-head"><div><span className="f-overview-eyebrow">{['settled', 'cancelled', 'archived'].includes(view) ? 'History' : 'Next payment first'}</span><h3>{view === 'settled' ? 'Settled agreements' : view === 'cancelled' ? 'Cancelled agreements' : view === 'archived' ? 'Archived agreements' : view === 'overdue' ? 'Overdue agreements' : view === 'due-soon' ? 'Due soon' : 'Active plans'}</h3></div><span className="f-credit-count">{plans.length}</span></div>
-      {plans.length ? <div className="f-credit-list">{plans.map(({ agreement, balances, next, nextBalance, status }) => <article className="f-credit-card-entry" key={agreement.id}><button type="button" className="f-credit-plan" onClick={() => openAgreement(agreement)}><span className="f-credit-plan-main"><span className="f-credit-plan-name">{agreement.title}</span><span className="f-credit-plan-meta">{agreement.merchant || 'Credit purchase'} · {agreement.archivedAt ? 'Archived' : statusLabels[status] || statusLabels[getCreditAgreementStatus(data, agreement, transactionIndex)]}</span></span><strong className="f-credit-plan-balance"><Money amount={balances.totalRemaining} currency={currency}/> <small>left</small></strong><span className="f-credit-plan-next">{next ? <>Next payment <strong><Money amount={nextBalance.remaining} currency={currency}/></strong> · {moneyDate(next.dueDate)}</> : statusLabels[getCreditAgreementStatus(data, agreement, transactionIndex)]}</span><span className="f-credit-plan-progress">{agreement.totalRepayable ? `${Math.min(100, Number((balances.paidTotal * 100 / agreement.totalRepayable).toFixed(2)))}% repaid` : 'No payment history'} · {agreement.term} total payments · {agreement.financeMode === 'apr' ? `${agreement.apr}% APR` : agreement.financeCharge ? 'Fixed finance fee' : '0% finance'}</span><span className="f-credit-plan-open" aria-hidden="true">›</span></button><details className="f-credit-list-more"><summary className="f-button" aria-label={`More actions for ${agreement.title}`}>⋯</summary><div className="f-credit-more-menu" onClick={event => { if (event.target.closest('button')) event.currentTarget.closest('details').open = false; }}><button type="button" className="f-button" disabled={busy} onClick={() => openAgreement(agreement)}>Open details</button><button type="button" className="f-button" disabled={busy} onClick={() => { openAgreement(agreement); beginEdit(agreement); }}>Edit agreement</button>{agreement.archivedAt ? <button type="button" className="f-button" disabled={busy} onClick={() => restoreAgreement(agreement)}>{pendingAction === 'Restoring credit purchase' ? 'Restoring…' : 'Restore'}</button> : <button type="button" className="f-button" disabled={busy} onClick={() => archiveAgreement(agreement)}>{pendingAction === 'Archiving credit purchase' ? 'Archiving…' : 'Archive'}</button>}{canDeleteCreditPurchase(data, agreement.id) ? <button type="button" className="f-button danger-action" disabled={busy} onClick={() => deleteAgreement(agreement)}>{pendingAction === 'Deleting credit purchase' ? 'Deleting…' : agreement.archivedAt ? 'Delete permanently' : 'Delete agreement'}</button> : <small className="f-credit-delete-note">Cannot delete: {getCreditPurchaseDeleteBlockReason(data, agreement.id)}</small>}</div></details></article>)}</div> : <div className="f-credit-empty"><strong>{view === 'completed' ? 'No completed agreements yet.' : view === 'archived' ? 'No archived agreements yet.' : (data.creditAgreements || []).some(item => !item.archivedAt) ? 'No agreements match this filter.' : (data.creditAgreements || []).length ? 'No active credit purchases.' : 'No credit purchases yet.'}</strong><p>{view === 'completed' ? 'Paid-off and settled plans will be kept here.' : view === 'archived' ? 'Archived agreements stay available here.' : (data.creditAgreements || []).some(item => item.archivedAt) ? 'Archived agreements remain available in Archived.' : 'Track instalments, Pay Later purchases and financed items here.'}</p>{view === 'active' && <button type="button" className="f-primary" onClick={beginCreate}>＋ Add Credit Purchase</button>}</div>}
+      {plans.length ? <div className="f-credit-list">{plans.map(({ agreement, balances, next, nextBalance, status }) => {
+        const planMenuOpen = openPlanMenuId === agreement.id;
+        const closePlanMenu = () => { setOpenPlanMenuId(''); setPlanMenuPosition(null); };
+        const itemProps = { role: 'menuitem', tabIndex: 0, disabled: busy, className: 'f-button' };
+        return <article className={`f-credit-card-entry${planMenuOpen ? ' is-menu-open' : ''}`} key={agreement.id}>
+          <button type="button" className="f-credit-plan" onClick={() => openAgreement(agreement)}>
+            <span className="f-credit-plan-main"><span className="f-credit-plan-name">{agreement.title}</span><span className="f-credit-plan-meta">{agreement.merchant || 'Credit purchase'}{' \u00b7 '}{agreement.archivedAt ? 'Archived' : statusLabels[status] || statusLabels[getCreditAgreementStatus(data, agreement, transactionIndex)]}</span></span>
+            <strong className="f-credit-plan-balance"><Money amount={balances.totalRemaining} currency={currency}/> <small>left</small></strong>
+            <span className="f-credit-plan-next">{next ? <>Next payment <strong><Money amount={nextBalance.remaining} currency={currency}/></strong>{' \u00b7 '}{moneyDate(next.dueDate)}</> : statusLabels[getCreditAgreementStatus(data, agreement, transactionIndex)]}</span>
+            <span className="f-credit-plan-progress">{agreement.totalRepayable ? `${Math.min(100, Number((balances.paidTotal * 100 / agreement.totalRepayable).toFixed(2)))}% repaid` : 'No payment history'}{' \u00b7 '}{agreement.term} total payments{' \u00b7 '}{agreement.financeMode === 'apr' ? `${agreement.apr}% APR` : agreement.financeCharge ? 'Fixed finance fee' : '0% finance'}</span>
+          </button>
+          <div className="f-credit-list-more">
+            <button ref={planMenuOpen ? planMenuTriggerRef : null} type="button" className="f-button f-credit-menu-trigger" aria-label={`More actions for ${agreement.title}`} aria-haspopup="menu" aria-expanded={planMenuOpen} onClick={() => { setPlanMenuPosition(null); setOpenPlanMenuId(planMenuOpen ? '' : agreement.id); }} onKeyDown={event => { if (event.key === 'ArrowDown' && !planMenuOpen) { event.preventDefault(); setOpenPlanMenuId(agreement.id); } }}><span aria-hidden="true">{'\u22ef'}</span></button>
+            {planMenuOpen && <div ref={planMenuRef} role="menu" aria-label={`${agreement.title} actions`} className="f-credit-more-menu f-credit-plan-menu" style={{ left: planMenuPosition?.left ?? 0, top: planMenuPosition?.top ?? 0, maxHeight: planMenuPosition?.maxHeight ?? 'calc(100dvh - 1rem)', visibility: planMenuPosition ? 'visible' : 'hidden' }} onKeyDown={event => {
+              const items = [...(planMenuRef.current?.querySelectorAll('[role="menuitem"]') || [])].filter(item => !item.disabled);
+              const index = items.indexOf(event.target);
+              let next = null;
+              if (event.key === 'ArrowDown') next = items[(index + 1 + items.length) % items.length];
+              if (event.key === 'ArrowUp') next = items[(index - 1 + items.length) % items.length];
+              if (event.key === 'Home') next = items[0];
+              if (event.key === 'End') next = items.at(-1);
+              if (next) { event.preventDefault(); next.focus(); }
+            }} onClick={event => { if (event.target.closest('[role="menuitem"]')) closePlanMenu(); }}>
+              <button {...itemProps} onClick={() => openAgreement(agreement)}>Open details</button>
+              <button {...itemProps} onClick={() => { openAgreement(agreement); beginEdit(agreement); }}>Edit agreement</button>
+              {agreement.archivedAt ? <button {...itemProps} onClick={() => restoreAgreement(agreement)}>{pendingAction === 'Restoring credit purchase' ? 'Restoring\u2026' : 'Restore'}</button> : <button {...itemProps} onClick={() => archiveAgreement(agreement)}>{pendingAction === 'Archiving credit purchase' ? 'Archiving\u2026' : 'Archive'}</button>}
+              {canDeleteCreditPurchase(data, agreement.id) ? <button {...itemProps} className="f-button danger-action" onClick={() => deleteAgreement(agreement)}>{pendingAction === 'Deleting credit purchase' ? 'Deleting\u2026' : agreement.archivedAt ? 'Delete permanently' : 'Delete agreement'}</button> : <small className="f-credit-delete-note">Cannot delete: {getCreditPurchaseDeleteBlockReason(data, agreement.id)}</small>}
+            </div>}
+          </div>
+        </article>;
+      })}</div> : <div className="f-credit-empty"><strong>{view === 'completed' ? 'No completed agreements yet.' : view === 'archived' ? 'No archived agreements yet.' : (data.creditAgreements || []).some(item => !item.archivedAt) ? 'No agreements match this filter.' : (data.creditAgreements || []).length ? 'No active credit purchases.' : 'No credit purchases yet.'}</strong><p>{view === 'completed' ? 'Paid-off and settled plans will be kept here.' : view === 'archived' ? 'Archived agreements stay available here.' : (data.creditAgreements || []).some(item => item.archivedAt) ? 'Archived agreements remain available in Archived.' : 'Track instalments, Pay Later purchases and financed items here.'}</p>{view === 'active' && <button type="button" className="f-primary" onClick={beginCreate}>＋ Add Credit Purchase</button>}</div>}
     </>}
 
     {selected && <>

@@ -7,6 +7,10 @@ import { TransactionDetailDialog } from '../../../src/features/finance/Transacti
 import { AuthProvider } from '../../../src/contexts/AuthContext.jsx';
 import { ReminderProvider } from '../../../src/features/focusTimer/ReminderProvider.jsx';
 import '../../../src/features/finance/finance.css';
+import '../../../src/styles/design-tokens.css';
+import '../../../src/styles/shared-ui.css';
+import '../../../src/styles/danger-actions.css';
+import '../../../src/styles/midnight.css';
 
 function Harness() {
   const [state, setState] = useState(() => {
@@ -23,8 +27,8 @@ function Harness() {
   async function change(mutator) { const next = structuredClone(state); mutator(next); setState(next); return true; }
   const noop = async () => true;
   return <AuthProvider><ReminderProvider><main style={{ maxWidth: 1200, margin: '0 auto', padding: 16 }}>
-    <button type="button" onClick={() => setDetailId('')}>Open Credit Purchases</button><button type="button" onClick={() => setState(current => { const next = structuredClone(current); createCreditAgreement(next, { id: 'revision-fixture', title: 'Schedule revision test', purchaseDate: '2026-11-14', cashPrice: 12000, deposit: 0, financedAmount: 12000, term: 3, financeMode: 'zero', frequency: 'monthly', firstPaymentDate: '2027-01-15' }); return next; })}>Seed schedule revision plan</button>
-    <FinanceCreditPurchases data={state} change={change} busy={false} confirmAction={async () => true} setTab={() => {}} openTransactionDetail={transaction => setDetailId(transaction.id)}/>
+    <button type="button" onClick={() => setDetailId('')}>Open Credit Purchases</button><button type="button" onClick={() => setState(current => { const next = structuredClone(current); createCreditAgreement(next, { id: 'revision-fixture', title: 'Schedule revision test', purchaseDate: '2026-11-14', cashPrice: 12000, deposit: 0, financedAmount: 12000, term: 3, financeMode: 'zero', frequency: 'monthly', firstPaymentDate: '2027-01-15' }); return next; })}>Seed schedule revision plan</button><button type="button" onClick={() => setState(current => { const next = structuredClone(current); for (let index = 1; index <= 3; index += 1) createCreditAgreement(next, { id: `menu-fixture-${index}`, title: `Menu positioning plan ${index}`, purchaseDate: '2026-11-14', cashPrice: 12000 + index * 100, deposit: 0, financedAmount: 12000 + index * 100, term: 3, financeMode: 'zero', frequency: 'monthly', firstPaymentDate: '2027-01-15' }); return next; })}>Seed menu positioning plans</button>
+    <div className="finance"><FinanceCreditPurchases data={state} change={change} busy={false} confirmAction={async () => true} setTab={() => {}} openTransactionDetail={transaction => setDetailId(transaction.id)}/></div>
     {detailId && <TransactionDetailDialog transaction={state.transactions.find(item => item.id === detailId)} data={state} busy={false} close={() => setDetailId('')} edit={noop} remove={noop} duplicate={noop} reclassify={noop} openLinked={linked => { if (linked.kind === "credit") setDetailId(""); }} markDonationUnpaid={noop} markDebtUnpaid={noop} canMarkDonationUnpaid={false} canMarkDebtUnpaid={false} createRefund={noop} editRefund={noop} linkRefund={noop} reverseRefund={noop} reclassifySaved={noop}/>}
     <output data-testid="finance-state" style={{ display: 'block', overflowWrap: 'anywhere' }}>{JSON.stringify(state)}</output>
   </main></ReminderProvider></AuthProvider>;

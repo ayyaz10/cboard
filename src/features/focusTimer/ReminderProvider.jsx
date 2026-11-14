@@ -254,12 +254,13 @@ export function ReminderStore({ userId, children }) {
             </div>
             <div className="flex items-center gap-2">
               <span className="ui-badge">{liveTimerCount}</span>
-              <button type="button" onClick={() => setLiveDockVisible(false)} aria-label="Hide live timers" title="Hide live timers" className="ui-button ui-button--sm h-8 w-8 p-0">
+              <button type="button" onClick={() => setLiveDockVisible(false)} aria-label="Hide live timers" title="Hide live timers" className="ui-button ui-button--sm live-timer-hide">
                 <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M3 3l18 18" />
                   <path d="M10.6 10.7a2 2 0 0 0 2.7 2.7" />
                   <path d="M9.9 4.2A10.8 10.8 0 0 1 12 4c5.5 0 9 5 9 8a9.7 9.7 0 0 1-2 3.8M6.6 6.6C4.4 8 3 10.2 3 12c0 3 3.5 8 9 8 1.2 0 2.3-.2 3.3-.7" />
                 </svg>
+                <span>Hide</span>
               </button>
             </div>
           </div>
@@ -278,9 +279,9 @@ export function ReminderStore({ userId, children }) {
             )}
 
             {liveReminders.slice(0, liveFocusSession ? 1 : 2).map((item) => (
-              <button type="button" key={item.id} onClick={() => setWidgetOpen(true)} className={`ui-button ui-button--sm w-full justify-between text-left ${item.status === 'ringing' ? 'ui-button--warning' : ''}`} aria-label={`Open reminder ${item.title}`}>
+              <button type="button" key={item.id} onClick={() => setWidgetOpen(true)} className={`ui-button ui-button--sm w-full justify-between text-left live-timer-item ${item.status === 'ringing' ? 'ui-button--warning' : ''}`} aria-label={`Open reminder ${item.title}`}>
                 <span className="min-w-0">
-                  <span className="block truncate text-sm font-black">{item.title}</span>
+                  <span className="block break-words text-sm font-black live-timer-item-title">{item.title}</span>
                   <span className="block text-[0.68rem] font-bold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">{item.status === 'ringing' ? 'Due now' : item.repeatMs > 0 ? 'Repeating reminder' : 'Reminder'}</span>
                 </span>
                 <span role="timer" aria-live="off" className="shrink-0 font-mono text-xl font-black tabular-nums">{item.status === 'ringing' ? 'DUE' : reminderCountdown(item.dueAt, now)}</span>
@@ -288,8 +289,8 @@ export function ReminderStore({ userId, children }) {
             ))}
 
             {liveTimerCount > 2 && (
-              <button type="button" onClick={() => setWidgetOpen(true)} className="text-center text-xs font-black underline decoration-2 underline-offset-2">
-                +{liveTimerCount - 2} more active
+              <button type="button" onClick={() => setWidgetOpen(true)} className="text-center text-xs font-black underline decoration-2 underline-offset-2 live-timer-view-all">
+                View all {liveTimerCount}
               </button>
             )}
           </div>
