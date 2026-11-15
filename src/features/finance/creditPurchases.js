@@ -317,7 +317,8 @@ export function planCreditReminderReconciliation(state, reminders, asOfDate = ne
         const dueAt = new Date(`${eventDate}T09:00:00`).getTime();
         if (Number.isFinite(dueAt)) targets.set(key, {
           key, agreementId: agreement.id, instalmentId: instalment.id, event: event.event,
-          dueAt, title: `Credit payment ${event.event === 'due_date' ? 'due' : 'coming up'}: ${agreement.title} (${instalment.dueDate})`,
+          dueAt, paymentDueDate: instalment.dueDate,
+          title: `Credit payment ${event.event === 'due_date' ? 'due' : 'coming up'}: ${agreement.title}`,
         });
       }
     }
@@ -329,7 +330,8 @@ export function planCreditReminderReconciliation(state, reminders, asOfDate = ne
   for (const item of active) {
     const key = `${item.creditAgreementId}:${item.creditInstalmentId}:${item.creditReminderEvent}`;
     const target = targets.get(key);
-    if (!target || target.dueAt !== item.dueAt || keep.has(key)) cancelIds.push(item.id);
+    if (!target || target.dueAt !== item.dueAt || target.title !== item.title
+      || target.paymentDueDate !== item.paymentDueDate || keep.has(key)) cancelIds.push(item.id);
     else keep.add(key);
   }
   const add = [...targets.entries()].filter(([key]) => !keep.has(key)).map(([, target]) => target);

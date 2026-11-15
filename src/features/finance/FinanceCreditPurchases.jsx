@@ -149,6 +149,7 @@ export function FinanceCreditPurchases({ data, change, busy, confirmAction, setT
       creditAgreementId: target.agreementId,
       creditInstalmentId: target.instalmentId,
       creditReminderEvent: target.event,
+      paymentDueDate: target.paymentDueDate,
       dueAt: target.dueAt,
     }));
   }, [data.creditAgreements, reminders, addReminder, cancelReminder]);
@@ -465,7 +466,7 @@ export function FinanceCreditPurchases({ data, change, busy, confirmAction, setT
       setActionError('This payment date has passed. Choose a future instalment to set a reminder.');
       return;
     }
-    addReminder(title, Math.max(60_000, todayAtNine - Date.now()), false, { creditAgreementId: agreement.id, creditInstalmentId: next.id, creditReminderEvent: 'manual' });
+    addReminder(title, Math.max(60_000, todayAtNine - Date.now()), false, { creditAgreementId: agreement.id, creditInstalmentId: next.id, creditReminderEvent: 'manual', paymentDueDate: next.dueDate });
     setActionError('Reminder added to CBoard Reminders for 9:00 on the payment date.');
   }
 

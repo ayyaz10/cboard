@@ -816,6 +816,7 @@ body:has(.g-footer) { --grocery-action-offset: 5rem; }
 .live-timer-dock :where(p,button,span) { min-width:0; overflow-wrap:anywhere; }
 .live-timer-dock .live-timer-item { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:.65rem; color:var(--color-text); }
 .live-timer-dock .live-timer-item-title { white-space:normal; overflow-wrap:anywhere; }
+.live-timer-item-countdown { align-self:center; white-space:nowrap; font-size:clamp(.82rem, 4vw, 1.1rem); }
 .live-timer-dock .live-timer-hide { display:inline-flex; align-items:center; justify-content:center; gap:.35rem; min-width:44px; min-height:44px; padding:.35rem .55rem; }
 .live-timer-dock .live-timer-hide svg { width:1rem; height:1rem; flex:none; }
 .live-timer-dock .live-timer-view-all { min-height:44px; padding:.55rem; }

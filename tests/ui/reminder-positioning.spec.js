@@ -127,3 +127,51 @@ for (const width of widths) {
     await context.close();
   });
 }
+
+test('scheduled credit countdowns and the live focus clock share accurate compact and expanded displays', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const page = await context.newPage();
+  await page.route('**/rest/v1/**', route => route.fulfill({ status: 401, body: '{}' }));
+  await page.addInitScript(() => {
+    const now = Date.now();
+    const hour = 3_600_000;
+    const creditTitle = 'Credit payment coming up: Admiral Platinum Tier, Comprehensive (2026-12-01)';
+    const reminders = [
+      { id: 'short', title: 'A short reminder', dueAt: now + 2 * hour + 15 * 60_000, status: 'waiting', repeatMs: 0 },
+      { id: 'credit-15d', title: creditTitle, dueAt: now + 369 * hour + 26 * 60_000 + 56_000, paymentDueDate: '2026-12-01', creditReminderEvent: 'before_due', creditAgreementId: 'agreement-1', creditInstalmentId: 'instalment-1', status: 'waiting', repeatMs: 0 },
+      { id: 'credit-16d', title: 'Credit payment due: Admiral Platinum Tier, Comprehensive (2026-12-02)', dueAt: now + 393 * hour + 26 * 60_000 + 56_000, paymentDueDate: '2026-12-02', creditReminderEvent: 'due_date', creditAgreementId: 'agreement-1', creditInstalmentId: 'instalment-2', status: 'waiting', repeatMs: 0 },
+    ];
+    localStorage.setItem('cboard:reminders:qa-user', JSON.stringify({ reminders, history: [] }));
+  });
+  await page.goto('/cboard/tests/ui/fixtures/reminder.html');
+
+  const dock = page.locator('.live-timer-dock');
+  await expect(dock).toBeVisible();
+  await expect(dock.locator('.live-timer-item-countdown').nth(0)).toHaveText('In 2h 15m');
+  await expect(dock.locator('.live-timer-item-countdown').nth(1)).toHaveText('In 15d 9h');
+  await expect(dock.locator('.live-timer-item-title').nth(1)).not.toContainText('(2026-12-01)');
+  await expect(dock.getByText(/Payment due/)).toBeVisible();
+  await dock.getByRole('button', { name: 'View all 3' }).click();
+
+  const panel = page.getByRole('dialog', { name: 'Reminders' });
+  await expect(panel.getByRole('timer', { name: 'Time remaining for Credit payment coming up: Admiral Platinum Tier, Comprehensive' })).toHaveText('In 15d 9h');
+  await expect(panel.getByRole('timer', { name: 'Time remaining for Credit payment due: Admiral Platinum Tier, Comprehensive' })).toHaveText('In 16d 9h');
+  const localizedPaymentDate = await page.evaluate(() => new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date('2026-12-01T12:00:00Z')));
+  await expect(panel.getByText(`Payment due ${localizedPaymentDate}`)).toBeVisible();
+  await expect(panel.getByText(/Alert/).first()).toBeVisible();
+  await page.getByRole('button', { name: 'Close reminders' }).click();
+
+  await page.evaluate(() => {
+    const now = Date.now();
+    window.dispatchEvent(new CustomEvent('cboard:focus-session-changed', { detail: { session: {
+      id: 'focus-seconds', title: 'Running focus timer', status: 'active_focus', focusMinutes: 10, breakMinutes: 5,
+      focusRemainingSeconds: 120, breakRemainingSeconds: 300, phaseStartedAt: new Date(now).toISOString(),
+    } } }));
+  });
+  const focusClock = page.locator('.live-timer-dock [role="timer"]').first();
+  await expect(focusClock).toBeVisible();
+  const initial = await focusClock.textContent();
+  expect(initial).toMatch(/^\d{2}:\d{2}$/);
+  await expect.poll(() => focusClock.textContent(), { timeout: 3000 }).not.toBe(initial);
+  await context.close();
+});

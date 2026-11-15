@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useReminders } from './ReminderProvider';
 import { ReminderHistory } from './ReminderHistory.jsx';
 import { ReminderPresets } from './ReminderPresets.jsx';
-import { durationMilliseconds, formatReminderInterval, reminderCountdown } from './reminderHelpers';
+import { durationMilliseconds, formatReminderAlertDate, formatReminderDate, formatReminderInterval, reminderCountdown, reminderPaymentDueDate, reminderTitle } from './reminderHelpers';
 
 const presets = [[15, '15 min'], [30, '30 min'], [45, '45 min'], [60, '1 hour'], [90, '1 hr 30 min']];
 const buttonClass = 'ui-button ui-button--sm';
@@ -89,12 +89,13 @@ export function RemindersPanel() {
             <ul className="mt-3 max-h-80 space-y-3 overflow-y-auto p-1">
               {upcoming.map((item) => (
                 <li key={item.id} className="ui-card p-4">
-                  <p className="break-words font-bold">{item.title}</p>
+                  <p className="break-words font-bold">{reminderTitle(item)}</p>
                   {item.repeatMs > 0 && <p className="mt-1 text-xs font-bold text-[var(--color-text-secondary)]">Every {formatReminderInterval(item.repeatMs)}</p>}
                   <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <p role="timer" aria-label={`Time remaining for ${item.title}`} className="text-2xl font-bold tabular-nums">{reminderCountdown(item.dueAt, now)}</p>
-                      <p className="text-xs text-[var(--color-text-muted)]">Due {new Date(item.dueAt).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</p>
+                      <p role="timer" aria-label={`Time remaining for ${reminderTitle(item)}`} className="text-2xl font-bold tabular-nums">{item.status === 'ringing' ? 'Due now' : reminderCountdown(item.dueAt, now)}</p>
+                      <p className="text-xs text-[var(--color-text-muted)]">Alert {formatReminderAlertDate(item.dueAt)}</p>
+                      {reminderPaymentDueDate(item) && <p className="text-xs text-[var(--color-text-muted)]">Payment due {formatReminderDate(reminderPaymentDueDate(item))}</p>}
                     </div>
                     <button type="button" onClick={() => cancel(item.id)} aria-label={`${item.repeatMs > 0 ? 'Stop repeating' : 'Cancel'} ${item.title}`} className={buttonClass}>{item.repeatMs > 0 ? 'Stop repeating' : 'Cancel'}</button>
                   </div>

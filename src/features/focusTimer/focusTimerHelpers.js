@@ -29,11 +29,15 @@ export function clampNumber(value, min, max) {
 }
 
 export function formatTimer(totalSeconds) {
-  const safeSeconds = Math.max(0, Math.floor(totalSeconds));
-  const minutes = Math.floor(safeSeconds / 60);
+  const parsedSeconds = Number(totalSeconds);
+  const safeSeconds = Number.isFinite(parsedSeconds) ? Math.max(0, Math.floor(parsedSeconds)) : 0;
   const seconds = safeSeconds % 60;
-
-  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  const minutes = Math.floor(safeSeconds / 60) % 60;
+  const hours = Math.floor(safeSeconds / 3600);
+  if (safeSeconds < 3600) return `${String(Math.floor(safeSeconds / 60)).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  const clock = `${String(hours % 24).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  if (safeSeconds < 86_400) return clock;
+  return `${Math.floor(hours / 24)}d ${clock}`;
 }
 
 export function formatSessionDate(value) {

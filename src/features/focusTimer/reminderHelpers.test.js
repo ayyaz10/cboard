@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { activateDueReminders, dismissReminder, durationMilliseconds, formatReminderInterval, readReminders, reminderCountdown } from './reminderHelpers.js';
+import { activateDueReminders, dismissReminder, durationMilliseconds, formatReminderAlertDate, formatReminderDate, formatReminderInterval, readReminders, reminderCountdown, reminderPaymentDueDate, reminderTitle } from './reminderHelpers.js';
 
 test('custom durations accept 1 hour 30 minutes and reject invalid values', () => {
   assert.equal(durationMilliseconds('1', '30'), 5_400_000);
@@ -28,10 +28,34 @@ test('bad stored data does not break reminders', () => {
   assert.deepEqual(readReminders('[{"id":"x","title":"Tea","dueAt":"bad","status":"waiting"}]'), []);
 });
 
-test('countdowns handle long durations, rounding, and overdue reminders', () => {
-  assert.equal(reminderCountdown(5_400_000, 0), '1:30:00');
-  assert.equal(reminderCountdown(60_000, 1), '01:00');
-  assert.equal(reminderCountdown(0, 1000), '00:00');
+test('reminder countdowns use days, hours, and minutes at the requested boundaries', () => {
+  const hour = 3_600_000;
+  const minute = 60_000;
+  assert.equal(reminderCountdown(369 * hour + 26 * minute + 56_000, 0), 'In 15d 9h');
+  assert.equal(reminderCountdown(393 * hour + 26 * minute + 56_000, 0), 'In 16d 9h');
+  assert.equal(reminderCountdown(24 * hour, 0), 'In 1d 0h');
+  assert.equal(reminderCountdown(24 * hour - 1000, 0), 'In 23h 59m');
+  assert.equal(reminderCountdown(2 * hour + 14 * minute + 40_000, 0), 'In 2h 15m');
+  assert.equal(reminderCountdown(hour, 0), 'In 1h 0m');
+  assert.equal(reminderCountdown(hour - 1, 0), 'In 60m');
+  assert.equal(reminderCountdown(25 * minute, 0), 'In 25m');
+  assert.equal(reminderCountdown(minute, 0), 'In 1m');
+  assert.equal(reminderCountdown(minute - 1, 0), 'In <1 min');
+  assert.equal(reminderCountdown(0, 0), 'Due now');
+  assert.equal(reminderCountdown(-1000, 0), 'Due now');
+});
+
+test('credit reminders show clean titles and a distinct localized payment date', () => {
+  const reminder = { creditReminderEvent: 'before_due', paymentDueDate: '2026-12-01', title: 'Credit payment coming up: Admiral Platinum Tier (2026-12-01)' };
+  assert.equal(reminderTitle(reminder), 'Credit payment coming up: Admiral Platinum Tier');
+  assert.equal(reminderPaymentDueDate(reminder), '2026-12-01');
+  assert.equal(formatReminderDate('2026-12-01'), new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date('2026-12-01T12:00:00Z')));
+  assert.notEqual(formatReminderAlertDate(Date.parse('2026-11-16T09:00:00Z')), formatReminderDate('2026-12-01'));
+  const legacy = { ...reminder, paymentDueDate: undefined };
+  assert.equal(reminderPaymentDueDate(legacy), '2026-12-01');
+  const manual = { creditReminderEvent: 'manual', paymentDueDate: '2026-12-01', title: 'Credit payment due: Admiral amount 50 (2026-12-01)' };
+  assert.equal(reminderTitle(manual), 'Credit payment due: Admiral amount 50');
+  assert.equal(reminderPaymentDueDate(manual), '2026-12-01');
 });
 
 test('45-minute and hourly reminders repeat even without dismissing the last alert', () => {

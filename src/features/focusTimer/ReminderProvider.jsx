@@ -7,7 +7,14 @@ import {
   formatTimer,
   getPhaseRemainingSeconds,
 } from './focusTimerHelpers';
-import { formatReminderInterval, reminderCountdown } from './reminderHelpers';
+import {
+  formatReminderAlertDate,
+  formatReminderDate,
+  formatReminderInterval,
+  reminderCountdown,
+  reminderPaymentDueDate,
+  reminderTitle,
+} from './reminderHelpers';
 import { readReminderState, reminderReducer } from './reminderHistoryState.js';
 import { availableReminderPresets, readReminderPresets } from './reminderPresetData.js';
 
@@ -199,6 +206,7 @@ export function ReminderStore({ userId, children }) {
       ...(typeof metadata?.creditAgreementId === 'string' ? { creditAgreementId: metadata.creditAgreementId } : {}),
       ...(typeof metadata?.creditInstalmentId === 'string' ? { creditInstalmentId: metadata.creditInstalmentId } : {}),
       ...(typeof metadata?.creditReminderEvent === 'string' ? { creditReminderEvent: metadata.creditReminderEvent } : {}),
+      ...(typeof metadata?.paymentDueDate === 'string' ? { paymentDueDate: metadata.paymentDueDate } : {}),
     } });
   }, [prepareSound]);
 
@@ -274,17 +282,17 @@ export function ReminderStore({ userId, children }) {
                     {focusRemaining === 0 && !focusIsPaused ? `${focusIsBreak ? 'Break' : 'Focus'} finished` : `${focusIsPaused ? 'Paused ' : ''}${focusIsBreak ? 'break' : 'focus'}`}
                   </span>
                 </span>
-                <span role="timer" aria-live="off" className="shrink-0 font-mono text-xl font-black tabular-nums">{formatTimer(focusRemaining)}</span>
+                <span role="timer" aria-live="off" className="shrink-0 font-mono text-base font-black tabular-nums sm:text-xl">{formatTimer(focusRemaining)}</span>
               </button>
             )}
 
             {liveReminders.slice(0, liveFocusSession ? 1 : 2).map((item) => (
               <button type="button" key={item.id} onClick={() => setWidgetOpen(true)} className={`ui-button ui-button--sm w-full justify-between text-left live-timer-item ${item.status === 'ringing' ? 'ui-button--warning' : ''}`} aria-label={`Open reminder ${item.title}`}>
                 <span className="min-w-0">
-                  <span className="block break-words text-sm font-black live-timer-item-title">{item.title}</span>
-                  <span className="block text-[0.68rem] font-bold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">{item.status === 'ringing' ? 'Due now' : item.repeatMs > 0 ? 'Repeating reminder' : 'Reminder'}</span>
+                  <span className="block break-words text-sm font-black live-timer-item-title">{reminderTitle(item)}</span>
+                  <span className="block text-[0.68rem] font-bold uppercase tracking-[0.12em] text-[var(--color-text-muted)]">{item.status === 'ringing' ? 'Due now' : item.repeatMs > 0 ? 'Repeating reminder' : 'Reminder'}{reminderPaymentDueDate(item) ? ` | Payment due ${formatReminderDate(reminderPaymentDueDate(item))}` : ''}</span>
                 </span>
-                <span role="timer" aria-live="off" className="shrink-0 font-mono text-xl font-black tabular-nums">{item.status === 'ringing' ? 'DUE' : reminderCountdown(item.dueAt, now)}</span>
+                <span role="timer" aria-live="off" className="live-timer-item-countdown shrink-0 font-mono font-black tabular-nums">{item.status === 'ringing' ? 'Due now' : reminderCountdown(item.dueAt, now)}</span>
               </button>
             ))}
 
@@ -313,9 +321,29 @@ export function ReminderStore({ userId, children }) {
               </svg>
             </button>
           </div>
+          {liveReminders.some(item => item.status === 'waiting') && (
+            <section aria-label="Upcoming reminders" className="mt-4 border-t border-[var(--color-border)] pt-3">
+              <h2 className="text-sm font-bold">Upcoming reminders</h2>
+              <ul className="mt-2 grid gap-2">
+                {liveReminders.filter(item => item.status === 'waiting').map(item => {
+                  const paymentDueDate = reminderPaymentDueDate(item);
+                  const paymentDueLabel = formatReminderDate(paymentDueDate);
+                  return <li key={item.id} className="ui-card grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 p-3">
+                    <span className="min-w-0">
+                      <span className="block break-words text-sm font-bold">{reminderTitle(item)}</span>
+                      <span className="block text-xs font-semibold text-[var(--color-text-muted)]">Alert {formatReminderAlertDate(item.dueAt)}</span>
+                      {paymentDueLabel && <span className="block text-xs font-semibold text-[var(--color-text-muted)]">Payment due {paymentDueLabel}</span>}
+                    </span>
+                    <span role="timer" aria-live="off" aria-label={`Time remaining for ${reminderTitle(item)}`} className="live-timer-item-countdown font-mono font-black tabular-nums">{reminderCountdown(item.dueAt, now)}</span>
+                  </li>;
+                })}
+              </ul>
+            </section>
+          )}
           {ringing.map((item) => (
             <div key={item.id} className="mt-4 border-t border-[var(--color-border)] pt-3">
-              <p className="break-words text-lg font-bold">{item.title}</p>
+              <p className="break-words text-lg font-bold">{reminderTitle(item)}</p>
+              {reminderPaymentDueDate(item) && <p className="mt-1 text-sm font-semibold">Payment due {formatReminderDate(reminderPaymentDueDate(item))}</p>}
               {item.repeatMs > 0 && <p className="mt-1 text-xs font-semibold">Repeats every {formatReminderInterval(item.repeatMs)}. Dismiss keeps it running; snooze restarts the interval after 5 minutes.</p>}
               <div className="mt-3 flex flex-wrap gap-2">
                 <button type="button" onClick={() => finishAlert(snooze, item.id)} aria-label={`Snooze ${item.title} for 5 minutes`} className="ui-button ui-button--sm">Snooze 5 min</button>
