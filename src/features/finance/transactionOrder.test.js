@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { orderedTransactions, filterTransactions } from './transactionOrder.js';
+import { orderedTransactions, filterTransactions, parseTransactionAmountQuery } from './transactionOrder.js';
 import { applyIncomeAllocations } from './financeAllocations.js';
 import { buildCashTimeline } from './financeChartData.js';
 import { donationDue } from './donationAccounting.js';
@@ -66,4 +66,41 @@ test('custom date range includes boundary dates, excludes outside rows and suppo
   ];
   assert.deepEqual(filterTransactions(rows,{from:'2026-11-01',to:'2026-11-30'}).map(row=>row.id),['end','inside','start']);
   assert.deepEqual(filterTransactions(rows,{from:'2026-11-01',to:'2026-11-30',type:'expense',category:'uncategorized'}).map(row=>row.id),['start']);
+});
+
+test('transaction amount queries parse exact integer minor units and direction signs', () => {
+  for (const query of ['13', '13.00', String.fromCharCode(163) + '13']) {
+    assert.deepEqual(parseTransactionAmountQuery(query), { amount: 1300, currency: 'GBP', direction: '' });
+  }
+  assert.deepEqual(parseTransactionAmountQuery('-13'), { amount: 1300, currency: 'GBP', direction: '-' });
+  assert.deepEqual(parseTransactionAmountQuery('+13'), { amount: 1300, currency: 'GBP', direction: '+' });
+  assert.deepEqual(parseTransactionAmountQuery('13.01'), { amount: 1301, currency: 'GBP', direction: '' });
+  assert.equal(parseTransactionAmountQuery('Vinted 13'), null);
+  assert.equal(parseTransactionAmountQuery('13.001'), null);
+  assert.equal(parseTransactionAmountQuery(String.fromCharCode(163) + '13', 'USD'), null);
+});
+
+test('exact amount search matches displayed amount, sign and other filters before pagination', () => {
+  const rows = [
+    { id: 'incoming-13', date: '2026-11-20', type: 'income', amount: 1300, paymentMethod: 'current' },
+    { id: 'outgoing-13', date: '2026-11-19', type: 'expense', amount: 1300, paymentMethod: 'current', title: 'Vinted' },
+    { id: 'outgoing-130', date: '2026-11-18', type: 'expense', amount: 13000, paymentMethod: 'current' },
+    { id: 'outgoing-1350', date: '2026-11-17', type: 'expense', amount: 1350, paymentMethod: 'card' },
+    { id: 'outgoing-113', date: '2026-11-16', type: 'expense', amount: 11300, paymentMethod: 'current' },
+    { id: 'incoming-1301', date: '2026-11-15', type: 'income', amount: 1301, paymentMethod: 'current' },
+  ];
+  assert.deepEqual(filterTransactions(rows, { from: '2026-11-01', to: '2026-11-30', query: '13' }).map(row => row.id), ['incoming-13', 'outgoing-13']);
+  assert.deepEqual(filterTransactions(rows, { query: '-13' }).map(row => row.id), ['outgoing-13']);
+  assert.deepEqual(filterTransactions(rows, { query: '+13' }).map(row => row.id), ['incoming-13']);
+  assert.deepEqual(filterTransactions(rows, { query: '13.01' }).map(row => row.id), ['incoming-1301']);
+  assert.deepEqual(filterTransactions(rows, { query: String.fromCharCode(163) + '13' }).map(row => row.id), ['incoming-13', 'outgoing-13']);
+  assert.deepEqual(filterTransactions(rows, { query: '13', source: 'current' }).map(row => row.id), ['incoming-13', 'outgoing-13']);
+  assert.deepEqual(filterTransactions(rows, { query: '13', from: '2026-11-19', to: '2026-11-30' }).map(row => row.id), ['incoming-13', 'outgoing-13']);
+  assert.deepEqual(filterTransactions(rows, { query: 'Vinted 13' }), []);
+  assert.deepEqual(filterTransactions(rows, { query: 'Vinted' }).map(row => row.id), ['outgoing-13']);
+  assert.deepEqual(filterTransactions(rows, { query: '' }).length, rows.length);
+
+  const olderRows = Array.from({ length: 120 }, (_, index) => ({ id: `recent-${index}`, date: '2026-11-20', type: 'expense', amount: 500, sequence: index }));
+  olderRows.push({ id: 'older-match', date: '2025-01-01', type: 'expense', amount: 1300 });
+  assert.equal(filterTransactions(olderRows, { query: '13', month: null }).some(row => row.id === 'older-match'), true);
 });

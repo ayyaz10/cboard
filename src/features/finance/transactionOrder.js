@@ -1,3 +1,5 @@
+import { getTransactionAmountPresentation } from './transactionPresentation.js';
+
 // Keep an income and its generated allocations together. History lists the
 // allocations first; the chronological timeline lists the income first.
 export function orderedTransactions(transactions, newestFirst = true) {
@@ -36,6 +38,19 @@ export function transactionSearchText(item, { categories = [], donationCategorie
     .filter(value => typeof value === 'string').join(' ').toLocaleLowerCase();
 }
 
+// Amount searches use the same integer minor units as transaction records.
+// An explicit pound sign means GBP; an unsigned plain amount uses the list currency.
+export function parseTransactionAmountQuery(query, currency = 'GBP') {
+  const text = String(query ?? '').trim();
+  const match = /^([+-])?\s*(\u00a3)?\s*((?:\d+|\d{1,3}(?:,\d{3})+))(?:\.(\d{1,2}))?$/.exec(text);
+  if (!match) return null;
+  const queryCurrency = match[2] ? 'GBP' : currency;
+  const whole = Number(match[3].replace(/,/g, ''));
+  const amount = whole * 100 + Number((match[4] || '').padEnd(2, '0'));
+  if (!Number.isSafeInteger(amount) || amount < 0 || (match[2] && currency !== 'GBP')) return null;
+  return { amount, currency: queryCurrency, direction: match[1] || '' };
+}
+
 export function isValidFinanceDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ''))) return false;
   const [year, month, day] = value.split('-').map(Number);
@@ -55,12 +70,16 @@ export function dateRangeForPeriod(period, month) {
   return { from: `${month}-01`, to: `${month}-${String(new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate()).padStart(2, '0')}` };
 }
 
-export function filterTransactions(transactions, { month, from = '', to = '', query = '', type = 'all', category = 'all', source = 'all', linkedType = 'all', minAmount = '', maxAmount = '', reversed = 'all', categories = [], donationCategories = [], linkedNamesById = {} }) {
+export function filterTransactions(transactions, { month, from = '', to = '', query = '', currency = 'GBP', type = 'all', category = 'all', source = 'all', linkedType = 'all', minAmount = '', maxAmount = '', reversed = 'all', categories = [], donationCategories = [], linkedNamesById = {} }) {
   const normalizedQuery = query.trim().toLocaleLowerCase();
+  const amountQuery = parseTransactionAmountQuery(query, currency);
   return orderedTransactions(transactions).filter(item => (!month || String(item.date || '').slice(0, 7) === month)
     && (!from || String(item.date || '').slice(0, 10) >= from)
     && (!to || String(item.date || '').slice(0, 10) <= to)
-    && (!normalizedQuery || transactionSearchText(item, { categories, donationCategories, linkedNames: linkedNamesById[item.id] || [] }).includes(normalizedQuery))
+    && (!normalizedQuery || (amountQuery
+      ? item.amount === amountQuery.amount && currency === amountQuery.currency
+        && (!amountQuery.direction || getTransactionAmountPresentation(item).prefix === amountQuery.direction)
+      : transactionSearchText(item, { categories, donationCategories, linkedNames: linkedNamesById[item.id] || [] }).includes(normalizedQuery)))
     && (type === 'all' || item.type === type)
     && (category === 'all' || (category === 'uncategorized' ? !item.categoryId : item.categoryId === category))
     && (source === 'all' || item.paidFromFundId === source || item.paymentMethod === source)
