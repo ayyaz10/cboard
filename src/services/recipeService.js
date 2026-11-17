@@ -22,10 +22,13 @@ export async function saveRecipeIngredientNutrition(recipe, ingredientIndex, nut
   if (!recipe.updatedAt || found.data.updated_at !== recipe.updatedAt)
     throw new Error('This recipe changed in another tab. Reload it before saving ingredient nutrition.');
   const stored = prepareIngredientEditor(found.data.value.recipe);
-  if (!Number.isInteger(ingredientIndex) || ingredientIndex < 0 || ingredientIndex >= stored.ingredients.length)
+  const resolvedIndex = typeof ingredientIndex === 'string'
+    ? stored.ingredients.findIndex(item => item.id === ingredientIndex)
+    : ingredientIndex;
+  if (!Number.isInteger(resolvedIndex) || resolvedIndex < 0 || resolvedIndex >= stored.ingredients.length)
     throw new Error('That ingredient is no longer available. Reload the recipe and try again.');
   const ingredients = stored.ingredients.map((item, index) => {
-    if (index !== ingredientIndex) return item;
+    if (index !== resolvedIndex) return item;
     const { nutritionLabel, ...manualItem } = item;
     const name = typeof quantity.name === 'string' ? quantity.name.trim() : item.name;
     if (!name || name.length > 200) throw new Error('Enter an ingredient name of 1 to 200 characters.');
@@ -57,12 +60,15 @@ export async function removeRecipeIngredient(recipe, ingredientIndex) {
   if (!recipe.updatedAt || found.data.updated_at !== recipe.updatedAt)
     throw new Error('This recipe changed in another tab. Reload it before removing an ingredient.');
   const stored = prepareIngredientEditor(found.data.value.recipe);
-  if (!Number.isInteger(ingredientIndex) || ingredientIndex < 0 || ingredientIndex >= stored.ingredients.length)
+  const resolvedIndex = typeof ingredientIndex === 'string'
+    ? stored.ingredients.findIndex(item => item.id === ingredientIndex)
+    : ingredientIndex;
+  if (!Number.isInteger(resolvedIndex) || resolvedIndex < 0 || resolvedIndex >= stored.ingredients.length)
     throw new Error('That ingredient is no longer available. Reload the recipe and try again.');
   if (stored.ingredients.length <= 1)
     throw new Error('A recipe must keep at least one ingredient.');
-  const removed = stored.ingredients[ingredientIndex];
-  const draft = { ...stored, ingredients: stored.ingredients.filter((_, index) => index !== ingredientIndex), nutritionFromIngredients: true };
+  const removed = stored.ingredients[resolvedIndex];
+  const draft = { ...stored, ingredients: stored.ingredients.filter((_, index) => index !== resolvedIndex), nutritionFromIngredients: true };
   if (draft.scaling?.anchorIngredientId === removed.id) delete draft.scaling;
   const clean = validateRecipe(draft);
   const updatedAt = new Date().toISOString();

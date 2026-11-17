@@ -681,3 +681,33 @@ html[data-theme] .groceries .g-footer button { color: var(--color-text); backgro
 @media (max-width: 600px) { .g-link-row { grid-template-columns: minmax(0, 1fr) auto; } .g-link-row > span { grid-column: 1 / -1; } .g-link-row select { width: 100%; } }
 
 .g-unlinked-status { color: var(--color-text-muted); font-size: .8rem; }
+
+.g-stock-filters { display:flex; flex-wrap:wrap; gap:.5rem; margin:1rem 0; }
+.groceries .g-stock-filters button { display:flex; flex:1 1 8rem; align-items:center; justify-content:space-between; gap:.75rem; min-height:44px; padding:.55rem .8rem; border:1px solid var(--border-default); background:var(--surface-elevated); color:var(--color-text); }
+.groceries .g-stock-filters button[aria-pressed="true"] { border-color:var(--color-accent); background:var(--color-accent); color:var(--color-accent-contrast,var(--color-text)); box-shadow:0 0 0 1px var(--color-accent); }
+.g-stock-filters strong { min-width:1.5rem; text-align:center; }
+.g-status-badge { text-transform:none; letter-spacing:0; font-size:.75rem !important; }
+.g-status-unknown,.g-stock-percent,.g-on-list { color:var(--color-text-muted); font-size:.78rem !important; font-weight:650; }
+.g-stock-percent { white-space:nowrap; }
+.g-add-top { flex:0 0 auto; min-height:44px; }
+.g-row { min-width:0; }
+.g-item-name { overflow-wrap:anywhere; }
+.g-row-actions button,.g-overflow summary { min-height:42px; }
+@media (max-width: 42rem) {
+  .g-tools { align-items:stretch; }
+  .g-search-toolbar { display:flex; flex-wrap:wrap; gap:.5rem; }
+  .g-search-toolbar > input { flex:1 1 100%; min-width:0; }
+  .g-search-toolbar > * { flex:1 1 auto; }
+  .g-search-toolbar .g-sort-control { min-width:8rem; }
+  .g-row { display:grid; grid-template-columns:auto 40px minmax(0,1fr); align-items:start; gap:.55rem; }
+  .g-row .g-thumb { width:40px; height:40px; }
+  .g-item-name { min-width:0; }
+  .g-quantity { grid-column:2 / 4; justify-content:flex-start; flex-wrap:wrap; }
+  .g-row-actions { grid-column:2 / 4; justify-content:flex-start; }
+  .g-row-actions > button { flex:1 1 auto; }
+  .g-stock-filters button { flex-basis:calc(50% - .5rem); }
+}
+.g-baseline-field { display:grid; grid-template-columns:repeat(auto-fit,minmax(10rem,1fr)); gap:.6rem; margin:.7rem 0; padding:.75rem; border:1px solid var(--border-default); border-radius:12px; }
+.g-baseline-field small { grid-column:1/-1; color:var(--color-text-muted); }
+
+.g-complete-toggle { display:inline-flex; align-items:center; gap:.4rem; min-height:42px; color:var(--color-text-secondary); font-size:.85rem; }

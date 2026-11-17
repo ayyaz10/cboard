@@ -152,17 +152,26 @@ function RecipesContent({ route, navigationPath }) {
     if (!items.length) return;
     await saveMainFoodItems(items.map(item => ({ ...item, groceryTrackingEnabled: false, shoppingListEnabled: false })));
   }
-  async function recipeUpdated(updated, { source = 'recipe' } = {}) {
+  async function recipeUpdated(updated, { source = 'recipe', updateSharedFoodId } = {}) {
     setRecipes(current => current.map(item => item.slug === updated.slug ? updated : item));
-    try {
-      await saveRecipeFoodsToCatalog([updated]);
-    } catch (error) {
-      const message = error.message || 'The food library could not be updated.';
-      if (source === 'ingredient') notify.warning(`Ingredient saved, but ${message}`);
-      else notify.error(`Recipe saved, but ${message}`);
+    if (source === 'ingredient' && !updateSharedFoodId) {
+      notify.success('Ingredient saved to this recipe');
       return;
     }
-    notify.success(source === 'ingredient' ? 'Ingredient saved' : 'Recipe updated');
+    try {
+      if (updateSharedFoodId) {
+        const existing = foodCatalog.find(item => item.id === updateSharedFoodId);
+        const linked = catalogItemsFromRecipe(updated).find(item => item.id === updateSharedFoodId);
+        if (!existing || !linked) throw new Error('The linked Food Library item is no longer available.');
+        await saveMainFoodItems([{ ...existing, ...linked, aliases: [...new Set([...(existing.aliases || []), ...(linked.aliases || [])])] }]);
+      } else await saveRecipeFoodsToCatalog([updated]);
+    } catch (error) {
+      const message = error.message || 'The food library could not be updated.';
+      if (source === 'ingredient') notify.warning('Ingredient saved, but ' + message);
+      else notify.error('Recipe saved, but ' + message);
+      return;
+    }
+    notify.success(source === 'ingredient' ? 'Ingredient and linked food saved' : 'Recipe updated');
   }
   useEffect(() => {
     refresh();
@@ -257,8 +266,9 @@ function RecipesContent({ route, navigationPath }) {
   const parts = route.replace(/\/$/, '').split('/').filter(Boolean);
   const foods = parts.length === 3 && parts[1] === 'library' && parts[2] === 'items';
   const manage = parts.length === 2 && parts[1] === 'manage';
-  const importing = parts.length === 2 && parts[1] === 'import';
+  const recipeEditRoute = parts.length === 3 && parts[2] === 'edit';
   const recipe = recipes.find((item) => item.slug === parts[1]);
+  const importing = (parts.length === 2 && parts[1] === 'import') || (recipeEditRoute && Boolean(recipe));
   const group =
     parts.length === 4 &&
     parts[2] === 'alternatives' &&
@@ -310,7 +320,7 @@ function RecipesContent({ route, navigationPath }) {
       if (skipImportHistoryGuard.current) { skipImportHistoryGuard.current = false; return; }
       void confirmDiscard().then(confirmed => {
         if (confirmed) setImportDirty(false);
-        else { skipImportHistoryGuard.current = true; navigateTo('/recipes/import', { replace: true }); }
+        else { skipImportHistoryGuard.current = true; navigateTo(recipeEditRoute && recipe ? '/recipes/' + recipe.slug + '/edit' : '/recipes/import', { replace: true }); }
       });
     };
     document.addEventListener('click', guardLink, true);
@@ -323,13 +333,19 @@ function RecipesContent({ route, navigationPath }) {
     setSelectionMode(manage);
     if (!manage) setSelectedRecipeSlugs(new Set());
   }, [manage]);
-  function startImport(initial = null, editing = false) {
+  function startImport(initial = null) {
     setImportDirty(false);
-    setDraft({ initial, editing, key: crypto.randomUUID() });
+    setDraft({ initial, editing: false, key: crypto.randomUUID() });
     skipImportHistoryGuard.current = true;
     navigateTo('/recipes/import');
   }
-  async function save(data, image, edit) {
+  function editRecipe(item) {
+    setImportDirty(false);
+    setDraft(null);
+    skipImportHistoryGuard.current = true;
+    navigateTo('/recipes/' + encodeURIComponent(item.slug) + '/edit');
+  }
+  async function save(data, image, edit, updateSharedFoods = false) {
     let saved;
     const aliasResult = addConfirmedFoodAliases(resolveRecipeIngredients(data, foodCatalog).recipe, foodCatalog);
     const resolved = aliasResult.recipe;
@@ -345,8 +361,10 @@ function RecipesContent({ route, navigationPath }) {
     ]);
     setDraft(null);
     setImportDirty(false);
-    try { await saveRecipeFoodsToCatalog([saved]); }
-    catch (error) { notify.error(error.message || 'Recipe saved, but its foods could not be added to All Food Items.'); }
+    if (!edit || updateSharedFoods) {
+      try { await saveRecipeFoodsToCatalog([saved]); }
+      catch (error) { notify.error(error.message || 'Recipe saved, but its foods could not be added to All Food Items.'); }
+    }
     notify.success(edit ? 'Recipe updated' : 'Recipe saved');
     skipImportHistoryGuard.current = true;
     navigateTo(`/recipes/${saved.slug}`);
@@ -585,7 +603,7 @@ function RecipesContent({ route, navigationPath }) {
           {shortcutOrder.map((item) => {
             if (item === 'foods') return <RecipeLink key={item} to="/recipes/library/items">All food items</RecipeLink>;
             if (item === 'home') return !home && !(recipe && parts.length === 2) ? <RecipeLink key={item} to="/recipes">Back to recipes</RecipeLink> : null;
-            if (item === 'add') return !importing ? <PrimaryButton key={item} onClick={() => startImport()}>Add recipe</PrimaryButton> : null;
+            if (item === 'add') return !importing && !recipeEditRoute ? <PrimaryButton key={item} onClick={() => startImport()}>Add recipe</PrimaryButton> : null;
             if (item === 'planner') return !planning ? <RecipeLink key={item} to="/recipes/planner/day">Meal planner</RecipeLink> : null;
             if (item === 'diary') return !diary ? <RecipeLink key={item} to="/food-diary">Food diary</RecipeLink> : null;
             return !manage ? <RecipeLink key={item} to="/recipes/manage">Manage recipes</RecipeLink> : null;
@@ -618,9 +636,9 @@ function RecipesContent({ route, navigationPath }) {
             )}
             {!error && importing ? (
               <RecipeImporter
-                key={draft?.key ?? 'new'}
-                initial={draft?.initial}
-                editing={draft?.editing}
+                key={recipeEditRoute ? 'edit:' + (recipe?.slug || parts[1]) : draft?.key ?? 'new'}
+                initial={recipeEditRoute ? recipe : draft?.initial}
+                editing={recipeEditRoute || draft?.editing}
                 onDirtyChange={setImportDirty}
                 ingredientLibrary={ingredientLibrary}
                 onAddItem={() => setAddingFood(true)}
@@ -632,7 +650,7 @@ function RecipesContent({ route, navigationPath }) {
                     setImportDirty(false);
                     setDraft(null);
                     skipImportHistoryGuard.current = true;
-                    navigateTo('/recipes');
+                    navigateTo(recipeEditRoute && recipe ? '/recipes/' + recipe.slug : '/recipes');
                   })();
                 }}
                 getSlugs={async () =>
@@ -660,10 +678,11 @@ function RecipesContent({ route, navigationPath }) {
               />
             ) : null}
             {!error && foods && <FoodLibrary library={ingredientLibrary} recipes={recipes} foodCatalog={foodCatalog} mealPlans={mealPlanRefs} onAdd={() => setAddingFood(true)} onEdit={id=>setAddingFood(foodCatalog.find(item=>item.id===id)||true)} onDuplicate={id => { const food = foodCatalog.find(item => item.id === id); if (food) setAddingFood({ ...structuredClone(food), id: undefined, name: `${food.name} (copy)`, duplicateDraft: true }); }} onDeleteFoods={deleteFoods} onDeleteRecipeIngredients={deleteRecipeOnlyIngredients} onMergeFoods={mergeFoods} />}
-            {!error && planning && <DailyMealPlanner recipes={recipes} nutritionGoals={nutritionGoals} />}
+            {!error && planning && <DailyMealPlanner recipes={recipes} nutritionGoals={nutritionGoals} foodCatalog={foodCatalog} />}
             {!error && archived && <section className="space-y-5"><header><span className="pill">Recipe archive</span><h1 className="mt-3 text-4xl font-bold">Archived recipes</h1><p className="mt-2 text-[var(--color-text-secondary)]">Restore a recipe to make it available in your library again. Existing Diary history remains saved. Permanent deletion is available only when no Diary, Planner or Grocery references remain.</p></header>{archivedLoading ? <p role="status">Loading archived recipes…</p> : archivedRecipes.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{archivedRecipes.map(item => <article className="recipe-card panel space-y-3 p-4" key={item.slug}><h2 className="text-lg font-bold">{item.title}</h2><p className="text-sm">Archived {new Date(item.archivedAt).toLocaleDateString()}</p><div className="flex flex-wrap gap-2"><button type="button" className={secondaryButton} disabled={busy} onClick={() => restoreRecipe(item)}>Restore recipe</button><button type="button" className={`${secondaryButton} danger-action`} disabled={busy} onClick={() => permanentlyDeleteArchived(item)}>Delete permanently</button></div></article>)}</div> : <p>No archived recipes.</p>}</section>}
             {!error && diary && <FoodDiary recipes={recipes} nutritionGoals={nutritionGoals} foodCatalog={foodCatalog} onFoodCatalogChange={saveMainFoodItems} onDiaryRecipeUpdated={updated => setRecipes(current => [updated, ...current.filter(item => item.slug !== updated.slug)])} />}
-            {!error && (home || manage) && (
+            {!error && recipeEditRoute && !recipe && !loading && <section className="space-y-3"><h1 className="text-3xl font-bold">Recipe not found</h1><p>The recipe may have been deleted or this edit link is incomplete.</p><RecipeLink to="/recipes">Back to recipes</RecipeLink></section>}
+            {!error && !recipeEditRoute && (home || manage) && (
               <>
                 <header className="flex flex-wrap items-start justify-between gap-4">
                   <div>
@@ -744,7 +763,7 @@ function RecipesContent({ route, navigationPath }) {
                             favouritePending={favouritePending.has(item.slug)}
                             onToggleFavourite={toggleFavourite}
                             onArchive={!manage ? archiveRecipe : undefined}
-                            onEdit={!manage ? recipe => startImport(recipe, true) : undefined}
+                            onEdit={editRecipe}
                             onDuplicate={!manage ? recipe => startImport({ ...recipe, title: `${recipe.title} (copy)` }) : undefined}
                             bulkSelection={manage && selectionMode}
                             selected={selectedRecipeSlugs.has(item.slug)}
@@ -816,11 +835,11 @@ function RecipesContent({ route, navigationPath }) {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                   <RecipeLink to="/recipes">Back to recipes</RecipeLink>
                     <div className="flex flex-wrap gap-2">
-                      <button type="button" className={secondaryButton} onClick={() => startImport(recipe, true)}>Edit Recipe</button>
+                      <button type="button" className={secondaryButton} onClick={() => editRecipe(recipe)}>Edit Recipe</button>
                       <button type="button" className={secondaryButton} onClick={() => archiveRecipe(recipe)}>Archive recipe</button>
                     </div>
                 </div>
-                <RecipePage key={recipe.slug} recipe={recipe} foodCatalog={foodCatalog} favourite={favourites.has(recipe.slug)} favouritePending={favouritePending.has(recipe.slug)} onToggleFavourite={toggleFavourite} onRecipeUpdated={recipeUpdated} onMatchExistingFoods={matchExistingFoods} onUseFood={linkRecipeFood} onKeepSeparate={keepRecipeFoodSeparate} onEdit={item => startImport(item, true)} onDuplicate={item => startImport({ ...item, title: `${item.title} (copy)` })} onArchive={archiveRecipe} onAddToDiary={options => addToDiary(recipe, options)} onAddToPlanner={options => addToPlanner(recipe, options)} />
+                <RecipePage key={recipe.slug} recipe={recipe} foodCatalog={foodCatalog} favourite={favourites.has(recipe.slug)} favouritePending={favouritePending.has(recipe.slug)} onToggleFavourite={toggleFavourite} onRecipeUpdated={recipeUpdated} onMatchExistingFoods={matchExistingFoods} onUseFood={linkRecipeFood} onKeepSeparate={keepRecipeFoodSeparate} onEdit={editRecipe} onDuplicate={item => startImport({ ...item, title: `${item.title} (copy)` })} onArchive={archiveRecipe} onAddToDiary={options => addToDiary(recipe, options)} onAddToPlanner={options => addToPlanner(recipe, options)} />
               </div>
             )}
             {!error &&
@@ -831,6 +850,7 @@ function RecipesContent({ route, navigationPath }) {
               !planning &&
               !diary &&
               !archived &&
+              !recipeEditRoute &&
               !(recipe && parts.length === 2) &&
               !group && (
                 <>
@@ -844,7 +864,7 @@ function RecipesContent({ route, navigationPath }) {
               )}
           </>
         )}
-        {!importing && <button type="button" className="recipe-mobile-add" onClick={() => startImport()}>＋ Add recipe</button>}
+        {!importing && !recipeEditRoute && <button type="button" className="recipe-mobile-add" onClick={() => startImport()}>＋ Add recipe</button>}
         <dialog
           ref={dialog}
           onPointerDown={event => { const rect = dialog.current?.getBoundingClientRect(); dialogBackdropPointerDown.current = Boolean(rect && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)); }}

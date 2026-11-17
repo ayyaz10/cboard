@@ -30,6 +30,7 @@ export function RecipeImporter({
     return JSON.stringify(recipeEditorData(initial), null, 2);
   });
   const [image, setImage] = useState(initial?.image ?? null);
+  const [updateSharedFoods, setUpdateSharedFoods] = useState(false);
   const [mode, setMode] = useState(editing ? 'form' : 'json');
   const [formData, setFormData] = useState(() => recipeEditorData(initial ?? emptyRecipe()));
   const [preview, setPreview] = useState(null);
@@ -108,7 +109,7 @@ export function RecipeImporter({
           `Existing or repeated slugs were renamed: ${renamed.map((item) => item.slug).join(', ')}.`,
         );
       if (editing) {
-        await onSave(resolved[0], image, true);
+        await onSave(resolved[0], image, true, updateSharedFoods);
         return;
       }
       setPreview(
@@ -131,7 +132,7 @@ export function RecipeImporter({
     setBusy(true);
     setError('');
     try {
-      if (preview.length === 1) await onSave(preview[0].recipe, image, editing);
+      if (preview.length === 1) await onSave(preview[0].recipe, image, editing, updateSharedFoods);
       else
         await onSaveBatch(
           preview.map((entry) => ({
@@ -293,11 +294,14 @@ export function RecipeImporter({
         </>
       ) : (
         <form onSubmit={showPreview} className="space-y-6">
-          {editing && <div className="flex flex-wrap gap-3">
+          {editing && <div className="space-y-3 rounded-xl border border-black/15 p-3">
+            <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={updateSharedFoods} onChange={event => { setUpdateSharedFoods(event.target.checked); markDirty(); }} /><span>Also update linked foods in the shared Food Library</span></label>
+            <div className="flex flex-wrap gap-3">
             <PrimaryButton type="submit" disabled={busy || imageBusy}>
               {busy ? 'Saving…' : 'Save Recipe'}
             </PrimaryButton>
             <button type="button" className={secondaryButton} disabled={busy || imageBusy} onClick={onCancel}>Cancel</button>
+            </div>
           </div>}
           <fieldset disabled={busy || imageBusy} className="min-w-0 space-y-5">
             <div className="flex flex-wrap gap-3" aria-label="Editor mode">
@@ -446,7 +450,7 @@ export function RecipeImporter({
           {mode !== 'ai' && <p className="text-sm text-[var(--color-text-secondary)]">
             {editing ? 'Upload a replacement image or remove the current one.' : 'The image above is for a single-recipe import. Batch imports have a separate image uploader for each recipe in the preview.'}
           </p>}
-          <div className="flex flex-wrap gap-3">
+          <div className="sticky bottom-2 z-20 flex flex-wrap gap-3 rounded-xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-3 shadow-lg">
             {mode !== 'ai' && <PrimaryButton type="submit" disabled={busy || imageBusy}>
               {busy ? (editing ? 'Saving…' : 'Checking…') : (editing ? 'Save Recipe' : 'Preview Recipe')}
             </PrimaryButton>}

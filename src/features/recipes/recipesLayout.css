@@ -42,7 +42,14 @@
 .recipe-mobile-add { display: none; }
 
 .recipe-item-drag-handle {
-  display: inline-flex;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 2.75rem;
+  width: 2.75rem;
+  min-height: 2.75rem;
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-elevated);
   margin-right: 0.2rem;
   color: var(--color-text-muted);
   vertical-align: middle;
@@ -55,8 +62,8 @@
 .recipe-item-move {
   display: inline-grid;
   place-items: center;
-  min-width: 2rem;
-  min-height: 1.8rem;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
   border: var(--border-width) solid var(--border-strong);
   border-radius: var(--radius-sm);
   background: var(--surface-elevated);

@@ -120,8 +120,8 @@ function IngredientNameField({ value, onChange, onSelect, library }) {
   </div>;
 }
 
-function ItemEditor({ item, onChange, groups, visible, ingredientLibrary, isIngredient = false, isAnchor = false, onSetAnchor }) {
-  const [lookup, setLookup] = useState(false);
+function ItemEditor({ item, onChange, groups, visible, ingredientLibrary, isIngredient = false, isAnchor = false, onSetAnchor, startWithLookup = false }) {
+  const [lookup, setLookup] = useState(startWithLookup);
   const [nutritionOpen, setNutritionOpen] = useState(Boolean(item.nutritionLabel));
   const nutritionDetails = useRef(null);
   const set = (key, value) => {
@@ -132,7 +132,7 @@ function ItemEditor({ item, onChange, groups, visible, ingredientLibrary, isIngr
   const label = item.nutritionLabel;
   function useLabel(nutrition) {
     const needsWeight = initialProductAmount(item, nutrition.unit) === '';
-    const next = { ...item, nutritionLabel: cleanIngredientLabel({ ...nutrition,
+    const next = { ...item, ...(item.name ? {} : { name: nutrition.source?.foodName || nutrition.source?.name || '' }), nutritionLabel: cleanIngredientLabel({ ...nutrition,
       ...(needsWeight && nutrition.portion ? { amountPerUnit: nutrition.portion.grams, recipeUnit: String(item.unit || '').trim().toLowerCase() } : {}),
     }) };
     next.nutrition = ingredientLabelNutrition(next);
@@ -247,44 +247,42 @@ function ItemEditor({ item, onChange, groups, visible, ingredientLibrary, isIngr
   );
 }
 
-function ItemRow({ title, item, index, items, onChange, groups, ingredientLibrary, isIngredient = false, anchorId, onSetAnchor, dragging, dragOver, onMove, onDragStart, onDragEnd, onDragOver, onDrop }) {
-  const normalizedItem = typeof item === 'string' ? { name: item } : item;
-  const [open, setOpen] = useState(!normalizedItem?.name);
+function ingredientRowSummary(item) {
+  const keys = [['calories', 'kcal'], ['protein', 'g protein'], ['carbs', 'g carbs'], ['fat', 'g fat'], ['fiber', 'g fibre']];
+  const summary = keys.map(([key, unit]) => item.nutrition?.[key] == null ? null : `${new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(item.nutrition[key])} ${unit}`).filter(Boolean);
+  return summary.length ? summary.join(' \u00b7 ') : 'Nutrition not calculated yet';
+}
 
+function ItemRow({ title, item, index, items, onChange, groups, ingredientLibrary, isIngredient = false, anchorId, onSetAnchor, open, onToggle, dragging, dragOver, onMove, onDragStart, onDragEnd, onDragOver, onDrop, startWithLookup = false }) {
+  const normalizedItem = typeof item === 'string' ? { name: item } : item;
+  const label = normalizedItem.name || (isIngredient ? 'New ingredient' : title.slice(0, -1).toLowerCase());
+  const itemKey = normalizedItem.id ?? item;
+  const update = (next, options) => onChange(items.map((current, currentIndex) => (current.id ?? current) === itemKey || currentIndex === index ? next : current), options);
+  const remove = () => onChange(items.filter((current, currentIndex) => (current.id ?? current) !== itemKey && currentIndex !== index));
   return (
-    <details
+    <div
       className={`recipe-item-row min-w-0 self-start rounded-xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-3${dragging ? ' is-dragging' : ''}${dragOver ? ' is-drag-over' : ''}`}
-      open={open}
-      onToggle={(event) => setOpen(event.currentTarget.open)}
-      onDragOver={event => onDragOver(event, index)}
-      onDrop={event => onDrop(event, index)}
+      data-ingredient-id={normalizedItem.id}
+      role="group"
+      aria-label={`${title.slice(0, -1)} ${index + 1}: ${label}`}
+      onDragOver={event => onDragOver(event, itemKey)}
+      onDrop={event => onDrop(event, itemKey)}
     >
-      <summary className="cursor-pointer font-bold">
-        <span className="recipe-item-drag-handle" draggable aria-label={`Drag to reorder ${normalizedItem.name || title.slice(0, -1).toLowerCase()}`} title="Drag to reorder" onDragStart={event => onDragStart(event, index)} onDragEnd={onDragEnd}><svg aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><circle cx="5" cy="3" r="1.25"/><circle cx="11" cy="3" r="1.25"/><circle cx="5" cy="8" r="1.25"/><circle cx="11" cy="8" r="1.25"/><circle cx="5" cy="13" r="1.25"/><circle cx="11" cy="13" r="1.25"/></svg></span>{' '}
-        <span className="text-[var(--color-text-muted)]">{index + 1}.</span>{' '}
-        {normalizedItem.name || `New ${title.toLowerCase()}`}
-        {(normalizedItem.amount != null || normalizedItem.unit) && (
-          <span className="ml-2 text-sm font-normal text-[var(--color-text-muted)]">
-            {[normalizedItem.amount, normalizedItem.unit]
-              .filter((value) => value != null && value !== '')
-              .join(' ')}
-          </span>
-        )}
-      </summary>
-      <div className="flex justify-end gap-1 pt-2">
-        <button type="button" className="recipe-item-move" aria-label={`Move ${normalizedItem.name || title.slice(0, -1).toLowerCase()} up`} title="Move up" disabled={index === 0} onClick={() => onMove(index, -1)}><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 13V3M4 7l4-4 4 4"/></svg></button>
-        <button type="button" className="recipe-item-move" aria-label={`Move ${normalizedItem.name || title.slice(0, -1).toLowerCase()} down`} title="Move down" disabled={index === items.length - 1} onClick={() => onMove(index, 1)}><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3v10m4-4-4 4-4-4"/></svg></button>
-      </div>
-      <div className="mt-3 space-y-3">
-        <div className="flex justify-end">
-          <button
-            type="button"
-            className={`${secondaryButton} danger-action`}
-            onClick={() => onChange(items.filter((_, i) => i !== index))}
-          >
-            Remove {isIngredient ? 'ingredient' : title.slice(0, -1).toLowerCase()} #{index + 1}
-          </button>
+      <div className="flex min-w-0 items-center gap-2">
+        <button type="button" className="recipe-item-drag-handle" draggable aria-label={`Drag to reorder ${label}`} title="Drag to reorder" onDragStart={event => onDragStart(event, itemKey)} onDragEnd={onDragEnd}>
+          <svg aria-hidden="true" viewBox="0 0 16 16" fill="currentColor"><circle cx="5" cy="3" r="1.25"/><circle cx="11" cy="3" r="1.25"/><circle cx="5" cy="8" r="1.25"/><circle cx="11" cy="8" r="1.25"/><circle cx="5" cy="13" r="1.25"/><circle cx="11" cy="13" r="1.25"/></svg>
+        </button>
+        <button type="button" className="min-h-11 min-w-0 flex-1 text-left" aria-expanded={open} onClick={onToggle}>
+          <span className="block truncate font-bold">{label}</span>
+          <span className="block text-sm text-[var(--color-text-secondary)]">{[normalizedItem.amount, normalizedItem.unit].filter(value => value != null && value !== '').join(' ') || 'Amount not set'} {'\u00b7'} {ingredientRowSummary(normalizedItem)}</span>
+        </button>
+        <div className="flex shrink-0 gap-1">
+          <button type="button" className="recipe-item-move" aria-label={`Move ${label} up`} title="Move up" disabled={index === 0} onClick={() => onMove(itemKey, -1)}><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 13V3M4 7l4-4 4 4"/></svg></button>
+          <button type="button" className="recipe-item-move" aria-label={`Move ${label} down`} title="Move down" disabled={index === items.length - 1} onClick={() => onMove(itemKey, 1)}><svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3v10m4-4-4 4-4-4"/></svg></button>
+          <button type="button" className={`${secondaryButton} danger-action px-2`} disabled={items.length <= 1} aria-label={`Remove ${label}`} onClick={remove}>Remove</button>
         </div>
+      </div>
+      {open && <div className="mt-3 space-y-3 border-t border-black/15 pt-3">
         <ItemEditor
           item={normalizedItem}
           groups={groups}
@@ -293,14 +291,14 @@ function ItemRow({ title, item, index, items, onChange, groups, ingredientLibrar
           isIngredient={isIngredient}
           isAnchor={normalizedItem.id === anchorId}
           onSetAnchor={onSetAnchor}
-          onChange={(next, options) =>
-            onChange(items.map((current, i) => (i === index ? next : current)), options)
-          }
+          startWithLookup={startWithLookup}
+          onChange={update}
         />
-      </div>
-    </details>
+      </div>}
+    </div>
   );
 }
+
 
 function useDesktopColumns() {
   const query = '(min-width: 1024px)';
@@ -317,101 +315,92 @@ function useDesktopColumns() {
 
 function Items({ title, items, onChange, groups, ingredientLibrary, isIngredient = false, anchorId, onSetAnchor }) {
   const desktop = useDesktopColumns();
-  const [draggingIndex, setDraggingIndex] = useState(null);
-  const [dragOverIndex, setDragOverIndex] = useState(null);
-  const moveItem = (sourceIndex, targetIndex, after = false) => {
-    if (!Number.isInteger(sourceIndex) || !Number.isInteger(targetIndex) || sourceIndex === targetIndex) return;
+  const [openItemId, setOpenItemId] = useState(null);
+  const [lookupItemId, setLookupItemId] = useState(null);
+  const [draggingId, setDraggingId] = useState(null);
+  const [dragOverId, setDragOverId] = useState(null);
+  const keyFor = (item, index) => item.id ?? `row:${index}`;
+  const moveItem = (sourceId, targetId, after = false) => {
+    if (sourceId === targetId) return;
+    const sourceIndex = items.findIndex((item, index) => keyFor(item, index) === sourceId);
+    if (sourceIndex < 0) return;
     const next = [...items];
     const [source] = next.splice(sourceIndex, 1);
-    // Recompute the target position after removing the source row.
-    const targetAfterRemoval = next.findIndex(item => item === items[targetIndex]);
-    if (targetAfterRemoval < 0) return;
-    next.splice(targetAfterRemoval + Number(after), 0, source);
+    const targetIndex = next.findIndex((item, index) => keyFor(item, index) === targetId);
+    if (targetIndex < 0) return;
+    next.splice(targetIndex + Number(after), 0, source);
     onChange(next);
   };
-  const moveBy = (index, offset) => {
-    const target = index + offset;
-    if (target < 0 || target >= items.length) return;
-    const next = [...items];
-    const [item] = next.splice(index, 1);
-    next.splice(target, 0, item);
-    onChange(next);
+  const moveBy = (id, offset) => {
+    const index = items.findIndex((item, currentIndex) => keyFor(item, currentIndex) === id);
+    const target = items[index + offset];
+    if (target) moveItem(id, keyFor(target, index + offset), offset > 0);
   };
-  const handleDragStart = (event, index) => {
+  const handleDragStart = (event, id) => {
     event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData('text/plain', String(index));
-    setDraggingIndex(index);
+    event.dataTransfer.setData('text/plain', String(id));
+    setDraggingId(id);
   };
-  const handleDragEnd = () => { setDraggingIndex(null); setDragOverIndex(null); };
-  const handleDragOver = (event, index) => {
-    if (draggingIndex == null) return;
+  const handleDragEnd = () => { setDraggingId(null); setDragOverId(null); };
+  const handleDragOver = (event, id) => {
+    if (draggingId == null) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
-    setDragOverIndex(index);
+    setDragOverId(id);
   };
-  const handleDrop = (event, targetIndex) => {
+  const handleDrop = (event, id) => {
     event.preventDefault();
-    const sourceIndex = draggingIndex ?? Number(event.dataTransfer.getData('text/plain'));
+    const sourceId = draggingId ?? event.dataTransfer.getData('text/plain');
     const bounds = event.currentTarget.getBoundingClientRect();
-    moveItem(sourceIndex, targetIndex, event.clientY >= bounds.top + bounds.height / 2);
+    moveItem(sourceId, id, event.clientY >= bounds.top + bounds.height / 2);
     handleDragEnd();
   };
-  const itemRow = (item, index) => (
-    <ItemRow
-      key={item.id || `${item.name || title}-${index}`}
-      title={title}
-      item={item}
-      index={index}
-      items={items}
-      onChange={onChange}
-      groups={groups}
-      ingredientLibrary={ingredientLibrary}
-      isIngredient={isIngredient}
-      anchorId={anchorId}
-      onSetAnchor={onSetAnchor}
-      dragging={draggingIndex === index}
-      dragOver={dragOverIndex === index}
-      onMove={moveBy}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
-    />
-  );
+  const addItem = (withLookup = false) => {
+    const item = { id: crypto.randomUUID(), name: '', amount: null, unit: '' };
+    onChange([...items, item]);
+    setOpenItemId(item.id);
+    setLookupItemId(withLookup ? item.id : null);
+  };
+  const itemRow = (item, index) => {
+    const id = keyFor(item, index);
+    return <ItemRow
+      key={item.id || `${title}-${index}`}
+      title={title} item={item} index={index} items={items} onChange={onChange}
+      groups={groups} ingredientLibrary={ingredientLibrary} isIngredient={isIngredient}
+      anchorId={anchorId} onSetAnchor={onSetAnchor}
+      open={openItemId === id} onToggle={() => { setOpenItemId(openItemId === id ? null : id); setLookupItemId(null); }}
+      dragging={draggingId === id} dragOver={dragOverId === id} onMove={moveBy}
+      onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragOver={handleDragOver} onDrop={handleDrop}
+      startWithLookup={lookupItemId === id}
+    />;
+  };
   return (
     <section className="space-y-4">
-      <h2 className="text-2xl font-bold">{title}</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-2xl font-bold">{title}</h2>{isIngredient && <span className="text-xs text-[var(--color-text-muted)]">{items.length} items ? Edit one row at a time</span>}</div>
       {desktop ? (
         <div className="grid items-start gap-2 lg:grid-cols-2">
           <div className="min-w-0 space-y-2">{items.map((item, index) => index % 2 === 0 ? itemRow(item, index) : null)}</div>
           <div className="min-w-0 space-y-2">{items.map((item, index) => index % 2 === 1 ? itemRow(item, index) : null)}</div>
         </div>
-      ) : (
-        <div className="space-y-2">{items.map(itemRow)}</div>
-      )}
-      <button
-        type="button"
-        className={secondaryButton}
-        onClick={() =>
-          onChange([...items, { id: crypto.randomUUID(), name: '', amount: null, unit: '' }])
-        }
-      >
-        Add {title.toLowerCase()}
-      </button>
+      ) : <div className="space-y-2">{items.map(itemRow)}</div>}
+      {isIngredient ? <div className="flex flex-wrap gap-2"><button type="button" className={secondaryButton} onClick={() => addItem(true)}>Add food</button><button type="button" className={secondaryButton} onClick={() => addItem(false)}>Add manually</button></div> : <button type="button" className={secondaryButton} onClick={() => addItem(false)}>Add {title.toLowerCase()}</button>}
     </section>
   );
 }
 
+
 export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary = [], imageEditor = null }) {
+  const sourceRecipe = recipe;
   recipe = prepareIngredientEditor(recipe);
-  const nutritionDisplay = recipeNutritionDisplay(recipe);
+  const nutritionDisplay = recipeNutritionDisplay(sourceRecipe.productNutrition ? sourceRecipe : recipe);
   const [recipeScanAmount,setRecipeScanAmount]=useState('');
   const [recipeScanUnit,setRecipeScanUnit]=useState('g');
   const [scaleTarget, setScaleTarget] = useState('');
   const [scaleOthers, setScaleOthers] = useState(true);
   const [confirmScaling, setConfirmScaling] = useState(false);
   const set = (key, value, options = {}) => {
-    const next = { ...recipe, [key]: value };
+    const preserveProductBasis = sourceRecipe.productNutrition && !['ingredients', 'sauces', 'nutrition'].includes(key);
+    const next = { ...(preserveProductBasis ? sourceRecipe : recipe), [key]: value };
     if (['ingredients', 'sauces'].includes(key) && next.scaling) {
       const combined = [...(next.ingredients || []), ...(next.sauces || [])];
       if (!combined.some(item => item.id === next.scaling.anchorIngredientId)) delete next.scaling;
@@ -547,6 +536,13 @@ export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary 
           </div>}
         </> : <p className="text-sm text-[var(--color-text-secondary)]">Choose an ingredient below with “Use as main ingredient” to enable proportional scaling. Existing recipes are left unanchored until you choose.</p>}
       </section>
+      <section aria-label="Live recipe nutrition summary" className="rounded-2xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-4">
+        <h2 className="text-xl font-bold">Nutrition {nutritionDisplay.wholeRecipe ? 'for the whole recipe' : 'per serving'}</h2>
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+          {[['calories', 'kcal'], ['protein', 'g protein'], ['carbs', 'g carbs'], ['fat', 'g fat'], ['fiber', 'g fibre']].map(([key, unit]) => <div key={key} className="rounded-lg border border-black/15 p-2"><strong>{nutritionDisplay.nutrition[key] ?? '?'}</strong><span className="ml-1 text-xs text-[var(--color-text-secondary)]">{unit}</span></div>)}
+        </div>
+        {nutritionDisplay.partialKeys?.length > 0 && <p className="mt-2 text-sm">Some nutrient totals are partial because values are missing from one or more ingredients.</p>}
+      </section>
       <details className="rounded-2xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-4" open={!editing}>
         <summary className="cursor-pointer text-xl font-bold">Recipe nutrition</summary>
         <p className="text-sm text-[var(--color-text-secondary)]">
@@ -658,9 +654,10 @@ export function RecipeFormEditor({ recipe, onChange, editing, ingredientLibrary 
           </div>
         </details>
       )}
-      <details className="order-first rounded-2xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-4" open={Boolean(recipe.source)}>
-        <summary className="cursor-pointer text-xl font-bold">Recipe source</summary>
+      <details className="order-first rounded-2xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] p-4" open={Boolean(recipe.source || recipe.notes)}>
+        <summary className="cursor-pointer text-xl font-bold">Notes and recipe source</summary>
         <div className="mt-4 space-y-3">
+        <Field label="Recipe notes" multiline rows={3} value={recipe.notes} onChange={value => set('notes', value)} />
         <label className="flex items-center gap-3 font-semibold">
           <input
             type="checkbox"

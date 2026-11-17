@@ -4,7 +4,7 @@ import { linkRecipeInventory, reconcileInventory } from './inventory.js';
 import { foodItem, recipeItems, validateDay } from '../diary/diaryData.js';
 import { validateRecipe } from '../recipes/recipeData.js';
 import { removeGroceryItems, addItems, purchase, normalizeGroceryState, ingredientKey } from './groceryData.js';
-const stock = () => ({ items: [{ id: 'chicken', name: 'Chicken', quantity: 1000, unit: 'g' }], settings: {}, shopping: [] });
+const stock = () => ({ items: [{ id: 'chicken', name: 'Chicken', quantity: 1000, unit: 'g', stockBaseline: { quantity: 1000, unit: 'g' } }], settings: { lowStockThresholdPercent: 45 }, shopping: [] });
 const recipe = (slug = 'chicken-rice') => validateRecipe({ slug, title: slug, mealType: 'Lunch', servings: 2, ingredients: [{ name: 'Chicken', amount: 300, unit: 'g', nutrition: { calories: 330, protein: 60, salt: 1, sugars: 2 } }], steps: ['Cook'], nutritionFromIngredients: true });
 const day = items => ({ date: '2026-09-29', meals: [{ id: 'meal', meal: 'Lunch', title: 'Lunch', items }], skipped: [], complete: false });
 const quantity = state => state.items.find(item => item.id === 'chicken').quantity;

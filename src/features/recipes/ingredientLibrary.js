@@ -107,6 +107,9 @@ export function applyStoredIngredient(current, stored) {
     ...(current.group ? { group: current.group } : {}),
     ...(current.preparation ? { preparation: current.preparation } : {}),
     ...(current.scaleEnabled === false ? { scaleEnabled: false } : {}),
+    ...(typeof current.groceryTrackingEnabled === 'boolean' ? { groceryTrackingEnabled: current.groceryTrackingEnabled } : {}),
+    ...(typeof current.shoppingListEnabled === 'boolean' ? { shoppingListEnabled: current.shoppingListEnabled } : {}),
+    ...(typeof current.nutritionTrackingEnabled === 'boolean' ? { nutritionTrackingEnabled: current.nutritionTrackingEnabled } : {}),
     nutrition: { ...(stored.nutrition || {}) },
     ...(stored.nutritionLabel ? { nutritionLabel: { ...stored.nutritionLabel, source: { ...stored.nutritionLabel.source } } } : {}),
   };

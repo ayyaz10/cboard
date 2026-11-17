@@ -200,6 +200,7 @@ export function validateRecipe(data) {
     slug,
     mealType: string(data.mealType, 'Meal type', true, 100),
     description: string(data.description, 'Description'),
+    notes: string(data.notes, 'Recipe notes', false, 4000),
     nutrition: nutrition(data.nutrition),
     prepTime: string(data.prepTime, 'Prep time', false, 100) || null,
     cookTime: string(data.cookTime, 'Cooking time', false, 100) || null,

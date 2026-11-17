@@ -13,7 +13,9 @@
     "test:pwa": "node --test src/pwa/*.test.js",
     "test:backup": "node --test src/services/backupService.test.js",
     "verify:pwa": "node scripts/verify-pwa.js",
-    "test:ui": "playwright test"
+    "test:ui": "playwright test",
+    "test:recipe-detail": "node scripts/check-recipe-detail.mjs",
+    "test:recipe-edit": "node scripts/check-recipe-edit.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.1",

@@ -20,7 +20,11 @@ import { NutritionLookup } from '../groceries/NutritionLookup.jsx';
 import { notify } from '../../lib/notifications.js';
 import { formatScaledQuantity } from './recipeScaling.js';
 
-const RecipeDetailExperience = lazy(() => import('./RecipeDetailExperience.jsx'));
+const RecipeDetailExperience = lazy(() =>
+  import('./RecipeDetailExperience.jsx').then(module => ({
+    default: module.RecipeDetailExperience,
+  })),
+);
 
 export const secondaryButton =
   'inline-flex items-center justify-center rounded-full border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-4 py-2 text-sm font-bold text-[var(--color-text)] transition hover:-translate-y-px focus-visible:outline-offset-4 disabled:opacity-50';
@@ -160,9 +164,10 @@ function ingredientNutritionSummary(item) {
   return values.length ? values.join(' · ') : 'Nutrition not calculated yet';
 }
 
-function IngredientNutritionRow({ item, index, recipe, preview, onSaved, showNutrition = true, originalItem }) {
-  item = prepareIngredientEditor(recipe).ingredients[index] || item;
-  const editableAmount = initialProductAmount({ amount: item.amount, unit: 'pieces' }, 'pieces');
+function IngredientNutritionRow({ item, index, recipe, preview, onSaved, showNutrition = true, originalItem, displayItem = item }) {
+  item = prepareIngredientEditor(recipe).ingredients.find(entry => entry.id === item.id) || item;
+  const editableAmount = item.amount == null ? '' : String(item.amount);
+  const scaledDisplay = displayItem?.amount !== item.amount || displayItem?.unit !== item.unit;
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(item.name);
   const [values, setValues] = useState(item.nutrition || {});
@@ -173,6 +178,7 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved, showNut
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState('');
+  const [updateSharedFood, setUpdateSharedFood] = useState(false);
   const [removeConfirmation, setRemoveConfirmation] = useState(false);
   const editorRef = useRef(null);
   const saving = useRef(false);
@@ -203,8 +209,8 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved, showNut
     setBusy(true);
     setError('');
     try {
-      const saved = await saveRecipeIngredientNutrition(recipe, index, values, { name, amount: Number(amount), unit, ...(nutritionLabel?{nutritionLabel}: {}) });
-      if (onSaved) await onSaved(saved, { source: 'ingredient' });
+      const saved = await saveRecipeIngredientNutrition(recipe, item.id, values, { name, amount: amount === '' ? null : Number(amount), unit, ...(nutritionLabel ? { nutritionLabel } : {}) });
+      if (onSaved) await onSaved(saved, { source: 'ingredient', updateSharedFoodId: updateSharedFood ? item.foodId : undefined });
       else notify.success('Ingredient changes saved');
       setDirty(false);
       setEditing(false);
@@ -215,14 +221,6 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved, showNut
       setBusy(false);
     }
   }
-  useEffect(() => {
-    if (!editing || !dirty || busy) return;
-    const saveOnOutsideClick = event => {
-      if (!editorRef.current?.contains(event.target)) void save();
-    };
-    document.addEventListener('pointerdown', saveOnOutsideClick, true);
-    return () => document.removeEventListener('pointerdown', saveOnOutsideClick, true);
-  }, [editing, dirty, busy, save]);
   function toggleEditor() {
     if (!editing) {
       setName(item.name);
@@ -232,18 +230,18 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved, showNut
       setUnit(item.unit);
       setError('');
       setDirty(false);
+      setUpdateSharedFood(false);
       setEditing(true);
-      return;
+    } else {
+      setEditing(false);
     }
-    if (dirty) save();
-    else setEditing(false);
   }
   async function removeIngredient() {
     setBusy(true);
     setError('');
     try {
-      const updated = await removeRecipeIngredient(recipe, index);
-      onSaved?.(updated);
+      const updated = await removeRecipeIngredient(recipe, item.id);
+      onSaved?.(updated, { source: 'ingredient' });
       setEditing(false);
     } catch (removeError) {
       setError(removeError.message || 'Could not remove this ingredient. Please try again.');
@@ -255,7 +253,7 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved, showNut
   return <li className="min-w-0 self-start rounded-xl border-2 border-[var(--border-default)] bg-[var(--surface-elevated)] px-3 py-2.5">
     <div className="flex min-w-0 items-center justify-between gap-3">
       <div className="min-w-0 flex-1">
-        {preview && showNutrition === false ? <p className="recipe-ingredient-display"><strong>{item.amount != null && item.amount !== '' ? `${originalItem && originalItem.amount !== item.amount ? `${typeof originalItem.amount === 'number' ? formatScaledQuantity(originalItem.amount) : originalItem.amount}${originalItem.unit ? ` ${originalItem.unit}` : ''} → ` : ''}${typeof item.amount === 'number' ? formatScaledQuantity(item.amount) : item.amount}${item.unit ? ` ${item.unit}` : ''}` : ''}</strong><span>{item.name}</span></p> : <p className="font-semibold">{formatIngredient(item)}</p>}
+        {preview && showNutrition === false ? <p className="recipe-ingredient-display"><strong>{item.amount != null && item.amount !== '' ? `${originalItem && originalItem.amount !== item.amount ? `${typeof originalItem.amount === 'number' ? formatScaledQuantity(originalItem.amount) : originalItem.amount}${originalItem.unit ? ` ${originalItem.unit}` : ''} → ` : ''}${typeof item.amount === 'number' ? formatScaledQuantity(item.amount) : item.amount}${item.unit ? ` ${item.unit}` : ''}` : ''}</strong><span>{item.name}</span></p> : <p className="font-semibold">{formatIngredient(displayItem)}</p>}
         {preview && showNutrition === false && item.preparation && <p className="recipe-ingredient-preparation">{item.preparation}</p>}
         {!preview && item.preparation && <p className="text-xs text-[var(--color-text-muted)]">{item.preparation}</p>}
         {!preview && item.nutritionTrackingEnabled === false && <p className="text-xs text-[var(--color-text-muted)]">Nutrition excluded</p>}
@@ -266,10 +264,10 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved, showNut
           <button
             type="button"
             disabled={busy}
-            className="group mt-0.5 flex min-h-9 max-w-full items-center gap-1.5 text-left text-xs leading-5 text-[var(--color-text-secondary)] transition hover:text-[var(--color-text)] focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2"
-            aria-label={`${editing ? 'Close' : 'Edit'} ingredient ${formatIngredient(item)}`}
+            className="group mt-0.5 flex min-h-11 max-w-full items-center gap-2 text-left text-xs leading-5 text-[var(--color-text-secondary)] transition hover:text-[var(--color-text)] focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2"
+            aria-label={'Quick edit ' + formatIngredient(item)}
             aria-expanded={editing}
-            title="Edit ingredient name and nutrition"
+            title="Quick edit this ingredient"
             onClick={toggleEditor}
           >
             <span>{ingredientNutritionSummary(item)}</span>
@@ -286,9 +284,7 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved, showNut
         <RecipeLink to={`/recipes/${recipe.slug}/alternatives/${item.alternativeGroup}`}>Alternatives →</RecipeLink>
       ))}
     </div>
-    {editing && <fieldset ref={editorRef} disabled={busy} onBlur={event => {
-      if (!event.currentTarget.contains(event.relatedTarget)) void save();
-    }} className="mt-3 space-y-3 border-t-2 border-black/15 pt-3">
+    {editing && <fieldset ref={editorRef} disabled={busy} className="mt-3 space-y-3 border-t-2 border-black/15 pt-3">
       <legend className="sr-only">Edit ingredient name and nutrition for {formatIngredient(item)}</legend>
       <div className="flex justify-end">
         <button type="button" className={`${secondaryButton} danger-action`} disabled={busy || recipe.ingredients.length <= 1} onClick={() => setRemoveConfirmation(true)}>
@@ -319,7 +315,7 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved, showNut
           onSelect={useFoodNutrition}
         />
       </div>}
-      <div className="grid grid-cols-2 gap-2"><label>Amount<input className="field-input" type="number" min="0.0001" step="any" value={amount ?? ''} onChange={event => {
+      <div className="grid grid-cols-2 gap-2"><label>{scaledDisplay ? 'Saved amount (' + (recipe.servings || 1) + ' saved serving' + (recipe.servings === 1 ? '' : 's') + ')' : 'Amount'}<input className="field-input" type="number" min="0.0001" step="any" value={amount ?? ''} onChange={event => {
         const next = updateIngredientField({ amount, unit, nutrition: values, nutritionLabel }, 'amount', event.target.value);
         setAmount(event.target.value); setValues(next.nutrition); setDirty(true);
       }} /></label><label>Unit<input className="field-input" value={unit} onChange={event => { const next = updateIngredientField({ amount, unit, nutrition: values, nutritionLabel }, 'unit', event.target.value); setUnit(event.target.value); setValues(next.nutrition); setDirty(true); }} /></label></div>
@@ -336,17 +332,19 @@ function IngredientNutritionRow({ item, index, recipe, preview, onSaved, showNut
           <input className="field-input" type="number" min="0" step="any" value={values[key] ?? ''} onChange={(event) => {setNutritionLabel(null);setValues((current) => ({ ...current, [key]: event.target.value === '' ? null : Number(event.target.value) }));setDirty(true);}} />
         </label>)}
       </div>
-      <p className="text-xs text-[var(--color-text-muted)]">Values are for the full ingredient amount shown above.</p>
+      <p className="text-xs text-[var(--color-text-muted)]">Values are for the full saved ingredient amount shown above.</p>
+      {item.foodId && <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={updateSharedFood} onChange={event => setUpdateSharedFood(event.target.checked)} /><span>Also update this linked food in the shared Food Library</span></label>}
       {error && <p role="alert" className="text-sm font-semibold">{error}</p>}
       <div className="flex flex-wrap gap-2">
         <button type="button" className={secondaryButton} disabled={busy || !name.trim()} onClick={save}>{busy ? 'Saving…' : 'Save changes'}</button>
-        <button type="button" className={secondaryButton} disabled={busy} onClick={() => { setError(''); setDirty(false); setEditing(false); }}>Cancel</button>
+        <button type="button" className={secondaryButton} disabled={busy} onClick={() => { setError(''); setDirty(false); setUpdateSharedFood(false); setEditing(false); }}>Cancel</button>
       </div>
     </fieldset>}
   </li>;
 }
 
-export function IngredientList({ recipe, preview = false, readOnly = false, originalRecipe, onRecipeUpdated }) {
+export function IngredientList({ recipe, displayRecipe = recipe, preview = false, readOnly = false, originalRecipe, onRecipeUpdated }) {
+  const displayById = new Map((displayRecipe.ingredients || []).map(item => [item.id, item]));
   const groups = recipe.ingredients.reduce((list, item, index) => {
     const name = item.group?.trim() || 'Ingredients';
     const last = list.at(-1);
@@ -362,7 +360,7 @@ export function IngredientList({ recipe, preview = false, readOnly = false, orig
           {recipe.ingredients.length} items{!preview && <> · Tap the pencil to edit names or nutrition</>}
         </span>
       </div>
-      <div className="recipe-ingredient-groups mt-3">{groups.map((group, groupIndex) => <section key={`${group.name}-${groupIndex}`}><h3>{group.name}</h3><ul>{group.rows.map(({ item, index }) => <IngredientNutritionRow key={item.id || index} item={item} index={index} recipe={recipe} originalItem={originalRecipe?.ingredients.find(original => original.id === item.id)} preview={preview || readOnly} showNutrition={!readOnly} onSaved={onRecipeUpdated} />)}</ul></section>)}</div>
+      <div className="recipe-ingredient-groups mt-3">{groups.map((group, groupIndex) => <section key={`${group.name}-${groupIndex}`}><h3>{group.name}</h3><ul>{group.rows.map(({ item, index }) => <IngredientNutritionRow key={item.id || index} item={item} displayItem={displayById.get(item.id) || item} index={index} recipe={recipe} originalItem={originalRecipe?.ingredients.find(original => original.id === item.id)} preview={preview || readOnly} showNutrition={!readOnly} onSaved={onRecipeUpdated} />)}</ul></section>)}</div>
     </section>
   );
 }

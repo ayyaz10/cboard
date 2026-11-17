@@ -1,4 +1,4 @@
-﻿import { convert, normalizeName, stockStatus } from './groceryData.js';
+import { convert, normalizeName, stockStatus, stockPercentage } from './groceryData.js';
 
 export function filterGroceryItems(items, {
   query = '',
@@ -10,6 +10,7 @@ export function filterGroceryItems(items, {
   sort = 'category',
   tab = 'stock',
   categoryNames = [],
+  thresholdPercent = 45,
 } = {}) {
   const normalizedQuery = query.trim().toLowerCase();
   const shoppingUnits = new Map();
@@ -24,20 +25,21 @@ export function filterGroceryItems(items, {
     return searchable.includes(normalizedQuery)
       && (category === 'All' || item.category === category)
       && (tab !== 'stock' || recipeUsage === 'all' || (recipeUsage === 'used' ? Boolean(item.recipeRefs?.length) : !item.recipeRefs?.length))
-      && (tab !== 'stock' || status === 'All' || (status === 'Needs attention' ? ['Low stock', 'Out of stock'].includes(stockStatus(item)) : stockStatus(item) === status))
+      && (tab !== 'stock' || status === 'All' || (status === 'Needs attention' ? ['Low stock', 'Out of stock'].includes(stockStatus(item, thresholdPercent)) : stockStatus(item, thresholdPercent) === status))
       && (tab !== 'stock' || shoppingFilter === 'all' || (shoppingUnits.get(normalizeName(item.name)) || []).some(unit => convert(1, item.unit, unit) != null) === (shoppingFilter === 'on'));
   }).sort((a, b) => {
+    if (tab === 'stock' && status === 'Low stock') return (stockPercentage(a) ?? Infinity) - (stockPercentage(b) ?? Infinity);
     if (sort === 'name') return a.name.localeCompare(b.name);
-    if (sort === 'stock') return ['Out of stock', 'Low stock', 'In stock', 'Unknown'].indexOf(stockStatus(a)) - ['Out of stock', 'Low stock', 'In stock', 'Unknown'].indexOf(stockStatus(b));
+    if (sort === 'stock') return ['Out of stock', 'Low stock', 'In stock', 'Unknown'].indexOf(stockStatus(a, thresholdPercent)) - ['Out of stock', 'Low stock', 'In stock', 'Unknown'].indexOf(stockStatus(b, thresholdPercent));
     if (sort === 'lowest') return (a.quantity ?? Number.POSITIVE_INFINITY) - (b.quantity ?? Number.POSITIVE_INFINITY);
     return categoryNames.indexOf(a.category) - categoryNames.indexOf(b.category) || a.name.localeCompare(b.name);
   });
 }
 
-export function summarizeCategoryStock(items) {
+export function summarizeCategoryStock(items, thresholdPercent = 45) {
   const summary = { count: items.length, out: 0, low: 0, inStock: 0, unknown: 0 };
   for (const item of items) {
-    const status = stockStatus(item);
+    const status = stockStatus(item, thresholdPercent);
     if (status === 'Out of stock') summary.out++;
     else if (status === 'Low stock') summary.low++;
     else if (status === 'In stock') summary.inStock++;

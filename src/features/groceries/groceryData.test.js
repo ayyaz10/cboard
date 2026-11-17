@@ -10,6 +10,13 @@ import {
   newItem,
   parseEntry,
   stockStatus,
+  stockPercentage,
+  formatStockPercentage,
+  recordStockTransitions,
+  plannedIngredientShortages,
+  restockStock,
+  undoRestockStock,
+  setShoppingCompleted,
   convert,
   addItems,
   addShopping,
@@ -137,15 +144,12 @@ test('negative balances migrate once to available zero and preserve shortage', (
   assert.equal(normalizeGroceryState(migrated).migrations.negativeStockV1Count, 1);
 });
 
-test('item thresholds are opt-in and status uses the shared resolver', () => {
-  const item = newItem('Chicken', 200, 'g');
-  assert.equal(stockStatus(item), 'In stock');
-  item.thresholdEnabled = true; item.threshold = 300;
+test('low stock percentage uses the baseline and configured default threshold', () => {
+  const item = { ...newItem('Chicken', 200, 'g'), stockBaseline: { quantity: 1000, unit: 'g' } };
   assert.equal(stockStatus(item), 'Low stock');
   item.quantity = 0;
   assert.equal(stockStatus(item), 'Out of stock');
 });
-
 test('grocery integrity check rejects negative availability, invalid shortage and duplicate canonical rows', () => {
   const state = { items: [{ id: 'a', name: 'A', quantity: -1, shortage: -2, foodId: 'food' }, { id: 'b', name: 'B', quantity: 0, shortage: 0, foodId: 'food' }], stockAlerts: [] };
   assert.equal(checkGroceryIntegrity(state).length, 3);
@@ -299,4 +303,97 @@ test("nutrition survives additions, shopping merges, recipes and purchases", () 
   const merged = addItems({ ...state, items: [newItem("Rice", 0, "kg")] }, [item]);
   assert.deepEqual(merged.items[0].nutrition, item.nutrition);
   assert.equal(state.items.length, 0);
+});
+
+test('stock percentage boundaries, unknown legacy baselines, and saved defaults', () => {
+  const baseline = { quantity: 100, unit: 'g' };
+  for (const [quantity, expected] of [[46, 'In stock'], [45, 'In stock'], [44.9, 'Low stock'], [0.01, 'Low stock'], [0, 'Out of stock']]) {
+    const item = { ...newItem('Rice', quantity, 'g'), stockBaseline: baseline };
+    assert.equal(stockStatus(item, 45), expected);
+  }
+  assert.equal(formatStockPercentage(stockPercentage({ quantity: 44.999, unit: 'g', stockBaseline: baseline }), 45), '44.999');
+  assert.equal(stockStatus({ ...newItem('Legacy', 10, 'g') }, 45), 'Unknown');
+  assert.deepEqual(normalizeGroceryState({ settings: { showStockPercentage: true, lowStockThresholdPercent: 30 } }).settings, { currency: 'GBP', autoImages: false, expiryReminders: true, imageLimit: 0, lowStockThresholdPercent: 30, showStockPercentage: true });
+  assert.equal(normalizeGroceryState({ settings: { currency: 'EUR' } }).settings.lowStockThresholdPercent, 45);
+});
+
+test('threshold edits alert on entry, recover without an alert, and can alert on a later drop', () => {
+  const item = { ...newItem('Milk', 46, 'ml'), stockBaseline: { quantity: 100, unit: 'ml' } };
+  const before = { ...initialState(), items: [item] };
+  const low = recordStockTransitions(before, { ...structuredClone(before), settings: { ...before.settings, lowStockThresholdPercent: 50 } }, { at: 1 });
+  assert.equal(low.stockAlerts.filter(alert => alert.itemIds.includes(item.id)).length, 1);
+  const recovered = recordStockTransitions(low, { ...structuredClone(low), settings: { ...low.settings, lowStockThresholdPercent: 40 } }, { at: 2 });
+  assert.equal(recovered.stockAlerts.length, 1);
+  const dropped = structuredClone(recovered); dropped.items[0].quantity = 39;
+  recordStockTransitions(recovered, dropped, { at: 3 });
+  assert.equal(dropped.stockAlerts.length, 2);
+});
+
+test('planned meal shortages combine, subtract pantry stock once, and retain unresolved items', () => {
+  const rice = { ...newItem('Rice', 300, 'g'), id: 'rice-stock', foodId: 'rice-food' };
+  const state = { ...initialState(), items: [rice], shopping: [] };
+  const recipes = [
+    { slug: 'one', title: 'Rice bowl', ingredients: [{ id: 'rice', foodId: 'rice-food', name: 'Rice', amount: 250, unit: 'g' }, { name: 'Unknown spice', amount: null, unit: 'g' }] },
+    { slug: 'two', title: 'Second bowl', ingredients: [{ id: 'rice2', foodId: 'rice-food', name: 'Rice', amount: 250, unit: 'g' }, { name: 'Milk', amount: 500, unit: 'ml' }] },
+  ];
+  const rows = plannedIngredientShortages([{ id: 'm1', slug: 'one', meal: 'Lunch', portions: 1 }, { id: 'm2', slug: 'two', meal: 'Dinner', portions: 1 }], recipes, state);
+  assert.equal(rows.find(row => row.name === 'Rice').required, 500);
+  assert.equal(rows.find(row => row.name === 'Rice').available, 300);
+  assert.equal(rows.find(row => row.name === 'Rice').shortage, 200);
+  assert.equal(rows.find(row => row.name === 'Milk').shortage, 500);
+  assert.equal(rows.find(row => row.name === 'Unknown spice').shortage, null);
+  assert.equal(plannedIngredientShortages([{ id: 'm2', slug: 'two', meal: 'Dinner', portions: 2 }], recipes, state).find(row => row.name === 'Rice').shortage, 200);
+  const incompatible = plannedIngredientShortages([{ id: 'm3', slug: 'bad', meal: 'Dinner', portions: 1 }], [{ slug: 'bad', ingredients: [{ name: 'Rice', amount: 1, unit: 'L' }] }], state);
+  assert.equal(incompatible[0].issue, 'Incompatible units');
+  const unknownStock = plannedIngredientShortages([{ id: 'm1', slug: 'one', meal: 'Lunch', portions: 1 }], recipes, { ...state, items: [{ ...rice, quantity: null }] }).find(row => row.name === 'Rice');
+  assert.equal(unknownStock.shortage, null);
+  assert.match(unknownStock.issue, /Available pantry quantity/);
+  const incompatibleList = plannedIngredientShortages([{ id: 'm1', slug: 'one', meal: 'Lunch', portions: 1 }], recipes, { ...state, shopping: [{ ...newItem('Rice', 1, 'packs'), id: 'rice-list' }] }).find(row => row.name === 'Rice');
+  assert.equal(incompatibleList.issue, 'Incompatible shopping-list unit');
+  assert.equal(incompatibleList.listedUnit, 'packs');
+});
+
+test('quick restock and its specific undo preserve later item changes and apply once', () => {
+  const item = { ...newItem('Milk', 300, 'ml'), id: 'milk-stock', stockBaseline: { quantity: 1000, unit: 'ml' } };
+  const state = { ...initialState(), items: [item] };
+  const restocked = restockStock(state, item.id, 1, 'L', null, 'restock-1');
+  restocked.items[0].quantity -= 100;
+  restocked.items.push(newItem('Bread', 1, 'pieces'));
+  const undone = undoRestockStock(restocked, 'restock-1');
+  assert.equal(undone.items[0].quantity, 200);
+  assert.equal(undone.items[1].name, 'Bread');
+  assert.throws(() => undoRestockStock(undone, 'restock-1'), /already undone/);
+});
+test('quick restock converts compatible units and specific undo preserves list edits and later stock changes', () => {
+  const item = { ...newItem('Milk', 300, 'ml'), id: 'milk-stock', stockBaseline: { quantity: 1000, unit: 'ml' } };
+  const listEntry = { id: 'milk-list', name: 'Milk', quantity: 1, unit: 'L', checked: true };
+  const state = { ...initialState(), items: [item], shopping: [listEntry] };
+  const restocked = restockStock(state, item.id, 1, 'L', null, 'restock-1', listEntry.id);
+  assert.equal(restocked.items[0].quantity, 1300);
+  assert.equal(restocked.shopping.length, 0);
+  restocked.items[0].quantity += 100;
+  restocked.items.push(newItem('Bread', 1, 'pieces'));
+  const undone = undoRestockStock(restocked, 'restock-1');
+  assert.equal(undone.items[0].quantity, 400);
+  assert.equal(undone.items[1].name, 'Bread');
+  assert.deepEqual(undone.shopping, [listEntry]);
+  assert.throws(() => undoRestockStock(undone, 'restock-1'), /already undone/);
+});
+test('shopping restock converts the selected compatible purchase unit and reuses canonical links', () => {
+  const milk = { ...newItem('Store milk', 300, 'ml'), id: 'milk-pantry', foodId: 'milk-food', stockBaseline: { quantity: 1000, unit: 'ml' } };
+  const listEntry = { id: 'milk-list', name: 'Milk', foodId: 'milk-food', quantity: 1, unit: 'L', checked: false };
+  const state = { ...initialState(), items: [milk], shopping: [listEntry] };
+  const result = purchase(state, [{ id: listEntry.id, quantity: 1, purchaseUnit: 'L' }]);
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].quantity, 1300);
+  assert.equal(result.shopping.length, 0);
+});
+test('marking a shopping item complete does not change pantry stock', () => {
+  const item = { ...newItem('Milk', 300, 'ml'), id: 'milk-stock' };
+  const entry = { id: 'milk-list', name: 'Milk', quantity: 1, unit: 'L' };
+  const state = { ...initialState(), items: [item], shopping: [entry] };
+  const completed = setShoppingCompleted(state, entry.id, true);
+  assert.equal(completed.items[0].quantity, 300);
+  assert.equal(completed.shopping[0].checked, true);
+  assert.equal(state.shopping[0].checked, undefined);
 });

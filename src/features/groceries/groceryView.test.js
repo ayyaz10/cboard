@@ -1,12 +1,12 @@
-﻿import test from 'node:test';
+import test from 'node:test';
 import assert from 'node:assert/strict';
 import { filterGroceryItems, isGroceryCategoryExpanded, summarizeCategoryStock } from './groceryView.js';
 
 const items = [
   { id: 'milk', name: 'Milk', category: 'Dairy', quantity: 0, threshold: 1, recipeRefs: [{ title: 'Oats' }] },
-  { id: 'apple', name: 'Apple', category: 'Fruit', quantity: 2, threshold: 3, tags: ['snack'] },
+  { id: 'apple', name: 'Apple', category: 'Fruit', quantity: 2, stockBaseline: { quantity: 5, unit: 'g' }, threshold: 3, unit: 'g', tags: ['snack'] },
   { id: 'rice', name: 'Rice', category: 'Grains', quantity: null },
-  { id: 'tea', name: 'Tea', category: 'Pantry', brand: 'North Star', quantity: 4 },
+  { id: 'tea', name: 'Tea', category: 'Pantry', brand: 'North Star', quantity: 4, stockBaseline: { quantity: 4, unit: 'g' }, unit: 'g' },
 ];
 
 test('grocery search includes category, brand, tags, and recipe usage', () => {
@@ -48,4 +48,16 @@ test('shopping filter matches compatible canonical inventory entries', () => {
   const inventory = [{ id: 'inventory-milk', name: 'Milk', category: 'Dairy', quantity: 1, unit: 'L' }, ...items.filter(item => item.id !== 'milk')];
   assert.deepEqual(filterGroceryItems(inventory, { shoppingFilter: 'on', shopping: compatible }).map(item => item.id), ['inventory-milk']);
   assert.ok(filterGroceryItems(inventory, { shoppingFilter: 'off', shopping: compatible }).every(item => item.id !== 'inventory-milk'));
+});
+
+test('percentage stock filters combine with search and category and sort low items first', () => {
+  const rows = [
+    { id: 'low-1', name: 'Rice', category: 'Grains', quantity: 20, unit: 'g', stockBaseline: { quantity: 100, unit: 'g' } },
+    { id: 'low-2', name: 'Rice flour', category: 'Baking', quantity: 10, unit: 'g', stockBaseline: { quantity: 100, unit: 'g' } },
+    { id: 'out', name: 'Rice milk', category: 'Dairy', quantity: 0, unit: 'ml' },
+    { id: 'healthy', name: 'Oats', category: 'Grains', quantity: 45, unit: 'g', stockBaseline: { quantity: 100, unit: 'g' } },
+  ];
+  assert.deepEqual(filterGroceryItems(rows, { status: 'Low stock', sort: 'lowest' }).map(item => item.id), ['low-2', 'low-1']);
+  assert.deepEqual(filterGroceryItems(rows, { status: 'Low stock', category: 'Baking', query: 'rice' }).map(item => item.id), ['low-2']);
+  assert.deepEqual(filterGroceryItems(rows, { status: 'Out of stock' }).map(item => item.id), ['out']);
 });

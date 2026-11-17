@@ -17,6 +17,8 @@ import {
 import { MealRoutine } from './MealRoutine';
 import { QuickRoutines } from './QuickRoutines';
 import { ingredientRecipeCalculation, recipeProductCalculation } from './ingredientNutrition.js';
+import { loadGroceries, saveGroceries } from '../../services/groceryService.js';
+import { addShopping, newItem, plannedIngredientShortages } from '../groceries/groceryData.js';
 
 const STORAGE_KEY = 'recipes:daily-plan:v1';
 const units = {
@@ -29,7 +31,7 @@ const units = {
 const format = (value) =>
   new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(value);
 
-export function DailyMealPlanner({ recipes, nutritionGoals }) {
+export function DailyMealPlanner({ recipes, nutritionGoals, foodCatalog = [] }) {
   const requestedDate = new URLSearchParams(window.location.search).get('date') || '';
   const [planDate, setPlanDate] = useState(() => /^\d{4}-\d{2}-\d{2}$/.test(requestedDate) ? requestedDate : '');
   const [entries, setEntries] = useState(emptyMealPlan);
@@ -46,6 +48,11 @@ export function DailyMealPlanner({ recipes, nutritionGoals }) {
   const [routinesOpen, setRoutinesOpen] = useState(() =>
     typeof window === 'undefined' || !window.matchMedia('(max-width: 47.99rem)').matches,
   );
+  const [review, setReview] = useState(null);
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const [reviewError, setReviewError] = useState('');
+  const [reviewMessage, setReviewMessage] = useState('');
+  const [reviewSelection, setReviewSelection] = useState({});
   const [totalsOpen, setTotalsOpen] = useState(() =>
     typeof window === 'undefined' || !window.matchMedia('(max-width: 47.99rem)').matches,
   );
@@ -126,6 +133,34 @@ export function DailyMealPlanner({ recipes, nutritionGoals }) {
       setBusy(false);
     }
   }
+  async function openMissingIngredients() {
+    setReviewError('');
+    try {
+      const groceries = await loadGroceries();
+      const rows = plannedIngredientShortages(entries, recipes, groceries.state, foodCatalog);
+      setReview({ groceries, rows, entries: entries.filter(entry => entry.slug), selectedMealIds: entries.filter(entry => entry.slug).map(entry => entry.id) });
+      setReviewSelection(Object.fromEntries(rows.map(row => [row.key, row.shortage > 0 && !row.issue && !row.listedId])));
+    } catch (error) { setReviewError(error.message || 'Could not prepare ingredient review.'); }
+  }
+  async function confirmMissingIngredients() {
+    if (!review || reviewBusy) return;
+    setReviewBusy(true); setReviewError('');
+    try {
+      const current = await loadGroceries();
+      if (current.userId !== review.groceries.userId || current.version !== review.groceries.version) throw new Error('Your Grocery list changed during review. Reopen the ingredient review before saving.');
+      let state = structuredClone(current.state);
+      for (const row of review.rows) {
+        if (!reviewSelection[row.key] || !(row.shortage > 0) || row.issue) continue;
+        const source = state.items.find(item => item.id === row.itemId) || newItem(row.name, row.shortage, row.unit, row.category);
+        if (row.foodId) source.foodId = row.foodId;
+        state.shopping = addShopping(state.shopping, source, row.shortage, true);
+      }
+      await saveGroceries(state, current.version, current.userId);
+      setReview(null);
+      setReviewMessage('Missing ingredients added to the Shopping List. Pantry stock was not changed.');
+    } catch (error) { setReviewError(error.message || 'Could not update the Shopping List.'); }
+    finally { setReviewBusy(false); }
+  }
   const { meals, totals } = calculateMealPlan(entries, recipes);
   return (
     <div className="daily-meal-planner space-y-5">
@@ -135,11 +170,21 @@ export function DailyMealPlanner({ recipes, nutritionGoals }) {
         <label className="inline-flex items-center gap-2 text-sm font-semibold">Plan for a date<input type="date" value={planDate || requestedDate} onChange={event => { const next = event.target.value; if (next) { navigateTo(`/recipes/planner/day?date=${encodeURIComponent(next)}`); setPlanDate(next); } }} /></label>
         {planDate && <button type="button" className={secondaryButton} onClick={() => { setPlanDate(''); navigateTo('/recipes/planner/day'); }}>Everyday routine</button>}
         <RecipeLink to="/food-diary">Food diary · log meals & view history</RecipeLink>
+        <button type="button" className={secondaryButton} disabled={loading || busy || !entries.some(entry => entry.slug)} onClick={openMissingIngredients}>Add missing ingredients</button>
+        {reviewError && !review && <p role="alert">{reviewError}</p>}
+        {reviewMessage && <p role="status">{reviewMessage} <RecipeLink to="/groceries">Open Grocery</RecipeLink></p>}
         <p className="leading-7 text-[var(--color-text-secondary)]">
           Choose your meals to see what you’ll eat and the combined calories,
           protein, carbs, fat and fibre.
         </p>
       </header>
+      {review && <section className="panel space-y-4 rounded-2xl p-4" aria-label="Review missing ingredients">
+        <div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="text-xl font-bold">Add missing ingredients</h2><p className="text-sm text-[var(--color-text-secondary)]">Requirements are combined across selected meals. Pantry stock is subtracted once; confirming changes only the Shopping List.</p></div><button type="button" className={secondaryButton} onClick={() => setReview(null)}>Close</button></div>
+        {reviewError && <p role="alert">{reviewError}</p>}
+        <fieldset className="space-y-2"><legend className="font-semibold">Meals included</legend>{review.entries.map(entry => <label key={entry.id} className="flex items-center gap-2"><input type="checkbox" checked={review.selectedMealIds.includes(entry.id)} onChange={event => { const selectedMealIds = event.target.checked ? [...review.selectedMealIds, entry.id] : review.selectedMealIds.filter(id => id !== entry.id); const selectedEntries = review.entries.filter(candidate => selectedMealIds.includes(candidate.id)); const rows = plannedIngredientShortages(selectedEntries, recipes, review.groceries.state, foodCatalog); setReview(current => ({ ...current, rows, selectedMealIds })); setReviewSelection(Object.fromEntries(rows.map(row => [row.key, row.shortage > 0 && !row.issue && !row.listedId]))); }} /><span>{entry.meal} · {recipes.find(recipe => recipe.slug === entry.slug)?.title || entry.slug} · {entry.portions}×</span></label>)}</fieldset><div className="space-y-3">{review.rows.map(row => <label key={row.key} className="block rounded-xl border border-[var(--border-default)] p-3"><span className="flex items-start gap-3"><input type="checkbox" disabled={Boolean(row.issue) || !(row.shortage > 0) || reviewBusy} checked={Boolean(reviewSelection[row.key])} onChange={event => setReviewSelection(current => ({ ...current, [row.key]: event.target.checked }))} /><span className="min-w-0 flex-1"><strong className="block break-words">{row.name}</strong><small className="block text-[var(--color-text-secondary)]">Needed for {row.meals.join(', ')} · Needed {row.required ?? 'unknown'} {row.unit} · Available {row.available ?? "unknown"} {row.unit} · Shortage {row.shortage ?? 'review required'}{row.listedId ? ` · On list ${row.listedQuantity} ${row.listedUnit || row.unit}${row.listGap > 0 ? ` · gap ${row.listGap} ${row.unit}; select to update` : ' · covers shortage'}` : ''}</small>{row.issue && <small className="block text-[var(--color-warning)]">{row.issue}; resolve the ingredient or unit before adding.</small>}</span></span></label>)}</div>
+        {!review.rows.length && <p>No ingredients need adding for the selected meals.</p>}
+        <button type="button" className={secondaryButton} disabled={reviewBusy || !Object.values(reviewSelection).some(Boolean)} onClick={confirmMissingIngredients}>{reviewBusy ? 'Saving…' : 'Add selected to Shopping List'}</button>
+      </section>}
       {loading ? (
         <p role="status">Loading your meal plan…</p>
       ) : loadError ? (
