@@ -134,3 +134,10 @@ test('category totals follow ledger edits and reclassification without stored ag
   assert.deepEqual(after.categories.map(row => [row.id, row.amount]), [['eating-out', 4000]]);
   assert.equal(after.total, 4000);
 });
+
+test('itemised purchase totals are allocated to item categories once in reports', () => {
+  const report=expenseCategoryReport(expenseReportState([{id:'aldi',type:'expense',title:'Aldi',categoryId:'groceries',amount:1000,date:'2026-10-12',purchaseItems:[{name:'Greek yogurt',categoryId:'eating-out',lineTotal:350},{name:'Frozen berries',categoryId:'eating-out',lineTotal:250},{name:'Bread',categoryId:'groceries',lineTotal:150},{name:'Eggs',categoryId:'groceries',lineTotal:250}]}]),{mode:'month',month:'2026-10'});
+  assert.equal(report.total,1000);
+  assert.deepEqual(report.categories.map(({id,amount})=>[id,amount]),[['eating-out',600],['groceries',400]]);
+  assert.equal(report.categories.reduce((sum,row)=>sum+row.amount,0),1000);
+});

@@ -81,7 +81,7 @@ export function filterTransactions(transactions, { month, from = '', to = '', qu
         && (!amountQuery.direction || getTransactionAmountPresentation(item).prefix === amountQuery.direction)
       : transactionSearchText(item, { categories, donationCategories, linkedNames: linkedNamesById[item.id] || [] }).includes(normalizedQuery)))
     && (type === 'all' || item.type === type)
-    && (category === 'all' || (category === 'uncategorized' ? !item.categoryId : item.categoryId === category))
+    && (category === 'all' || (category === 'uncategorized' ? !item.categoryId : item.categoryId === category || item.purchaseItems?.some(purchaseItem => purchaseItem.categoryId === category)))
     && (source === 'all' || item.paidFromFundId === source || item.paymentMethod === source)
     && (linkedType === 'all' || (linkedType === 'donation' ? item.type === 'donation' || item.financeGroup === 'donation' || Boolean(item.donationCategoryId) : linkedType === 'fund' ? ['savings', 'goal', 'budget', 'investment', 'transfer'].includes(item.type) : linkedType === 'debt' ? item.type === 'debt' : linkedType === 'credit' ? item.type === 'creditPayment' : false))
     && (minAmount === '' || item.amount >= minAmount)

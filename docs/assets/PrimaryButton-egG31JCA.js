@@ -1,0 +1,1 @@
+import{j as s,as as n}from"./index-BtFQFTdm.js";function m({children:t,type:r="button",className:a="",...o}){return s.jsx(n,{type:r,...o,variant:"primary",className:`primary-button w-full sm:w-auto ${a}`,children:t})}export{m as P};

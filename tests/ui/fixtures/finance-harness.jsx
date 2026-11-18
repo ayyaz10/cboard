@@ -20,7 +20,7 @@ import { reclassifySavedTransactionState } from '../../../src/features/finance/t
 function makeState() {
   const state = initialFinanceState();
   state.settings.configured = true;
-  state.categories = defaultCategories.filter(item => item.type === 'expense' || item.type === 'income');
+  state.categories = [...defaultCategories.filter(item => item.type === 'expense' || item.type === 'income'), { id:'weight-loss', name:'Weight Loss', type:'expense', color:'#a8d5ff' }];
   state.financePeople = [{ id: 'person-ahmed', name: 'Ahmed', archived: false }, { id: 'person-klarna', name: 'Klarna', archived: false }];
   state.accounts = [{ id: 'account-current', name: 'Current Account', type: 'bank', openingBalance: 100000, archivedAt: '' }, { id: 'account-savings', name: 'Savings', type: 'savings', openingBalance: 0, archivedAt: '' }];
   state.creditCards = [{ id: 'card-main', name: 'My Credit Card', openingLiability: 0, archivedAt: '' }];

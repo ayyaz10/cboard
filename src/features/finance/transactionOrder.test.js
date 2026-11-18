@@ -32,6 +32,12 @@ test('category, month and title filters produce the correct selected spending', 
   assert.equal(filterTransactions(rows,{month:'2026-09',category:'fitness',query:'shoes'}).length,1);
 });
 
+test('category filters include an itemised purchase assigned to that item category', () => {
+  const purchase={id:'aldi',date:'2026-11-17',type:'expense',amount:1000,categoryId:'groceries',purchaseItems:[{categoryId:'weight-loss',lineTotal:600},{categoryId:'groceries',lineTotal:400}]};
+  assert.deepEqual(filterTransactions([purchase],{category:'weight-loss'}).map(row=>row.id),['aldi']);
+  assert.deepEqual(filterTransactions([purchase],{category:'groceries'}).map(row=>row.id),['aldi']);
+});
+
 test('all-month history includes previous years while retaining search and category filters', () => {
   const rows=[
     {id:'old',date:'2025-12-31',type:'expense',title:'Gym membership',categoryId:'fitness'},

@@ -176,7 +176,7 @@ export function ReceiptEditor({ receipt, onChange, onExtract, total, currency, o
   </section>;
 }
 
-export function ReceiptItems({ receipt, currency }) {
+export function ReceiptItems({ receipt, currency, purchaseItems=[], categories=[] }) {
   if (!receipt) return null;
   const money = value => value == null ? 'Unknown' : formatMoney(value,receipt.currency || currency);
   return <details className="f-receipt-saved"><summary>Items ({receipt.items?.length || 0})</summary>

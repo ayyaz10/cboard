@@ -107,10 +107,13 @@ export function expenseCategoryReport(state, { mode = 'month', month = monthKey(
     return row;
   };
   for (const transaction of transactions) {
-    const row = rowFor(transaction);
-    row.amount += transaction.amount;
-    row.transactions.push(transaction);
-    total += transaction.amount;
+    const allocations = transaction.purchaseItems?.length ? transaction.purchaseItems.map(item => ({ categoryId:item.categoryId || '', amount:Number(item.lineTotal || 0) })) : [{ categoryId:transaction.categoryId || '', amount:transaction.amount }];
+    for (const allocation of allocations) {
+      const row = rowFor({ ...transaction, categoryId:allocation.categoryId });
+      row.amount += allocation.amount;
+      if (!row.transactions.includes(transaction)) row.transactions.push(transaction);
+      total += allocation.amount;
+    }
   }
   for (const refund of refunds) {
     const original = (state.transactions || []).find(item => item.id === refund.originalTransactionId);
