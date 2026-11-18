@@ -3,6 +3,7 @@ import { recipeUpdateRows, suggestedDiaryRecipe } from './diaryRecipeUpdate.js';
 
 export function DiaryRecipeConfirm({ meal, initial, recipes, busy, error, diarySaved, recipeSaved, onSave, onClose }) {
   const dialog = useRef(null);
+  const backdropPointerDown = useRef(null);
   const [slug, setSlug] = useState(() => suggestedDiaryRecipe(meal, recipes));
   const recipe = recipes.find(recipe => recipe.slug === slug);
   const [rows, setRows] = useState(() => recipeUpdateRows(meal, recipe, initial));
@@ -12,7 +13,15 @@ export function DiaryRecipeConfirm({ meal, initial, recipes, busy, error, diaryS
   const [servings, setServings] = useState(1);
   const [steps, setSteps] = useState('');
   useEffect(() => { dialog.current.showModal(); }, []);
-  return <dialog ref={dialog} className="g-dialog groceries diary-recipe-confirm" onCancel={event => { event.preventDefault(); if (!busy) onClose(); }} onClick={event => { if (event.target === dialog.current && !busy) onClose(); }}>
+  return <dialog ref={dialog} className="g-dialog groceries diary-recipe-confirm" onCancel={event => { event.preventDefault(); if (!busy) onClose(); }} onPointerDown={event => {
+    const rect = dialog.current?.getBoundingClientRect();
+    const onBackdrop = Boolean(rect && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom));
+    backdropPointerDown.current = event.isPrimary && event.button === 0 && onBackdrop ? event.pointerId : null;
+  }} onPointerCancel={() => { backdropPointerDown.current = null; }} onClick={event => {
+    const startedOnBackdrop = event.nativeEvent.pointerId === backdropPointerDown.current;
+    backdropPointerDown.current = null;
+    if (event.target === dialog.current && startedOnBackdrop && !busy) onClose();
+  }}>
     <div className="g-between"><h2>Save this meal to Recipes?</h2><button type="button" aria-label="Close popup" disabled={busy} onClick={onClose}>×</button></div>
     <p>Your diary can be saved on its own. To change a recipe, choose it below and select the foods to add or update.</p>
     {diarySaved && <p role="status">Your diary meal is saved.{recipeSaved ? ' The recipe is also saved.' : ''}</p>}
