@@ -21,7 +21,7 @@ export function ReminderHistory() {
           </select>
         </label>
       </div>
-      <p className="mt-2 text-xs leading-5 text-[var(--color-text-muted)]">Your reminder activity, newest first. History stays here after a reminder ends and is saved on this browser.</p>
+      <p className="mt-2 text-xs leading-5 text-[var(--color-text-muted)]">Your reminder activity, newest first. Signed-in history syncs across devices; guest history stays on this browser.</p>
       {filtered.length === 0 ? <p className="ui-card mt-3 border-dashed p-4 text-sm text-[var(--color-text-muted)]">No history yet. Set a reminder to start your history.</p> : (
         <ol className="mt-4 max-h-96 space-y-3 overflow-y-auto p-1">
           {filtered.slice(0, visibleCount).map((event) => (

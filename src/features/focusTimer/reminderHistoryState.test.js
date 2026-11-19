@@ -60,3 +60,32 @@ test('delayed ticks record one actual alert with its original scheduled time', (
   assert.equal(state.history[0].dueAt, 60_000);
   assert.equal(state.reminders[0].dueAt, 660_000);
 });
+
+test('a delayed refresh cannot replace a newer revision or resurrect a cancelled reminder', () => {
+  const newer = { ...reminder(), dueAt: 500_000, revision: 3 };
+  const state = { reminders: [newer], history: [] };
+  const refreshed = { ...reminder(), revision: 2 };
+  const merged = reminderReducer(state, { type: 'replaceAll', reminders: [refreshed], history: [] });
+  assert.equal(merged.reminders[0].dueAt, newer.dueAt);
+
+  const cancelled = { id: 'r1:cancelled:70000:60000', reminderId: 'r1', title: 'Stretch',
+    type: 'cancelled', at: 70_000, dueAt: 60_000, repeatMs: 0, durationMs: 60_000 };
+  const afterCancel = reminderReducer({ reminders: [{ ...reminder(), revision: 2, updatedAt: '1970-01-01T00:00:50.000Z' }], history: [cancelled] }, {
+    type: 'replaceAll', reminders: [{ ...reminder(), revision: 2, updatedAt: '1970-01-01T00:00:50.000Z' }], history: [],
+  });
+  assert.equal(afterCancel.reminders.length, 0);
+});
+
+test('shared reminder updates deduplicate their history by stable event key', () => {
+  const event = { id: 'r1:cancelled:10:60000', reminderId: 'r1', type: 'cancelled', at: 10, dueAt: 60_000, title: 'Stretch', repeatMs: 0 };
+  const state = { reminders: [reminder()], history: [event] };
+  const next = reminderReducer(state, { type: 'syncReminder', reminder: { ...reminder(), completedAt: 11, revision: 2 }, events: [event] });
+  assert.equal(next.reminders.length, 0);
+  assert.equal(next.history.length, 1);
+});
+test('signed-in action history retains its server revision for safe retry', () => {
+  const state = { reminders: [{ ...reminder(), status: 'ringing', revision: 8 }], history: [] };
+  const snoozed = reminderReducer(state, { type: 'snooze', id: 'r1', now: 10_000, expectedRevision: 8 });
+  assert.equal(snoozed.history[0].expectedRevision, 8);
+  assert.equal(snoozed.reminders[0].dueAt, 310_000);
+});

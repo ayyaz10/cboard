@@ -9,7 +9,7 @@ const buttonClass = 'ui-button ui-button--sm';
 const inputClass = 'ui-control mt-2';
 
 export function RemindersPanel() {
-  const { reminders, now, addReminder, cancel, prepareSound, playSound, storageError } = useReminders();
+  const { reminders, now, addReminder, cancel, prepareSound, playSound, storageError, syncError, cloudReady, signedIn } = useReminders();
   const [repeats, setRepeats] = useState(false);
   const [title, setTitle] = useState('');
   const [hours, setHours] = useState('0');
@@ -116,13 +116,14 @@ export function RemindersPanel() {
       }} />
       <ReminderHistory />
       <div className="mt-5 border-t border-[var(--color-border)] pt-4">
-        <p className="text-xs font-medium leading-5 text-[var(--color-text-muted)]">Saved for your account on this browser. Keep the app open for alerts; sleeping devices or suspended tabs may delay them. After a refresh, use Test sound to enable audio again.</p>
+        <p className="text-xs font-medium leading-5 text-[var(--color-text-muted)]">{signedIn ? "Signed-in reminders sync to your account. Open screens update live; opening or returning to the screen triggers a fresh sync." : "Guest reminders stay in this session and do not sync. Sign in to share reminders across devices."} Keep the app open for alerts; sleeping devices or suspended tabs may delay them. After a refresh, use Test sound to enable audio again.</p>
         <div className="mt-3 flex flex-wrap gap-2">
           <button type="button" onClick={() => { prepareSound(); window.setTimeout(playSound, 150); }} className={buttonClass}>Test sound</button>
           {'Notification' in window && <button type="button" onClick={enableNotifications} className={buttonClass}>Enable notifications</button>}
         </div>
         <p role="status" className="mt-2 text-xs font-semibold">{notificationMessage}</p>
-        {storageError && <p role="alert" className="ui-badge ui-badge--danger mt-2 text-sm">{storageError}</p>}
+        {signedIn && !cloudReady && <p role="status" className="mt-2 text-xs font-semibold">Connecting reminders to your account...</p>}
+        {(syncError || storageError) && <p role="alert" className="ui-badge ui-badge--danger mt-2 text-sm">{syncError || storageError}</p>}
       </div>
     </section>
   );

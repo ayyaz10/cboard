@@ -17,6 +17,13 @@ import {
 } from './reminderHelpers';
 import { readReminderState, reminderReducer } from './reminderHistoryState.js';
 import { availableReminderPresets, readReminderPresets } from './reminderPresetData.js';
+import { isReminderDue } from './reminderHelpers.js';
+import { eventFor } from './reminderHistoryState.js';
+import {
+  applyFocusTimerReminderAction, beginFocusTimerOccurrence, createReminderId,
+  importFocusTimerHistory, importFocusTimerReminder, listFocusTimerHistory,
+  listFocusTimerReminders, subscribeFocusTimerReminders,
+} from '../../services/focusReminderSync.js';
 
 const ReminderContext = createContext(null);
 export const useReminders = () => useContext(ReminderContext);
@@ -30,6 +37,8 @@ export function ReminderStore({ userId, children }) {
   const route = useRoute();
   const storageKey = `cboard:reminders:${userId}`;
   const [storageError, setStorageError] = useState('');
+  const [syncError, setSyncError] = useState('');
+  const [cloudReady, setCloudReady] = useState(!userId);
   const [state, dispatch] = useReducer(reminderReducer, null, () => {
     try { return readReminderState(userId ? localStorage.getItem(storageKey) : null, Date.now()); }
     catch { return { reminders: [], history: [] }; }
@@ -54,6 +63,14 @@ export function ReminderStore({ userId, children }) {
   const reminderToggleRef = useRef(null);
   const reminderCloseRef = useRef(null);
   const focusRestoreRef = useRef(null);
+  const stateRef = useRef(state);
+  const cloudReadyRef = useRef(!userId);
+  const refreshFlightRef = useRef(null);
+  const historyKeysRef = useRef(new Set());
+  const syncingIdsRef = useRef(new Set());
+  const beginningRef = useRef(new Set());
+  stateRef.current = state;
+  cloudReadyRef.current = cloudReady;
 
   useEffect(() => {
     if (!userId) return;
@@ -64,13 +81,214 @@ export function ReminderStore({ userId, children }) {
       setStorageError('This browser could not save reminders and history. Keep this page open; refreshing may lose the latest changes.');
     }
   }, [state, storageKey, userId]);
+  const importAndReconcile = useCallback(async (item) => {
+    let saved = await importFocusTimerReminder(item);
+    const latest = stateRef.current;
+    const current = latest.reminders.find(entry => entry.id === item.id);
+    const terminal = latest.history.filter(event => event.reminderId === item.id
+      && (['cancelled', 'stopped'].includes(event.type) || (event.type === 'dismissed' && !event.repeatMs)))
+      .sort((left, right) => right.at - left.at)[0];
+    if (terminal && !current && !saved.completedAt) {
+      const action = terminal.type === 'dismissed' ? 'dismiss' : 'cancel';
+      const result = await applyFocusTimerReminderAction(item.id, action, terminal.expectedRevision || saved.revision, terminal.id);
+      if (result.applied) historyKeysRef.current.add(terminal.id);
+      else if (!result.reminder.completedAt) {
+        dispatch({ type: 'removeHistoryEvent', id: terminal.id });
+        throw new Error('A reminder changed on another device. The latest saved state will load on retry.');
+      }
+      saved = result.reminder;
+    } else if (current && current.dueAt !== item.dueAt && item.status === 'ringing'
+      && current.status === 'waiting' && !saved.completedAt) {
+      const snooze = latest.history.filter(event => event.reminderId === item.id && event.type === 'snoozed')
+        .sort((left, right) => right.at - left.at)[0];
+      if (snooze) {
+        const result = await applyFocusTimerReminderAction(item.id, 'snooze', snooze.expectedRevision || saved.revision, snooze.id);
+        if (result.applied) historyKeysRef.current.add(snooze.id);
+        else {
+          dispatch({ type: 'removeHistoryEvent', id: snooze.id });
+          throw new Error('A snooze conflicted with a newer reminder change. The latest saved due time will load on retry.');
+        }
+        saved = result.reminder;
+      }
+    }
+    return saved;
+  }, []);
+  const refreshCloud = useCallback(() => {
+    if (!userId) return Promise.resolve();
+    if (refreshFlightRef.current) return refreshFlightRef.current;
+    const request = (async () => {
+      try {
+        const local = stateRef.current;
+        const imported = [];
+        for (const item of local.reminders) imported.push(item.revision ? item : await importAndReconcile(item));
+
+        const [listedReminders, remoteHistory] = await Promise.all([
+          listFocusTimerReminders(), listFocusTimerHistory(),
+        ]);
+        const remoteReminders = [...listedReminders];
+        const latestLocal = stateRef.current;
+        let reconciliationError = false;
+        for (let index = 0; index < remoteReminders.length; index += 1) {
+          const saved = remoteReminders[index];
+          const current = latestLocal.reminders.find(item => item.id === saved.id);
+          const terminal = latestLocal.history.filter(event => event.reminderId === saved.id
+            && (['cancelled', 'stopped'].includes(event.type) || (event.type === 'dismissed' && !event.repeatMs)))
+            .sort((left, right) => right.at - left.at)[0];
+          if (!terminal || current || saved.completedAt) continue;
+          const action = terminal.type === 'dismissed' ? 'dismiss' : 'cancel';
+          const result = await applyFocusTimerReminderAction(saved.id, action, terminal.expectedRevision || saved.revision, terminal.id);
+          remoteReminders[index] = result.reminder;
+          if (!result.applied && !result.reminder.completedAt) {
+            dispatch({ type: 'removeHistoryEvent', id: terminal.id });
+            reconciliationError = true;
+            setSyncError('A reminder change could not be confirmed. The latest saved reminder is shown; retry the action if needed.');
+          }
+        }
+        for (const event of remoteHistory) historyKeysRef.current.add(event.id);
+        // A snooze saved during a lost response is retried with its original revision and idempotency key.
+        for (let index = 0; index < remoteReminders.length; index += 1) {
+          const saved = remoteReminders[index];
+          const current = latestLocal.reminders.find(item => item.id === saved.id);
+          const snooze = latestLocal.history.filter(event => event.reminderId === saved.id && event.type === 'snoozed')
+            .sort((left, right) => right.at - left.at)[0];
+          if (!snooze?.expectedRevision || !current || current.status !== 'waiting'
+            || current.dueAt !== snooze.dueAt || historyKeysRef.current.has(snooze.id)) continue;
+          if (saved.status === 'waiting' && saved.dueAt === snooze.dueAt) continue;
+          if (saved.status !== 'ringing' || saved.revision !== snooze.expectedRevision) {
+            dispatch({ type: 'removeHistoryEvent', id: snooze.id });
+            reconciliationError = true;
+            setSyncError('A snooze conflicted with a newer reminder change. The latest saved due time is shown.');
+            continue;
+          }
+          const result = await applyFocusTimerReminderAction(saved.id, 'snooze', snooze.expectedRevision, snooze.id);
+          remoteReminders[index] = result.reminder;
+          if (result.applied) historyKeysRef.current.add(snooze.id);
+          else {
+            dispatch({ type: 'removeHistoryEvent', id: snooze.id });
+            reconciliationError = true;
+            setSyncError('A snooze conflicted with a newer reminder change. The latest saved due time is shown.');
+          }
+        }
+        const actionEvents = new Set(['snoozed', 'dismissed', 'cancelled', 'stopped']);
+        const activeById = new Map(remoteReminders.filter(item => !item.completedAt).map(item => [item.id, item]));
+        const missingHistory = latestLocal.history.filter(event => !historyKeysRef.current.has(event.id)
+          && (!actionEvents.has(event.type) || !activeById.has(event.reminderId)
+            || ((event.type === 'snoozed' || (event.type === 'dismissed' && event.repeatMs > 0))
+              && activeById.get(event.reminderId).status === 'waiting'
+              && activeById.get(event.reminderId).dueAt === event.dueAt)));
+        if (missingHistory.length) {
+          await importFocusTimerHistory(missingHistory);
+          for (const event of missingHistory) historyKeysRef.current.add(event.id);
+        }
+        const canonical = new Map(remoteReminders.map(item => [item.id, item]));
+        for (const item of imported) if (!canonical.has(item.id)) canonical.set(item.id, item);
+        const allRows = [...canonical.values()];
+        for (const item of allRows) if (item.revision) syncingIdsRef.current.add(item.id);
+        const activeRows = allRows.filter(item => !item.completedAt);
+        dispatch({ type: 'replaceAll', reminders: activeRows, history: remoteHistory });
+        if (!reconciliationError) setSyncError('');
+        setCloudReady(true);
+        cloudReadyRef.current = true;
+        for (const item of activeRows) {
+          if (item.status === 'waiting' && item.dueAt <= Date.now()) beginningRef.current.delete(item.id + ':' + item.dueAt);
+        }
+        return activeRows;
+      } catch (error) {
+        setSyncError(error.message || 'Could not sync reminders. They remain saved on this device.');
+        throw error;
+      }
+    })();
+    refreshFlightRef.current = request;
+    request.finally(() => { if (refreshFlightRef.current === request) refreshFlightRef.current = null; }).catch(() => {});
+    return request;
+  }, [importAndReconcile, userId]);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId) return undefined;
+    let active = true;
+    let unsubscribe = null;
+    const refresh = () => { void refreshCloud().catch(() => {}); };
+    void refreshCloud().catch(() => {});
+    subscribeFocusTimerReminders(userId, refresh, status => {
+      if (status === 'SUBSCRIBED') refresh();
+      else if (['CHANNEL_ERROR', 'TIMED_OUT', 'CLOSED'].includes(status)) setSyncError('Live sync is disconnected. This screen will refresh when you return to it.');
+    }).then(cleanup => {
+      if (active) unsubscribe = cleanup;
+      else cleanup();
+    }).catch(error => setSyncError(error.message || 'Live reminder updates could not connect.'));
+    const onFocus = () => refresh();
+    const onVisibility = () => { if (document.visibilityState === 'visible') refresh(); };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      active = false;
+      unsubscribe?.();
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+      cloudReadyRef.current = false;
+    };
+  }, [refreshCloud, userId]);
+
+  useEffect(() => {
+    if (!userId || !cloudReady) return;
+    for (const item of reminders) {
+      if (item.revision || syncingIdsRef.current.has(item.id)) continue;
+      syncingIdsRef.current.add(item.id);
+      importAndReconcile(item).then(remote => {
+        dispatch({ type: 'syncReminder', reminder: remote });
+        if (remote.completedAt) setSyncError('A reminder changed on another device; the latest saved state was restored.');
+        else setSyncError('');
+      }).catch(error => {
+        syncingIdsRef.current.delete(item.id);
+        setSyncError(error.message || 'Reminder save could not be confirmed. It remains saved on this device.');
+      });
+    }
+  }, [cloudReady, importAndReconcile, reminders, userId]);
+
+  useEffect(() => {
+    if (!userId || !cloudReady) return;
+    const actionTypes = new Set(['snoozed', 'dismissed', 'cancelled', 'stopped']);
+    const missing = history.filter(event => !actionTypes.has(event.type) && !historyKeysRef.current.has(event.id));
+    if (!missing.length) return;
+    importFocusTimerHistory(missing).then(() => {
+      for (const event of missing) historyKeysRef.current.add(event.id);
+      setSyncError('');
+    }).catch(error => setSyncError(error.message || 'Reminder history could not sync. It remains saved on this device.'));
+  }, [cloudReady, history, userId]);
+
+  useEffect(() => {
     const tick = () => {
       const timestamp = Date.now();
       setNow(timestamp);
-      dispatch({ type: 'tick', now: timestamp });
+      if (!userId) {
+        dispatch({ type: 'tick', now: timestamp });
+        return;
+      }
+      if (!cloudReadyRef.current) return;
+      const due = stateRef.current.reminders.filter(item => isReminderDue(item, timestamp));
+      if (!due.length) return;
+      for (const item of due) {
+        const occurrenceKey = item.id + ':' + item.dueAt;
+        if (beginningRef.current.has(occurrenceKey)) continue;
+        if (!item.revision) {
+          setSyncError('Reminder save is still pending. Keep this page open and retry when connected.');
+          continue;
+        }
+        beginningRef.current.add(occurrenceKey);
+        beginFocusTimerOccurrence(item.id, item.dueAt).then(result => {
+          beginningRef.current.delete(occurrenceKey);
+          const current = stateRef.current.reminders.find(entry => entry.id === item.id);
+          if (result.reminder.status === 'ringing' && result.reminder.alertAt === item.dueAt
+            && (!current || current.revision <= result.reminder.revision)) {
+            dispatch({ type: 'syncReminder', reminder: result.reminder,
+              events: [eventFor(item, 'triggered', Date.parse(result.reminder.updatedAt) || Date.now())] });
+          } else dispatch({ type: 'syncReminder', reminder: result.reminder });
+          if (!result.applied && result.reminder.status !== 'ringing' && !result.reminder.completedAt) {
+            setSyncError('A reminder changed on another device. Its latest state has been restored.');
+            void refreshCloud().catch(() => {});
+          }
+        }).catch(error => setSyncError(error.message || 'The reminder could not be marked due in the cloud.'));
+      }
     };
     tick();
     const interval = window.setInterval(tick, 1000);
@@ -81,8 +299,7 @@ export function ReminderStore({ userId, children }) {
       window.removeEventListener('focus', tick);
       document.removeEventListener('visibilitychange', tick);
     };
-  }, [userId]);
-
+  }, [refreshCloud, userId]);
   useEffect(() => {
     if (!userId) return;
     try { localStorage.setItem(liveDockStorageKey, String(liveDockVisible)); }
@@ -201,8 +418,8 @@ export function ReminderStore({ userId, children }) {
     prepareSound();
     const timestamp = Date.now();
     dispatch({ type: 'add', now: timestamp, item: {
-      id: crypto.randomUUID(), title, dueAt: Number.isFinite(metadata?.dueAt) ? metadata.dueAt : timestamp + duration, status: 'waiting',
-      repeatMs: repeats ? duration : 0, durationMs: duration,
+      id: createReminderId(), title, dueAt: Number.isFinite(metadata?.dueAt) ? metadata.dueAt : timestamp + duration,
+      status: 'waiting', repeatMs: repeats ? duration : 0, durationMs: duration,
       ...(typeof metadata?.creditAgreementId === 'string' ? { creditAgreementId: metadata.creditAgreementId } : {}),
       ...(typeof metadata?.creditInstalmentId === 'string' ? { creditInstalmentId: metadata.creditInstalmentId } : {}),
       ...(typeof metadata?.creditReminderEvent === 'string' ? { creditReminderEvent: metadata.creditReminderEvent } : {}),
@@ -210,13 +427,43 @@ export function ReminderStore({ userId, children }) {
     } });
   }, [prepareSound]);
 
-  function dismiss(id) { dispatch({ type: 'dismiss', id, now: Date.now() }); }
-  const cancel = useCallback((id) => { dispatch({ type: 'cancel', id, now: Date.now() }); }, []);
-  function snooze(id) {
-    prepareSound();
-    dispatch({ type: 'snooze', id, now: Date.now() });
+  function applySharedAction(item, action) {
+    const timestamp = Date.now();
+    const eventItem = action === 'snooze'
+      ? { ...item, dueAt: timestamp + 5 * 60_000, alertAt: undefined, status: 'waiting' } : item;
+    const eventType = action === 'cancel' ? (item.repeatMs > 0 ? 'stopped' : 'cancelled')
+      : action === 'dismiss' ? 'dismissed' : 'snoozed';
+    const event = eventFor(eventItem, eventType, timestamp);
+    if (userId && item.revision) event.expectedRevision = item.revision;
+    dispatch({ type: action, id: item.id, now: timestamp, expectedRevision: item.revision });
+    if (!userId || !item.revision) return;
+    applyFocusTimerReminderAction(item.id, action, item.revision, event.id).then(result => {
+      if (result.applied) historyKeysRef.current.add(event.id);
+      dispatch({ type: 'syncReminder', reminder: result.reminder, events: result.applied ? [event] : [] });
+      if (!result.applied) {
+        dispatch({ type: 'removeHistoryEvent', id: event.id });
+        setSyncError('This reminder changed on another device. The latest saved version is loaded; repeat your action if needed.');
+      } else setSyncError('');
+    }).catch(error => {
+      setSyncError(error.message || 'Reminder change could not be confirmed. It remains saved on this device.');
+      void refreshCloud().then(() => refreshCloud()).catch(() => {});
+    });
   }
 
+  function dismiss(id) {
+    const item = stateRef.current.reminders.find(entry => entry.id === id);
+    if (item) applySharedAction(item, 'dismiss');
+  }
+  function cancel(id) {
+    const item = stateRef.current.reminders.find(entry => entry.id === id);
+    if (item) applySharedAction(item, 'cancel');
+  }
+  function snooze(id) {
+    const item = stateRef.current.reminders.find(entry => entry.id === id);
+    if (!item) return;
+    prepareSound();
+    applySharedAction(item, 'snooze');
+  }
   const ringing = reminders.filter((item) => item.status === 'ringing');
   const liveReminders = [...reminders]
     .filter((item) => item.status === 'waiting' || item.status === 'ringing')
@@ -248,7 +495,7 @@ export function ReminderStore({ userId, children }) {
     if (ringing.length === 1) setWidgetOpen(false);
   };
   return (
-    <ReminderContext.Provider value={{ reminders, history, now, addReminder, dismiss, cancel, snooze, prepareSound, playSound, storageError }}>
+    <ReminderContext.Provider value={{ reminders, history, now, addReminder, dismiss, cancel, snooze, prepareSound, playSound, storageError, syncError, cloudReady, signedIn: Boolean(userId) }}>
       {children}
       {userId && liveTimerCount > 0 && liveDockVisible && !widgetOpen && (
         <aside aria-label="Live timers" className="ui-popover live-timer-dock fixed p-3">
