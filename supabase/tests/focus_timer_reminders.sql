@@ -1,4 +1,4 @@
--- Run after migrations 202611190001 and 202611190002 in an isolated database
+-- Run after migrations 202611190001 through 202611190004 in an isolated database
 -- with these two auth.users fixtures. All test data rolls back.
 begin;
 select set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', true);
