@@ -16,6 +16,7 @@ import {
   reminderTitle,
 } from './reminderHelpers';
 import { readReminderState, reminderReducer } from './reminderHistoryState.js';
+import { importLocalRemindersIndependently } from './reminderImportReconciliation.js';
 import { availableReminderPresets, readReminderPresets } from './reminderPresetData.js';
 import { isReminderDue } from './reminderHelpers.js';
 import { eventFor } from './reminderHistoryState.js';
@@ -118,9 +119,10 @@ export function ReminderStore({ userId, children }) {
     if (refreshFlightRef.current) return refreshFlightRef.current;
     const request = (async () => {
       try {
-        const local = stateRef.current;
-        const imported = [];
-        for (const item of local.reminders) imported.push(item.revision ? item : await importAndReconcile(item));
+        const localSync = await importLocalRemindersIndependently(
+          stateRef.current.reminders, importAndReconcile,
+        );
+        const imported = localSync.imported;
 
         const [listedReminders, remoteHistory] = await Promise.all([
           listFocusTimerReminders(), listFocusTimerHistory(),
@@ -186,7 +188,8 @@ export function ReminderStore({ userId, children }) {
         for (const item of allRows) if (item.revision) syncingIdsRef.current.add(item.id);
         const activeRows = allRows.filter(item => !item.completedAt);
         dispatch({ type: 'replaceAll', reminders: activeRows, history: remoteHistory });
-        if (!reconciliationError) setSyncError('');
+        if (localSync.errors.length) setSyncError(localSync.errors[0].error.message || 'A local reminder could not sync. It remains saved on this device.');
+        else if (!reconciliationError) setSyncError('');
         setCloudReady(true);
         cloudReadyRef.current = true;
         for (const item of activeRows) {
