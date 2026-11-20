@@ -159,7 +159,7 @@ function AppContent() {
   }
 
   if (route === '/board') {
-    return <AppBoard calculators={calculators} />;
+    return <AppBoard key={user.id} calculators={calculators} />;
   }
 
   if (route === '/calculators') {

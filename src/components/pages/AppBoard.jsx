@@ -7,6 +7,7 @@ import { ArrowRight, Grid2X2, PanelsTopLeft, Rows3 } from 'lucide-react';
 import { PageShell } from '../layout/PageShell';
 import { dashboardModules } from '../layout/appModules.js';
 import { DASHBOARD_VIEW_SIZES, DEFAULT_DASHBOARD_VIEW_SIZE, normalizeDashboardViewSize } from '../layout/dashboardLayout.js';
+import { QuickCaptureReminder } from './QuickCaptureReminder.jsx';
 
 const VIEW_KEY = 'cboard:dashboard-view-size:v1';
 
@@ -60,6 +61,7 @@ export function AppBoard({ calculators }) {
   const viewIcons = { small: Grid2X2, medium: PanelsTopLeft, large: Rows3 };
   return (
     <PageShell>
+      <QuickCaptureReminder userId={user?.id} />
       <section className="panel app-board-panel">
         <header className="app-board-heading">
           <div>

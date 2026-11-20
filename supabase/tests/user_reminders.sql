@@ -1,4 +1,5 @@
--- Run after the reminder migration in an isolated database with these two auth.users fixtures.
+-- Run after migrations 202611190001 and 202611200001 in an isolated database
+-- with these two auth.users fixtures.
 -- All checks execute as authenticated and the transaction rolls back its records.
 begin;
 select set_config('request.jwt.claim.sub', '11111111-1111-4111-8111-111111111111', true);
@@ -9,6 +10,7 @@ declare
   first_row record;
   retry_row record;
   completed_row record;
+  completed_retry record;
   repeated_row record;
   rejected boolean := false;
 begin
@@ -31,8 +33,13 @@ begin
   if not rejected then raise exception 'Conflicting retry was accepted.'; end if;
 
   select * into completed_row from public.complete_user_reminder('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+  select * into completed_retry from public.create_user_reminder(
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'Read from another device', '2026-11-19T09:30:00Z'
+  );
   select * into repeated_row from public.complete_user_reminder('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
-  if completed_row.completed_at is null or repeated_row.completed_at is distinct from completed_row.completed_at then
+  if completed_row.completed_at is null
+    or completed_retry.completed_at is distinct from completed_row.completed_at
+    or repeated_row.completed_at is distinct from completed_row.completed_at then
     raise exception 'Repeated completion changed the original completion time.';
   end if;
 
