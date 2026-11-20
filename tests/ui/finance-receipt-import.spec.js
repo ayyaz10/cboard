@@ -27,6 +27,39 @@ test('receipt import reviews and saves one expense through Finance into the ledg
   expect(JSON.stringify(saved)).not.toContain('purchase_receipt');
 });
 
+test('ChatGPT itemized receipt JSON fills the transaction receipt and per-item category editor', async ({ page }) => {
+  await useFinanceStub(page);
+  await page.getByRole('button', { name: 'Import from Receipt', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Paste receipt JSON').fill(JSON.stringify({
+    store:{name:'ALDI',location:'McKenzie Street, Kirkcaldy'},
+    date:'2026-11-17', time:'20:31', total:11.26, currency:'GBP', item_count:4,
+    items:[
+      {code:'586719',name:'CRUNCHY NUT 720G',quantity:1,unit:'each',unitPrice:3.99,amount:3.99,tax_code:'A'},
+      {code:'386021',name:'MILLED/WHOLE CHIA',quantity:1,unit:'each',unitPrice:1.79,amount:1.79,tax_code:'A'},
+      {code:'761542',name:'MILLED FLAXSEED',quantity:1,unit:'each',unitPrice:1.79,amount:1.79,tax_code:'A'},
+      {code:'656970',name:'AUTH GREEK YOG 1KG',quantity:1,unit:'each',unitPrice:3.69,amount:3.69,tax_code:'A'}
+    ]
+  }));
+  await dialog.getByRole('button', { name: 'Review Transaction' }).click();
+  await expect(dialog.getByLabel('Merchant or title')).toHaveValue('ALDI');
+  await expect(dialog.getByRole('textbox', { name:'Amount' })).toHaveValue('11.26');
+  await expect(dialog.getByLabel('Date', { exact:true })).toHaveValue('2026-11-17');
+  await expect(dialog.getByLabel('Receipt time')).toHaveValue('20:31');
+  await expect(dialog.getByLabel('Line total for item 1')).toHaveValue('3.99');
+  await expect(dialog.getByLabel('Line total for item 4')).toHaveValue('3.69');
+  await expect(dialog.getByLabel('Category for item 1')).toHaveValue(/.+/);
+  await dialog.getByLabel('Category for item 2').selectOption({ label:'Groceries' });
+  await dialog.getByRole('button', { name: 'Save Transaction' }).click();
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('receipt-import-state')));
+  expect(saved.transactions).toHaveLength(1);
+  expect(saved.transactions[0].purchaseItems.map(item => [item.name,item.lineTotal])).toEqual([
+    ['CRUNCHY NUT 720G',399], ['MILLED/WHOLE CHIA',179], ['MILLED FLAXSEED',179], ['AUTH GREEK YOG 1KG',369]
+  ]);
+  expect(saved.transactions[0].receipt.items.map(item => item.retailerProductCode)).toEqual(['586719','386021','761542','656970']);
+  expect(saved.transactions[0].receipt.time).toBe('20:31');
+});
+
 test('manual transaction entry remains available from Add transaction', async ({ page }) => {
   await useFinanceStub(page);
   await page.getByRole('button', { name: /\+ Add transaction/ }).click();
