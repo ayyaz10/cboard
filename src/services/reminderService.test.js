@@ -21,6 +21,8 @@ function fakeDatabase() {
     if (name === 'create_user_reminder') {
       const prior = records.get(args.p_id);
       if (prior) {
+        if (prior.deletedAt) return { data: null, error: { code: 'P0001', message: 'Reminder is unavailable.' } };
+
         if (prior.userId !== userId || prior.title !== args.p_title || prior.dueAt !== args.p_due_at) {
           return { data: null, error: { code: 'P0001', message: 'Conflicting reminder ID.' } };
         }
@@ -33,7 +35,7 @@ function fakeDatabase() {
     }
     if (name === 'list_user_reminders') {
       const rows = [...records.values()].filter(row => row.userId === userId
-        && row.dueAt >= args.p_start_at && row.dueAt < args.p_end_at
+        && !row.deletedAt && row.dueAt >= args.p_start_at && row.dueAt < args.p_end_at
         && (!args.p_after_due_at || row.dueAt > args.p_after_due_at
           || (row.dueAt === args.p_after_due_at && row.id > args.p_after_id)))
         .sort((a, b) => a.dueAt.localeCompare(b.dueAt) || a.id.localeCompare(b.id))
@@ -49,7 +51,20 @@ function fakeDatabase() {
       }
       return { data: [asRow(record)], error: null };
     }
-    throw new Error('Unexpected RPC ' + name);
+    if (name === 'update_user_reminder') {
+      const record = records.get(args.p_id);
+      if (!record || record.userId !== userId || record.deletedAt) return { data: null, error: { code: 'P0001', message: 'unavailable' } };
+      if (record.updatedAt !== args.p_expected_updated_at) return { data: [{ ...asRow(record), applied: record.title === args.p_title && record.dueAt === args.p_due_at }], error: null };
+      record.title = args.p_title; record.dueAt = args.p_due_at; record.updatedAt = '2026-11-19T10:00:00.123456Z';
+      return { data: [{ ...asRow(record), applied: true }], error: null };
+    }
+    if (name === 'delete_user_reminder') {
+      const record = records.get(args.p_id);
+      if (!record || record.userId !== userId) return { data: null, error: { code: 'P0001', message: 'unavailable' } };
+      if (record.deletedAt) return { data: true, error: null };
+      if (record.updatedAt !== args.p_expected_updated_at) return { data: null, error: { code: 'P0001', message: 'stale' } };
+      record.deletedAt = '2026-11-19T11:00:00Z'; return { data: true, error: null };
+    }    throw new Error('Unexpected RPC ' + name);
   }
   const clientFor = userId => ({ rpc(name, args) {
     return { abortSignal: signal => signal.aborted
@@ -167,4 +182,23 @@ test('request timeout is unknown and retrying after a late commit returns the sa
   const retry = serviceFor(db, userA);
   assert.equal((await retry.createReminder(input)).id, id);
   assert.equal(db.records.size, 1);
+});
+test('reminder updates retain the precise server version and stale edits are rejected', async () => {
+  const db=fakeDatabase(),service=serviceFor(db,userA);
+  const created=await service.createReminder({id,title:'Pay bill',dueAt});
+  const updated=await service.updateReminder({id,expectedUpdatedAt:created.updatedAt,title:'Pay bill today',dueAt:'2026-11-20T09:30:00.000Z'});
+  assert.equal(updated.title,'Pay bill today');
+  assert.equal(db.calls.at(-1).args.p_expected_updated_at,created.updatedAt);
+  assert.equal(db.records.get(id).updatedAt,'2026-11-19T10:00:00.123456Z');
+  await assert.rejects(service.updateReminder({id,expectedUpdatedAt:created.updatedAt,title:'Stale title',dueAt:'2026-11-20T09:30:00.000Z'}),e=>e.outcome==='rejected');
+});
+
+test('reminder delete is idempotent, hidden from reads, and does not permit stale re-create', async () => {
+  const db=fakeDatabase(),service=serviceFor(db,userA);
+  const created=await service.createReminder({id,title:'Pay bill',dueAt});
+  await service.deleteReminder(id,created.updatedAt);
+  await service.deleteReminder(id,created.updatedAt);
+  const page=await service.listReminders({startAt:'2026-11-19T00:00:00Z',endAt:'2026-11-20T00:00:00Z'});
+  assert.equal(page.items.length,0);
+  await assert.rejects(service.createReminder({id,title:'Pay bill',dueAt}),e=>e.outcome==='rejected');
 });

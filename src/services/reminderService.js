@@ -43,6 +43,12 @@ function normalizeInstant(value, field) {
   return date.toISOString();
 }
 
+function normalizeVersion(value) {
+  if (value instanceof Date) return normalizeInstant(value, 'Record version');
+  normalizeInstant(value, 'Record version');
+  return value;
+}
+
 function normalizePageSize(value) {
   if (!Number.isInteger(value) || value < 1 || value > MAX_REMINDER_PAGE_SIZE) {
     throw new RangeError('Reminder page size must be between 1 and ' + MAX_REMINDER_PAGE_SIZE + '.');
@@ -131,6 +137,24 @@ export function createReminderService({ getContext = getUserScopedClient, offlin
       return { items, nextCursor: hasMore && last ? { dueAt: last.dueAt, id: last.id } : null };
     },
 
+    async updateReminder({ id, expectedUpdatedAt, title, dueAt }) {
+      const reminderId = normalizeId(id), updatedAt = normalizeVersion(expectedUpdatedAt);
+      if (typeof title !== 'string' || title.trim().length === 0 || title.length > 120 || title !== title.trim()) throw new TypeError('Reminder title must be trimmed and contain 1 to 120 characters.');
+      const dueInstant = normalizeInstant(dueAt, 'Reminder due time'), { client } = await getContext();
+      const result = await runRpc(client, 'update_user_reminder', { p_id: reminderId, p_expected_updated_at: updatedAt, p_title: title, p_due_at: dueInstant }, 'update');
+      if (result.error) throw classifyRequestError(result.error, 'update');
+      const row = Array.isArray(result.data) ? result.data[0] : result.data;
+      if (!row) throw new ReminderServiceError('Reminder update could not be confirmed.', { outcome: 'unknown' });
+      if (!row.applied) throw new ReminderServiceError('This reminder changed on another device. Refresh it before editing.', { outcome: 'rejected' });
+      return toReminder(row);
+    },
+    async deleteReminder(id, expectedUpdatedAt) {
+      const reminderId = normalizeId(id), updatedAt = normalizeVersion(expectedUpdatedAt), { client } = await getContext();
+      const result = await runRpc(client, 'delete_user_reminder', { p_id: reminderId, p_expected_updated_at: updatedAt }, 'delete');
+      if (result.error) throw classifyRequestError(result.error, 'delete');
+      if (result.data !== true) throw new ReminderServiceError('Reminder deletion could not be confirmed.', { outcome: 'unknown' });
+      return true;
+    },
     async completeReminder(id) {
       const reminderId = normalizeId(id);
       const { client } = await getContext();
@@ -144,3 +168,5 @@ const reminders = createReminderService();
 export const createReminder = input => reminders.createReminder(input);
 export const listReminders = input => reminders.listReminders(input);
 export const completeReminder = id => reminders.completeReminder(id);
+export const updateReminder = input => reminders.updateReminder(input);
+export const deleteReminder = (id, updatedAt) => reminders.deleteReminder(id, updatedAt);

@@ -137,3 +137,5 @@
   .dashboard-grid[data-view-size="large"] .board-card-link h2 { font-size:1.45rem; }
   .board-card-description { margin-top:.55rem; }
 }
+
+.today-view-switch { display:flex; gap:.45rem; }

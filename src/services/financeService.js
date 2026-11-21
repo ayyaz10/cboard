@@ -50,7 +50,7 @@ function runFinanceAutomations(state, date = today()) {
   return changed;
 }
 
-export async function loadFinance() {
+export async function loadFinance({ runAutomations = true } = {}) {
   const { client, userId } = await getUserScopedClient();
   const result = await client.from('finance_workspaces').select('state,updated_at').eq('user_id', userId).maybeSingle();
   assertSupabaseResult(result);
@@ -68,7 +68,7 @@ export async function loadFinance() {
   });
   state.transactions = [...state.transactions.filter(item => !String(item.id).startsWith('bank-')), ...bankTransactions];
   let version = result.data?.updated_at || null;
-  if (runFinanceAutomations(state)) version = await saveFinance(state, version, userId);
+  if (runAutomations && runFinanceAutomations(state)) version = await saveFinance(state, version, userId);
   return { state, version, userId, bankData, bankError };
 }
 

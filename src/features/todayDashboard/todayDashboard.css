@@ -1,0 +1,49 @@
+.today-dashboard { display:grid; gap:1rem; }
+.today-dashboard-header { display:flex; align-items:flex-end; justify-content:space-between; gap:1rem; padding:clamp(1rem,3vw,1.75rem); border:var(--border-width-strong) solid var(--color-border); border-radius:var(--radius-panel); background:var(--surface-primary); color:var(--color-text); box-shadow:var(--shadow-sm); }
+.today-dashboard-date { margin:0 0 .45rem; color:var(--color-text-secondary); font-size:.84rem; font-weight:650; }
+.today-dashboard-header h1 { margin:0; font-size:clamp(2rem,5vw,3.3rem); font-weight:850; letter-spacing:-.065em; line-height:1; }
+.today-dashboard-subtitle { margin:.55rem 0 0; color:var(--color-text-secondary); }
+.today-dashboard-header-actions { display:flex; align-items:center; gap:.65rem; }
+.today-dashboard-kicker,.today-count { display:inline-flex; min-height:2rem; align-items:center; justify-content:center; padding:.25rem .65rem; border:1px solid var(--color-border); border-radius:var(--radius-pill); background:var(--color-accent-soft); color:var(--color-accent-text); font-size:.75rem; font-weight:800; }
+.today-dashboard-grid { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); align-items:start; gap:1rem; }
+.today-card { display:grid; min-width:0; gap:.8rem; padding:clamp(1rem,2vw,1.35rem); border:var(--border-width-strong) solid var(--color-border); border-radius:var(--radius-card); background:var(--surface-primary); color:var(--color-text); box-shadow:var(--shadow-sm); }
+.today-next-card { min-height:15rem; align-content:start; background:var(--surface-elevated); }
+.today-card h2 { margin:0; font-size:clamp(1.2rem,2.5vw,1.65rem); font-weight:800; letter-spacing:-.04em; }
+.today-card-eyebrow { margin:0; color:var(--color-accent-text); font-size:.68rem; font-weight:850; letter-spacing:.12em; text-transform:uppercase; }
+.today-card-heading { display:flex; align-items:center; justify-content:space-between; gap:.75rem; }
+.today-card-heading > div { display:grid; gap:.35rem; }
+.today-next-content { display:grid; justify-items:start; gap:.75rem; margin-top:.2rem; }
+.today-next-title { margin:0; font-size:1.25rem; font-weight:750; line-height:1.35; overflow-wrap:anywhere; }
+.today-reminder-overdue { margin:0; color:var(--color-danger); font-size:.88rem; font-weight:800; }
+.today-reminder-time { color:var(--color-accent-text); font-size:.82rem; font-weight:750; }
+.today-empty-copy { margin:0; color:var(--color-text-secondary); line-height:1.55; }
+.today-reminder-list,.today-overdue-list { display:grid; gap:.45rem; margin:0; padding:0; list-style:none; }
+.today-reminder-list li,.today-overdue-list li { display:flex; align-items:center; justify-content:space-between; gap:.7rem; padding:.65rem .7rem; border:1px solid var(--color-border); border-radius:var(--radius-input); background:var(--surface-secondary); }
+.today-reminder-main { display:grid; min-width:0; grid-template-columns:auto minmax(0,1fr); align-items:baseline; gap:.15rem .65rem; }
+.today-reminder-name { overflow-wrap:anywhere; font-weight:700; }
+.today-reminder-state { grid-column:2; color:var(--color-text-muted); font-size:.72rem; }
+.today-reminder-list li.is-completed .today-reminder-name { color:var(--color-text-secondary); text-decoration:line-through; }
+.today-reminder-list li.is-completed .today-reminder-state { color:var(--color-success); }
+.today-overdue-list li > div { display:grid; min-width:0; gap:.2rem; }
+.today-overdue-list li strong { overflow-wrap:anywhere; }
+.today-overdue-list li span { color:var(--color-danger); font-size:.75rem; font-weight:750; }
+.today-overview-card progress { width:100%; height:.65rem; accent-color:var(--color-accent); }
+.today-overview-card > p { margin:0; color:var(--color-text-secondary); }
+.today-overview-card > p strong { color:var(--color-text); }
+.today-dashboard-alert { display:flex; align-items:center; justify-content:space-between; gap:.75rem; padding:.75rem 1rem; border:1px solid var(--color-danger); border-radius:var(--radius-input); background:var(--surface-secondary); color:var(--color-danger); }
+.today-dashboard-status { margin:0; color:var(--color-success); font-weight:750; }
+@media(max-width:767px) {
+  .today-dashboard-header { align-items:flex-start; flex-direction:column; }
+  .today-dashboard-header-actions { width:100%; justify-content:space-between; }
+  .today-dashboard-grid { grid-template-columns:minmax(0,1fr); }
+  .today-next-card { min-height:0; }
+  .today-reminder-list li,.today-overdue-list li { align-items:flex-start; }
+}
+.timeline-views { display:flex; flex-wrap:wrap; gap:.5rem; }
+.timeline-card { grid-column:1 / -1; }
+.timeline-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:.35rem; }
+.timeline-actions button { min-height:2.35rem; padding:.35rem .6rem; font-size:.78rem; }
+.timeline-alert-note { margin:0; color:var(--color-text-secondary); font-size:.82rem; }
+.quick-capture-type { display:flex; gap:.5rem; }
+.quick-capture-type button[aria-pressed="true"] { border-color:var(--color-accent); color:var(--color-accent-text); }
+@media(max-width:767px){.timeline-actions{justify-content:flex-start}.timeline-card li{flex-direction:column}.timeline-views{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.timeline-views button{width:100%;}}

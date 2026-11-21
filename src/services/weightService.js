@@ -17,6 +17,14 @@ export async function loadWeights() {
   }
   return { entries, userId };
 }
+export async function loadLatestWeights(expectedUserId, limit = 2) {
+  if (!Number.isInteger(limit) || limit < 1 || limit > 10) throw new RangeError('Weight summary limit must be between 1 and 10.');
+  const { client, userId } = await scoped(expectedUserId);
+  const result = await client.from('weight_entries').select('date,weight_kg')
+    .eq('user_id', userId).order('date', { ascending: false }).limit(limit);
+  assertSupabaseResult(result);
+  return result.data || [];
+}
 export async function loadWeightForDate(date, expectedUserId) {
   const { client, userId } = await scoped(expectedUserId);
   const result = await client.from('weight_entries').select('date,weight_kg').eq('user_id', userId).eq('date', date).maybeSingle();

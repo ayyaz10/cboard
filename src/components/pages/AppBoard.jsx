@@ -8,12 +8,19 @@ import { PageShell } from '../layout/PageShell';
 import { dashboardModules } from '../layout/appModules.js';
 import { DASHBOARD_VIEW_SIZES, DEFAULT_DASHBOARD_VIEW_SIZE, normalizeDashboardViewSize } from '../layout/dashboardLayout.js';
 import { QuickCaptureReminder } from './QuickCaptureReminder.jsx';
+import { TodayDashboard } from '../../features/todayDashboard/TodayDashboard.jsx';
+import { MyLifeOverview } from '../../features/myLife/MyLifeOverview.jsx';
+import { useLifeOverview } from '../../features/myLife/useLifeOverview.js';
+import { Button } from '../ui/Button.jsx';
 
 const VIEW_KEY = 'cboard:dashboard-view-size:v1';
 
 export function AppBoard({ calculators }) {
   const { user } = useAuth();
   const [viewSize, setViewSize] = useState(DEFAULT_DASHBOARD_VIEW_SIZE);
+  const [boardView, setBoardView] = useState('today');
+  const [refreshReminders, setRefreshReminders] = useState(() => () => {});
+  const { sections: lifeSections, refresh: refreshLife } = useLifeOverview(user?.id);
   const viewSizeRef = useRef(viewSize);
   const userIdRef = useRef(user?.id);
   const saveQueue = useRef(Promise.resolve());
@@ -26,6 +33,7 @@ export function AppBoard({ calculators }) {
     const startingRevision = viewChangeRef.current;
     setViewSize(DEFAULT_DASHBOARD_VIEW_SIZE);
     viewSizeRef.current = DEFAULT_DASHBOARD_VIEW_SIZE;
+    setBoardView('today');
     getPreference(VIEW_KEY, DEFAULT_DASHBOARD_VIEW_SIZE).then(value => {
       if (!active || viewChangeRef.current !== startingRevision) return;
       const stored = normalizeDashboardViewSize(value);
@@ -61,8 +69,13 @@ export function AppBoard({ calculators }) {
   const viewIcons = { small: Grid2X2, medium: PanelsTopLeft, large: Rows3 };
   return (
     <PageShell>
-      <QuickCaptureReminder userId={user?.id} />
-      <section className="panel app-board-panel">
+      <QuickCaptureReminder userId={user?.id} onSaved={() => { refreshReminders(); refreshLife(); }} />
+      <nav className="today-view-switch" aria-label="CBoard view">
+        <Button variant={boardView === 'today' ? 'primary' : 'secondary'} aria-pressed={boardView === 'today'} onClick={() => setBoardView('today')}>Today</Button>
+        <Button variant={boardView === 'mylife' ? 'primary' : 'secondary'} aria-pressed={boardView === 'mylife'} onClick={() => { setBoardView('mylife'); refreshLife(); }}>My Life</Button>
+        <Button variant={boardView === 'modules' ? 'primary' : 'secondary'} aria-pressed={boardView === 'modules'} onClick={() => setBoardView('modules')}>Modules</Button>
+      </nav>
+      {boardView === 'today' ? <TodayDashboard userId={user?.id} lifeSections={lifeSections} onRefreshLife={refreshLife} onOpenModules={() => setBoardView('modules')} onRefreshReady={setRefreshReminders} /> : boardView === 'mylife' ? <MyLifeOverview sections={lifeSections} onRefresh={refreshLife} /> : <section className="panel app-board-panel">
         <header className="app-board-heading">
           <div>
             <h1>CBoard</h1>
@@ -94,7 +107,7 @@ export function AppBoard({ calculators }) {
               </a>
             </article>)}
         </div>
-      </section>
+      </section>}
     </PageShell>
   );
 }
