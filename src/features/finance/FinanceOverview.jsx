@@ -1,17 +1,22 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { formatMoney, financeSummary, monthKey, shiftMonth } from './financeMath.js';
 import { expenseCategoryReport } from './financeReports.js';
 import { deriveFinancePosition, inspectFinanceIntegrity } from './financeLedger.js';
 import { donationDue } from './donationAccounting.js';
 import { debtPaymentDue } from './debtAccounting.js';
 import { orderedTransactions } from './transactionOrder.js';
+import { financeAccountPosition } from './financeAccounts.js';
 
 const labels = { income: 'Income', expense: 'Expense', donation: 'Donation', debt: 'Debt payment', transfer: 'Transfer' };
 const monthTitle = month => new Date(`${month}-15T12:00:00`).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 
 function Money({ amount, currency }) { return <>{formatMoney(amount, currency)}</>; }
 
-export function FinanceOverview({ data, month, setMonth, setTab, setTransactionScope, openTransaction, openTransactionDetail, setOverviewCategory }) {
+export function FinanceOverview({ data, month, setMonth, setTab, setTransactionScope, openTransaction, openTransactionDetail, setOverviewCategory, onSetupBankAccount }) {
+  const [selectedAccountId, setSelectedAccountId] = useState('');
+  const bankAccounts = (data.accounts || []).filter(account => !account.archivedAt && ['bank', 'savings'].includes(account.type));
+  const selectedAccount = bankAccounts.find(account => account.id === selectedAccountId) || bankAccounts[0] || null;
+  const accountPosition = selectedAccount ? financeAccountPosition(data, selectedAccount.id) : null;
   const currency = data.settings.currency;
   const monthly = financeSummary(data, month);
   const position = deriveFinancePosition(data);
@@ -41,6 +46,18 @@ export function FinanceOverview({ data, month, setMonth, setTab, setTransactionS
       </section>
       <section className="f-overview-actions" aria-label="Quick transaction actions"><span className="f-overview-eyebrow">Quick actions</span><div className="f-actions"><button className="f-primary" onClick={() => openTransaction({ type: 'expense' })}>＋ Expense</button><button className="f-button" onClick={() => openTransaction({ type: 'income' })}>＋ Income</button><button className="f-button" onClick={() => openTransaction({ type: 'transfer' })}>Move money</button></div></section>
     </div>
+
+    <section className="f-overview-section f-expected-bank" aria-labelledby="expected-bank-heading">
+      <div className="f-overview-section-heading"><div><span className="f-overview-eyebrow">Calculated from Finance records</span><h2 id="expected-bank-heading">Expected Bank Balance</h2></div>{bankAccounts.length > 1 && <label className="f-expected-bank-selector">Account<select value={selectedAccount?.id || ''} onChange={event => setSelectedAccountId(event.target.value)}>{bankAccounts.map(account => <option key={account.id} value={account.id}>{account.name} | {account.currency || currency}</option>)}</select></label>}</div>
+      {!bankAccounts.length ? <div className="f-overview-empty"><p>No active bank or savings account is configured, so Finance cannot calculate an account balance yet. Spendable now is a different ledger total and cannot be used as a bank balance.</p><p>Set up an account with the balance before its first recorded transaction. Only booked activity assigned to that account will be included; cash accounts, credit limits and savings goals are separate.</p>{onSetupBankAccount && <button type="button" className="f-button mt-3" onClick={onSetupBankAccount}>Set up bank or savings account</button>}</div> : <>
+        {bankAccounts.length === 1 && <p className="f-expected-bank-account">{selectedAccount.name} | {selectedAccount.currency || currency}</p>}
+        <p className="f-expected-bank-value">{accountPosition.available ? <Money amount={accountPosition.balance} currency={selectedAccount.currency || currency}/> : 'Unavailable'}</p>
+        {!accountPosition.available && <p className="f-alert" role="status">{accountPosition.reason === 'missing-opening-balance' ? 'An opening balance is missing, so the expected balance cannot be calculated.' : 'The account balance exceeds the supported precise money range.'}</p>}
+        <p className="f-help">Calculated from recorded activity; not verified against your bank.</p>
+        <dl className="f-expected-bank-breakdown"><div><dt>Opening balance</dt><dd>{Number.isSafeInteger(selectedAccount.openingBalance) ? <Money amount={selectedAccount.openingBalance} currency={selectedAccount.currency || currency}/> : 'Unavailable'}</dd></div><div><dt>Income received</dt><dd>{accountPosition.available ? <Money amount={accountPosition.income} currency={selectedAccount.currency || currency}/> : 'Unavailable'}</dd></div><div><dt>Refunds received</dt><dd>{accountPosition.available ? <Money amount={accountPosition.refunds} currency={selectedAccount.currency || currency}/> : 'Unavailable'}</dd></div><div><dt>Other money in</dt><dd>{accountPosition.available ? <Money amount={accountPosition.otherIncome} currency={selectedAccount.currency || currency}/> : 'Unavailable'}</dd></div><div><dt>Expenses paid</dt><dd>{accountPosition.available ? <Money amount={accountPosition.expenses} currency={selectedAccount.currency || currency}/> : 'Unavailable'}</dd></div><div><dt>Net transfers</dt><dd>{accountPosition.available ? <Money amount={accountPosition.transfers} currency={selectedAccount.currency || currency}/> : 'Unavailable'}</dd></div></dl>
+        <div className="f-expected-bank-footer"><span>{accountPosition.lastTransactionDate ? `Last recorded transaction ${new Date(`${accountPosition.lastTransactionDate}T12:00:00`).toLocaleDateString()}` : 'No account activity recorded'}</span><button type="button" className="f-link-button" onClick={() => { setOverviewCategory(''); setTransactionScope('all'); setTab('transactions'); }}>View transactions</button></div>
+      </>}
+    </section>
 
     <section className="f-overview-flow" aria-labelledby="monthly-flow-heading">
       <div className="f-overview-section-heading"><div><span className="f-overview-eyebrow">Monthly flow</span><h2 id="monthly-flow-heading">This month</h2></div><div className="f-overview-month"><button className="f-button" onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Previous month">‹</button><strong aria-live="polite">{monthTitle(month)}</strong><button className="f-button" onClick={() => setMonth(shiftMonth(month, 1))} aria-label="Next month">›</button><button className="f-button f-overview-current" onClick={() => setMonth(monthKey())}>This month</button></div></div>

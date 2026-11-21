@@ -1,6 +1,57 @@
 import { id } from './financeData.js';
 
 const live = item => item && !item.reversedAt && !['cancelled', 'planned'].includes(item.allocationStatus);
+const booked = item => !item.source || item.providerStatus === 'BOOK';
+
+function accountTransactionMovement(item, state) {
+  const amount = Number.isSafeInteger(item.amount) ? item.amount : 0;
+  if (item.type === 'transfer') {
+    if (item.transferKind === 'linked' && item.linkedTransferId) return item.transferSide === 'in' ? amount : item.transferSide === 'out' ? -amount : 0;
+    if (item.transferKind === 'external-out') return -amount;
+    if (item.transferKind === 'external-in') return amount;
+    if (item.transferKind === 'card-payment' && item.accountingKind !== 'card-liability-only') return -amount;
+    return 0;
+  }
+  if (item.type === 'expense' || item.type === 'creditPayment') return -amount;
+  if (item.type === 'donation') return item.allocationStatus === 'allocated' ? 0 : -amount;
+  if (item.type === 'debt') return item.allocationStatus === 'allocated' ? 0 : -amount;
+  if (item.type === 'personalRepayment') return -amount;
+  if (['income', 'reimbursement', 'borrowedCash'].includes(item.type)) return amount;
+  if (item.type === 'refund') {
+    const original = (state.transactions || []).find(transaction => transaction.id === item.originalTransactionId);
+    const eligibleOriginal = original?.type === 'expense' && !original.financeGroup && !original.donationPaymentId
+      && (!original.creditAgreementId || original.creditPaymentKind === 'deposit') && !original.creditCardId;
+    return (item.refundStatus || 'received') === 'received' && eligibleOriginal && !item.refundToCard && !item.refundToPerson ? amount : 0;
+  }
+  return 0;
+}
+
+/** Per-account transaction totals in the same minor units used by the account ledger. */
+export function financeAccountPosition(state, accountId, asOfDate = '9999-12-31') {
+  const account = (state.accounts || []).find(item => item.id === accountId);
+  if (!account) return { account: null, available: false, reason: 'missing-account' };
+  const hasOpeningBalance = Number.isSafeInteger(account.openingBalance);
+  const openingBalance = hasOpeningBalance ? account.openingBalance : 0;
+  const transactions = (state.transactions || []).filter(item => live(item) && booked(item)
+    && String(item.date || '').slice(0, 10) <= asOfDate && item.accountId === accountId);
+  const totals = { openingBalance, income: 0, refunds: 0, otherIncome: 0, expenses: 0, transfers: 0, balance: openingBalance, lastTransactionDate: '' };
+  for (const item of transactions) {
+    const movement = accountTransactionMovement(item, state);
+    if (!movement) continue;
+    if (item.type === 'transfer') totals.transfers += movement;
+    else if (item.type === 'refund') totals.refunds += movement;
+    else if (item.type === 'income') totals.income += movement;
+    else if (movement > 0) totals.otherIncome += movement;
+    else totals.expenses -= movement;
+    totals.balance += movement;
+    if (!Number.isSafeInteger(totals.balance) || !Number.isSafeInteger(totals.income) || !Number.isSafeInteger(totals.refunds) || !Number.isSafeInteger(totals.otherIncome) || !Number.isSafeInteger(totals.expenses) || !Number.isSafeInteger(totals.transfers)) {
+      return { account, available: false, reason: 'precision-overflow' };
+    }
+    const date = String(item.date || '').slice(0, 10);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(date) && date > totals.lastTransactionDate) totals.lastTransactionDate = date;
+  }
+  return { account, ...totals, available: hasOpeningBalance, ...(hasOpeningBalance ? {} : { reason: 'missing-opening-balance' }) };
+}
 
 export function createFinanceAccount(state, { name, type = 'bank', openingBalance = 0, currency = state.settings?.currency || 'GBP', accountId = id() }) {
   state.accounts ||= [];
@@ -13,21 +64,9 @@ export function createFinanceAccount(state, { name, type = 'bank', openingBalanc
 }
 
 export function financeAccountBalance(state, accountId, asOfDate = '9999-12-31') {
-  const account = (state.accounts || []).find(item => item.id === accountId);
-  if (!account) return 0;
-  return (state.transactions || []).filter(item => live(item) && String(item.date || '').slice(0, 10) <= asOfDate && item.accountId === accountId)
-    .reduce((balance, item) => {
-      if (item.type === 'transfer' && item.transferKind === 'linked' && item.linkedTransferId) return balance + (item.transferSide === 'in' ? item.amount : -item.amount);
-      if (item.type === 'transfer' && item.transferKind === 'external-out') return balance - item.amount;
-      if (item.type === 'transfer' && item.transferKind === 'card-payment' && item.accountId === accountId && item.accountingKind !== 'card-liability-only') return balance - item.amount;
-      if (item.type === 'transfer' && item.transferKind === 'external-in') return balance + item.amount;
-      if (item.type === 'expense' || item.type === 'creditPayment') return balance - item.amount;
-      if (item.type === 'debt' && item.allocationStatus !== 'allocated' && item.allocationStatus !== 'cancelled' && item.allocationStatus !== 'planned') return balance - item.amount;
-      if (['income', 'reimbursement', 'borrowedCash'].includes(item.type) || item.type === 'refund' && (item.refundStatus || 'received') === 'received') return balance + item.amount;
-      return balance;
-    }, account.openingBalance || 0);
+  const position = financeAccountPosition(state, accountId, asOfDate);
+  return position.available || position.reason === 'missing-opening-balance' ? position.balance : 0;
 }
-
 export function findPossibleTransfer(record, accountId, transactions, windowDays = 3) {
   const date = Date.parse(`${record.date}T00:00:00Z`);
   if (!Number.isFinite(date)) return null;

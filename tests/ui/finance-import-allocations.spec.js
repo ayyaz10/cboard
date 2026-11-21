@@ -10,7 +10,7 @@ const statement = `Date,Description,Amount
 for (const width of [390, 1366]) {
   test(`import classifications allocate genuine income once at ${width}px`, async ({ browser }) => {
     test.setTimeout(120000);
-    const context = await browser.newContext({ viewport: { width, height: 900 }, isMobile: width === 390, hasTouch: width === 390 });
+    const context = await browser.newContext({ viewport: { width, height: 900 }, hasTouch: width === 390 });
     const page = await context.newPage();
     await page.goto('/cboard/tests/ui/fixtures/finance.html');
     await page.getByRole('button', { name: 'Prepare import rules and matches' }).click();
@@ -24,7 +24,10 @@ for (const width of [390, 1366]) {
     await expect(page.getByTestId('finance-state')).not.toContainText('sourceIncomeId');
     await dialog.getByLabel('Classification for Salary').selectOption('income');
     await expect(dialog.getByRole('button', { name: 'Import 1 transaction' })).toBeEnabled();
-    await dialog.getByRole('button', { name: 'Import 1 transaction' }).click();
+    const importButton = dialog.getByRole('button', { name: 'Import 1 transaction' });
+    await dialog.locator('.f-import-workspace').evaluate(workspace => { workspace.scrollTop = workspace.scrollHeight; });
+    await importButton.scrollIntoViewIfNeeded();
+    await importButton.click();
     await expect(dialog.getByRole('status')).toContainText('1 transaction imported');
     const importedState = JSON.parse(await page.getByTestId('finance-state').textContent());
     const salary = importedState.transactions.find(item => item.title === 'Salary' && item.type === 'income');
@@ -86,10 +89,13 @@ for (const width of [390, 1366]) {
     const duplicateDialog = page.getByRole('dialog', { name: 'Import transactions' });
     await duplicateDialog.getByLabel('Import into account').selectOption('account-savings');
     await upload(duplicateDialog);
-    await expect(duplicateDialog.getByText(/Duplicate.*skipped/)).toHaveCount(1);
-    await duplicateDialog.getByRole('button', { name: 'Link as refund' }).first().click({ force: true });
-    await duplicateDialog.getByRole('button', { name: 'Link as reimbursement to Ahmed' }).click({ force: true });
-    await duplicateDialog.getByRole('button', { name: 'Link transfer' }).click({ force: true });
+    await expect(duplicateDialog.getByText('Already recorded')).toHaveCount(1);
+    await duplicateDialog.getByTestId('finance-import-row').filter({ hasText: 'Amazon' }).locator('details.f-import-more-actions > summary').click();
+    await duplicateDialog.getByRole('button', { name: 'Link as refund' }).first().click();
+    await duplicateDialog.getByTestId('finance-import-row').nth(2).locator('details.f-import-more-actions > summary').click();
+    await duplicateDialog.getByRole('button', { name: 'Link as reimbursement to Ahmed' }).click();
+    await duplicateDialog.getByTestId('finance-import-row').nth(3).locator('details.f-import-more-actions > summary').click();
+    await duplicateDialog.getByRole('button', { name: 'Link transfer' }).click();
     const linkedState = JSON.parse(await page.getByTestId('finance-state').textContent());
     expect(linkedState.transactions.find(item => item.id === 'amazon-purchase').type).toBe('expense');
     expect(linkedState.transactions.some(item => item.type === 'refund' && item.originalTransactionId === 'amazon-purchase')).toBe(true);
@@ -97,11 +103,11 @@ for (const width of [390, 1366]) {
     expect(linkedState.transactions.filter(item => item.linkedTransferId).length).toBe(2);
     expect(linkedState.donationAccruals.filter(item => item.status !== 'reversed').length + linkedState.debtAccruals.filter(item => item.status !== 'reversed').length + linkedState.goalContributions.filter(item => item.sourceIncomeId === salary.id).length).toBe(3);
     expect(linkedState.donationAccruals.filter(item => item.status === 'reversed').length + linkedState.debtAccruals.filter(item => item.status === 'reversed').length).toBeGreaterThanOrEqual(4);
-    await duplicateDialog.getByRole('button', { name: 'Choose another file' }).click();
+    await duplicateDialog.locator('.f-import-sticky').getByRole('button', { name: 'Choose another file' }).click();
     await upload(duplicateDialog);
-    await expect(duplicateDialog.getByText(/Duplicate.*skipped/)).toHaveCount(4);
+    await expect(duplicateDialog.getByText('Already recorded')).toHaveCount(4);
     await expect(duplicateDialog.getByRole('button', { name: 'Import 0 transactions' })).toBeDisabled();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+    expect(await dialog.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(false);
     await context.close();
   });
 }

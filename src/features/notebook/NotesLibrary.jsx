@@ -9,6 +9,8 @@ import {
   permanentlyDeleteNote, restoreNote, setNotePinned, subscribeToNotes, trashNote, unarchiveNote, updateNote,
 } from '../../services/noteService';
 import { createId } from '../progressTracker/progressTrackerStorage';
+import { getLifeLearningNote, listLifeItemChoices, saveLifeLearningNote } from '../../services/lifeAreasService.js';
+import { parseYouTubeTimestamp, validLifeAreaId } from '../lifeAreas/lifeAreaModel.js';
 import { getTextFromHtml, isSafeNoteMedia } from './noteContent';
 import { getNotesLoadMessage, readNotesCache, reportNotesFailure, shouldShowNotesEmpty, writeNotesCache } from './notesLoadState';
 const RichDocumentEditor = lazy(() => import('./RichDocumentEditor').then((module) => ({ default: module.RichDocumentEditor })));
@@ -70,7 +72,7 @@ const NotesListItem = memo(function NotesListItem({ note, selected, onSelect }) 
   </button>;
 });
 
-export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
+export function NotesLibrary({ userId, goals = [], initialNoteId = '', initialLifeItemId = '' }) {
   const { confirm, dialog } = useConfirmDialog();
   const [initialUiState] = useState(() => readLibraryState(userId));
   const initialView = views.some((item) => item.id === initialUiState.view) ? initialUiState.view : 'active';
@@ -90,6 +92,12 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
   const [lastSelectedId, setLastSelectedId] = useState(initialNoteId || initialUiState.selectedId || '');
   const [workingNote, setWorkingNote] = useState(null);
   const [tagText, setTagText] = useState('');
+  const [learningChoices, setLearningChoices] = useState([]);
+  const [learningDraft, setLearningDraft] = useState({ lifeItemId: '', sourceType: 'other', sourceUrl: '', youtubeTimestamp: '', keyTakeaways: '', observations: '' });
+  const [learningMeta, setLearningMeta] = useState(null);
+  const [learningError, setLearningError] = useState('');
+  const [learningSaving, setLearningSaving] = useState(false);
+  const initialCaptureStarted = useRef(false);
   const [editingProperties, setEditingProperties] = useState({ tracker: false, tags: false });
   const [isNewNote, setIsNewNote] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -230,6 +238,13 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
   }, [userId, view, query, sortBy, lastSelectedId, initialUiState.scrollTop]);
 
   useEffect(() => {
+    let active = true;
+    setLearningChoices([]);
+    if (userId) listLifeItemChoices().then(rows => { if (active) setLearningChoices(rows); }).catch(problem => { if (active) setLearningError(problem?.message || 'Projects and Skills could not be loaded.'); });
+    return () => { active = false; };
+  }, [userId]);
+
+  useEffect(() => {
     if (!userId) return;
     try { window.localStorage.setItem(`cboard:notes-full-width:${userId}`, String(fullWidth)); }
     catch { /* A width preference is optional and falls back to the comfortable width. */ }
@@ -294,6 +309,13 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
     if (!snapshot.isNewNote) void validateRecoveredDraft();
   }, [initialNoteId, updateWorkingNote, userId]);
 
+  useEffect(() => {
+    if (!initialLifeItemId || initialCaptureStarted.current || isLoading || selectedId || recovered) return;
+    if (!validLifeAreaId(initialLifeItemId)) { setLearningError('That Project or Skill link is invalid.'); initialCaptureStarted.current = true; return; }
+    initialCaptureStarted.current = true;
+    void startNewNote(initialLifeItemId);
+  }, [initialLifeItemId, isLoading, selectedId, recovered]);
+
   const orderedNotes = useMemo(() => notes, [notes]);
 
   function preserveCurrentDraft() {
@@ -327,8 +349,11 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
     setErrorType('');
     const startedAt = performance.now();
     try {
-      const note = await getNoteById(noteId);
+      const [noteResult, metadataResult] = await Promise.allSettled([getNoteById(noteId), getLifeLearningNote(noteId)]);
       if (requestId !== detailRequest.current) return;
+      if (noteResult.status === 'rejected') throw noteResult.reason;
+      const note = noteResult.value;
+      const metadata = metadataResult.status === 'fulfilled' ? metadataResult.value : null;
       if (!note) {
         setSelectedId('');
         setLastSelectedId('');
@@ -337,6 +362,9 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
         return;
       }
       updateWorkingNote(note);
+      setLearningMeta(metadata);
+      setLearningDraft({ lifeItemId: metadata?.lifeItemId || '', sourceType: metadata?.sourceType || 'other', sourceUrl: metadata?.sourceUrl || '', youtubeTimestamp: metadata?.youtubeSeconds == null ? '' : String(metadata.youtubeSeconds), keyTakeaways: metadata?.keyTakeaways || '', observations: metadata?.observations || '' });
+      setLearningError(metadataResult.status === 'rejected' ? 'Learning details could not be loaded. Retry from this panel after the Life Areas migration is available.' : '');
       setEditingProperties({ tracker: false, tags: false });
       tagTextRef.current = tagsToText(note.tags);
       setTagText(tagTextRef.current);
@@ -362,7 +390,7 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
     else if (!initialNoteId && selectedId && !isNewNote) { detailRequest.current += 1; setSelectedId(''); }
   }, [initialNoteId]);
 
-  async function startNewNote() {
+  async function startNewNote(requestedLifeItemId = '') {
     documentEditorRef.current?.flush();
     const currentNote = workingRef.current;
     if (currentNote && getEditorSignature({ ...currentNote, tags: tagTextRef.current }) !== savedSignature.current) {
@@ -373,6 +401,9 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
     if (initialNoteId) navigateTo('/notes');
     const note = emptyNote();
     updateWorkingNote(note);
+    setLearningMeta(null);
+    setLearningDraft({ lifeItemId: requestedLifeItemId || '', sourceType: 'other', sourceUrl: '', youtubeTimestamp: '', keyTakeaways: '', observations: '' });
+    setLearningError('');
     setEditingProperties({ tracker: false, tags: false });
     tagTextRef.current = '';
     setTagText('');
@@ -472,6 +503,22 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
     }
   }
 
+  async function saveLearningDetails() {
+    const note = workingRef.current;
+    if (!note || !learningDraft.lifeItemId) { setLearningError('Choose a Project or Skill first.'); return; }
+    if (saveLock.current) { setLearningError('The note is still saving. Wait a moment, then save learning details.'); return; }
+    if (!await saveNote()) { setLearningError('Save the Notebook note first, then retry the learning details.'); return; }
+    setLearningSaving(true); setLearningError('');
+    try {
+      const seconds = learningDraft.sourceType === 'youtube' ? parseYouTubeTimestamp(learningDraft.youtubeTimestamp) : null;
+      const updatedAt = await saveLifeLearningNote({ ...learningDraft, noteId: workingRef.current.id, youtubeSeconds: seconds, expectedUpdatedAt: learningMeta?.updatedAt || null });
+      setLearningMeta({ ...learningDraft, youtubeSeconds: seconds, updatedAt });
+      setLearningDraft(current => ({ ...current, youtubeTimestamp: seconds == null ? '' : String(seconds) }));
+      setLearningError('');
+    } catch (problem) { setLearningError(problem?.message || 'Learning details could not be saved. Retry safely.'); }
+    finally { setLearningSaving(false); }
+  }
+
   const workingSignature = workingNote ? getEditorSignature({ ...workingNote, tags: tagText }) : '';
   useEffect(() => {
     if (!workingNote || !selectedId || workingSignature === savedSignature.current || saveState === 'error') return undefined;
@@ -566,7 +613,7 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
         <header className="notes-library-header">
           <div className="notes-library-heading">
             <div><span className="notes-eyebrow">Your workspace</span><h2>{activeViewLabel}</h2></div>
-            <button type="button" className="notes-primary-button" onClick={startNewNote}><FilePlus2 size={17} aria-hidden="true" /> New note</button>
+            <button type="button" className="notes-primary-button" onClick={() => startNewNote()}><FilePlus2 size={17} aria-hidden="true" /> New note</button>
           </div>
           <label className="notes-search"><Search size={17} aria-hidden="true" /><span className="sr-only">Search notes</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search title, text, or tags" /></label>
           <nav className="notes-views" aria-label="Note views">
@@ -585,7 +632,7 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
         }}>
           {isLoading && !orderedNotes.length && <div className="notes-skeleton-list" aria-hidden="true">{Array.from({ length: 5 }, (_, index) => <div className="notes-skeleton-row" key={index}><span className="notes-skeleton notes-skeleton-title" /><span className="notes-skeleton notes-skeleton-preview" /><span className="notes-skeleton notes-skeleton-date" /></div>)}</div>}
           {error && <div className="notes-inline-error" role="alert" data-error-type={errorType}><span>{error}{orderedNotes.length > 0 ? ' Showing the last successfully loaded list.' : ''}</span><button type="button" onClick={() => loadLibrary({ retry: true })} className="underline" disabled={isLoading}>{isLoading ? 'Retrying...' : 'Retry'}</button></div>}
-          {shouldShowNotesEmpty({ isLoading, error, notes: orderedNotes }) && <div className="notes-empty"><strong>{query ? 'No notes match this search' : view === 'trash' ? 'Trash is empty' : view === 'archived' ? 'No archived notes' : view === 'pinned' ? 'No pinned notes' : 'No notes yet'}</strong><span>{query ? 'Try another search.' : view === 'active' ? 'Capture ideas, plans, and anything you want to remember.' : ''}</span>{query ? <button type="button" className="notes-secondary-button" onClick={() => setQuery('')}>Clear search</button> : view === 'active' ? <button type="button" className="notes-primary-button" onClick={startNewNote}><FilePlus2 size={16} aria-hidden="true" /> New note</button> : null}</div>}
+          {shouldShowNotesEmpty({ isLoading, error, notes: orderedNotes }) && <div className="notes-empty"><strong>{query ? 'No notes match this search' : view === 'trash' ? 'Trash is empty' : view === 'archived' ? 'No archived notes' : view === 'pinned' ? 'No pinned notes' : 'No notes yet'}</strong><span>{query ? 'Try another search.' : view === 'active' ? 'Capture ideas, plans, and anything you want to remember.' : ''}</span>{query ? <button type="button" className="notes-secondary-button" onClick={() => setQuery('')}>Clear search</button> : view === 'active' ? <button type="button" className="notes-primary-button" onClick={() => startNewNote()}><FilePlus2 size={16} aria-hidden="true" /> New note</button> : null}</div>}
           {orderedNotes.map((note) => <NotesListItem key={note.id} note={note} selected={(selectedId || lastSelectedId) === note.id} onSelect={handleChooseNote} />)}
           {hasMore && <button className="notes-secondary-button notes-load-more" type="button" onClick={() => loadLibrary({ append: true })} disabled={isLoading || isLoadingMore}>{isLoadingMore ? 'Loading...' : 'Load more'}</button>}
           {view === 'trash' && orderedNotes.length > 0 && <button className="notes-danger-button notes-empty-trash" type="button" onClick={handleEmptyTrash}>Empty Trash</button>}
@@ -624,6 +671,7 @@ export function NotesLibrary({ userId, goals = [], initialNoteId = '' }) {
               <div className="notes-property"><span>Tags</span>{editingProperties.tags ? <input autoFocus aria-label="Note tags, comma separated" value={tagText} maxLength={1547} onChange={(event) => { tagTextRef.current = event.target.value; setTagText(event.target.value); }} onBlur={() => setEditingProperties((value) => ({ ...value, tags: false }))} onKeyDown={(event) => { if (event.key === 'Escape') event.currentTarget.blur(); }} placeholder="Add tags, separated by commas" /> : <button type="button" aria-label={`Edit tags${tagText.trim() ? `: ${tagText}` : ''}`} onClick={() => setEditingProperties((value) => ({ ...value, tags: true }))}>{tagText.trim() ? tagText.split(',').map((tag) => tag.trim()).filter(Boolean).map((tag) => <span className="notes-property-chip" key={tag}>{tag}</span>) : <span className="notes-property-empty">Add tags</span>}</button>}</div>
             </div>}
             {!goals.length && !tagText.trim() && !editingProperties.tags && <button type="button" className="notes-add-property" onClick={() => setEditingProperties((value) => ({ ...value, tags: true }))}>Add tags</button>}
+            <section className="learning-note-panel" aria-labelledby="learning-note-title"><div><h3 id="learning-note-title">Learning details</h3><p>Optionally attach this Notebook note to a Project or Skill.</p></div><label>Project or Skill<select aria-label="Project or Skill" value={learningDraft.lifeItemId} onChange={event => setLearningDraft(current => ({ ...current, lifeItemId: event.target.value }))}><option value="">Not linked</option>{learningChoices.map(choice => <option value={choice.id} key={choice.id}>{choice.name} ({choice.item_type})</option>)}</select></label>{learningDraft.lifeItemId && <><label>Source type<select aria-label="Source type" value={learningDraft.sourceType} onChange={event => setLearningDraft(current => ({ ...current, sourceType: event.target.value }))}><option value="other">Other</option><option value="youtube">YouTube</option><option value="article">Article</option><option value="book">Book</option><option value="course">Course</option></select></label><label>Source URL<input aria-label="Source URL" type="url" maxLength={2048} value={learningDraft.sourceUrl} onChange={event => setLearningDraft(current => ({ ...current, sourceUrl: event.target.value }))} placeholder="https://..." /></label>{learningDraft.sourceType === 'youtube' && <label>YouTube timestamp<input aria-label="YouTube timestamp" value={learningDraft.youtubeTimestamp} onChange={event => setLearningDraft(current => ({ ...current, youtubeTimestamp: event.target.value }))} placeholder="4:32" /></label>}<label>Key takeaways<textarea aria-label="Key takeaways" maxLength={5000} value={learningDraft.keyTakeaways} onChange={event => setLearningDraft(current => ({ ...current, keyTakeaways: event.target.value }))} /></label><label>Observations<textarea aria-label="Observations" maxLength={5000} value={learningDraft.observations} onChange={event => setLearningDraft(current => ({ ...current, observations: event.target.value }))} /></label><button type="button" className="notes-secondary-button" disabled={learningSaving || isSaving || saveState === 'pending'} onClick={saveLearningDetails}>{learningSaving ? 'Saving learning details...' : learningMeta ? 'Save learning details' : 'Attach learning note'}</button></>}{learningError && <p role="alert">{learningError}</p>}{learningMeta && !learningError && <p role="status">Learning details saved.</p>}</section>
             <Suspense fallback={<div className="notes-document-loading" role="status">Opening writing tools…</div>}>
               <RichDocumentEditor editorApiRef={documentEditorRef} value={workingNote.contentHtml || ''} onChange={(contentHtml) => updateWorkingNote((current) => ({ ...current, contentHtml }))} media={workingNote.media || []} onMediaChange={(media) => updateWorkingNote((current) => ({ ...current, media }))} ariaLabel="Note content" />
             </Suspense>

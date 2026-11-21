@@ -1,8 +1,9 @@
 import { test } from 'node:test';
+import { financeSummary } from './financeMath.js';
 import assert from 'node:assert/strict';
-import { createFinanceAccount, financeAccountBalance, findMatchingAccountTransaction, findPossibleCardPayment, findPossibleTransfer, linkCardPaymentState, linkExistingTransactionsAsTransferState } from './financeAccounts.js';
+import { createFinanceAccount, financeAccountBalance, financeAccountPosition, findMatchingAccountTransaction, findPossibleCardPayment, findPossibleTransfer, linkCardPaymentState, linkExistingTransactionsAsTransferState } from './financeAccounts.js';
 
-const state = () => ({ settings: { currency: 'GBP' }, accounts: [], creditCards: [], transactions: [] });
+const state = () => ({ settings: { currency: 'GBP', monthlyIncome: 0 }, budgets: {}, accounts: [], creditCards: [], transactions: [] });
 
 test('account imports change the selected stable account balance and persist via state', () => {
   const data = state(); createFinanceAccount(data, { name: 'Current', accountId: 'current', openingBalance: 10000 });
@@ -59,4 +60,78 @@ test('Credit Purchase payments reduce the selected stable account once and rever
   assert.equal(financeAccountBalance(data, 'current'), 7075);
   payment.reversedAt = '2026-11-26T10:00:00.000Z';
   assert.equal(financeAccountBalance(data, 'current'), 10000);
+});
+
+test('account position includes the opening balance, income, paid expenses, debt payments, and refunds in minor units', () => {
+  const data = state(); createFinanceAccount(data, { name: 'Current', accountId: 'current', openingBalance: 10000 });
+  data.transactions.push(
+    { id: 'salary', accountId: 'current', type: 'income', amount: 12500, date: '2026-11-01' },
+    { id: 'side-income', accountId: 'current', type: 'income', amount: 1500, date: '2026-11-01' },
+    { id: 'groceries', accountId: 'current', type: 'expense', amount: 1250, date: '2026-11-02' },
+    { id: 'debt', accountId: 'current', type: 'debt', amount: 300, date: '2026-11-03', allocationStatus: 'paid' },
+    { id: 'donation', accountId: 'current', type: 'donation', amount: 700, date: '2026-11-04', allocationStatus: 'paid' },
+    { id: 'original', accountId: 'current', type: 'expense', amount: 800, date: '2026-11-04' },
+    { id: 'refund', accountId: 'current', type: 'refund', amount: 200, date: '2026-11-05', originalTransactionId: 'original', refundStatus: 'received' },
+    { id: 'pending-refund', accountId: 'current', type: 'refund', amount: 100, date: '2026-11-06', originalTransactionId: 'original', refundStatus: 'pending' },
+  );
+  const position = financeAccountPosition(data, 'current');
+  assert.deepEqual([position.openingBalance, position.income, position.refunds, position.otherIncome, position.expenses, position.balance, position.lastTransactionDate], [10000, 14000, 200, 0, 3050, 21150, '2026-11-05']);
+  assert.equal(financeAccountBalance(data, 'current'), position.balance);
+});
+
+
+test('linked transfers and account-specific cash deposits are not combined across accounts or currencies', () => {
+  const data = state();
+  createFinanceAccount(data, { name: 'Current', accountId: 'current', openingBalance: 50000, currency: 'GBP' });
+  createFinanceAccount(data, { name: 'Savings', accountId: 'savings', type: 'savings', openingBalance: 10000, currency: 'USD' });
+  data.transactions.push(
+    { id: 'out', accountId: 'current', type: 'transfer', transferKind: 'linked', linkedTransferId: 'pair', transferSide: 'out', amount: 12000, date: '2026-11-01' },
+    { id: 'in', accountId: 'savings', type: 'transfer', transferKind: 'linked', linkedTransferId: 'pair', transferSide: 'in', amount: 12000, date: '2026-11-01' },
+    { id: 'cash-withdrawal', accountId: 'current', type: 'expense', amount: 5000, date: '2026-11-02' },
+    { id: 'cash-deposit', accountId: 'current', type: 'income', amount: 1500, date: '2026-11-03' },
+  );
+  const current = financeAccountPosition(data, 'current');
+  const savings = financeAccountPosition(data, 'savings');
+  assert.deepEqual([current.balance, current.transfers, current.expenses, current.income], [34500, -12000, 5000, 1500]);
+  assert.deepEqual([savings.balance, savings.transfers, savings.account.currency], [22000, 12000, 'USD']);
+});
+
+test('pending bank imports, cancelled, planned, and allocated records do not change the account position', () => {
+  const data = state(); createFinanceAccount(data, { name: 'Current', accountId: 'current', openingBalance: 50000 });
+  data.transactions.push(
+    { id: 'pending', accountId: 'current', type: 'income', amount: 10000, date: '2026-11-01', source: 'bank', providerStatus: 'PENDING' },
+    { id: 'booked', accountId: 'current', type: 'income', amount: 3000, date: '2026-11-02', source: 'bank', providerStatus: 'BOOK' },
+    { id: 'planned', accountId: 'current', type: 'expense', amount: 2000, date: '2026-11-03', allocationStatus: 'planned' },
+    { id: 'cancelled', accountId: 'current', type: 'expense', amount: 2000, date: '2026-11-03', allocationStatus: 'cancelled' },
+    { id: 'reserved-debt', accountId: 'current', type: 'debt', amount: 4000, date: '2026-11-03', allocationStatus: 'allocated' },
+  );
+  assert.equal(financeAccountPosition(data, 'current').balance, 53000);
+});
+
+test('edited or deleted transactions recalculate while missing opening balances stay unavailable', () => {
+  const data = state(); data.accounts.push({ id: 'legacy', name: 'Legacy', type: 'bank', currency: 'GBP' });
+  createFinanceAccount(data, { name: 'Current', accountId: 'current', openingBalance: 1000 });
+  const edit = { id: 'expense', accountId: 'current', type: 'expense', amount: 250, date: '2026-11-01' };
+  data.transactions.push(edit);
+  assert.equal(financeAccountPosition(data, 'current').balance, 750);
+  edit.amount = 125;
+  assert.equal(financeAccountPosition(data, 'current').balance, 875);
+  data.transactions = data.transactions.filter(item => item.id !== edit.id);
+  assert.equal(financeAccountPosition(data, 'current').balance, 1000);
+  assert.deepEqual([financeAccountPosition(data, 'legacy').available, financeAccountPosition(data, 'legacy').reason], [false, 'missing-opening-balance']);
+});
+
+test('account position rejects unsafe aggregate precision rather than rounding silently', () => {
+  const data = state(); createFinanceAccount(data, { name: 'Current', accountId: 'current', openingBalance: Number.MAX_SAFE_INTEGER });
+  data.transactions.push({ id: 'income', accountId: 'current', type: 'income', amount: 1, date: '2026-11-01' });
+  assert.equal(financeAccountPosition(data, 'current').reason, 'precision-overflow');
+});
+
+test('account position calculation does not mutate or replace existing Finance totals', () => {
+  const data = state(); createFinanceAccount(data, { name: 'Current', accountId: 'current', openingBalance: 20000 });
+  data.transactions.push({ id: 'income', accountId: 'current', type: 'income', amount: 5000, date: '2026-11-01' }, { id: 'expense', accountId: 'current', type: 'expense', amount: 1200, date: '2026-11-02' }, { id: 'debt', accountId: 'current', type: 'debt', amount: 300, date: '2026-11-03' });
+  const before = financeSummary(data, null);
+  assert.equal(financeAccountPosition(data, 'current').balance, 23500);
+  const after = financeSummary(data, null);
+  assert.deepEqual([after.income, after.expenses, after.debtPayments, after.remaining], [before.income, before.expenses, before.debtPayments, before.remaining]);
 });

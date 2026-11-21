@@ -1,4 +1,6 @@
-import { getAppHref } from '../../app/useRoute.js';
+import { getAppHref, navigateTo } from '../../app/useRoute.js';
+import { useEffect, useState } from 'react';
+import { listLifeAreasOverview } from '../../services/lifeAreasService.js';
 import { Button } from '../../components/ui/Button.jsx';
 import { formatMoney } from '../finance/financeMath.js';
 import { formatWeightDate } from '../weightProgress/weightData.js';
@@ -15,8 +17,14 @@ function SummaryCard({ title, eyebrow, status, onRetry, children, className = ''
 }
 
 export function MyLifeOverview({ sections, onRefresh }) {
+  const [lifeRows, setLifeRows] = useState([]), [lifeLoading, setLifeLoading] = useState(true), [lifeError, setLifeError] = useState('');
+  const [lifeRevision, setLifeRevision] = useState(0);
+  useEffect(() => { let active = true; setLifeLoading(true); listLifeAreasOverview().then(rows => { if (active) { setLifeRows(rows); setLifeError(''); } }).catch(problem => { if (active) setLifeError(problem?.message || 'Life Areas summary could not be loaded.'); }).finally(() => { if (active) setLifeLoading(false); }); return () => { active = false; }; }, [lifeRevision]);
   return <section className="my-life-overview" aria-labelledby="my-life-title">
     <header className="my-life-header"><div><p className="life-eyebrow">Your life at a glance</p><h1 id="my-life-title">My Life</h1><p className="life-muted">A compact view of information already saved in CBoard.</p></div><Button onClick={onRefresh}>Refresh summaries</Button></header>
+    <section className="life-summary-card life-areas-summary" aria-label="Life Areas and next actions"><div className="life-summary-heading"><div><p className="life-eyebrow">Projects and Skills</p><h2>Life Areas</h2></div><ModuleLink href="/life-areas">Open Life Areas</ModuleLink></div>
+      {lifeLoading ? <p role="status">Loading Life Areas...</p> : lifeError ? <div role="alert"><p>{lifeError}</p><Button onClick={() => setLifeRevision(value => value + 1)}>Retry</Button></div> : !lifeRows.length ? <p className="life-muted">No active areas yet. Create one to organize your projects and skills.</p> : <ul className="life-areas-summary-list">{lifeRows.map((row, index) => <li key={`${row.areaId}:${row.itemId || index}`}><button type="button" onClick={() => navigateTo(row.itemId ? `/life-areas/${row.areaId}/${row.itemId}` : `/life-areas/${row.areaId}`)}><span>{row.areaIcon}</span><span><strong>{row.itemName || row.areaName}</strong><small>{row.itemName ? `${row.itemType} in ${row.areaName}` : 'Life Area'}{row.linkedGoalTitle ? ` | Goal: ${row.linkedGoalTitle}` : ''}{row.nextTaskTitle ? ` | Next: ${row.nextTaskTitle}${row.nextTaskDueAt ? ` (${new Date(row.nextTaskDueAt).toLocaleDateString()})` : ''}` : ''}</small></span></button></li>)}</ul>}
+    </section>
     <div className="my-life-grid">
       <SummaryCard title="Finance" eyebrow="Money" status={sections.finance} onRetry={onRefresh}>
         {data => <><dl className="life-metrics"><div><dt>Spendable now</dt><dd>{formatMoney(data.spendable, data.currency)}</dd></div><div><dt>Debt outstanding</dt><dd>{formatMoney(data.debtOutstanding, data.currency)}</dd></div><div><dt>Income this month</dt><dd>{formatMoney(data.monthlyIncome, data.currency)}</dd></div><div><dt>Spending this month</dt><dd>{formatMoney(data.monthlyExpenses, data.currency)}</dd></div></dl><p className="life-muted">{data.upcomingPayments.length? `${data.upcomingPayments.length} scheduled credit payment${data.upcomingPayments.length === 1? '' : 's'} in the next 7 days.` : 'No scheduled credit payments in the next 7 days.'}</p><ModuleLink href="/finance">Open Finance</ModuleLink></>}

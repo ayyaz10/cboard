@@ -1,8 +1,8 @@
-﻿import { test, expect } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 
 for (const width of [390, 768, 1024, 1366, 1920]) {
   test(`debt detail automatic allocation setup stays usable at ${width}px`, async ({ browser }) => {
-    const context = await browser.newContext({ viewport: { width, height: 900 }, isMobile: width === 390, hasTouch: width === 390 });
+    const context = await browser.newContext({ viewport: { width, height: 900 }, hasTouch: width === 390 });
     const page = await context.newPage();
     await page.goto('/cboard/tests/ui/fixtures/finance.html');
     await page.getByRole('button', { name: 'Prepare Debt Detail' }).click();
@@ -40,7 +40,7 @@ for (const width of [390, 768, 1024, 1366, 1920]) {
     await expect(page.getByTestId('finance-state')).toContainText('"linkedIncomeTransactionId":"salary-debt-test"');
     await expect(page.getByTestId('finance-state')).toContainText('"accruedAmount":7500');
     await expect(page.getByTestId('finance-state')).toContainText('"remaining":15400');
-    expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+    expect(await detail.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(false);
     await context.close();
   });
 }

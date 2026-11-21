@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { getGoals } from '../../services/goalService';
 import { NotesLibrary } from './NotesLibrary';
 
-export function NotebookPage({ noteId = '' }) {
+export function NotebookPage({ noteId = '', lifeItemId = '' }) {
   const { user } = useAuth();
   const [goals, setGoals] = useState([]);
   const [goalsError, setGoalsError] = useState(false);
@@ -23,7 +23,7 @@ export function NotebookPage({ noteId = '' }) {
           <p>Capture, organize, find, and recover your thoughts.</p>
           {goalsError && <p role="status">Progress tracker links could not be loaded. Notes are still available.</p>}
         </header>
-        <NotesLibrary key={user?.id || 'signed-out'} userId={user?.id} goals={goals} initialNoteId={noteId} />
+        <NotesLibrary key={user?.id || 'signed-out'} userId={user?.id} goals={goals} initialNoteId={noteId} initialLifeItemId={lifeItemId} />
       </section>
     </PageShell>
   );

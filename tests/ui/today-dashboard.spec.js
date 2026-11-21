@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+﻿import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 
 const env = readFileSync('.env.local', 'utf8');
@@ -17,6 +17,8 @@ async function prepare(page) {
   const records = new Map();
   const tasks = new Map();
   let listCalls = 0;
+  let dashboardPreference = null;
+  let failNextPreferenceWrite = false;
   await page.route('**/*', async route => {
     const url = new URL(route.request().url());
     if (url.hostname !== new URL(supabaseUrl).hostname) return route.continue();
@@ -49,10 +51,20 @@ async function prepare(page) {
       if (row && !row.completed_at) { row.completed_at = new Date().toISOString(); row.updated_at = row.completed_at; }
       return json(row ? [row] : []);
     }
-    if (url.pathname.includes('/rest/v1/')) return json([]);
+    if (url.pathname.endsWith('/rest/v1/user_tool_preferences')) {
+      const method = route.request().method();
+      const body = method === 'POST' || method === 'PATCH' ? route.request().postDataJSON() : null;
+      const key = (Array.isArray(body) ? body[0]?.key : body?.key) || url.searchParams.get('key')?.replace(/^eq\./, '');
+      if (key === 'cboard:dashboard-widgets:v1') {
+        if (method === 'GET') return json(dashboardPreference ? [dashboardPreference] : []);
+        dashboardPreference = { user_id: userId, key, value: Array.isArray(body) ? body[0].value : body.value, updated_at: new Date().toISOString() };
+        if (failNextPreferenceWrite) { failNextPreferenceWrite = false; return json({ message: 'Simulated lost save response' }, 503); }
+        return json([dashboardPreference]);
+      }
+    }    if (url.pathname.includes('/rest/v1/')) return json([]);
     return route.continue();
   });
-  return { records, listCalls: () => listCalls };
+  return { records, listCalls: () => listCalls, getDashboardPreference: () => dashboardPreference, simulateRemoteDashboardChange: value => { dashboardPreference = { user_id: userId, key: 'cboard:dashboard-widgets:v1', value, updated_at: new Date(Date.now() + 1000).toISOString() }; }, failNextPreferenceWrite: () => { failNextPreferenceWrite = true; } };
 }
 
 async function fillLocalDueDate(page, offsetMinutes = 90) {
@@ -138,4 +150,88 @@ test('My Life presents connected module summaries and remains usable on mobile a
   }
   await page.setViewportSize({ width: 1366, height: 900 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
+});
+
+test('Dashboard widgets can be customized, pinned, and restored after refresh on phone and desktop', async ({ page }) => {
+  const fixture = await prepare(page);
+  for (const width of [390, 1366]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/cboard/board');
+    await expect(page.locator('[data-dashboard-widget="today-agenda"]')).toBeVisible();
+    await page.getByRole('button', { name: 'Customize Dashboard' }).click();
+    await expect(page.getByRole('heading', { name: 'Customize Dashboard' })).toBeVisible();
+    await page.getByRole('checkbox', { name: 'Groceries widget visibility' }).click();
+    await page.getByRole('checkbox', { name: 'Finance Overview widget visibility' }).click();
+    await page.getByLabel('Training size').selectOption('expanded');
+    await page.getByRole('button', { name: 'Move Training up' }).click();
+    await page.getByLabel('Search calculators and modules').fill('Percentage');
+    await page.getByRole('checkbox', { name: 'Percentage Calculator pin' }).check();
+    await expect(page.locator('[data-dashboard-widget="groceries"]')).toBeVisible();
+    await expect(page.locator('[data-dashboard-widget="finance-overview"]')).toHaveCount(0);
+    await expect(page.locator('[data-dashboard-widget="training"]')).toHaveAttribute('data-widget-size', 'expanded');
+    await expect(page.getByRole('link', { name: 'Percentage Calculator' })).toHaveAttribute('href', /calculators\/percentage/);
+    await expect(page.getByText(/Previewing edits/)).toBeVisible();
+    await page.getByRole('button', { name: 'Save layout' }).click();
+    await expect(page.getByRole('button', { name: 'Customize Dashboard' })).toBeVisible();
+    await expect.poll(() => fixture.getDashboardPreference()?.value).not.toBeNull();
+    await page.reload();
+    await page.getByRole('button', { name: 'Customize Dashboard' }).click();
+    await expect(page.getByRole('checkbox', { name: 'Groceries widget visibility' })).toBeChecked();
+    await expect(page.getByRole('checkbox', { name: 'Finance Overview widget visibility' })).not.toBeChecked();
+    await expect(page.getByLabel('Training size')).toHaveValue('expanded');
+    await expect(page.getByRole('checkbox', { name: 'Percentage Calculator pin' })).toBeChecked();
+    await expect(page.locator('[data-dashboard-widget="groceries"]')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
+    await page.getByRole('button', { name: 'Restore default layout' }).click();
+    await expect(page.getByText(/Previewing edits/)).toBeVisible();
+    await page.getByRole('button', { name: 'Save layout' }).click();
+    await expect(page.getByRole('button', { name: 'Customize Dashboard' })).toBeVisible();
+    await expect.poll(() => fixture.getDashboardPreference()?.value).not.toBeNull();
+    await page.reload();
+  }
+  expect(fixture.records.size).toBe(0);
+});
+
+test('dashboard default reset restores the seven safe widgets and removes pinned tools', async ({ page }) => {
+  const fixture = await prepare(page);
+  await page.goto('/cboard/board');
+  await page.getByRole('button', { name: 'Customize Dashboard' }).click();
+  await page.getByRole('checkbox', { name: 'Groceries widget visibility' }).click();
+  await page.getByLabel('Search calculators and modules').fill('Percentage');
+  await page.getByRole('checkbox', { name: 'Percentage Calculator pin' }).check();
+  await page.getByRole('button', { name: 'Restore default layout' }).click();
+  await expect(page.locator('[data-dashboard-widget="groceries"]')).toHaveCount(0);
+  await expect(page.locator('[data-dashboard-widget="pinned-tools"]')).toContainText('Pin calculators or modules');
+  await expect(page.locator('.today-dashboard-grid [data-dashboard-widget]')).toHaveCount(7);
+  await page.getByRole('button', { name: 'Save layout' }).click();
+    await expect(page.getByRole('button', { name: 'Customize Dashboard' })).toBeVisible();
+    await expect.poll(() => fixture.getDashboardPreference()?.value).not.toBeNull();
+  await page.reload();
+  await expect(page.locator('.today-dashboard-grid [data-dashboard-widget]')).toHaveCount(7);
+});
+
+test('uncertain dashboard save remains idempotent after refresh', async ({ page }) => {
+  const fixture = await prepare(page);
+  await page.goto('/cboard/board');
+  await page.getByRole('button', { name: 'Customize Dashboard' }).click();
+  await page.getByRole('checkbox', { name: 'Groceries widget visibility' }).click();
+  fixture.failNextPreferenceWrite();
+  await page.getByRole('button', { name: 'Save layout' }).click();
+  await expect.poll(() => fixture.getDashboardPreference()?.value?.widgets.some(widget => widget.id === 'groceries')).toBe(true);
+  await page.reload();
+  await expect(page.locator('[data-dashboard-widget="groceries"]')).toBeVisible();
+  expect(fixture.getDashboardPreference().key).toBe('cboard:dashboard-widgets:v1');
+});
+test('a stale layout save leaves the newer cross-device preference untouched', async ({ page }) => {
+  const fixture = await prepare(page);
+  await page.goto('/cboard/board');
+  await page.getByRole('button', { name: 'Customize Dashboard' }).click();
+  await page.getByRole('checkbox', { name: 'Groceries widget visibility' }).click();
+  const remote = { version: 1, widgets: [{ id: 'today-agenda', size: 'expanded' }, { id: 'needs-attention', size: 'compact' }], pinnedTools: [] };
+  fixture.simulateRemoteDashboardChange(remote);
+  await page.getByRole('button', { name: 'Save layout' }).click();
+  await expect(page.getByRole('region', { name: 'Notifications alt+T' }).getByText(/Another device saved a newer dashboard layout/)).toBeVisible();
+  await expect(page.locator('[data-dashboard-widget="groceries"]')).toHaveCount(0);
+  await expect(page.locator('[data-dashboard-widget="finance-overview"]')).toHaveCount(0);
+  expect(fixture.getDashboardPreference().value.widgets.some(widget => widget.id === 'groceries')).toBe(false);
 });

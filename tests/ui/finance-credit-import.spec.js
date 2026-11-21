@@ -12,6 +12,7 @@ test('a statement payment can be recorded through canonical Credit Purchase acco
   });
   await expect(dialog.getByTestId('finance-import-count-found')).toContainText('1 transactions found');
   const row = dialog.getByTestId('finance-import-row');
+  await row.locator('details.f-import-more-actions > summary').click();
   await row.getByText('Link as Credit Purchase payment').click();
   await row.getByLabel('Credit Purchase').selectOption('agreement-1');
   await expect(row.getByLabel('Scheduled instalment')).toHaveValue(/.+/);

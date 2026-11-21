@@ -260,3 +260,9 @@ main.page-shell.page-shell--workspace {
 @media (prefers-reduced-motion: reduce) {
   .notes-library *, .notes-page * { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
 }
+
+.learning-note-panel { display:grid; gap:.7rem; margin:1rem 0; padding:1rem; border:1px solid var(--border, #8884); border-radius:.75rem; background:var(--surface, rgba(127,127,127,.04)); }
+.learning-note-panel h3,.learning-note-panel p { margin:.1rem 0; }
+.learning-note-panel > label { display:grid; gap:.35rem; font-size:.9rem; }
+.learning-note-panel input,.learning-note-panel select,.learning-note-panel textarea { width:100%; min-height:2.5rem; padding:.55rem .7rem; border:1px solid var(--border, #8888); border-radius:.45rem; background:var(--surface, transparent); color:inherit; font:inherit; }
+.learning-note-panel textarea { min-height:5rem; resize:vertical; }

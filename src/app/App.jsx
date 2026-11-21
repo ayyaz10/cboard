@@ -17,6 +17,7 @@ import {
 const ProgressTracker = lazy(() => import('../features/progressTracker/ProgressTracker').then(module => ({ default: module.ProgressTracker })));
 const FocusTimerPage = lazy(() => import('../features/focusTimer/FocusTimerPage').then(module => ({ default: module.FocusTimerPage })));
 const NotebookPage = lazy(() => import('../features/notebook/NotebookPage').then(module => ({ default: module.NotebookPage })));
+const LifeAreasPage = lazy(() => import('../features/lifeAreas/LifeAreasPage.jsx').then(module => ({ default: module.LifeAreasPage })));
 const Recipes = lazy(() => import('../features/recipes/Recipes').then(module => ({ default: module.Recipes })));
 const Groceries = lazy(() => import('../features/groceries/Groceries').then(module => ({ default: module.Groceries })));
 const WeightProgress = lazy(() => import('../features/weightProgress/WeightProgress.jsx').then(module => ({ default: module.WeightProgress })));
@@ -111,7 +112,7 @@ function AppContent() {
   }
 
   if (import.meta.env.DEV && route === '/design-system') {
-    return <Suspense fallback={<main className="p-6" role="status">Loading theme preview…</main>}><ThemePreview /></Suspense>;
+    return <Suspense fallback={<main className="p-6" role="status">Loading theme preview...</main>}><ThemePreview /></Suspense>;
   }
 
   if (route === '/login' || route === '/forgot-password' || route === '/reset-password') {
@@ -173,7 +174,14 @@ function AppContent() {
   if (route === '/notes' || route.startsWith('/notes/')) {
     const noteId = route.startsWith('/notes/') ? safeDecodePathSegment(route.slice('/notes/'.length)) : '';
     if (noteId === null || noteId.includes('/')) return <NotFoundPage />;
-    return <Suspense fallback={<RouteLoading label="Loading Notes..." />}><NotebookPage noteId={noteId} /></Suspense>;
+    const lifeItemId = route === '/notes' ? new URLSearchParams(window.location.search).get('lifeItemId') || '' : '';
+    return <Suspense fallback={<RouteLoading label="Loading Notes..." />}><NotebookPage key={user.id} noteId={noteId} lifeItemId={lifeItemId} /></Suspense>;
+  }
+
+  if (route === '/life-areas' || route.startsWith('/life-areas/')) {
+    const segments = route === '/life-areas' ? [] : route.slice('/life-areas/'.length).split('/').map(safeDecodePathSegment);
+    if (segments.some(segment => segment === null) || segments.length > 2) return <NotFoundPage />;
+    return <Suspense fallback={<RouteLoading label="Loading Life Areas..." />}><LifeAreasPage key={`${user.id}:${segments[0] || 'root'}`} areaId={segments[0] || ''} itemId={segments[1] || ''} /></Suspense>;
   }
 
   if (route === '/groceries') return <Suspense fallback={<RouteLoading label="Loading Groceries..." />}><Groceries key={user.id} /></Suspense>;
@@ -182,7 +190,7 @@ function AppContent() {
 
   if (route === '/finance' || route.startsWith('/finance/debt/')) return <Suspense fallback={<RouteLoading label="Loading Finance..." />}><FinancePage key={user.id} userId={user.id} /></Suspense>;
   if (route === '/account') return <Suspense fallback={<RouteLoading label="Loading Profile..." />}><ProfilePage key={user.id} /></Suspense>;
-  if (route === '/training') return <Suspense fallback={<main className="panel m-6 p-6" role="status">Loading Training…</main>}><Training key={user.id} /></Suspense>;
+  if (route === '/training') return <Suspense fallback={<main className="panel m-6 p-6" role="status">Loading Training...</main>}><Training key={user.id} /></Suspense>;
   if (route === '/driving-improvement') return <main className="panel m-6 p-6" role="status">Opening Driving Improvement...</main>;
   if (route === '/habit-improvement' || route === '/habit-improvement/backlog') return <Suspense fallback={<main className="panel m-6 p-6" role="status">Loading Habit Improvement...</main>}><HabitImprovementHome key={user.id} userId={user.id} view={route.endsWith('/backlog') ? 'backlog' : 'active'} /></Suspense>;
   if (route.startsWith('/habit-improvement/')) {

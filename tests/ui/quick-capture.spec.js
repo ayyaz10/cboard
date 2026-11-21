@@ -48,8 +48,9 @@ for (const width of [390, 1366]) {
     const fixture = await prepare(page, width);
     await page.goto('/cboard/board');
     await page.getByRole('button', { name: 'Quick Capture', exact: true }).click();
-    const title = page.getByLabel('Reminder title');
+    const title = page.getByRole('dialog').getByLabel('Title');
     await expect(title).toBeFocused();
+    await page.getByRole('button', { name: 'Reminder', exact: true }).click();
     await title.fill('Send the parcel');
     await page.locator('#quick-capture-reminder-date').fill('2031-06-12');
     await page.locator('#quick-capture-reminder-time').fill('14:30');
@@ -59,7 +60,7 @@ for (const width of [390, 1366]) {
     await expect(page.getByRole('dialog')).not.toBeVisible();
     await expect(page.getByRole('button', { name: 'Retry save' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Quick Capture', exact: true }).click();
-    await expect(page.getByLabel('Reminder title')).toHaveValue('');
+    await expect(page.getByRole('dialog').getByLabel('Title')).toHaveValue('');
     expect(fixture.creates).toHaveLength(1);
     expect(fixture.records.size).toBe(1);
     const expectedDueAt = await page.evaluate(() => new Date(2031, 5, 12, 14, 30).toISOString());
@@ -72,10 +73,11 @@ test('Quick Capture reports invalid fields and retries uncertain saves with the 
   const fixture = await prepare(page, 390);
   await page.goto('/cboard/board');
   await page.getByRole('button', { name: 'Quick Capture', exact: true }).click();
-  await page.getByLabel('Reminder title').fill('Keep retry payload');
+  await page.getByRole('button', { name: 'Reminder', exact: true }).click();
+  await page.getByRole('dialog').getByLabel('Title').fill('Keep retry payload');
   await page.locator('#quick-capture-reminder-date').fill('');
   await page.getByRole('button', { name: 'Save reminder' }).click();
-  await expect(page.getByRole('region', { name: 'Notifications alt+T' }).getByText('Enter a valid date and time.')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Notifications alt+T' }).getByText('Choose both a date and time for a reminder.')).toBeVisible();
   await page.locator('#quick-capture-reminder-date').fill('2031-06-12');
   await page.locator('#quick-capture-reminder-time').fill('14:30');
   fixture.loseResponse();

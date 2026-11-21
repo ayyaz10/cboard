@@ -27,3 +27,15 @@
 .today-attention-refresh { justify-self:start; min-height:2rem; font-size:.75rem; }
 .today-attention-card { grid-column:1; }
 @media(max-width:767px) { .my-life-header { align-items:flex-start; flex-direction:column; } .my-life-grid { grid-template-columns:minmax(0,1fr); } .life-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } .today-attention-card { grid-column:1/-1; } .today-attention-list li { align-items:flex-start; flex-direction:column; } }
+
+.my-life-areas-entry { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:1rem 1.1rem; margin:1rem 0; border:1px solid var(--border, #8884); border-radius:.85rem; background:var(--surface, rgba(127,127,127,.05)); }
+.my-life-areas-entry strong { display:block; }
+@media (max-width:560px) { .my-life-areas-entry { align-items:flex-start; flex-direction:column; } }
+
+.life-areas-summary { margin:1rem 0; }
+.life-areas-summary-list { list-style:none; padding:0; margin:.5rem 0 0; display:grid; gap:.45rem; }
+.life-areas-summary-list button { width:100%; display:flex; align-items:center; gap:.7rem; text-align:left; padding:.7rem; border:1px solid var(--border, #8884); border-radius:.6rem; color:inherit; background:transparent; cursor:pointer; }
+.life-areas-summary-list button:hover,.life-areas-summary-list button:focus-visible { border-color:var(--accent, #f97316); }
+.life-areas-summary-list button > span:first-child { font-size:1.4rem; }
+.life-areas-summary-list button > span:last-child { display:grid; gap:.2rem; }
+.life-areas-summary-list small { color:var(--text-muted, #777); }
